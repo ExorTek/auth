@@ -71,3 +71,31 @@ export function assertObject(value, name) {
     _fail(name, 'an object');
   }
 }
+
+/**
+ * Assert that `value` is either `undefined` or a plain object. Convenience
+ * wrapper for the very common "optional options object" pattern.
+ * @param {unknown} value
+ * @param {string}  name
+ */
+export function assertOptionalObject(value, name) {
+  if (value === undefined) {
+    return;
+  }
+  assertObject(value, name);
+}
+
+/**
+ * Assert that `value` is either a string or a byte buffer (`Buffer` or
+ * `Uint8Array`). The `@exortek/crypto` public surface uniformly accepts
+ * both representations for opaque data inputs (hash data, hmac secrets,
+ * encoder inputs, cipher plaintexts).
+ *
+ * @param {unknown} value
+ * @param {string}  name
+ */
+export function assertBytesOrString(value, name) {
+  if (typeof value !== 'string' && !Buffer.isBuffer(value) && !(value instanceof Uint8Array)) {
+    _fail(name, 'a string or Buffer');
+  }
+}

@@ -1,5 +1,5 @@
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertString } from '../internal/validate.js';
+import { assertBytesOrString, assertString } from '../internal/validate.js';
 
 /** Standard base64 alphabet (RFC 4648 §4), with optional `=` padding to a multiple of 4. */
 const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -21,13 +21,12 @@ const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
  * encode(Buffer.from([0xff, 0x00, 0xff]))      // '/wD/'
  */
 export function encode(input) {
-  if (typeof input === 'string') {
-    return Buffer.from(input, 'utf8').toString('base64');
-  }
-  if (Buffer.isBuffer(input) || input instanceof Uint8Array) {
-    return Buffer.from(input.buffer, input.byteOffset, input.byteLength).toString('base64');
-  }
-  throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'input must be a string or Buffer');
+  assertBytesOrString(input, 'input');
+  const buf =
+    typeof input === 'string'
+      ? Buffer.from(input, 'utf8')
+      : Buffer.from(input.buffer, input.byteOffset, input.byteLength);
+  return buf.toString('base64');
 }
 
 /**

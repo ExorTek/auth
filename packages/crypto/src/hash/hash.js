@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
+import { assertBytesOrString, assertOptionalObject } from '../internal/validate.js';
 
 /**
  * @typedef {'sha256' | 'sha384' | 'sha512' | 'sha1' | 'md5'} HashAlgorithm
@@ -41,19 +42,9 @@ const _SUPPORTED = new Set(SUPPORTED_HASHES);
  * hash('hello', { encoding: 'base64url' })// '...sha256 base64url...'
  */
 export function hash(data, options) {
-  _assertData(data);
+  assertBytesOrString(data, 'data');
   const { algo, encoding } = _resolveOptions(options);
   return crypto.createHash(algo).update(data).digest(encoding);
-}
-
-/**
- * @private
- * @param {unknown} data
- */
-function _assertData(data) {
-  if (typeof data !== 'string' && !Buffer.isBuffer(data) && !(data instanceof Uint8Array)) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'data must be a string or Buffer');
-  }
 }
 
 /**
@@ -62,9 +53,7 @@ function _assertData(data) {
  * @returns {{ algo: HashAlgorithm, encoding: 'hex' | 'base64' | 'base64url' }}
  */
 export function _resolveOptions(options) {
-  if (options !== undefined && (options === null || typeof options !== 'object' || Array.isArray(options))) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options must be an object');
-  }
+  assertOptionalObject(options, 'options');
   const algo = options?.algo ?? 'sha256';
   if (!_SUPPORTED.has(algo)) {
     throw new CryptoError(

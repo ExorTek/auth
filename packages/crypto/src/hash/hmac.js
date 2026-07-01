@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { CryptoError, ErrorCode } from '../errors.js';
+import { assertBytesOrString } from '../internal/validate.js';
 import { _resolveOptions } from './hash.js';
 
 /**
@@ -28,19 +28,8 @@ import { _resolveOptions } from './hash.js';
  * hmac(payload, key, { algo: 'sha512' })          // sha512 hex
  */
 export function hmac(data, secret, options) {
-  _assertBinaryOrString(data, 'data');
-  _assertBinaryOrString(secret, 'secret');
+  assertBytesOrString(data, 'data');
+  assertBytesOrString(secret, 'secret');
   const { algo, encoding } = _resolveOptions(options);
   return crypto.createHmac(algo, secret).update(data).digest(encoding);
-}
-
-/**
- * @private
- * @param {unknown} value
- * @param {string}  name
- */
-function _assertBinaryOrString(value, name) {
-  if (typeof value !== 'string' && !Buffer.isBuffer(value) && !(value instanceof Uint8Array)) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, `${name} must be a string or Buffer`);
-  }
 }
