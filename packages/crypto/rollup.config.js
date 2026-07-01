@@ -6,7 +6,7 @@ const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 
 export default createConfig(pkg, {
   entries: {
     index: 'src/index.js',
-    // hash: 'src/hash/index.js',
+    hash: 'src/hash/index.js',
     // cipher: 'src/cipher/index.js',
     encode: 'src/encode/index.js',
     random: 'src/random/index.js',
