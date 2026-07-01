@@ -1,0 +1,23 @@
+import { assertPositiveInt } from '../internal/validate.js';
+import { biasFreeSample } from '../internal/sample.js';
+
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+/**
+ * Bias-free alphanumeric random string.
+ *
+ * Samples uniformly from `[A-Za-z0-9]` (62 characters) using rejection
+ * sampling — no modulo bias. Nanoid-style identifiers: URL-safe,
+ * human-copyable, no separators.
+ *
+ * @param {number} length  Desired output length. Must be a positive integer.
+ * @returns {string}       Random string of exactly `length` characters from `[A-Za-z0-9]`.
+ * @throws {CryptoError}   With code `INVALID_ARGUMENT` if `length` is not a positive integer.
+ *
+ * @example
+ * alphanumeric(21) // 'V1StGXR8Z5jdHi6BmyTQ' — nanoid-style ID (~126 bits of entropy)
+ */
+export function alphanumeric(length) {
+  assertPositiveInt(length, 'length');
+  return biasFreeSample(ALPHABET, length);
+}
