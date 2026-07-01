@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+
+# Yarn (Berry) — keep cache/install state out
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage
+coverage/
+.nyc_output/
+lcov.info
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Env
+.env
+.env.*
+!.env.example
+
+# npm pack output (yarn npm pack, yarn pack)
+*.tgz
+
+# Claude Code / personal working notes
+/.claude
+skills-lock.json
+ARCHITECTURE.md
+CLAUDE.md
