@@ -1,0 +1,73 @@
+import { CryptoError, ErrorCode } from '../errors.js';
+
+/**
+ * @private
+ * Module-internal validation helpers used across the crypto package. Each
+ * helper throws `CryptoError(INVALID_ARGUMENT)` with a consistent, argument-
+ * named message so error surfaces stay uniform.
+ *
+ * NOT exported from the package public surface — the leading `internal/`
+ * segment marks it as implementation detail.
+ */
+
+function _fail(name, description) {
+  throw new CryptoError(ErrorCode.INVALID_ARGUMENT, `${name} must be ${description}`);
+}
+
+/**
+ * Assert that `value` is a non-negative safe integer (`0, 1, 2, …`).
+ * @param {unknown} value
+ * @param {string}  name   Argument name to include in the error message.
+ * @returns {void}
+ * @throws {CryptoError}
+ */
+export function assertNonNegativeInt(value, name) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    _fail(name, 'a non-negative safe integer');
+  }
+}
+
+/**
+ * Assert that `value` is a strictly positive safe integer (`1, 2, 3, …`).
+ * @param {unknown} value
+ * @param {string}  name
+ */
+export function assertPositiveInt(value, name) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    _fail(name, 'a positive integer');
+  }
+}
+
+/**
+ * Assert that `value` fits in a 48-bit unsigned integer (`0 … 2^48 − 1`).
+ * Used for Unix millisecond timestamps in UUID v7 / ULID.
+ * @param {unknown} value
+ * @param {string}  name
+ */
+export function assertUint48(value, name) {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 0xffffffffffff) {
+    _fail(name, 'a non-negative safe integer ≤ 2^48 − 1 (Unix ms since epoch)');
+  }
+}
+
+/**
+ * Assert that `value` is a string (may be empty).
+ * @param {unknown} value
+ * @param {string}  name
+ */
+export function assertString(value, name) {
+  if (typeof value !== 'string') {
+    _fail(name, 'a string');
+  }
+}
+
+/**
+ * Assert that `value` is a plain object (not `null`, not an array, not a primitive).
+ * @param {unknown} value
+ * @param {string}  name
+ */
+export function assertObject(value, name) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    _fail(name, 'an object');
+  }
+}

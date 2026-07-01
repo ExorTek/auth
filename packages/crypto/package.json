@@ -1,0 +1,74 @@
+{
+  "name": "@exortek/crypto",
+  "version": "0.0.1",
+  "description": "Zero-dependency cryptographic primitives — hash, cipher, encode, random — built on node:crypto",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./hash": {
+      "types": "./dist/hash.d.ts",
+      "import": "./dist/hash.mjs",
+      "require": "./dist/hash.cjs"
+    },
+    "./cipher": {
+      "types": "./dist/cipher.d.ts",
+      "import": "./dist/cipher.mjs",
+      "require": "./dist/cipher.cjs"
+    },
+    "./encode": {
+      "types": "./dist/encode.d.ts",
+      "import": "./dist/encode.mjs",
+      "require": "./dist/encode.cjs"
+    },
+    "./random": {
+      "types": "./dist/random.d.ts",
+      "import": "./dist/random.mjs",
+      "require": "./dist/random.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "crypto",
+    "hash",
+    "hmac",
+    "cipher",
+    "aes",
+    "rsa",
+    "ecdh",
+    "random",
+    "ulid",
+    "uuid"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ExorTek/auth",
+    "directory": "packages/crypto"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
