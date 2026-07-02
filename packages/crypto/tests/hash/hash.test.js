@@ -45,6 +45,14 @@ describe('hash', () => {
     assert.deepEqual(Buffer.from(hex, 'hex'), Buffer.from(b64u, 'base64url'));
   });
 
+  it("encoding: 'buffer' returns raw digest bytes", () => {
+    const hex = hash('hello');
+    const buf = hash('hello', { encoding: 'buffer' });
+    assert.ok(Buffer.isBuffer(buf));
+    assert.equal(buf.length, 32); // SHA-256 = 32 bytes
+    assert.equal(buf.toString('hex'), hex);
+  });
+
   it('is deterministic (same input → same output)', () => {
     assert.equal(hash('same data'), hash('same data'));
   });

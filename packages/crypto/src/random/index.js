@@ -18,7 +18,7 @@ import { token } from './token.js';
  *
  * @namespace
  */
-export const random = {
+export const random = Object.freeze({
   bytes,
   hex,
   base64url,
@@ -34,7 +34,7 @@ export const random = {
   ulid,
   isULID,
   token,
-};
+});
 
 export {
   bytes,

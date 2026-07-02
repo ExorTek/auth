@@ -1,6 +1,10 @@
 import { CryptoError, ErrorCode } from '../errors.js';
 
 /**
+ * @typedef {import('node:crypto').KeyObject} KeyObject
+ */
+
+/**
  * @private
  * Module-internal validation helpers used across the crypto package. Each
  * helper throws `CryptoError(INVALID_ARGUMENT)` with a consistent, argument-
@@ -97,5 +101,20 @@ export function assertOptionalObject(value, name) {
 export function assertBytesOrString(value, name) {
   if (typeof value !== 'string' && !Buffer.isBuffer(value) && !(value instanceof Uint8Array)) {
     _fail(name, 'a string or Buffer');
+  }
+}
+
+/**
+ * Assert that `key` is a Node `KeyObject` of the expected type
+ * (`'secret'`, `'public'`, or `'private'`).
+ *
+ * @param {unknown} key
+ * @param {'secret' | 'public' | 'private'} expectedType
+ * @param {string}  name
+ * @returns {asserts key is KeyObject}
+ */
+export function assertKeyObject(key, expectedType, name) {
+  if (!key || typeof key !== 'object' || key.type !== expectedType) {
+    throw new CryptoError(ErrorCode.INVALID_KEY, `${name} must be a ${expectedType} KeyObject`);
   }
 }

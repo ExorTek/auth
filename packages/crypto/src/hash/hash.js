@@ -9,9 +9,11 @@ import { assertBytesOrString, assertOptionalObject } from '../internal/validate.
 /**
  * @typedef {object} HashOptions
  * @property {HashAlgorithm} [algo='sha256']  Digest algorithm. See {@link SUPPORTED_HASHES}.
- * @property {'hex' | 'base64' | 'base64url'} [encoding='hex']
+ * @property {'hex' | 'base64' | 'base64url' | 'buffer'} [encoding='hex']
  *   Output encoding. Use `'hex'` for stored password/token hashes (developer-
- *   friendly, comparable), `'base64url'` for JWT / URL contexts.
+ *   friendly, comparable), `'base64url'` for JWT / URL contexts, and
+ *   `'buffer'` for raw digest bytes (key derivation, envelope construction,
+ *   further chained hashing).
  */
 
 /** Whitelist of supported hash algorithms. */
@@ -31,7 +33,8 @@ const _SUPPORTED = new Set(SUPPORTED_HASHES);
  *
  * @param {string | Buffer | Uint8Array} data
  * @param {HashOptions}                  [options]
- * @returns {string}     Encoded digest (hex by default).
+ * @returns {string | Buffer}  Encoded digest (hex string by default);
+ *                             `encoding: 'buffer'` returns raw digest bytes.
  * @throws {CryptoError} With code `INVALID_ARGUMENT` if `data` is neither a string nor
  *                       a Buffer, or `UNSUPPORTED_ALGORITHM` if `options.algo` is not
  *                       in {@link SUPPORTED_HASHES}.
@@ -40,11 +43,13 @@ const _SUPPORTED = new Set(SUPPORTED_HASHES);
  * hash('hello world')                     // '...sha256 hex...'
  * hash('hello', { algo: 'sha512' })       // '...sha512 hex...'
  * hash('hello', { encoding: 'base64url' })// '...sha256 base64url...'
+ * hash('hello', { encoding: 'buffer' })   // Buffer<...>
  */
 export function hash(data, options) {
   assertBytesOrString(data, 'data');
   const { algo, encoding } = _resolveOptions(options);
-  return crypto.createHash(algo).update(data).digest(encoding);
+  const digest = crypto.createHash(algo).update(data);
+  return encoding === 'buffer' ? digest.digest() : digest.digest(encoding);
 }
 
 /**
@@ -62,10 +67,10 @@ export function _resolveOptions(options) {
     );
   }
   const encoding = options?.encoding ?? 'hex';
-  if (encoding !== 'hex' && encoding !== 'base64' && encoding !== 'base64url') {
+  if (encoding !== 'hex' && encoding !== 'base64' && encoding !== 'base64url' && encoding !== 'buffer') {
     throw new CryptoError(
       ErrorCode.INVALID_ARGUMENT,
-      "encoding must be 'hex', 'base64', or 'base64url'",
+      "encoding must be 'hex', 'base64', 'base64url', or 'buffer'",
     );
   }
   return { algo, encoding };

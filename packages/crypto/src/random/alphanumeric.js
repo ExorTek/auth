@@ -1,7 +1,6 @@
 import { assertPositiveInt } from '../internal/validate.js';
 import { biasFreeSample } from '../internal/sample.js';
-
-const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+import { ALPHANUM } from '../internal/alphabets.js';
 
 /**
  * Bias-free alphanumeric random string.
@@ -19,5 +18,5 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
  */
 export function alphanumeric(length) {
   assertPositiveInt(length, 'length');
-  return biasFreeSample(ALPHABET, length);
+  return biasFreeSample(ALPHANUM, length);
 }

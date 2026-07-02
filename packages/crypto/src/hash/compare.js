@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { CryptoError, ErrorCode } from '../errors.js';
+import { toBuffer } from '../internal/bytes.js';
 
 /**
  * Timing-safe equality check for hash digests, tokens, MACs and any other
@@ -30,29 +30,10 @@ import { CryptoError, ErrorCode } from '../errors.js';
  * if (!compare(receivedSig, hmac(payload, key))) throw new Error('bad signature')
  */
 export function compare(a, b) {
-  const bufA = _toBuffer(a, 'a');
-  const bufB = _toBuffer(b, 'b');
+  const bufA = toBuffer(a, 'a');
+  const bufB = toBuffer(b, 'b');
   if (bufA.length !== bufB.length) {
     return false;
   }
   return crypto.timingSafeEqual(bufA, bufB);
-}
-
-/**
- * @private
- * @param {unknown} value
- * @param {string}  name
- * @returns {Buffer}
- */
-function _toBuffer(value, name) {
-  if (typeof value === 'string') {
-    return Buffer.from(value, 'utf8');
-  }
-  if (Buffer.isBuffer(value)) {
-    return value;
-  }
-  if (value instanceof Uint8Array) {
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-  }
-  throw new CryptoError(ErrorCode.INVALID_ARGUMENT, `${name} must be a string or Buffer`);
 }

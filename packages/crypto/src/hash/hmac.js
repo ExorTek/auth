@@ -19,7 +19,8 @@ import { _resolveOptions } from './hash.js';
  * @param {string | Buffer | Uint8Array} data
  * @param {string | Buffer | Uint8Array} secret  Key material.
  * @param {import('./hash.js').HashOptions} [options]
- * @returns {string}     Encoded MAC (hex by default).
+ * @returns {string | Buffer}  Encoded MAC (hex string by default);
+ *                             `encoding: 'buffer'` returns raw MAC bytes.
  * @throws {CryptoError} With code `INVALID_ARGUMENT` if `data` or `secret` is invalid,
  *                       or `UNSUPPORTED_ALGORITHM` if `options.algo` is not recognised.
  *
@@ -31,5 +32,6 @@ export function hmac(data, secret, options) {
   assertBytesOrString(data, 'data');
   assertBytesOrString(secret, 'secret');
   const { algo, encoding } = _resolveOptions(options);
-  return crypto.createHmac(algo, secret).update(data).digest(encoding);
+  const mac = crypto.createHmac(algo, secret).update(data);
+  return encoding === 'buffer' ? mac.digest() : mac.digest(encoding);
 }

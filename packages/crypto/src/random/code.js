@@ -1,11 +1,7 @@
 import { assertString } from '../internal/validate.js';
 import { CryptoError, ErrorCode } from '../errors.js';
 import { biasFreeSample } from '../internal/sample.js';
-
-const ALPHANUM = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-const UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const LOWER = 'abcdefghijklmnopqrstuvwxyz';
-const DIGITS = '0123456789';
+import { ALPHANUM, DIGITS, LOWER, UPPER } from '../internal/alphabets.js';
 
 // Cache alphabet per placeholder to avoid the switch on every character.
 const PLACEHOLDERS = {

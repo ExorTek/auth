@@ -1,11 +1,6 @@
 import crypto from 'node:crypto';
 import { assertUint48 } from '../internal/validate.js';
-
-/**
- * Crockford base32 alphabet — RFC-less but widely accepted ULID standard.
- * 32 chars, deliberately omits `I`, `L`, `O`, `U` (visual ambiguity / accidental profanity).
- */
-const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+import { CROCKFORD as ALPHABET } from '../internal/alphabets.js';
 
 /** Matches a 26-char ULID, case-insensitive. Character class excludes `I`, `L`, `O`, `U`. */
 const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/i;

@@ -1,7 +1,6 @@
 import { assertPositiveInt } from '../internal/validate.js';
 import { biasFreeSample } from '../internal/sample.js';
-
-const ALPHABET = '0123456789';
+import { DIGITS } from '../internal/alphabets.js';
 
 /**
  * Bias-free numeric random string.
@@ -20,5 +19,5 @@ const ALPHABET = '0123456789';
  */
 export function numeric(length) {
   assertPositiveInt(length, 'length');
-  return biasFreeSample(ALPHABET, length);
+  return biasFreeSample(DIGITS, length);
 }

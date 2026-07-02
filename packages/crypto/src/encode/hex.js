@@ -1,5 +1,6 @@
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertString } from '../internal/validate.js';
+import { assertString } from '../internal/validate.js';
+import { toBuffer } from '../internal/bytes.js';
 
 /** Hex digits, case-insensitive. Length must be even (each byte = 2 chars). */
 const HEX_RE = /^([0-9a-fA-F]{2})*$/;
@@ -19,12 +20,7 @@ const HEX_RE = /^([0-9a-fA-F]{2})*$/;
  * encode(Buffer.from([0xde, 0xad, 0xbe, 0xef]))  // 'deadbeef'
  */
 export function encode(input) {
-  assertBytesOrString(input, 'input');
-  const buf =
-    typeof input === 'string'
-      ? Buffer.from(input, 'utf8')
-      : Buffer.from(input.buffer, input.byteOffset, input.byteLength);
-  return buf.toString('hex');
+  return toBuffer(input, 'input').toString('hex');
 }
 
 /**

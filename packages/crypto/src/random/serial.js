@@ -1,8 +1,8 @@
 import { assertObject, assertPositiveInt, assertString } from '../internal/validate.js';
 import { biasFreeSample } from '../internal/sample.js';
+import { UPPER_ALPHANUM } from '../internal/alphabets.js';
 
 // Uppercase alphanumeric — human-readable, common invoice/tracking convention.
-const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
 /**
  * @typedef {object} SerialOptions
@@ -63,7 +63,7 @@ export function serial(options) {
     parts.push(String(new Date().getFullYear()));
   }
   for (let i = 0; i < blocks; i++) {
-    parts.push(biasFreeSample(ALPHABET, blockLen));
+    parts.push(biasFreeSample(UPPER_ALPHANUM, blockLen));
   }
   return parts.join(separator);
 }
