@@ -37,7 +37,7 @@ export function createConfig(pkg, options = {}) {
         exports: 'named',
       },
       external,
-      plugins: [nodeResolve(), minify],
+      plugins: [nodeResolve()],
     },
   ]);
 }
