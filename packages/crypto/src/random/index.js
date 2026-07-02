@@ -1,14 +1,26 @@
 import { bytes } from './bytes.js';
 import { hex } from './hex.js';
 import { base64url } from './base64url.js';
+import { base64 } from './base64.js';
+import { crockford } from './crockford.js';
+import { base58 } from './base58.js';
 import { alphanumeric } from './alphanumeric.js';
 import { numeric } from './numeric.js';
 import { pin } from './pin.js';
 import { code } from './code.js';
 import { serial } from './serial.js';
-import { uuid4, uuid7, uuid5, isUUID, NAMESPACE_DNS, NAMESPACE_URL, NAMESPACE_OID, NAMESPACE_X500 } from './uuid.js';
+import {
+  uuid4,
+  uuid7,
+  uuid5,
+  isUUID,
+  NAMESPACE_DNS,
+  NAMESPACE_URL,
+  NAMESPACE_OID,
+  NAMESPACE_X500,
+} from './uuid.js';
 import { ulid, isULID } from './ulid.js';
-import { token } from './token.js';
+import { token, TOKEN_ENCODINGS } from './token.js';
 
 /**
  * Cryptographically secure random helpers.
@@ -22,6 +34,9 @@ export const random = Object.freeze({
   bytes,
   hex,
   base64url,
+  base64,
+  crockford,
+  base58,
   alphanumeric,
   numeric,
   pin,
@@ -40,6 +55,9 @@ export {
   bytes,
   hex,
   base64url,
+  base64,
+  crockford,
+  base58,
   alphanumeric,
   numeric,
   pin,
@@ -52,6 +70,7 @@ export {
   ulid,
   isULID,
   token,
+  TOKEN_ENCODINGS,
   NAMESPACE_DNS,
   NAMESPACE_URL,
   NAMESPACE_OID,

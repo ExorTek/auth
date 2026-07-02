@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { token } from '../../src/index.js';
+import { token, TOKEN_ENCODINGS } from '../../src/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 const URL_SAFE_BODY = /^[A-Za-z0-9_-]+$/;
@@ -78,5 +78,62 @@ describe('token', () => {
   it('allows arbitrary separator strings (multi-char)', () => {
     const t = token(16, { prefix: 'org', separator: '::' });
     assert.ok(t.startsWith('org::'));
+  });
+
+  it('rejects an empty separator string', () => {
+    assert.throws(
+      () => token(16, { prefix: 'usr', separator: '' }),
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+  });
+});
+
+describe('token — encodings', () => {
+  it('exports TOKEN_ENCODINGS listing every supported encoding', () => {
+    assert.deepEqual([...TOKEN_ENCODINGS].sort(), [
+      'base58',
+      'base64',
+      'base64url',
+      'crockford',
+      'hex',
+    ]);
+  });
+
+  it("encoding: 'hex' produces lowercase hex", () => {
+    const t = token(8, { encoding: 'hex' });
+    assert.equal(t.length, 16);
+    assert.match(t, /^[0-9a-f]+$/);
+  });
+
+  it("encoding: 'base64' produces padded base64", () => {
+    const t = token(16, { encoding: 'base64' });
+    assert.equal(t.length, 24);
+    assert.match(t, /^[A-Za-z0-9+/]+=*$/);
+  });
+
+  it("encoding: 'crockford' produces sortable Crockford base32", () => {
+    const t = token(16, { encoding: 'crockford' });
+    assert.equal(t.length, 26); // ceil(16 * 8 / 5)
+    assert.match(t, /^[0-9A-HJKMNP-TV-Z]+$/);
+  });
+
+  it("encoding: 'base58' produces Bitcoin base58", () => {
+    const t = token(16, { encoding: 'base58' });
+    assert.match(t, /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/);
+    assert.doesNotMatch(t, /[0OIl]/);
+  });
+
+  it('combines prefix + encoding', () => {
+    const t = token(8, { prefix: 'ID', encoding: 'crockford' });
+    assert.ok(t.startsWith('ID_'));
+    const body = t.slice('ID_'.length);
+    assert.equal(body.length, 13); // ceil(8 * 8 / 5)
+  });
+
+  it('rejects an unknown encoding', () => {
+    assert.throws(
+      () => token(16, { encoding: 'base32' }),
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+    );
   });
 });

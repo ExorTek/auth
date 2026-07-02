@@ -22,3 +22,10 @@ export const UPPER_ALPHANUM = UPPER + DIGITS;
  * `L`, `O`, `U` for visual clarity and to avoid accidental profanity.
  */
 export const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/**
+ * Bitcoin base58 alphabet. Omits `0`, `O`, `I`, `l` to avoid
+ * look-alike confusion. Common in crypto-wallet address formats and
+ * short human-readable identifiers.
+ */
+export const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
