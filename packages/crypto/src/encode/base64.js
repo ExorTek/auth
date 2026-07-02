@@ -1,6 +1,7 @@
 import { CryptoError, ErrorCode } from '../errors.js';
 import { assertString } from '../internal/validate.js';
 import { toBuffer } from '../internal/bytes.js';
+import crypto from 'node:crypto';
 
 /** Standard base64 alphabet (RFC 4648 §4), with optional `=` padding to a multiple of 4. */
 const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -45,4 +46,12 @@ export function decode(input) {
     throw new CryptoError(ErrorCode.INVALID_ENCODING, 'input is not a valid base64 string');
   }
   return Buffer.from(input, 'base64');
+}
+
+export function randomBase64(size) {
+  if (size < 0) {
+    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'size must be a non-negative integer');
+  }
+
+  return crypto.randomBytes(size).toString('base64');
 }

@@ -2,15 +2,6 @@ import { assertObject, assertPositiveInt } from '../internal/validate.js';
 import { numeric } from './numeric.js';
 
 /**
- * Check whether `digits` is a "weak" PIN — i.e., trivially guessable.
- *
- * Rejects:
- *   • all identical digits: `0000`, `1111`, …, `9999`
- *   • ascending runs (wraps `9 → 0`): `1234`, `5678`, `9012`, …
- *   • descending runs (wraps `0 → 9`): `4321`, `9876`, `1098`, …
- *
- * Weakness only makes sense for length ≥ 3; shorter inputs return `false`.
- *
  * @private
  * @param {string} digits
  * @returns {boolean}
@@ -62,21 +53,10 @@ function _isWeak(digits) {
  */
 
 /**
- * Cryptographically secure numeric PIN.
- *
- * Delegates to bias-free {@link numeric} sampling; by default filters out
- * "weak" PINs (all-same digit or strictly sequential) so a fresh sample is
- * drawn until the result is non-trivial. Rejection rate is < 1% for length ≥ 4.
- *
  * @param {number}     length     Number of digits. Must be a positive integer.
  * @param {PinOptions} [options]
  * @returns {string}              Random PIN of length `length`.
  * @throws {CryptoError}          With code `INVALID_ARGUMENT` on invalid inputs.
- *
- * @example
- * pin(4)                          // '3729' — never '0000', '1111', '1234', …
- * pin(6)                          // '294816'
- * pin(4, { avoidWeak: false })    // unfiltered uniform numeric
  */
 export function pin(length, options) {
   assertPositiveInt(length, 'length');

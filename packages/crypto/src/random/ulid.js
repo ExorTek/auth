@@ -58,37 +58,12 @@ function _encodeRandom(n) {
 }
 
 /**
- * ULID — Universally Unique Lexicographically Sortable Identifier.
- *
- * 26-character Crockford base32 string: 10 timestamp chars (48-bit ms epoch)
- * followed by 16 randomness chars (80 bits of entropy). Lexicographically
- * sortable by creation time, URL-safe, case-insensitive on read.
- *
- * **Strict monotonicity guarantee** (default path): within a single process,
- * successive `ulid()` calls are strictly ordered (`ulid() < ulid()` always),
- * even at the same millisecond. Same-ms calls increment the 80-bit random
- * tail by 1 (per the ULID spec's "Monotonicity" section). On the astronomical
- * chance of an 80-bit overflow inside one ms, we bump the timestamp by 1 ms
- * and re-roll the random tail. System clock regressions are ignored — we
- * continue issuing ULIDs from the last observed timestamp.
- *
- * Passing an explicit `time` (backfill, event-sourced data) bypasses the
- * monotonic counter — same-`time` calls are unordered by spec.
- *
  * @param {number} [time]  Optional override timestamp in Unix milliseconds (UTC).
  *                         Must be a non-negative safe integer ≤ 2^48 − 1.
  *                         Defaults to `Date.now()`. Use `date.getTime()` for a `Date`.
  * @returns {string}       26-char uppercase Crockford base32 ULID.
  * @throws {CryptoError}   With code `INVALID_ARGUMENT` if `time` is provided but
  *                         is not a non-negative integer within the 48-bit range.
- *
- * @example
- * ulid()                                   // '01ARZ3NDEKTSV4RRFFQ69G5FAV'
- * ulid() < ulid() < ulid()                 // true (even within the same ms)
- *
- * @example
- * ulid(event.createdAt.getTime())          // backfill with event time
- *
  * @see https://github.com/ulid/spec
  */
 export function ulid(time) {
@@ -126,17 +101,8 @@ export function ulid(time) {
 }
 
 /**
- * Returns true if `value` is a string that matches the 26-char ULID format
- * (Crockford base32, case-insensitive). Does not validate the timestamp
- * portion is within a reasonable range.
- *
  * @param {unknown} value
  * @returns {boolean}
- *
- * @example
- * isULID(ulid())                            // true
- * isULID('01ARZ3NDEKTSV4RRFFQ69G5FAV')      // true
- * isULID('not-a-ulid')                      // false
  */
 export function isULID(value) {
   return typeof value === 'string' && ULID_RE.test(value);
