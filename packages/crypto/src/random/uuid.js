@@ -9,14 +9,27 @@ import { decode as hexDecode } from '../encode/hex.js';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * Returns true if `value` is a string matching the canonical UUID format
+ * (`8-4-4-4-12` lowercase or uppercase hex). Does not validate the version
+ * or variant bits — accepts any well-formed UUID (nil, v1–v8, custom).
+ *
  * @param {unknown} value
  * @returns {boolean}
+ *
+ * @example
+ * isUUID(uuid4())                                  // true
+ * isUUID('not-a-uuid')                             // false
+ * isUUID('00000000-0000-0000-0000-000000000000')   // true (nil UUID)
  */
 export function isUUID(value) {
   return typeof value === 'string' && UUID_RE.test(value);
 }
 
 /**
+ * Format a 16-byte buffer as a canonical UUID string (`8-4-4-4-12`, lowercase hex).
+ * Internal helper shared by `uuid5` and `uuid7` — `_` prefix marks it as
+ * module-private (not exported, not part of the public API).
+ *
  * @private
  * @param {Buffer | Uint8Array} bytes  Exactly 16 bytes.
  * @returns {string}
@@ -125,11 +138,32 @@ export function uuid7(time) {
 }
 
 /**
+ * RFC 9562 UUID v5 — namespaced, SHA-1 based, deterministic.
+ *
+ * Hashes `namespace + name` with SHA-1 and shapes the digest into a UUID
+ * (sets version `0101` and variant `10` bits per spec). Calling with the
+ * same `(namespace, name)` pair always returns the same UUID — useful for
+ * content-addressable IDs, dedup keys, idempotency tokens.
+ *
+ * Use one of the predefined namespace constants ({@link NAMESPACE_DNS},
+ * {@link NAMESPACE_URL}, {@link NAMESPACE_OID}, {@link NAMESPACE_X500}) or
+ * a custom namespace UUID generated once for your domain.
+ *
+ * Note: SHA-1 is used per the v5 spec; v5 IDs are deterministic identifiers,
+ * not cryptographic commitments — do not rely on SHA-1's collision resistance
+ * for security-sensitive use cases. For unique random IDs use {@link uuid4}.
+ *
  * @param {string} namespace  Namespace UUID in canonical 8-4-4-4-12 form.
  * @param {string} name       Name to hash within the namespace.
  * @returns {string}          Deterministic lowercase UUID (8-4-4-4-12) with v5 layout.
  * @throws {CryptoError}      With code `INVALID_ARGUMENT` if `namespace` is not a valid UUID string
  *                            or `name` is not a string.
+ *
+ * @example
+ * import { uuid5, NAMESPACE_DNS } from '@exortek/crypto/random'
+ * const id = uuid5(NAMESPACE_DNS, 'user@example.com')
+ * // → always the same UUID for the same email
+ *
  * @see https://www.rfc-editor.org/rfc/rfc9562#name-uuid-version-5
  */
 export function uuid5(namespace, name) {

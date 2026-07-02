@@ -2,8 +2,6 @@ import { assertObject, assertPositiveInt, assertString } from '../internal/valid
 import { biasFreeSample } from '../internal/sample.js';
 import { UPPER_ALPHANUM } from '../internal/alphabets.js';
 
-// Uppercase alphanumeric — human-readable, common invoice/tracking convention.
-
 /**
  * @typedef {object} SerialOptions
  * @property {string}  [prefix]              Literal string prepended before any random blocks (e.g. `'INV'`, `'ORD'`).
@@ -42,11 +40,10 @@ import { UPPER_ALPHANUM } from '../internal/alphabets.js';
  * @example
  * serial()  // → 'A3F9-B2C1'  (no prefix, no year, default 2 blocks × 4 chars)
  */
-export function serial(options) {
-  if (options !== undefined) {
-    assertObject(options, 'options');
-  }
-  const { prefix, year = false, blocks = 2, blockLen = 4, separator = '-' } = options ?? {};
+export function serial(options = {}) {
+  assertObject(options, 'options');
+
+  const { prefix, year = false, blocks = 2, blockLen = 4, separator = '-' } = options;
 
   if (prefix !== undefined) {
     assertString(prefix, 'options.prefix');
@@ -56,6 +53,7 @@ export function serial(options) {
   assertString(separator, 'options.separator');
 
   const parts = [];
+
   if (prefix) {
     parts.push(prefix);
   }
@@ -65,5 +63,6 @@ export function serial(options) {
   for (let i = 0; i < blocks; i++) {
     parts.push(biasFreeSample(UPPER_ALPHANUM, blockLen));
   }
+
   return parts.join(separator);
 }
