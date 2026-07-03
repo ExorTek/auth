@@ -14,22 +14,22 @@
       "require": "./dist/index.cjs"
     },
     "./hash": {
-      "types": "./dist/hash.d.ts",
+      "types": "./dist/hash/index.d.ts",
       "import": "./dist/hash.mjs",
       "require": "./dist/hash.cjs"
     },
     "./cipher": {
-      "types": "./dist/cipher.d.ts",
+      "types": "./dist/cipher/index.d.ts",
       "import": "./dist/cipher.mjs",
       "require": "./dist/cipher.cjs"
     },
     "./encode": {
-      "types": "./dist/encode.d.ts",
+      "types": "./dist/encode/index.d.ts",
       "import": "./dist/encode.mjs",
       "require": "./dist/encode.cjs"
     },
     "./random": {
-      "types": "./dist/random.d.ts",
+      "types": "./dist/random/index.d.ts",
       "import": "./dist/random.mjs",
       "require": "./dist/random.cjs"
     }
