@@ -62,7 +62,18 @@ export const NAMESPACE_OID = '6ba7b812-9dad-11d1-80b4-00c04fd430c8';
 export const NAMESPACE_X500 = '6ba7b814-9dad-11d1-80b4-00c04fd430c8';
 
 /**
+ * RFC 9562 UUID v4 — fully random.
+ *
+ * Thin wrapper over `crypto.randomUUID()`. 128 bits total: 122 unpredictable,
+ * 6 reserved for version (`0100`) and variant (`10`) tags. Use this when you
+ * need an opaque identifier with no ordering guarantees (session IDs,
+ * request IDs, anything where sortability does not matter).
+ *
  * @returns {string}  Lowercase canonical UUID (8-4-4-4-12), e.g. `'550e8400-e29b-41d4-a716-446655440000'`.
+ *
+ * @example
+ * const sessionId = uuid4()
+ *
  * @see https://www.rfc-editor.org/rfc/rfc9562#name-uuid-version-4
  */
 export function uuid4() {
@@ -73,12 +84,39 @@ let _lastMs = -1;
 let _seq = 0;
 
 /**
+ * RFC 9562 UUID v7 — time-ordered, k-sortable.
+ *
+ * Layout: 48-bit Unix millisecond timestamp || 4-bit version (`0111`) ||
+ * 32-bit monotonic sequence (spread across bytes 6–10) || 2-bit variant (`10`) ||
+ * 42-bit random. Lexicographically sortable by creation time — excellent
+ * database primary key (B-tree friendly, no page-split storms like fully
+ * random v4).
+ *
+ * **Strict monotonicity guarantee** (default path): within a single process,
+ * successive `uuid7()` calls are strictly ordered (`uuid7() < uuid7()`
+ * always), even when invoked at the same millisecond. On 32-bit counter
+ * overflow the timestamp is bumped by one ms to preserve ordering. System
+ * clock regressions are ignored — we continue issuing UUIDs from the last
+ * observed timestamp.
+ *
+ * Passing an explicit `time` bypasses the monotonic counter — useful for
+ * backfilling historical records or event-sourced systems where event-time
+ * differs from receive-time. Same-`time` calls are unordered.
+ *
  * @param {number} [time]  Optional override timestamp in Unix milliseconds (UTC).
  *                         Must be a non-negative integer ≤ 2^48 − 1.
  *                         Defaults to `Date.now()`. Use `date.getTime()` for a `Date`.
  * @returns {string}       Lowercase canonical UUID (8-4-4-4-12) with v7 layout.
  * @throws {CryptoError}   With code `INVALID_ARGUMENT` if `time` is provided but
  *                         is not a non-negative integer within the 48-bit range.
+ *
+ * @example
+ * uuid7()                                  // 'now', strict monotonic
+ * uuid7() < uuid7() < uuid7()              // true (even within the same ms)
+ *
+ * @example
+ * uuid7(event.createdAt.getTime())         // backfill with event time
+ *
  * @see https://www.rfc-editor.org/rfc/rfc9562#name-uuid-version-7
  */
 export function uuid7(time) {

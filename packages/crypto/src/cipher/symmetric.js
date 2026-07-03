@@ -36,11 +36,25 @@ import { SYMMETRIC, SYMMETRIC_ALGOS } from './algorithms.js';
  * returned alongside the ciphertext and must be supplied to
  * {@link decryptSymmetric}.
  *
+ * Bind the ciphertext to non-secret context (user id, transaction id,
+ * request id, …) by passing `options.aad`; anyone flipping that context
+ * during transit will make decryption fail.
+ *
  * @param {string | Buffer | Uint8Array} data
  * @param {KeyObject}         key
  * @param {SymmetricOptions}  [options]
  * @returns {EncryptResult}
- * @throws {CryptoError}
+ * @throws {CryptoError}   With code `INVALID_ARGUMENT` for bad inputs,
+ *                         `INVALID_KEY` for non-secret keys, or
+ *                         `UNSUPPORTED_ALGORITHM` for unknown `options.algo`.
+ *
+ * @example
+ * const key = await generateKey()
+ * const { ciphertext, iv, tag } = encryptSymmetric('hello', key)
+ *
+ * @example
+ * // AAD binds ciphertext to context — tag verifies both together.
+ * encryptSymmetric(payload, key, { aad: `user:${userId}` })
  */
 export function encryptSymmetric(data, key, options) {
   assertBytesOrString(data, 'data');
@@ -73,11 +87,27 @@ export function encryptSymmetric(data, key, options) {
 /**
  * Decrypt a symmetric ciphertext.
  *
+ * For AEAD modes (`aes-256-gcm`, `chacha20-poly1305`), integrity is checked
+ * BEFORE any plaintext is produced — a bad tag, tampered ciphertext, wrong
+ * key or altered AAD all raise `CryptoError(DECRYPT_FAILED)` with no side
+ * channel leak.
+ *
  * @param {Buffer | Uint8Array} ciphertext
  * @param {KeyObject}           key
  * @param {DecryptOptions}      options   `iv` (and `tag` for AEAD) are mandatory.
  * @returns {Buffer}                       Plaintext bytes.
- * @throws {CryptoError} With code `DECRYPT_FAILED` on tampering / wrong key / bad tag.
+ * @throws {CryptoError}   With code:
+ *   - `INVALID_ARGUMENT` if `ciphertext`, `iv` or (AEAD) `tag` are missing / wrong type
+ *   - `INVALID_KEY` if `key` is not a secret KeyObject
+ *   - `UNSUPPORTED_ALGORITHM` for unknown `options.algo`
+ *   - `DECRYPT_FAILED` on any authentication failure
+ *
+ * @example
+ * const plaintext = decryptSymmetric(ciphertext, key, { iv, tag })
+ *
+ * @example
+ * // AAD verification — same AAD as encryption or the tag check fails:
+ * decryptSymmetric(ct, key, { iv, tag, aad: `user:${userId}` })
  */
 export function decryptSymmetric(ciphertext, key, options) {
   if (!(ciphertext instanceof Uint8Array)) {
@@ -115,12 +145,19 @@ export function decryptSymmetric(ciphertext, key, options) {
 /**
  * Encrypt `data` and pack `iv || tag || ciphertext` into a single URL-safe
  * base64url token. The token is fully self-contained: {@link decryptFromString}
- * needs only the key and the token.
+ * needs only the key and the token — nothing else must travel alongside.
+ *
+ * Ideal for session cookies, magic-link tokens, opaque state tokens.
  *
  * @param {string | Buffer | Uint8Array} data
  * @param {KeyObject}                    key
  * @param {SymmetricOptions}             [options]
  * @returns {string}                     base64url(iv || tag || ciphertext)
+ * @throws {CryptoError}                 Same codes as {@link encryptSymmetric}.
+ *
+ * @example
+ * const token = encryptToString('user-state', key)
+ * res.cookie('session', token, { httpOnly: true, secure: true })
  */
 export function encryptToString(data, key, options) {
   const { ciphertext, iv, tag } = encryptSymmetric(data, key, options);
@@ -135,6 +172,18 @@ export function encryptToString(data, key, options) {
  * @param {KeyObject}        key
  * @param {SymmetricOptions} [options]
  * @returns {Buffer}
+ * @throws {CryptoError}     With code:
+ *   - `INVALID_ARGUMENT` if `token` is not a string
+ *   - `INVALID_CIPHERTEXT` if the packed payload is shorter than iv + tag
+ *   - Plus every code {@link decryptSymmetric} may raise (DECRYPT_FAILED, …)
+ *
+ * @example
+ * try {
+ *   const plaintext = decryptFromString(cookieValue, key)
+ * } catch (err) {
+ *   if (err.code === ErrorCode.DECRYPT_FAILED) return res.status(401).end()
+ *   throw err
+ * }
  */
 export function decryptFromString(token, key, options) {
   assertString(token, 'token');

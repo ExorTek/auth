@@ -20,14 +20,33 @@ import { toBuffer } from '../internal/bytes.js';
  *
  * The raw Diffie–Hellman output is fed through HKDF (RFC 5869) to produce
  * a fixed-length, uniformly-distributed key suitable for use with
- * {@link encrypt}. This is the recommended pattern — never use the raw
- * DH output directly, since it retains structure from the underlying
- * curve arithmetic.
+ * {@link encryptSymmetric}. This is the recommended pattern — never use
+ * the raw DH output directly, since it retains structure from the
+ * underlying curve arithmetic (biased distribution).
  *
- * @param {KeyObject}     privateKey  Local private key.
+ * Use `options.info` for domain separation when the same key pair drives
+ * multiple derived keys (e.g. one for authentication, one for encryption):
+ * different `info` values produce cryptographically independent keys.
+ *
+ * @param {KeyObject}     privateKey  Local private key from {@link generateKeyPair}.
  * @param {KeyObject}     publicKey   Remote public key. Must use the same curve.
  * @param {DeriveOptions} [options]
  * @returns {Buffer}                  Derived key of `options.length` bytes (default 32).
+ * @throws {CryptoError}  With code:
+ *   - `INVALID_KEY` if either key is not a matching-curve KeyObject
+ *   - `INVALID_ARGUMENT` if `options.length` is outside HKDF limits
+ *   - `UNSUPPORTED_ALGORITHM` if `options.hash` is unknown
+ *
+ * @example
+ * // Simple session-key exchange:
+ * const alice = await generateKeyPair('x25519')
+ * const bob = await generateKeyPair('x25519')
+ * const sessionKey = deriveSharedSecret(alice.privateKey, bob.publicKey)
+ *
+ * @example
+ * // Domain-separated keys from the same pair:
+ * const encKey = deriveSharedSecret(sk, pk, { info: 'encryption' })
+ * const macKey = deriveSharedSecret(sk, pk, { info: 'authentication' })
  */
 export function deriveSharedSecret(privateKey, publicKey, options) {
   assertKeyObject(privateKey, 'private', 'privateKey');

@@ -19,12 +19,21 @@ import { ASYMMETRIC, ASYMMETRIC_ALGOS } from './algorithms.js';
  *
  * Suitable for small payloads (a few hundred bytes at most — RSA is not
  * designed for bulk data). Use {@link encryptHybrid} to seal larger
- * plaintexts.
+ * plaintexts. Each call uses fresh OAEP padding, so the same plaintext
+ * yields distinct ciphertexts (semantic security).
  *
  * @param {string | Buffer | Uint8Array} data
- * @param {KeyObject}                    publicKey
- * @param {AsymmetricOptions}            options
+ * @param {KeyObject}                    publicKey  RSA public key from {@link generateKeyPair}.
+ * @param {AsymmetricOptions}            options    `options.algo` is required.
  * @returns {Buffer}                     Ciphertext.
+ * @throws {CryptoError}  With code:
+ *   - `INVALID_ARGUMENT` for bad `data` or missing `options`
+ *   - `INVALID_KEY` if `publicKey` is not a public KeyObject
+ *   - `UNSUPPORTED_ALGORITHM` for unknown `options.algo`
+ *
+ * @example
+ * const { publicKey } = await generateKeyPair('rsa-oaep-256')
+ * const enc = encryptAsymmetric('shared-secret', publicKey, { algo: 'rsa-oaep-256' })
  */
 export function encryptAsymmetric(data, publicKey, options) {
   assertObject(options, 'options');
@@ -45,10 +54,17 @@ export function encryptAsymmetric(data, publicKey, options) {
  * RSA-OAEP decrypt a ciphertext with a private key.
  *
  * @param {Buffer | Uint8Array} ciphertext
- * @param {KeyObject}           privateKey
- * @param {AsymmetricOptions}   options
- * @returns {Buffer}                     Plaintext bytes.
- * @throws {CryptoError} With code `DECRYPT_FAILED` on wrong key or malformed ciphertext.
+ * @param {KeyObject}           privateKey  RSA private key from {@link generateKeyPair}.
+ * @param {AsymmetricOptions}   options     Must specify the same `algo` used at encryption.
+ * @returns {Buffer}                        Plaintext bytes.
+ * @throws {CryptoError}  With code:
+ *   - `INVALID_ARGUMENT` for missing / wrong-type `ciphertext` or `options`
+ *   - `INVALID_KEY` if `privateKey` is not a private KeyObject
+ *   - `UNSUPPORTED_ALGORITHM` for unknown `options.algo`
+ *   - `DECRYPT_FAILED` on wrong key or malformed ciphertext
+ *
+ * @example
+ * const plaintext = decryptAsymmetric(enc, privateKey, { algo: 'rsa-oaep-256' })
  */
 export function decryptAsymmetric(ciphertext, privateKey, options) {
   if (!(ciphertext instanceof Uint8Array)) {

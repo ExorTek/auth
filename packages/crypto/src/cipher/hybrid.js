@@ -38,6 +38,15 @@ import { encryptAsymmetric, decryptAsymmetric } from './asymmetric.js';
  * @param {KeyObject}                    publicKey  Recipient's RSA public key.
  * @param {HybridOptions}                [options]
  * @returns {HybridEnvelope}
+ * @throws {CryptoError}  With code:
+ *   - `INVALID_ARGUMENT` for bad `data` or `options`
+ *   - `INVALID_KEY` if `publicKey` is not a public KeyObject
+ *   - `UNSUPPORTED_ALGORITHM` for unknown `options.algo`
+ *
+ * @example
+ * const { publicKey } = await generateKeyPair('rsa-oaep-256')
+ * const envelope = encryptHybrid(largePayload, publicKey)
+ * // Ship the envelope (all four Buffers) to the recipient.
  */
 export function encryptHybrid(data, publicKey, options) {
   assertBytesOrString(data, 'data');
@@ -57,13 +66,21 @@ export function encryptHybrid(data, publicKey, options) {
 
 /**
  * Reverse of {@link encryptHybrid} — unwrap the AES key with RSA-OAEP,
- * then decrypt the ciphertext with AES-GCM.
+ * then decrypt the ciphertext with AES-GCM. Both steps are authenticated,
+ * so any tampering with the envelope raises `DECRYPT_FAILED` before any
+ * plaintext is produced.
  *
  * @param {HybridEnvelope}  envelope
  * @param {KeyObject}       privateKey  Recipient's RSA private key.
  * @param {HybridOptions}   [options]
  * @returns {Buffer}                    Plaintext bytes.
- * @throws {CryptoError} With code `DECRYPT_FAILED` on tampering or wrong key.
+ * @throws {CryptoError}  With code:
+ *   - `INVALID_ARGUMENT` if `envelope` fields are missing or wrong type
+ *   - `INVALID_KEY` if `privateKey` is not a private KeyObject
+ *   - `DECRYPT_FAILED` on tampering, wrong key, or bad OAEP unwrapping
+ *
+ * @example
+ * const plaintext = decryptHybrid(envelope, privateKey)
  */
 export function decryptHybrid(envelope, privateKey, options) {
   assertObject(envelope, 'envelope');
