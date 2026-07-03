@@ -41,10 +41,7 @@ export function encode(input) {
 export function decode(input) {
   assertString(input, 'input');
   if (!HEX_RE.test(input)) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ENCODING,
-      'input is not a valid hex string (even length, hex chars only)',
-    );
+    throw new CryptoError(ErrorCode.INVALID_ENCODING, 'input is not a valid hex string (even length, hex chars only)');
   }
   return Buffer.from(input, 'hex');
 }

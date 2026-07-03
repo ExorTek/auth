@@ -1,11 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import {
-  assertBytesOrString,
-  assertKeyObject,
-  assertObject,
-  assertString,
-} from '../internal/validate.js';
+import { assertBytesOrString, assertKeyObject, assertObject, assertString } from '../internal/validate.js';
 import { toBuffer } from '../internal/bytes.js';
 import { SYMMETRIC, SYMMETRIC_ALGOS } from './algorithms.js';
 

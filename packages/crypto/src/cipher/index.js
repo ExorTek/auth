@@ -1,13 +1,9 @@
 import { generateKey, generateKeyPair } from './generate.js';
-import {
-  encryptSymmetric,
-  decryptSymmetric,
-  encryptToString,
-  decryptFromString,
-} from './symmetric.js';
+import { encryptSymmetric, decryptSymmetric, encryptToString, decryptFromString } from './symmetric.js';
 import { encryptAsymmetric, decryptAsymmetric } from './asymmetric.js';
 import { encryptHybrid, decryptHybrid } from './hybrid.js';
 import { deriveSharedSecret } from './derive.js';
+import { encryptWithPassphrase, decryptWithPassphrase } from './passphrase.js';
 import { SYMMETRIC_ALGOS, ASYMMETRIC_ALGOS, KEY_AGREEMENT_ALGOS } from './algorithms.js';
 import { CryptoError, ErrorCode } from '../errors.js';
 
@@ -79,21 +75,16 @@ function decrypt(ciphertext, key, options) {
  * @example
  * import { cipher } from '@exortek/crypto/cipher'
  *
- * // Polymorphic (dispatches on key type)
+ * // Symmetric with a KeyObject
  * const key = await cipher.generateKey()
- * const enc = cipher.encrypt('data', key)
- * const plain = cipher.decrypt(enc.ciphertext, key, { iv: enc.iv, tag: enc.tag })
- *
- * // Explicit symmetric — same primitives, unambiguous return type
  * const { ciphertext, iv, tag } = cipher.encryptSymmetric('data', key)
- * const buf = cipher.decryptSymmetric(ciphertext, key, { iv, tag })
  *
- * // Explicit asymmetric (RSA-OAEP)
- * const { publicKey, privateKey } = await cipher.generateKeyPair('rsa-oaep-256')
- * const encPk = cipher.encryptAsymmetric('msg', publicKey, { algo: 'rsa-oaep-256' })
- * const dec = cipher.decryptAsymmetric(encPk, privateKey, { algo: 'rsa-oaep-256' })
+ * // Password-Based Encryption — no key management
+ * const token = await cipher.encryptWithPassphrase('data', 'my-passphrase')
+ * const plain = await cipher.decryptWithPassphrase(token, 'my-passphrase')
  *
- * // Hybrid, string-shorthand, ECDH — as before.
+ * // Asymmetric (RSA-OAEP) / Hybrid / Key agreement — as documented in
+ * // the module JSDoc for each function.
  */
 export const cipher = Object.freeze({
   generateKey,
@@ -108,6 +99,8 @@ export const cipher = Object.freeze({
   decryptFromString,
   encryptHybrid,
   decryptHybrid,
+  encryptWithPassphrase,
+  decryptWithPassphrase,
   deriveSharedSecret,
   SYMMETRIC_ALGOS,
   ASYMMETRIC_ALGOS,
@@ -125,6 +118,8 @@ export {
   decryptFromString,
   encryptHybrid,
   decryptHybrid,
+  encryptWithPassphrase,
+  decryptWithPassphrase,
   deriveSharedSecret,
   SYMMETRIC_ALGOS,
   ASYMMETRIC_ALGOS,

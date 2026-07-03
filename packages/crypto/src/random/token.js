@@ -16,9 +16,7 @@ const ENCODERS = Object.freeze({
 });
 
 /** Public list of encoding names — useful for algorithm-picker UIs or validation. */
-export const TOKEN_ENCODINGS = /** @type {readonly (keyof typeof ENCODERS)[]} */ (
-  Object.freeze(Object.keys(ENCODERS))
-);
+export const TOKEN_ENCODINGS = /** @type {readonly (keyof typeof ENCODERS)[]} */ (Object.freeze(Object.keys(ENCODERS)));
 
 /**
  * @typedef {'base64url' | 'base64' | 'hex' | 'crockford' | 'base58'} TokenEncoding
@@ -76,10 +74,7 @@ export function token(size, options) {
     if (options.separator !== undefined) {
       assertString(options.separator, 'options.separator');
       if (options.separator === '') {
-        throw new CryptoError(
-          ErrorCode.INVALID_ARGUMENT,
-          'options.separator must be a non-empty string',
-        );
+        throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.separator must be a non-empty string');
       }
     }
     if (options.encoding !== undefined && !(options.encoding in ENCODERS)) {

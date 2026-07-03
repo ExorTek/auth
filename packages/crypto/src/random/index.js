@@ -9,16 +9,7 @@ import { numeric } from './numeric.js';
 import { pin } from './pin.js';
 import { code } from './code.js';
 import { serial } from './serial.js';
-import {
-  uuid4,
-  uuid7,
-  uuid5,
-  isUUID,
-  NAMESPACE_DNS,
-  NAMESPACE_URL,
-  NAMESPACE_OID,
-  NAMESPACE_X500,
-} from './uuid.js';
+import { uuid4, uuid7, uuid5, isUUID, NAMESPACE_DNS, NAMESPACE_URL, NAMESPACE_OID, NAMESPACE_X500 } from './uuid.js';
 import { ulid, isULID } from './ulid.js';
 import { token, TOKEN_ENCODINGS } from './token.js';
 

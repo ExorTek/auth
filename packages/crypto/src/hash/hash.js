@@ -61,17 +61,11 @@ export function _resolveOptions(options) {
   assertOptionalObject(options, 'options');
   const algo = options?.algo ?? 'sha256';
   if (!_SUPPORTED.has(algo)) {
-    throw new CryptoError(
-      ErrorCode.UNSUPPORTED_ALGORITHM,
-      `algo must be one of: ${SUPPORTED_HASHES.join(', ')}`,
-    );
+    throw new CryptoError(ErrorCode.UNSUPPORTED_ALGORITHM, `algo must be one of: ${SUPPORTED_HASHES.join(', ')}`);
   }
   const encoding = options?.encoding ?? 'hex';
   if (encoding !== 'hex' && encoding !== 'base64' && encoding !== 'base64url' && encoding !== 'buffer') {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
-      "encoding must be 'hex', 'base64', 'base64url', or 'buffer'",
-    );
+    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "encoding must be 'hex', 'base64', 'base64url', or 'buffer'");
   }
   return { algo, encoding };
 }

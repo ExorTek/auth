@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
 import { assertKeyObject, assertOptionalObject } from '../internal/validate.js';
-import { toBuffer } from '../internal/bytes.js';
+import { hkdf } from '../hash/hkdf.js';
 
 /**
  * @typedef {import('node:crypto').KeyObject} KeyObject
@@ -53,31 +53,24 @@ export function deriveSharedSecret(privateKey, publicKey, options) {
   assertKeyObject(publicKey, 'public', 'publicKey');
   assertOptionalObject(options, 'options');
 
-  const length = options?.length ?? 32;
-  if (!Number.isSafeInteger(length) || length <= 0 || length > 255 * 32) {
-    // HKDF-SHA256 caps at 255 × hashLen; conservatively require > 0 and reasonable.
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
-      'options.length must be a positive safe integer within HKDF limits',
-    );
-  }
-  const info = options?.info !== undefined ? toBuffer(options.info, 'options.info') : Buffer.alloc(0);
-  const salt = options?.salt !== undefined ? toBuffer(options.salt, 'options.salt') : Buffer.alloc(0);
-  const hash = options?.hash ?? 'sha256';
-  if (!['sha256', 'sha384', 'sha512'].includes(hash)) {
-    throw new CryptoError(
-      ErrorCode.UNSUPPORTED_ALGORITHM,
-      "options.hash must be 'sha256', 'sha384' or 'sha512'",
-    );
-  }
-
+  let shared;
   try {
-    const shared = crypto.diffieHellman({ privateKey, publicKey });
-    // hkdfSync returns an ArrayBuffer; wrap in Buffer for ergonomic API.
-    return Buffer.from(crypto.hkdfSync(hash, shared, salt, info, length));
+    shared = crypto.diffieHellman({ privateKey, publicKey });
   } catch (err) {
     throw new CryptoError(ErrorCode.INVALID_KEY, 'key agreement failed — mismatched curves?', {
       cause: err,
     });
   }
+
+  // Delegate to the public hkdf() helper — same primitive both places, single
+  // source of truth for validation and error codes.
+  return /** @type {Buffer} */ (
+    hkdf(shared, {
+      salt: options?.salt,
+      info: options?.info,
+      length: options?.length ?? 32,
+      hash: options?.hash ?? 'sha256',
+      encoding: 'buffer',
+    })
+  );
 }
