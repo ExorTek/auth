@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { scrypt } from '../../src/hash/scrypt.js';
+import { scrypt } from '../../src/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 // Small N/r/p to keep tests fast; production uses defaults.

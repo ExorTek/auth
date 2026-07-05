@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { hmac } from '../../src/hash/hmac.js';
+import { hmac } from '../../src/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 // RFC 4231 test case 1: HMAC-SHA-256, key = 0x0b × 20, data = 'Hi There'.
@@ -53,7 +53,7 @@ describe('hmac', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => hmac(bad, 'k'),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -62,7 +62,7 @@ describe('hmac', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => hmac('data', bad),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -70,7 +70,7 @@ describe('hmac', () => {
   it('rejects unsupported algorithms', () => {
     assert.throws(
       () => hmac('data', 'key', { algo: 'blake2b' }),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.UNSUPPORTED_ALGORITHM,
+      err => err instanceof CryptoError && err.code === ErrorCode.UNSUPPORTED_ALGORITHM,
     );
   });
 });

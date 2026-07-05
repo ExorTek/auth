@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { base58 } from '../../src/random/index.js';
+import { base58 } from '../../src/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 // Bitcoin base58 alphabet omits 0, O, I, l.

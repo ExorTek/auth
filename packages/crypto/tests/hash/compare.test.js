@@ -1,9 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { compare } from '../../src/hash/compare.js';
-import { hash } from '../../src/hash/hash.js';
-import { hmac } from '../../src/hash/hmac.js';
+import { compare } from '../../src/index.js';
+import { hash } from '../../src/index.js';
+import { hmac } from '../../src/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 describe('compare', () => {
@@ -54,25 +54,19 @@ describe('compare', () => {
   });
 
   it('accepts Uint8Array', () => {
-    assert.equal(
-      compare(new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 3])),
-      true,
-    );
-    assert.equal(
-      compare(new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 4])),
-      false,
-    );
+    assert.equal(compare(new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 3])), true);
+    assert.equal(compare(new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 4])), false);
   });
 
   it('rejects non-string, non-buffer inputs', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => compare(bad, 'x'),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
       assert.throws(
         () => compare('x', bad),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

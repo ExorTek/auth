@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { generateSignKeyPair, SIGN_ALGOS } from '../../src/sign/index.js';
+import { generateSignKeyPair, SIGN_ALGOS } from '../../src/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 describe('generateSignKeyPair', () => {

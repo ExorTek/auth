@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pbkdf2, SUPPORTED_PBKDF2_HASHES } from '../../src/hash/pbkdf2.js';
+import { pbkdf2, SUPPORTED_PBKDF2_HASHES } from '../../src/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 describe('pbkdf2', () => {

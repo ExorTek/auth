@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { base64 } from '../../src/random/index.js';
+import { base64 } from '../../src/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -9,7 +9,14 @@ const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
 describe('random.base64', () => {
   it('returns a padded base64 string of the expected length', () => {
     // N bytes → 4 * ceil(N / 3) chars with `=` padding.
-    for (const [size, len] of [[1, 4], [2, 4], [3, 4], [16, 24], [32, 44], [48, 64]]) {
+    for (const [size, len] of [
+      [1, 4],
+      [2, 4],
+      [3, 4],
+      [16, 24],
+      [32, 44],
+      [48, 64],
+    ]) {
       const s = base64(size);
       assert.equal(typeof s, 'string');
       assert.equal(s.length, len, `size=${size}: expected ${len}, got ${s.length}`);

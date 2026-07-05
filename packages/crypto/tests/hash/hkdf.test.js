@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { hkdf, SUPPORTED_HKDF_HASHES } from '../../src/hash/hkdf.js';
+import { hkdf, SUPPORTED_HKDF_HASHES } from '../../src/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 describe('hkdf', () => {
@@ -17,8 +17,7 @@ describe('hkdf', () => {
 
   it('matches RFC 5869 Test Case 1', () => {
     // OKM from RFC 5869 §A.1
-    const expected =
-      '3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865';
+    const expected = '3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865';
     const k = hkdf(ikm, { salt, info, length: 42, hash: 'sha256', encoding: 'hex' });
     assert.equal(k, expected);
   });
