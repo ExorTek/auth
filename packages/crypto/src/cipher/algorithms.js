@@ -1,5 +1,6 @@
 /**
- * @typedef {'aes-256-gcm' | 'chacha20-poly1305' | 'aes-256-cbc'} SymmetricAlgorithm
+ * @typedef {'aes-256-gcm' | 'aes-192-gcm' | 'aes-128-gcm'
+ *         | 'chacha20-poly1305' | 'aes-256-cbc'} SymmetricAlgorithm
  * @typedef {'rsa-oaep' | 'rsa-oaep-256'} AsymmetricAlgorithm
  * @typedef {'ecdh-p256' | 'ecdh-p384' | 'x25519'} KeyAgreementAlgorithm
  */
@@ -15,6 +16,8 @@
 export const SYMMETRIC = Object.freeze(
   /** @type {Record<SymmetricAlgorithm, { keyLength: number, ivLength: number, tagLength: number, mode: 'aead' | 'cbc' }>} */ ({
     'aes-256-gcm': { keyLength: 32, ivLength: 12, tagLength: 16, mode: 'aead' },
+    'aes-192-gcm': { keyLength: 24, ivLength: 12, tagLength: 16, mode: 'aead' },
+    'aes-128-gcm': { keyLength: 16, ivLength: 12, tagLength: 16, mode: 'aead' },
     'chacha20-poly1305': { keyLength: 32, ivLength: 12, tagLength: 16, mode: 'aead' },
     'aes-256-cbc': { keyLength: 32, ivLength: 16, tagLength: 0, mode: 'cbc' },
   }),

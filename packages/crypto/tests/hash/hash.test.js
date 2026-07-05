@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { hash } from '../../src/hash/hash.js';
+import { hash } from '../../src/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 // Well-known digests of 'hello' — RFC test vectors / OpenSSL confirmations.
@@ -70,7 +70,7 @@ describe('hash', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => hash(bad),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -78,20 +78,29 @@ describe('hash', () => {
   it('rejects unsupported algorithms', () => {
     assert.throws(
       () => hash('hello', { algo: 'sha3' }),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.UNSUPPORTED_ALGORITHM,
+      err => err instanceof CryptoError && err.code === ErrorCode.UNSUPPORTED_ALGORITHM,
     );
   });
 
   it('rejects invalid encoding', () => {
     assert.throws(
       () => hash('hello', { encoding: 'binary' }),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
   it('rejects non-object options', () => {
-    assert.throws(() => hash('hello', 'sha256'), (err) => err instanceof CryptoError);
-    assert.throws(() => hash('hello', null), (err) => err instanceof CryptoError);
-    assert.throws(() => hash('hello', []), (err) => err instanceof CryptoError);
+    assert.throws(
+      () => hash('hello', 'sha256'),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => hash('hello', null),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => hash('hello', []),
+      err => err instanceof CryptoError,
+    );
   });
 });

@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
 import { assertBytesOrString, assertKeyObject, assertObject } from '../internal/validate.js';
 import { toBuffer } from '../internal/bytes.js';
-import { _resolveSpec } from './sign.js';
+import { _resolveSpec, _keyInput } from './sign.js';
 
 /**
  * @typedef {import('node:crypto').KeyObject} KeyObject
@@ -59,9 +59,7 @@ export function verify(data, signature, publicKey, options) {
   }
 
   const dataBuf = toBuffer(data, 'data');
-  const keyInput = spec.padding !== undefined
-    ? { key: publicKey, padding: spec.padding, saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST }
-    : publicKey;
+  const keyInput = _keyInput(publicKey, spec);
 
   try {
     return crypto.verify(spec.hash, dataBuf, keyInput, sigBuf);

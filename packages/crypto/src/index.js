@@ -33,3 +33,4 @@ export * from './cipher/index.js';
 export * from './sign/index.js';
 export * from './errors.js';
 export * as encode from './encode/index.js';
+export * as binary from './binary/index.js';

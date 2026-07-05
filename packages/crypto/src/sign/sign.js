@@ -62,12 +62,28 @@ export function sign(data, privateKey, options) {
   }
 
   const dataBuf = toBuffer(data, 'data');
-  const keyInput = spec.padding !== undefined
-    ? { key: privateKey, padding: spec.padding, saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST }
-    : privateKey;
+  const keyInput = _keyInput(privateKey, spec);
 
   const signature = crypto.sign(spec.hash, dataBuf, keyInput);
   return encoding === 'buffer' ? signature : signature.toString(encoding);
+}
+
+/**
+ * Build the Node crypto key input for sign/verify.
+ * - RSA-PSS: bake in RSA_PSS_SALTLEN_DIGEST so callers don't juggle constants.
+ * - ECDSA:   force IEEE-P1363 (raw R||S) encoding — the JOSE / JWS format,
+ *            not Node's default DER. Downstream JWT libraries expect this.
+ * - Otherwise: pass the KeyObject through directly.
+ * @private
+ */
+export function _keyInput(key, spec) {
+  if (spec.padding !== undefined) {
+    return { key, padding: spec.padding, saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST };
+  }
+  if (spec.type === 'ec') {
+    return { key, dsaEncoding: 'ieee-p1363' };
+  }
+  return key;
 }
 
 /**

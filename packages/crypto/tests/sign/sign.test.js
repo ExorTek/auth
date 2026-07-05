@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { generateSignKeyPair, sign, verify } from '../../src/sign/index.js';
+import { generateSignKeyPair, sign, verify } from '../../src/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 const ALGOS = ['rs256', 'ps256', 'ps384', 'ps512', 'es256', 'es384', 'es512', 'eddsa'];
@@ -65,10 +65,7 @@ describe('sign / verify — options', () => {
   it('sign is deterministic for rs* / eddsa (no random component)', async () => {
     const rsa = await generateSignKeyPair('rs256');
     const eddsa = await generateSignKeyPair('eddsa');
-    assert.deepEqual(
-      sign('same', rsa.privateKey, { algo: 'rs256' }),
-      sign('same', rsa.privateKey, { algo: 'rs256' }),
-    );
+    assert.deepEqual(sign('same', rsa.privateKey, { algo: 'rs256' }), sign('same', rsa.privateKey, { algo: 'rs256' }));
     assert.deepEqual(
       sign('same', eddsa.privateKey, { algo: 'eddsa' }),
       sign('same', eddsa.privateKey, { algo: 'eddsa' }),

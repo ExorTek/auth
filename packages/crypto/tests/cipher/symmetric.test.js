@@ -95,10 +95,26 @@ describe('cipher explicit named exports', () => {
 
   it('SYMMETRIC_ALGOS lists all supported symmetric algorithms', () => {
     assert.deepEqual([...SYMMETRIC_ALGOS].sort(), [
+      'aes-128-gcm',
+      'aes-192-gcm',
       'aes-256-cbc',
       'aes-256-gcm',
       'chacha20-poly1305',
     ]);
+  });
+
+  it('aes-128-gcm round-trips (16-byte key)', async () => {
+    const key = await cipher.generateKey('aes-128-gcm');
+    assert.equal(key.symmetricKeySize, 16);
+    const { ciphertext, iv, tag } = cipher.encrypt('hi', key, { algo: 'aes-128-gcm' });
+    assert.equal(cipher.decrypt(ciphertext, key, { iv, tag, algo: 'aes-128-gcm' }).toString('utf8'), 'hi');
+  });
+
+  it('aes-192-gcm round-trips (24-byte key)', async () => {
+    const key = await cipher.generateKey('aes-192-gcm');
+    assert.equal(key.symmetricKeySize, 24);
+    const { ciphertext, iv, tag } = cipher.encrypt('hi', key, { algo: 'aes-192-gcm' });
+    assert.equal(cipher.decrypt(ciphertext, key, { iv, tag, algo: 'aes-192-gcm' }).toString('utf8'), 'hi');
   });
 });
 

@@ -3,7 +3,10 @@ import { CryptoError, ErrorCode } from '../errors.js';
 import { assertBytesOrString, assertOptionalObject } from '../internal/validate.js';
 
 /**
- * @typedef {'sha256' | 'sha384' | 'sha512' | 'sha1' | 'md5'} HashAlgorithm
+ * @typedef {'sha256' | 'sha384' | 'sha512'
+ *         | 'sha3-256' | 'sha3-384' | 'sha3-512'
+ *         | 'blake2b512' | 'blake2s256'
+ *         | 'sha1' | 'md5'} HashAlgorithm
  */
 
 /**
@@ -16,8 +19,25 @@ import { assertBytesOrString, assertOptionalObject } from '../internal/validate.
  *   further chained hashing).
  */
 
-/** Whitelist of supported hash algorithms. */
-export const SUPPORTED_HASHES = /** @type {const} */ (['sha256', 'sha384', 'sha512', 'sha1', 'md5']);
+/**
+ * Whitelist of supported hash algorithms.
+ *
+ * Groups:
+ * - **SHA-2** (`sha256`, `sha384`, `sha512`) — the modern default.
+ * - **SHA-3** (`sha3-256`, `sha3-384`, `sha3-512`) — RFC 6234 / FIPS 202.
+ *   Structurally distinct from SHA-2 (Keccak sponge) — pick this if you
+ *   want a hedge against future cryptanalytic advances in SHA-2.
+ * - **BLAKE2** (`blake2b512`, `blake2s256`) — RFC 7693. Faster than SHA-3
+ *   on modern CPUs, comparable security.
+ * - **Legacy** (`sha1`, `md5`) — cryptographically broken, included only
+ *   for interop with existing digests.
+ */
+export const SUPPORTED_HASHES = /** @type {const} */ ([
+  'sha256', 'sha384', 'sha512',
+  'sha3-256', 'sha3-384', 'sha3-512',
+  'blake2b512', 'blake2s256',
+  'sha1', 'md5',
+]);
 const _SUPPORTED = new Set(SUPPORTED_HASHES);
 
 /**
