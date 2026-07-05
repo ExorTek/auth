@@ -28,6 +28,11 @@
       "import": "./dist/sign.mjs",
       "require": "./dist/sign.cjs"
     },
+    "./binary": {
+      "types": "./dist/binary/index.d.ts",
+      "import": "./dist/binary.mjs",
+      "require": "./dist/binary.cjs"
+    },
     "./encode": {
       "types": "./dist/encode/index.d.ts",
       "import": "./dist/encode.mjs",

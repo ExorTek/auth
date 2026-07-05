@@ -9,6 +9,7 @@ export default createConfig(pkg, {
     hash: 'src/hash/index.js',
     cipher: 'src/cipher/index.js',
     sign: 'src/sign/index.js',
+    binary: 'src/binary/index.js',
     encode: 'src/encode/index.js',
     random: 'src/random/index.js',
   },
