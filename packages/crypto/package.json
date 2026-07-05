@@ -23,6 +23,11 @@
       "import": "./dist/cipher.mjs",
       "require": "./dist/cipher.cjs"
     },
+    "./sign": {
+      "types": "./dist/sign/index.d.ts",
+      "import": "./dist/sign.mjs",
+      "require": "./dist/sign.cjs"
+    },
     "./encode": {
       "types": "./dist/encode/index.d.ts",
       "import": "./dist/encode.mjs",
