@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertKeyObject, assertObject } from '../internal/validate.js';
+import { assertBytesOrString, assertEncoding, assertKeyObject, assertObject } from '../internal/validate.js';
 import { toBuffer } from '../internal/bytes.js';
 import { SIGN, SIGN_ALGOS } from './algorithms.js';
 
@@ -57,9 +57,7 @@ export function sign(data, privateKey, options) {
   assertKeyObject(privateKey, 'private', 'privateKey');
 
   const encoding = options.encoding ?? 'buffer';
-  if (encoding !== 'hex' && encoding !== 'base64' && encoding !== 'base64url' && encoding !== 'buffer') {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "encoding must be 'hex', 'base64', 'base64url', or 'buffer'");
-  }
+  assertEncoding(encoding, 'options.encoding');
 
   const dataBuf = toBuffer(data, 'data');
   const keyInput = _keyInput(privateKey, spec);
@@ -92,10 +90,7 @@ export function _keyInput(key, spec) {
 function _resolveSpec(options) {
   const spec = SIGN[options.algo];
   if (!spec) {
-    throw new CryptoError(
-      ErrorCode.UNSUPPORTED_ALGORITHM,
-      `options.algo must be one of: ${SIGN_ALGOS.join(', ')}`,
-    );
+    throw new CryptoError(ErrorCode.UNSUPPORTED_ALGORITHM, `options.algo must be one of: ${SIGN_ALGOS.join(', ')}`);
   }
   return spec;
 }

@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
-import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertOptionalObject, assertString } from '../internal/validate.js';
-import { toBuffer } from '../internal/bytes.js';
+import { assertBytesOrString, assertEncoding, assertOptionalObject } from '../internal/validate.js';
+import { toBuffer, toBufferWithEncoding } from '../internal/bytes.js';
 import { _resolveOptions } from './hash.js';
 
 /**
@@ -58,13 +57,9 @@ export function verifyHmac(data, expected, secret, options) {
  * @param {import('./hash.js').HashOptions} [options]
  */
 function _toExpectedBuffer(value, options) {
-  if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
-    return Buffer.isBuffer(value) ? value : Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-  }
-  assertString(value, 'expected');
   const encoding = options?.encoding ?? 'hex';
-  if (encoding !== 'hex' && encoding !== 'base64' && encoding !== 'base64url') {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "options.encoding must be 'hex', 'base64', or 'base64url'");
+  if (typeof value === 'string') {
+    assertEncoding(encoding, 'options.encoding', { allowBuffer: false });
   }
-  return Buffer.from(value, encoding);
+  return toBufferWithEncoding(value, 'expected', encoding);
 }

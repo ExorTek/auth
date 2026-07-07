@@ -105,6 +105,25 @@ export function assertBytesOrString(value, name) {
 }
 
 /**
+ * Assert that `encoding` is one of the accepted output/input encodings.
+ * Pass `allowBuffer: false` for cases where a Buffer output makes no sense
+ * (verifying a string signature, decoding a token payload).
+ *
+ * @param {unknown} encoding
+ * @param {string}  name
+ * @param {{ allowBuffer?: boolean }} [options]
+ */
+export function assertEncoding(encoding, name, options) {
+  const allowBuffer = options?.allowBuffer !== false;
+  const valid =
+    encoding === 'hex' || encoding === 'base64' || encoding === 'base64url' || (allowBuffer && encoding === 'buffer');
+  if (!valid) {
+    const list = allowBuffer ? "'hex', 'base64', 'base64url', or 'buffer'" : "'hex', 'base64', or 'base64url'";
+    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, `${name} must be ${list}`);
+  }
+}
+
+/**
  * Assert that `key` is a Node `KeyObject` of the expected type
  * (`'secret'`, `'public'`, or `'private'`).
  *

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertOptionalObject, assertPositiveInt } from '../internal/validate.js';
+import { assertBytesOrString, assertEncoding, assertOptionalObject, assertPositiveInt } from '../internal/validate.js';
 import { toBuffer } from '../internal/bytes.js';
 
 const pbkdf2Async = promisify(crypto.pbkdf2);
@@ -93,9 +93,7 @@ export async function pbkdf2(password, options) {
   assertPositiveInt(keyLength, 'options.keyLength');
 
   const encoding = options.encoding ?? 'buffer';
-  if (encoding !== 'hex' && encoding !== 'base64' && encoding !== 'base64url' && encoding !== 'buffer') {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "encoding must be 'hex', 'base64', 'base64url', or 'buffer'");
-  }
+  assertEncoding(encoding, 'options.encoding');
 
   const derived = await pbkdf2Async(
     toBuffer(password, 'password'),

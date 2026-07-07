@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertKeyObject, assertOptionalObject } from '../internal/validate.js';
+import { assertEncoding, assertKeyObject, assertOptionalObject } from '../internal/validate.js';
 
 /**
  * @typedef {object} ThumbprintOptions
@@ -57,9 +57,7 @@ export function thumbprint(key, options) {
     throw new CryptoError(ErrorCode.UNSUPPORTED_ALGORITHM, "options.hash must be 'sha256', 'sha384', or 'sha512'");
   }
   const encoding = options?.encoding ?? 'base64url';
-  if (encoding !== 'hex' && encoding !== 'base64' && encoding !== 'base64url' && encoding !== 'buffer') {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "encoding must be 'hex', 'base64', 'base64url', or 'buffer'");
-  }
+  assertEncoding(encoding, 'options.encoding');
 
   // Derive public form when a private key is supplied — the paired public
   // key is what identifies the key across systems.

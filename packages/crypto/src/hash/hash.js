@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertOptionalObject } from '../internal/validate.js';
+import { assertBytesOrString, assertEncoding, assertOptionalObject } from '../internal/validate.js';
 
 /**
  * @typedef {'sha256' | 'sha384' | 'sha512'
@@ -33,10 +33,16 @@ import { assertBytesOrString, assertOptionalObject } from '../internal/validate.
  *   for interop with existing digests.
  */
 export const SUPPORTED_HASHES = /** @type {const} */ ([
-  'sha256', 'sha384', 'sha512',
-  'sha3-256', 'sha3-384', 'sha3-512',
-  'blake2b512', 'blake2s256',
-  'sha1', 'md5',
+  'sha256',
+  'sha384',
+  'sha512',
+  'sha3-256',
+  'sha3-384',
+  'sha3-512',
+  'blake2b512',
+  'blake2s256',
+  'sha1',
+  'md5',
 ]);
 const _SUPPORTED = new Set(SUPPORTED_HASHES);
 
@@ -84,8 +90,6 @@ export function _resolveOptions(options) {
     throw new CryptoError(ErrorCode.UNSUPPORTED_ALGORITHM, `algo must be one of: ${SUPPORTED_HASHES.join(', ')}`);
   }
   const encoding = options?.encoding ?? 'hex';
-  if (encoding !== 'hex' && encoding !== 'base64' && encoding !== 'base64url' && encoding !== 'buffer') {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "encoding must be 'hex', 'base64', 'base64url', or 'buffer'");
-  }
+  assertEncoding(encoding, 'encoding');
   return { algo, encoding };
 }

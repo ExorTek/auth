@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
-import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertKeyObject, assertObject } from '../internal/validate.js';
-import { toBuffer } from '../internal/bytes.js';
+import { assertBytesOrString, assertEncoding, assertKeyObject, assertObject } from '../internal/validate.js';
+import { toBuffer, toBufferWithEncoding } from '../internal/bytes.js';
 import { _resolveSpec, _keyInput } from './sign.js';
 
 /**
@@ -45,18 +44,11 @@ export function verify(data, signature, publicKey, options) {
   const spec = _resolveSpec(options);
   assertKeyObject(publicKey, 'public', 'publicKey');
 
-  let sigBuf;
-  if (Buffer.isBuffer(signature) || signature instanceof Uint8Array) {
-    sigBuf = Buffer.isBuffer(signature) ? signature : Buffer.from(signature.buffer, signature.byteOffset, signature.byteLength);
-  } else if (typeof signature === 'string') {
-    const encoding = options.encoding ?? 'base64url';
-    if (encoding !== 'hex' && encoding !== 'base64' && encoding !== 'base64url') {
-      throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "options.encoding must be 'hex', 'base64', or 'base64url'");
-    }
-    sigBuf = Buffer.from(signature, encoding);
-  } else {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'signature must be a string or Buffer');
+  const encoding = options.encoding ?? 'base64url';
+  if (typeof signature === 'string') {
+    assertEncoding(encoding, 'options.encoding', { allowBuffer: false });
   }
+  const sigBuf = toBufferWithEncoding(signature, 'signature', encoding);
 
   const dataBuf = toBuffer(data, 'data');
   const keyInput = _keyInput(publicKey, spec);

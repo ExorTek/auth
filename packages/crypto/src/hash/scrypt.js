@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertOptionalObject, assertPositiveInt } from '../internal/validate.js';
+import { assertBytesOrString, assertEncoding, assertOptionalObject, assertPositiveInt } from '../internal/validate.js';
 import { toBuffer } from '../internal/bytes.js';
 
 const scryptAsync = promisify(crypto.scrypt);
@@ -76,9 +76,7 @@ export async function scrypt(password, options) {
   assertPositiveInt(p, 'options.p');
 
   const encoding = options.encoding ?? 'buffer';
-  if (encoding !== 'hex' && encoding !== 'base64' && encoding !== 'base64url' && encoding !== 'buffer') {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "encoding must be 'hex', 'base64', 'base64url', or 'buffer'");
-  }
+  assertEncoding(encoding, 'options.encoding');
 
   const scryptOpts = { N, r, p };
   if (options.maxmem !== undefined) {

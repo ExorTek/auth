@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertOptionalObject, assertPositiveInt } from '../internal/validate.js';
+import { assertBytesOrString, assertEncoding, assertOptionalObject, assertPositiveInt } from '../internal/validate.js';
 import { toBuffer } from '../internal/bytes.js';
 
 /** Supported HKDF underlying hash functions. */
@@ -78,9 +78,7 @@ export function hkdf(ikm, options) {
   const info = options?.info !== undefined ? toBuffer(options.info, 'options.info') : Buffer.alloc(0);
 
   const encoding = options?.encoding ?? 'buffer';
-  if (encoding !== 'hex' && encoding !== 'base64' && encoding !== 'base64url' && encoding !== 'buffer') {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "encoding must be 'hex', 'base64', 'base64url', or 'buffer'");
-  }
+  assertEncoding(encoding, 'options.encoding');
 
   // hkdfSync returns ArrayBuffer; wrap in Buffer for ergonomic API.
   const derived = Buffer.from(crypto.hkdfSync(hash, toBuffer(ikm, 'ikm'), salt, info, length));
