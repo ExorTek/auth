@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Framework-agnostic, zero-dependency, pure JavaScript authentication library for Node.js",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "web"
   ],
   "scripts": {
     "build": "yarn workspaces foreach --all --topological run build",
@@ -14,24 +15,26 @@
     "lint": "eslint packages/*/src/**/*.js",
     "format": "prettier --write packages/*/src/**/*.js",
     "format:check": "prettier --check packages/*/src/**/*.js",
-    "typecheck": "tsc --build",
+    "typecheck": "yarn workspaces foreach --all run typecheck",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "changeset publish",
-    "clean": "yarn workspaces foreach --all run clean"
+    "clean": "yarn workspaces foreach --all run clean",
+    "web:dev": "yarn workspace web dev",
+    "web:build": "yarn workspace web build"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^1.0.0",
     "eslint": "^10.6.0",
-    "prettier": "^3.9.1",
+    "prettier": "^3.9.4",
     "rollup": "^4.62.2",
     "typescript": "^6.0.3"
   },
   "engines": {
     "node": ">=22.0.0"
   },
-  "packageManager": "yarn@4.16.0",
+  "packageManager": "yarn@4.17.0",
   "license": "MIT"
 }

@@ -1,0 +1,53 @@
+# @exortek/crypto
+
+Zero-dependency cryptographic primitives for the auth stack. Everything is built on `node:crypto`.
+
+## Install
+
+```bash
+npm install @exortek/crypto
+```
+
+Requires **Node.js 22 or newer**.
+
+## Modules
+
+Import at the top level, or from a subpath for the smallest bundle.
+
+| Module | What it is |
+| --- | --- |
+| `random` | bytes, hex, base64url, base58, crockford, alphanumeric, numeric, pin, code, serial, token, uuid v4/v5/v7, ulid |
+| `hash` | hash, hmac, compare (timing-safe), verifyHmac, pbkdf2, hkdf, scrypt |
+| `cipher` | AES-GCM/CBC, ChaCha20-Poly1305, RSA-OAEP, hybrid, ECDH/X25519, encryptWithPassphrase |
+| `sign` | RS/PS/ES 256/384/512 (IEEE-P1363), EdDSA, thumbprint |
+| `encode` | base64url, base64, base32, hex — encode/decode |
+| `binary` | concat, xor, wipe, equal |
+| `errors` | `CryptoError` + stable `ErrorCode` |
+
+## Import styles
+
+```js
+// 1. Named, top-level — most ergonomic, still tree-shakes
+import { uuid4, hash, cipher } from '@exortek/crypto'
+
+// 2. Named, subpath — smallest bundle
+import { uuid4 } from '@exortek/crypto/random'
+
+// 3. Namespace — bulk / interactive
+import { random } from '@exortek/crypto'
+random.uuid4()
+```
+
+## Error handling
+
+```js
+import { CryptoError, ErrorCode } from '@exortek/crypto'
+
+try {
+  await cipher.decryptWithPassphrase(token, passphrase)
+} catch (err) {
+  if (err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED) {
+    // wrong passphrase / tampered token
+  }
+}
+```
