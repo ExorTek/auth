@@ -2,9 +2,9 @@ import nextra from 'nextra';
 
 const withNextra = nextra({
   defaultShowCopyCode: true,
-  search: {
-    codeblocks: false,
-  },
+  // Pagefind (Nextra's default search) needs a post-build step to
+  // generate the /_pagefind index. Disabled until we wire that.
+  search: false,
   mdxOptions: {
     rehypePrettyCodeOptions: {
       theme: {
