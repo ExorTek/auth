@@ -47,7 +47,7 @@ their inbox by prefix.
 | `docs/` | README, CONTRIBUTING, JSDoc, ARCHITECTURE. | `docs/crypto-readme` |
 | `test/` | Test-only additions or reshuffles. | `test/seal-clock-skew` |
 | `chore/` | Repo housekeeping — CI, deps, config. | `chore/upgrade-prettier` |
-| `release/` | Cutting a version (Changesets). | `release/v0.1.0` |
+| `release/` | Cutting a version (Changesets). | `release/v1.1.0` |
 
 Keep branch names lower-kebab-case. Avoid trailing issue numbers; commits and
 PR descriptions carry those.

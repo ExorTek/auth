@@ -27,7 +27,7 @@
     "typecheck": "yarn workspaces foreach --all --exclude web run typecheck",
     "clean": "yarn workspaces foreach --all --exclude web run clean",
     "changeset": "changeset",
-    "version": "changeset version",
+    "changeset:ver": "changeset version",
     "release": "yarn build && changeset publish",
     "web:dev": "yarn workspace web dev",
     "web:build": "yarn workspace web build"
