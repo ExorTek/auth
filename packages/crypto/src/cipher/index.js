@@ -4,6 +4,7 @@ import { encryptAsymmetric, decryptAsymmetric } from './asymmetric.js';
 import { encryptHybrid, decryptHybrid } from './hybrid.js';
 import { deriveSharedSecret } from './derive.js';
 import { encryptWithPassphrase, decryptWithPassphrase } from './passphrase.js';
+import { seal, unseal } from './seal.js';
 import { SYMMETRIC_ALGOS, ASYMMETRIC_ALGOS, KEY_AGREEMENT_ALGOS } from './algorithms.js';
 import { CryptoError, ErrorCode } from '../errors.js';
 
@@ -102,6 +103,8 @@ export const cipher = Object.freeze({
   encryptWithPassphrase,
   decryptWithPassphrase,
   deriveSharedSecret,
+  seal,
+  unseal,
   SYMMETRIC_ALGOS,
   ASYMMETRIC_ALGOS,
   KEY_AGREEMENT_ALGOS,
@@ -121,6 +124,8 @@ export {
   encryptWithPassphrase,
   decryptWithPassphrase,
   deriveSharedSecret,
+  seal,
+  unseal,
   SYMMETRIC_ALGOS,
   ASYMMETRIC_ALGOS,
   KEY_AGREEMENT_ALGOS,

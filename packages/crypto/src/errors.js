@@ -21,6 +21,12 @@ export const ErrorCode = Object.freeze({
   DECRYPT_FAILED: 'DECRYPT_FAILED',
   /** Encoded input is not valid for the requested format (e.g. non-hex chars in hex.decode). */
   INVALID_ENCODING: 'INVALID_ENCODING',
+  /** A sealed token's structure/framing is unparseable (bad length, wrong version byte). */
+  TOKEN_MALFORMED: 'TOKEN_MALFORMED',
+  /** A sealed token failed authenticated decryption (wrong secret, tampered bytes). */
+  TOKEN_TAMPERED: 'TOKEN_TAMPERED',
+  /** A sealed token's expiry timestamp has passed. */
+  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
 });
 
 /**
