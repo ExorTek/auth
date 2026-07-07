@@ -30,7 +30,8 @@
     "changeset:ver": "changeset version",
     "release": "yarn build && changeset publish",
     "web:dev": "yarn workspace web dev",
-    "web:build": "yarn workspace web build"
+    "web:build": "yarn workspace web build",
+    "web:preview": "yarn workspace web preview"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",

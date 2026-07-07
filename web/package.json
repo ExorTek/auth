@@ -3,7 +3,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build && pagefind --site .next/server/app --output-path public/_pagefind",
-    "start": "next start"
+    "start": "next start",
+    "preview": "next start -p 3001"
   },
   "dependencies": {
     "next": "^16.2.10",
