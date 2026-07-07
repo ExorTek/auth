@@ -422,6 +422,162 @@ type. Handy for REPL-style code; prefer the explicit variants at call
 sites where the return type matters — the polymorphic form's return
 type is ambiguous.
 
+## Real-world flows
+
+### Sign-up + email verification
+
+```js
+import { cipher, CryptoError, ErrorCode } from '@exortek/crypto'
+import { password } from './password.js'
+
+// POST /signup
+app.post('/signup', async (req, res) => {
+  const { email, rawPassword } = req.body
+
+  // Store an Argon2id verifier — never the raw password
+  const verifier = await password.hash(rawPassword)
+  await db.users.insert({ email, verifier, verifiedAt: null })
+
+  // Mint a 24-hour verification ticket. Payload is encrypted, expiry is
+  // authenticated — nobody can extend it by editing bytes.
+  const ticket = cipher.seal(
+    { email, purpose: 'email-verify' },
+    process.env.VERIFY_SECRET,
+    { ttl: '24h' },
+  )
+
+  await mail.send(email, `Click to verify: https://app.example/verify?t=${ticket}`)
+  res.status(202).end()
+})
+
+// GET /verify
+app.get('/verify', async (req, res) => {
+  try {
+    const { payload } = cipher.unseal(req.query.t, process.env.VERIFY_SECRET)
+    if (payload.purpose !== 'email-verify') return res.status(400).end()
+    await db.users.update({ email: payload.email }, { verifiedAt: new Date() })
+    res.render('verified')
+  } catch (err) {
+    if (!(err instanceof CryptoError)) throw err
+    if (err.code === ErrorCode.TOKEN_EXPIRED)   return res.render('link-expired')
+    if (err.code === ErrorCode.TOKEN_TAMPERED)  return res.status(404).end()
+    if (err.code === ErrorCode.TOKEN_MALFORMED) return res.status(400).end()
+    throw err
+  }
+})
+```
+
+### Encrypted session cookie
+
+```js
+import { cipher } from '@exortek/crypto'
+
+// Boot: load key from a KMS / vault, imported once per process
+const SESSION_KEY = crypto.createSecretKey(
+  Buffer.from(process.env.SESSION_KEY_B64, 'base64'),
+)
+
+// On login — issue the cookie
+res.cookie(
+  'sess',
+  cipher.encryptToString({ userId: user.id, roles: user.roles }, SESSION_KEY),
+  { httpOnly: true, sameSite: 'strict', secure: true, maxAge: 7 * 86_400_000 },
+)
+
+// On every request — decrypt the cookie
+try {
+  const session = cipher.decryptFromString(req.cookies.sess, SESSION_KEY)
+  req.user = session
+  next()
+} catch {
+  res.clearCookie('sess')
+  return res.status(401).end()
+}
+```
+
+### Encrypted backup file
+
+```js
+import { cipher } from '@exortek/crypto'
+import { writeFile } from 'node:fs/promises'
+
+// User enters a passphrase; we don't store it anywhere
+const token = await cipher.encryptWithPassphrase(
+  JSON.stringify(backupPayload),
+  userPassphrase,
+)
+await writeFile(`/backups/${user.id}.enc`, token, 'utf8')
+
+// Restore later
+const raw   = await readFile(`/backups/${user.id}.enc`, 'utf8')
+const bytes = await cipher.decryptWithPassphrase(raw, userPassphrase)
+const data  = JSON.parse(bytes.toString('utf8'))
+```
+
+## Common mistakes
+
+<Callout type="error">
+  **Forgetting `await` on key generation.** `generateKey`,
+  `generateKeyPair`, and `encryptWithPassphrase` all return `Promise`.
+  Passing the Promise where a `KeyObject` is expected throws
+  `INVALID_KEY: key must be a KeyObject; got a Promise — did you forget
+  "await"?`.
+</Callout>
+
+<Callout type="error">
+  **Passing a raw string / Buffer as the key.** `cipher.encryptSymmetric`
+  wants a `KeyObject`. For raw bytes, wrap with
+  `crypto.createSecretKey(buf)`. For a passphrase, use
+  `cipher.encryptWithPassphrase`.
+</Callout>
+
+<Callout type="error">
+  **Reusing an IV under the same key.** AES-GCM catastrophically fails
+  on nonce reuse — an attacker recovers the auth key and every message
+  under it. `encryptSymmetric` generates a fresh IV per call; never
+  pass your own unless you know exactly what you're doing.
+</Callout>
+
+<Callout type="error">
+  **Using CBC without HMAC.** CBC gives confidentiality but not
+  integrity. Padding oracle attacks are the classic exploit. For new
+  code use `aes-256-gcm` or `chacha20-poly1305` (both AEAD).
+</Callout>
+
+<Callout type="error">
+  **Encrypting large payloads with RSA-OAEP.** The modulus caps payload
+  size at ~190 bytes for a 2048-bit key. For anything larger use
+  `cipher.encryptHybrid` — it wraps a fresh AES key with RSA and
+  encrypts the payload with AES.
+</Callout>
+
+<Callout type="error">
+  **Using `deriveSharedSecret` output directly as a key.** DH secrets
+  are not uniformly distributed. Always run the output through
+  [`hkdf`](/crypto/hash#hkdf) with an `info` string before using it.
+</Callout>
+
+<Callout type="warning">
+  **Sharing the same secret for two purposes.** Anywhere you're about
+  to use one secret to derive two keys, run each through HKDF with a
+  different `info` string. TLS 1.3, Signal, Age — every serious
+  protocol does this.
+</Callout>
+
+<Callout type="warning">
+  **Rendering `TOKEN_TAMPERED` differently from `TOKEN_MALFORMED`.**
+  Both mean "not a token I issued". Same HTTP status, same body — never
+  confirm to a probing client that they hit the framing right.
+</Callout>
+
+<Callout type="warning">
+  **Persisting keys only in memory.** A restart wipes the key and every
+  ciphertext becomes undecryptable. Export via
+  `keyObject.export({ format: 'pem' })` and store in a KMS / secrets
+  manager; import on startup with `crypto.createSecretKey` /
+  `crypto.createPrivateKey`.
+</Callout>
+
 ## Security notes
 
 - **AEAD only.** For new work use AES-GCM or ChaCha20-Poly1305. CBC is

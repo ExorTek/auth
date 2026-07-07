@@ -8,25 +8,47 @@ import { Callout, Tabs } from 'nextra/components';
 # `hash`
 
 Digests, keyed message authentication, key derivation, timing-safe
-compare, signed cookies, and content-addressed fingerprints. Everything a
+compare, signed values, and content-addressed fingerprints. Everything a
 non-encrypting checksum-shaped primitive can be.
 
-```js
-import { hash, hmac, compare, verifyHmac, pbkdf2, hkdf, scrypt,
-         signValue, unsignValue, fingerprint } from '@exortek/crypto'
-```
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import { hash, hmac, compare, verifyHmac,
+             pbkdf2, hkdf, scrypt,
+             signValue, unsignValue, fingerprint }
+      from '@exortek/crypto'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { hash, hmac, compare, verifyHmac,
+            pbkdf2, hkdf, scrypt,
+            signValue, unsignValue, fingerprint }
+      = require('@exortek/crypto')
+    ```
+  </Tabs.Tab>
+</Tabs>
 
-## When to use what
+## Which one for what?
 
-| Use case | Function |
+| I want to… | Reach for |
 | --- | --- |
-| Fingerprint a file / blob | [`hash`](#hash) |
-| Verify a Stripe / GitHub webhook signature | [`verifyHmac`](#verifyhmac) |
+| Verify a webhook signature (Stripe / GitHub / Slack) | [`verifyHmac`](#verifyhmac) |
 | Sign a cookie value | [`signValue`](#signvalue--unsignvalue) |
-| Derive an encryption key from a passphrase | [`pbkdf2`](#pbkdf2) or [`scrypt`](#scrypt) |
-| Derive N keys from one master secret | [`hkdf`](#hkdf) |
-| Compare two secrets (timing-safe) | [`compare`](#compare) |
-| Cache key / ETag for a request body | [`fingerprint`](#fingerprint) |
+| Compute a stable cache / ETag / idempotency key | [`fingerprint`](#fingerprint) |
+| Store an encryption-key passphrase | [`pbkdf2`](#pbkdf2) or [`scrypt`](#scrypt) |
+| Derive many keys from one master secret | [`hkdf`](#hkdf) |
+| Hash a file / blob | [`hash`](#hash) |
+| Compute a keyed MAC | [`hmac`](#hmac) |
+| Compare two secrets without leaking timing | [`compare`](#compare) |
+
+<Callout type="warning">
+  **Password verifiers (login flows) belong in a memory-hard hasher**
+  (Argon2id / bcrypt). PBKDF2 and scrypt derive *cipher key material*
+  from a passphrase — different purpose. If you're storing "what a user
+  typed" for later comparison, pick a purpose-built password hasher.
+</Callout>
 
 ## Digests
 
@@ -39,36 +61,54 @@ interface HashOptions {
   algo?:     'sha256' | 'sha384' | 'sha512'
            | 'sha3-256' | 'sha3-384' | 'sha3-512'
            | 'blake2b512' | 'blake2s256'
-           | 'sha1' | 'md5'                       // legacy, interop only
-  encoding?: 'hex' | 'base64' | 'base64url' | 'buffer'  // default 'hex'
+           | 'sha1' | 'md5'                       // legacy interop only
+  encoding?: 'hex' | 'base64' | 'base64url' | 'buffer'   // default 'hex'
 }
 ```
 
-Compute a cryptographic hash. SHA-256 by default; see the algorithm table
-below for the full whitelist.
+Compute a cryptographic hash. SHA-256 by default.
 
 ```js
 hash('hello world')                          // sha256 hex
 hash(fileBuf, { algo: 'sha512' })            // sha512 hex
 hash(buf, { encoding: 'base64url' })         // sha256 URL-safe
-hash(buf, { encoding: 'buffer' })            // raw digest bytes
+hash(buf, { encoding: 'buffer' })            // raw digest bytes for chaining
+```
+
+**Real-world — file integrity check:**
+
+```js
+import { readFile } from 'node:fs/promises'
+import { hash } from '@exortek/crypto'
+
+const digest = hash(await readFile('/downloads/app.tar.gz'), { algo: 'sha256' })
+console.log('sha256:', digest)   // '5a0d7f...'
+// compare to publisher's advertised digest to verify no corruption
 ```
 
 **Algorithm groups:**
 
-| Family | Members | Use for |
+| Family | Members | Notes |
 | --- | --- | --- |
-| SHA-2 | `sha256` · `sha384` · `sha512` | Modern default. `sha256` is the sane choice for almost everything. |
-| SHA-3 | `sha3-256` · `sha3-384` · `sha3-512` | Structurally distinct from SHA-2 (Keccak sponge). Hedge against SHA-2 cryptanalysis. |
+| SHA-2 | `sha256` · `sha384` · `sha512` | Modern default. `sha256` is the sane pick almost everywhere. |
+| SHA-3 | `sha3-256` · `sha3-384` · `sha3-512` | Structurally distinct from SHA-2 (Keccak sponge) — hedge against SHA-2 cryptanalysis. |
 | BLAKE2 | `blake2b512` · `blake2s256` | Faster than SHA-3 on modern CPUs, comparable security. |
-| Legacy | `sha1` · `md5` | **Broken.** Included only for interop with existing digests you can't change. |
+| Legacy | `sha1` · `md5` | **Broken** — collision-vulnerable. For interop with pre-existing digests only. |
 
 <Callout type="error">
-  **Never use `md5` or `sha1` on untrusted input.** They are collision-
-  vulnerable — an attacker can craft two different inputs with the same
-  digest. Fine for a checksum on a file you control; catastrophic anywhere
-  security matters.
+  **Never use `md5` or `sha1` on untrusted input.** Both are
+  collision-vulnerable — an attacker can craft two different inputs with
+  the same digest. Fine for a checksum on data you control; catastrophic
+  anywhere security matters.
 </Callout>
+
+**Errors:**
+- `INVALID_ARGUMENT` — `data` is not a string / Buffer, or `options.encoding`
+  is not one of `hex` / `base64` / `base64url` / `buffer`.
+- `UNSUPPORTED_ALGORITHM` — `algo` is not in the supported list. Error
+  message enumerates every supported name.
+
+---
 
 ### `hmac`
 
@@ -79,21 +119,28 @@ hmac(data:   string | Buffer | Uint8Array,
 ```
 
 Compute a keyed HMAC (RFC 2104) — the standard way to prove "I know the
-key and this data has not been tampered with". Suitable for signed
-cookies, webhook signatures, cache keys derived from user input.
+key and this data has not been tampered with". Same options shape as
+[`hash`](#hash).
 
 ```js
-hmac('user:42', COOKIE_SECRET)                      // sha256 hex
-hmac(webhookBody, WHSEC, { algo: 'sha256' })        // Stripe / GitHub style
-hmac(data, key, { encoding: 'base64url' })          // JOSE / URL contexts
+hmac('user:42', COOKIE_SECRET)                       // sha256 hex
+hmac(webhookBody, WHSEC, { algo: 'sha256' })         // Stripe / GitHub style
+hmac(data, key, { encoding: 'base64url' })           // JOSE / URL contexts
 ```
 
-Never use `md5` or `sha1` for HMAC of untrusted input. HMAC is more
-resilient than the underlying hash but prefer `sha256`+ for security-
-sensitive verification.
+<Callout type="info">
+  **For verification prefer [`verifyHmac`](#verifyhmac).** It wraps
+  `hmac(...) + compare(...)` in a single timing-safe call and closes off
+  the classic pitfall of using `===` on the comparison.
+</Callout>
 
-For verification, prefer [`verifyHmac`](#verifyhmac) — it wraps this call
-in a timing-safe compare so you never accidentally use `===`.
+Never use `md5` or `sha1` for HMAC of untrusted input. HMAC is more
+resilient than the underlying hash, but prefer `sha256`+ for anything
+security-sensitive.
+
+**Errors:** same as [`hash`](#hash).
+
+---
 
 ### `compare`
 
@@ -102,18 +149,26 @@ compare(a: string | Buffer | Uint8Array,
         b: string | Buffer | Uint8Array): boolean
 ```
 
-Timing-safe equality check for secrets. Returns `false` for different-
-length inputs instead of throwing (unlike `crypto.timingSafeEqual`).
+Timing-safe equality check for two secrets. Different-length inputs
+return `false` (unlike `crypto.timingSafeEqual` which throws).
 
 ```js
-compare(givenToken, expectedToken)   // true / false, no timing leak
+if (compare(givenToken, expectedToken)) {
+  // authenticated
+}
 ```
 
-<Callout type="warning">
-  Do not use `===` to compare an HMAC, a token, or a password hash.
+Accepts strings and byte buffers; the two arguments can be different
+types (e.g. `compare(bufferMac, hexString)`).
+
+<Callout type="error">
+  **Do not use `===` to compare an HMAC, a token, or any secret.**
   Character-by-character comparison leaks how many prefix characters
-  matched, which is enough to brute-force the value across many requests.
+  matched — enough to brute-force the value across many requests.
+  Every "we thought we were checking a secret" CVE is this pitfall.
 </Callout>
+
+---
 
 ### `verifyHmac`
 
@@ -124,26 +179,66 @@ verifyHmac(data:     string | Buffer | Uint8Array,
            options?: HashOptions): boolean
 ```
 
-Compute the HMAC of `data` under `secret` and compare it timing-safely to
-`expected`. This is the primitive Stripe, GitHub, Slack, Twilio, Vercel
-and every webhook-shipping SaaS use.
+Compute the HMAC of `data` under `secret` and compare it timing-safely
+to `expected`. This is the primitive Stripe, GitHub, Slack, Twilio,
+Vercel, Shopify — every webhook-shipping SaaS — use.
+
+**Real-world — Stripe webhook handler (Express):**
 
 ```js
-// Express handler for a Stripe webhook
-app.post('/webhook', express.raw({ type: '*/*' }), (req, res) => {
-  const ok = verifyHmac(
-    req.body,
-    req.headers['stripe-signature'],
-    process.env.STRIPE_WHSEC,
-  )
-  if (!ok) return res.status(401).end()
-  // ... handle the event
+import express from 'express'
+import { verifyHmac } from '@exortek/crypto'
+
+app.post(
+  '/webhooks/stripe',
+  express.raw({ type: '*/*' }),        // raw body is critical — Stripe signs raw bytes
+  (req, res) => {
+    const sig = req.headers['stripe-signature']?.split(',')
+      .find(p => p.startsWith('v1='))?.slice(3)   // parse Stripe's timestamp,v1=... shape
+
+    if (!sig || !verifyHmac(req.body, sig, process.env.STRIPE_WHSEC)) {
+      return res.status(401).end()
+    }
+
+    const event = JSON.parse(req.body.toString('utf8'))
+    // ... handle the event
+    res.status(204).end()
+  },
+)
+```
+
+**Real-world — GitHub webhook (Fastify):**
+
+```js
+fastify.post('/webhooks/github', {
+  config: { rawBody: true },
+}, async (req, reply) => {
+  const sig = req.headers['x-hub-signature-256']?.slice(7)  // strip 'sha256='
+  const ok  = sig && verifyHmac(req.rawBody, sig, process.env.GITHUB_WHSEC)
+  if (!ok) return reply.code(401).send()
+  // ... handle
 })
 ```
 
 `expected` can be a Buffer or a string. Strings are decoded per
-`options.encoding` (default `hex`). Match the format your webhook provider
-uses.
+`options.encoding` (default `hex`). Match the format your webhook
+provider uses — Stripe is hex, GitHub is hex, Slack is hex, Shopify is
+base64.
+
+<Callout type="warning">
+  **Always sign the *raw* body, not the parsed JSON.** JSON round-trip
+  (`JSON.parse(...)` then `JSON.stringify(...)`) reorders keys and
+  drops whitespace — the resulting bytes will not match the signature
+  the provider computed. Every framework has a way to preserve the raw
+  body (Express: `express.raw`, Fastify: `rawBody` plugin, Hono:
+  `c.req.raw`).
+</Callout>
+
+**Errors:**
+- `INVALID_ARGUMENT` — bad type on any input.
+- `UNSUPPORTED_ALGORITHM` — unknown `options.algo`.
+
+---
 
 ## Key derivation (KDFs)
 
@@ -152,16 +247,8 @@ Three KDFs, three different jobs. Pick by input entropy:
 | KDF | Input entropy | Speed | Use for |
 | --- | --- | --- | --- |
 | [`hkdf`](#hkdf) | high (already-random secret) | fast | derive N subkeys from a master key |
-| [`pbkdf2`](#pbkdf2) | low (human passphrase) | tunable slow | interoperable password KDF |
-| [`scrypt`](#scrypt) | low (human passphrase) | memory-hard slow | GPU-resistant password KDF |
-
-<Callout type="info">
-  **These KDFs derive keys from passwords, they don't verify user logins.**
-  If you're building password authentication, reach for a memory-hard,
-  purpose-built password hasher (Argon2id or bcrypt). PBKDF2 and scrypt
-  are here for deriving *cipher key material* from a passphrase, not for
-  storing password verifiers.
-</Callout>
+| [`pbkdf2`](#pbkdf2) | low (human passphrase) | tunable slow | broadly interoperable password → key |
+| [`scrypt`](#scrypt) | low (human passphrase) | memory-hard slow | GPU-resistant password → key |
 
 ### `hkdf`
 
@@ -174,11 +261,11 @@ interface HkdfOptions {
   info?:     string | Buffer | Uint8Array    // default empty — DOMAIN SEPARATION
   length?:   number                          // default 32
   hash?:     'sha256' | 'sha384' | 'sha512'  // default 'sha256'
-  encoding?: 'hex' | 'base64' | 'base64url' | 'buffer'  // default 'buffer'
+  encoding?: 'hex' | 'base64' | 'base64url' | 'buffer'   // default 'buffer'
 }
 ```
 
-HKDF (RFC 5869) — extract-and-expand key derivation from high-entropy
+HKDF (RFC 5869) — extract-and-expand key derivation from **high-entropy**
 input keying material. The `info` parameter provides **domain
 separation** — same IKM + different info = cryptographically independent
 subkeys.
@@ -187,18 +274,33 @@ subkeys.
 // Two keys from one master secret, guaranteed independent
 const encKey = hkdf(masterSecret, { info: 'encryption', length: 32 })
 const macKey = hkdf(masterSecret, { info: 'authentication', length: 32 })
-
-// Session key with salt + application context
-const sessionKey = hkdf(sharedSecret, {
-  salt:   userId,
-  info:   'session-v1',
-  length: 32,
-})
 ```
 
-**Rule of thumb.** Any time you're about to use the same secret for two
-different purposes, run each through HKDF with a unique `info` string
-first. This is what TLS 1.3, Signal, and Age all do internally.
+**Real-world — session token with per-user derived key:**
+
+```js
+// Derive a per-user encryption key from a global master
+const userKey = hkdf(MASTER_SECRET, {
+  salt: userId,          // stable per-user salt
+  info: 'session-v1',    // versioned so future rotations are painless
+  length: 32,
+})
+const token = cipher.encryptToString({ userId, roles }, cipher.wrapKey(userKey))
+```
+
+<Callout type="info">
+  **Domain-separate everything.** Any time you're about to use the same
+  secret for two different purposes, run each through HKDF with a
+  distinct `info` string first. TLS 1.3, Signal, and Age all do this
+  internally — it's the single most under-used precaution in production
+  systems.
+</Callout>
+
+**Errors:**
+- `INVALID_ARGUMENT` — bad input types; `length` exceeds `255 × hashLength`.
+- `UNSUPPORTED_ALGORITHM` — unknown `hash`.
+
+---
 
 ### `pbkdf2`
 
@@ -207,29 +309,30 @@ pbkdf2(password: string | Buffer | Uint8Array,
        options:  Pbkdf2Options): Promise<string | Buffer>
 
 interface Pbkdf2Options {
-  salt:         string | Buffer | Uint8Array  // required, ≥ 16 bytes
-  iterations?:  number                        // OWASP 2023 defaults per digest
+  salt:         string | Buffer | Uint8Array  // REQUIRED, ≥ 16 bytes
+  iterations?:  number                        // OWASP 2023 default per digest
   keyLength?:   number                        // default 32
   digest?:      'sha256' | 'sha384' | 'sha512'  // default 'sha512'
-  encoding?:    'hex' | 'base64' | 'base64url' | 'buffer'  // default 'buffer'
+  encoding?:    'hex' | 'base64' | 'base64url' | 'buffer'   // default 'buffer'
 }
 ```
 
 PBKDF2 (RFC 8018) — derives a fixed-size key from a passphrase.
-Deliberately slow to make brute-force expensive. Defaults are OWASP 2023
-minimum iteration counts per digest:
+Deliberately slow. Defaults are **OWASP 2023 minimums**:
 
-| Digest | Default iterations |
+| `digest` | Default `iterations` |
 | --- | --- |
 | `sha256` | 600,000 |
 | `sha384` | 250,000 |
 | `sha512` | 210,000 |
 
 ```js
-const salt = random.bytes(16)
-const key  = await pbkdf2('user passphrase', { salt })  // 32-byte AES-256 key
+import { random, pbkdf2 } from '@exortek/crypto'
 
-// Explicit tuning
+const salt = random.bytes(16)
+const key  = await pbkdf2('user passphrase', { salt })   // 32-byte AES-256 key
+
+// Explicit tuning for a specific security posture
 const key = await pbkdf2('secret', {
   salt,
   iterations: 600_000,
@@ -240,10 +343,19 @@ const key = await pbkdf2('secret', {
 
 <Callout type="warning">
   **`iterations`, `keyLength`, `digest` are part of the recipe.** To
-  recover the key later you need the exact same values — treat them as
-  part of the ciphertext framing (that's how [`encryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase)
-  handles it).
+  recover the same key later you need the exact same values — treat all
+  four (including salt) as part of the ciphertext framing. That is why
+  [`cipher.encryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase)
+  packs the salt into the token: so decrypt time only needs the token +
+  the passphrase.
 </Callout>
+
+**Errors:**
+- `INVALID_ARGUMENT` — `password` / `options` type; `options.salt` missing
+  (error message includes a `random.bytes(16)` example).
+- `UNSUPPORTED_ALGORITHM` — unknown `digest`.
+
+---
 
 ### `scrypt`
 
@@ -254,11 +366,11 @@ scrypt(password: string | Buffer | Uint8Array,
 interface ScryptOptions {
   salt:       string | Buffer | Uint8Array
   keyLength?: number    // default 32
-  N?:         number    // CPU/memory cost, default 2^15 (32768)
+  N?:         number    // CPU/memory cost, power of two, default 2^15 (32768)
   r?:         number    // block size, default 8
   p?:         number    // parallelisation, default 1
-  maxmem?:    number    // memory ceiling
-  encoding?:  'hex' | 'base64' | 'base64url' | 'buffer'  // default 'buffer'
+  maxmem?:    number    // memory ceiling (bytes)
+  encoding?:  'hex' | 'base64' | 'base64url' | 'buffer'
 }
 ```
 
@@ -269,11 +381,25 @@ of RAM.
 ```js
 const key = await scrypt('user passphrase', {
   salt: random.bytes(16),
-})   // 32-byte key, ~64 MB peak RAM, ~100 ms on a modern laptop
+})
+// 32-byte key, ~64 MB peak RAM, ~100 ms on a modern laptop
 ```
 
 `N` must be a power of two; the defaults (`N=32768, r=8, p=1`) match the
 scrypt paper's "interactive login" tuning.
+
+<Callout type="info">
+  **`Error: memory limit exceeded`?** scrypt fails if
+  `N × r × p × 128` exceeds Node's default memory ceiling (~32 MiB).
+  Pass `options.maxmem` (in bytes) to raise it, or lower `N`. The error
+  message from `@exortek/crypto` points at this fix.
+</Callout>
+
+**Errors:**
+- `INVALID_ARGUMENT` — missing `salt`; non-positive `N`/`r`/`p`; scrypt
+  memory limit hit.
+
+---
 
 ## Signed values
 
@@ -290,44 +416,77 @@ unsignValue(signed: string,
 ```
 
 Sign an opaque string value with a secret, producing a self-verifying
-string you can round-trip through a cookie, header, URL fragment, or
+string you can round-trip through a cookie, header, URL parameter, or
 link.
 
-Output shape is `<value>.<base64url_hmac>` — the exact scheme Express's
-`cookie-signature` and Django's `signing` module use.
+Output shape is `"<value>.<base64url_hmac>"` — the same scheme Express's
+`cookie-signature`, Django's `signing`, and Rails's `MessageVerifier`
+use.
+
+**Real-world — signed session cookie:**
 
 ```js
-// Sign a session cookie value
-const cookie = signValue('sid:8f2a', process.env.COOKIE_SECRET)
-res.cookie('sid', cookie, { httpOnly: true, sameSite: 'lax' })
+import { signValue, unsignValue } from '@exortek/crypto'
 
-// Verify on the next request
+// On login
+res.cookie(
+  'sid',
+  signValue(sessionId, process.env.COOKIE_SECRET),
+  { httpOnly: true, sameSite: 'lax', secure: true },
+)
+
+// On every request
 const sid = unsignValue(req.cookies.sid, process.env.COOKIE_SECRET)
-if (sid === null) return res.status(401).end()   // tampered / wrong secret
+if (sid === null) return res.status(401).end()
+// sid is the original sessionId — safe to look up in the DB
+```
+
+**Real-world — signed unsubscribe link (no DB round trip):**
+
+```js
+const token = signValue(`unsub:${userId}`, process.env.MAIL_SECRET)
+const url   = `https://app.example/mail/unsubscribe?t=${encodeURIComponent(token)}`
+// Email the URL. When they click:
+
+const value = unsignValue(req.query.t, process.env.MAIL_SECRET)
+if (value === null || !value.startsWith('unsub:')) return res.status(400).end()
+const userId = value.slice('unsub:'.length)
+await db.mail.unsubscribe(userId)
+```
+
+**Rotation — sign with the newest secret, verify by trying each:**
+
+```js
+const SECRETS = [process.env.COOKIE_SECRET_V2, process.env.COOKIE_SECRET_V1]
+
+// Verify
+const value = SECRETS.map(s => unsignValue(cookie, s)).find(v => v !== null)
+if (value === null) return res.status(401).end()
 ```
 
 <Callout type="info">
   **Not encryption.** The value stays visible in the output — the
-  signature only proves the client hasn't tampered with it. If the value
-  itself is sensitive, use [`cipher.seal`](/crypto/cipher#seal--unseal)
-  instead.
+  signature only proves the client hasn't tampered with it. If the
+  value itself is sensitive, use
+  [`cipher.seal`](/crypto/cipher#seal--unseal) instead.
 </Callout>
-
-**Rotation.** Sign new cookies with the newest secret; verify by trying
-each candidate secret until one succeeds:
-
-```js
-const value = SECRETS.map(s => unsignValue(cookie, s)).find(v => v !== null)
-```
 
 **Constraints:**
 
 - `value` must be a string.
-- `value` must not contain `.` (the separator). Encode as base64url or
-  hex first for arbitrary bytes.
-- `unsignValue` returns `null` on any failure — bad separator, tampered
-  MAC, wrong secret, unsupported algo. This is the boundary-check convention
-  used by cookie-signature and Django; do not try/catch.
+- `value` must not contain `.` (the separator). If you need arbitrary
+  bytes, base64url-encode the value first: `signValue(base64url.encode(v),
+  secret)`.
+- `unsignValue` returns `null` on any failure — malformed input,
+  tampered MAC, wrong secret, unsupported algorithm. This is the
+  boundary-check convention used by cookie-signature and Django; **do
+  not try/catch**, match on `null`.
+
+**Errors:**
+- `INVALID_ARGUMENT` — `value` is not a string or contains `.`.
+- `UNSUPPORTED_ALGORITHM` — `options.algo` not in sha256/384/512.
+
+---
 
 ## Fingerprint
 
@@ -342,51 +501,115 @@ Deterministic content-addressed hash of any JSON-shaped value.
 `JSON.stringify` doesn't guarantee key order — two equivalent objects can
 serialise differently. `fingerprint` first **canonicalises** the input
 (sorted keys per RFC 8785 UTF-16 code-unit order, no whitespace,
-`.toJSON()` unwrap, `Date` handling) and then hashes.
+`.toJSON()` unwrap, `Date` support) and then hashes.
 
 ```js
 fingerprint({ b: 2, a: 1 }) === fingerprint({ a: 1, b: 2 })   // true
-fingerprint({ items: [{ id: 2 }, { id: 1 }] })                // stable across runtimes
+fingerprint({ items: [{ id: 2 }, { id: 1 }] })                // stable across Node versions
 fingerprint(payload, { algo: 'sha512', encoding: 'base64url' })
 ```
 
-Use cases:
+**Real-world — HTTP ETag on a dynamic endpoint:**
 
-- **Cache keys / ETags** derived from a request body.
-- **Idempotency keys** for at-least-once APIs — reject a duplicate POST
-  if the body fingerprint matches a previous request.
-- **Dedup IDs** in an event stream — compute once at the producer.
+```js
+app.get('/api/dashboard', async (req, res) => {
+  const data = await computeDashboard(req.user.id)
+  const etag = `W/"${fingerprint(data).slice(0, 16)}"`
+  if (req.headers['if-none-match'] === etag) {
+    return res.status(304).end()
+  }
+  res.setHeader('ETag', etag)
+  res.json(data)
+})
+```
+
+**Real-world — idempotency key for a payment endpoint:**
+
+```js
+app.post('/api/charge', async (req, res) => {
+  const key = fingerprint({ userId: req.user.id, body: req.body })
+  const previous = await db.charges.findOne({ idempotencyKey: key })
+  if (previous) return res.json(previous.response)
+  const charge = await stripe.charge(...)
+  await db.charges.insert({ idempotencyKey: key, response: charge })
+  res.json(charge)
+})
+```
+
+**Real-world — dedup an event stream:**
+
+```js
+for (const event of stream) {
+  const id = fingerprint({
+    type: event.type,
+    payload: event.payload,
+    minuteBucket: Math.floor(event.timestamp / 60_000),
+  })
+  if (await seen.has(id)) continue
+  await seen.add(id)
+  await handle(event)
+}
+```
 
 **Accepted:** `null`, `boolean`, finite `number`, `string`, `Array`,
 plain object, any object with a `.toJSON()` method (e.g. `Date`).
 
-**Rejected** (throws `INVALID_ARGUMENT`): `undefined`, `bigint`,
-`symbol`, `function`, `NaN`, `±Infinity`, `Buffer` / `Uint8Array` at any
-depth (encode as base64 or hex first), cyclic references.
+**Rejected** (throws `INVALID_ARGUMENT` with the path to the offending
+field): `undefined`, `bigint`, `symbol`, `function`, `NaN`, `±Infinity`,
+`Buffer` / `Uint8Array` at any depth (encode as base64 or hex first),
+cyclic references.
 
-## Security notes
+<Callout type="warning">
+  **BigInt is rejected on purpose.** JSON has no bigint representation
+  and different serialisers make different choices ("42n" vs `"42"` vs
+  `42`). To avoid silently unstable output, convert to string yourself
+  (`{ balance: String(userBalance) }`) before fingerprinting.
+</Callout>
 
-- **HMAC is timing-safe by construction** in [`verifyHmac`](#verifyhmac)
-  and [`compare`](#compare). Use those, not `===`.
-- **Never use `md5` or `sha1` on untrusted input.** Available for legacy
-  interop only.
-- **KDF outputs are keys, not password verifiers.** PBKDF2 and scrypt
-  derive cipher key material from a passphrase — they are not the right
-  tool for storing a user's login credentials. Use a memory-hard password
-  hasher (Argon2id) for that.
-- **Fingerprint canonicalisation is JSON-shaped only.** It rejects
-  BigInt, Symbol, Buffer at any depth — encode them explicitly first to
-  make the canonical form part of *your* contract, not ours.
-- **Domain-separate everything.** If you're deriving multiple keys from
-  one secret, run each through HKDF with a distinct `info` string. This
-  is the single most under-used precaution in production systems.
+---
 
-## Errors
+## Common mistakes
 
-See the [errors page](/crypto/errors) for the full `ErrorCode` enum. From
-this module you may see:
+<Callout type="error">
+  **`===` on secret comparison.** Character-by-character equality leaks
+  timing. Use [`compare`](#compare) for raw comparisons or
+  [`verifyHmac`](#verifyhmac) for HMAC verification.
+</Callout>
 
-- `INVALID_ARGUMENT` — bad input type, non-finite number, missing salt.
-- `UNSUPPORTED_ALGORITHM` — algo not in the whitelist.
-- `INVALID_ENCODING` (via `Buffer.from(str, encoding)`) — malformed
-  encoded strings.
+<Callout type="error">
+  **Signing parsed JSON instead of raw bytes.** `JSON.parse` → `JSON.stringify`
+  rearranges keys and drops whitespace — the resulting bytes won't match
+  what your webhook provider signed. Preserve the raw body at the
+  framework level (Express: `express.raw`, Fastify: `rawBody`, Hono:
+  `c.req.raw`).
+</Callout>
+
+<Callout type="error">
+  **Using PBKDF2 / scrypt as a password verifier.** These KDFs derive
+  cipher key material from a passphrase — they're not the right tool
+  for storing a user's login credentials. Use a memory-hard password
+  hasher (Argon2id / bcrypt) for that.
+</Callout>
+
+<Callout type="warning">
+  **Skipping domain separation.** If you derive multiple keys from one
+  secret, run each through HKDF with a distinct `info` string — never
+  reuse the raw secret for both encryption and authentication.
+</Callout>
+
+<Callout type="warning">
+  **Fingerprinting a Buffer.** `Buffer.prototype.toJSON` returns
+  `{ type: 'Buffer', data: [...] }` — a fingerprint would silently pass
+  but be surprising. `fingerprint()` rejects Buffers explicitly so you
+  encode them (base64 / hex) first.
+</Callout>
+
+## Related error codes
+
+- `INVALID_ARGUMENT` — bad input types, missing `salt`, non-finite number,
+  Buffer where JSON-shaped value expected. See the
+  [errors page](/crypto/errors#errorcode).
+- `UNSUPPORTED_ALGORITHM` — algo not in the module's whitelist. Error
+  message enumerates the supported set.
+- `INVALID_ENCODING` — reserved for `encode.*.decode` failures; the KDF /
+  hash paths do not emit it directly.

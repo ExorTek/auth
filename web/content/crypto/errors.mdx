@@ -3,40 +3,52 @@ title: 'crypto/errors — CryptoError'
 sidebarTitle: errors
 ---
 
-import { Callout } from 'nextra/components';
+import { Callout, Tabs } from 'nextra/components';
 
 # `errors`
 
-Every entry point in `@exortek/crypto` that can fail throws a `CryptoError`
-carrying a stable, machine-readable `code`. Branch on `code`, never on the
-message — messages may change between versions.
+Every entry point in `@exortek/crypto` that can fail throws a
+`CryptoError` carrying a stable, machine-readable `code`. **Branch on
+`code`, never on the message** — messages may change between versions,
+codes never do.
 
-```js
-import { CryptoError, ErrorCode } from '@exortek/crypto'
-```
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import { CryptoError, ErrorCode } from '@exortek/crypto'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { CryptoError, ErrorCode } = require('@exortek/crypto')
+    ```
+  </Tabs.Tab>
+</Tabs>
 
 ## `CryptoError`
 
 ```ts
 class CryptoError extends Error {
-  name:  'CryptoError'
-  code:  string           // one of ErrorCode
-  cause?: unknown         // wrapped underlying error (e.g. an OpenSSL exception)
+  name:   'CryptoError'
+  code:   string           // one of ErrorCode
+  cause?: unknown          // wrapped underlying error (node:crypto exception)
 }
 ```
 
-Extends the built-in `Error`. Adds a `code` property (stable) and an
-optional `cause` (the underlying `node:crypto` error, useful for
-diagnostics but never for user-facing messages).
+Extends the built-in `Error`. Adds a stable `code` (see [ErrorCode](#errorcode))
+and an optional `cause` (the underlying `node:crypto` error, useful for
+diagnostics — **never** for user-facing messages).
 
 ```js
+import { CryptoError, ErrorCode, cipher } from '@exortek/crypto'
+
 try {
   cipher.decryptSymmetric(ct, key, { iv, tag })
 } catch (err) {
   if (err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED) {
     // wrong key or tampered ciphertext
   } else {
-    throw err
+    throw err                 // let unexpected errors propagate
   }
 }
 ```
@@ -50,20 +62,32 @@ try {
 
 ## `ErrorCode`
 
-The complete enum. Codes are **stable across minor versions** — new codes
-may be added; existing codes are never renamed or repurposed.
+The complete enum. Codes are **stable across minor versions** — new
+codes may be added; existing codes are never renamed or repurposed.
 
-| Code | Meaning | Common source |
-| --- | --- | --- |
-| `INVALID_ARGUMENT` | Type / range / shape validation failed on a function argument. | Every module. |
-| `UNSUPPORTED_ALGORITHM` | Algorithm name not in the module's whitelist. | `hash`, `cipher`, `sign` — passing an unknown `algo`. |
-| `INVALID_KEY` | `KeyObject` missing, wrong type, or unusable with the algorithm. | `cipher`, `sign` — passing a public key where a private is expected, etc. |
-| `INVALID_CIPHERTEXT` | Ciphertext blob is malformed (truncated, bad framing). | `cipher.decryptFromString`, `cipher.decryptWithPassphrase`. |
-| `DECRYPT_FAILED` | Authenticated decryption failed — wrong key, tag mismatch, or tampering. | `cipher.decryptSymmetric`, `cipher.decryptWithPassphrase`. |
-| `INVALID_ENCODING` | Encoded input has characters outside the target alphabet. | `encode.*.decode`, `Buffer.from(str, encoding)` failures. |
-| `TOKEN_MALFORMED` | Sealed token's structure or framing is unparseable. | `cipher.unseal` — bad length, wrong version byte, non-base64url. |
-| `TOKEN_TAMPERED` | Sealed token failed authenticated decryption. | `cipher.unseal` — wrong secret, edited bytes. |
-| `TOKEN_EXPIRED` | Sealed token's TTL has passed. | `cipher.unseal` — the token was valid but now isn't. |
+| Code | Meaning |
+| --- | --- |
+| `INVALID_ARGUMENT` | Type / range / shape validation failed on a function argument. |
+| `UNSUPPORTED_ALGORITHM` | Algorithm name not in the module's whitelist. |
+| `INVALID_KEY` | `KeyObject` missing, wrong type, or unusable with the algorithm. |
+| `INVALID_CIPHERTEXT` | Ciphertext blob is malformed (truncated, bad framing). |
+| `DECRYPT_FAILED` | Authenticated decryption failed — wrong key, tag mismatch, or tampering. |
+| `INVALID_ENCODING` | Encoded input has characters outside the target alphabet. |
+| `TOKEN_MALFORMED` | Sealed token's structure or framing is unparseable. |
+| `TOKEN_TAMPERED` | Sealed token failed authenticated decryption. |
+| `TOKEN_EXPIRED` | Sealed token's TTL has passed. |
+
+## Which code comes from where?
+
+| Code | Emitted by |
+| --- | --- |
+| `INVALID_ARGUMENT` | Every module — bad type, missing option, non-finite number, wrong shape. |
+| `UNSUPPORTED_ALGORITHM` | [`hash`](/crypto/hash) · [`cipher.generateKey`/`generateKeyPair`](/crypto/cipher#generatekey) · [`cipher.encryptAsymmetric`/`Symmetric`](/crypto/cipher#encryptsymmetric) · [`sign`](/crypto/sign#sign) · [`sign.thumbprint`](/crypto/sign#thumbprint) · KDFs · [`signValue`](/crypto/hash#signvalue--unsignvalue) |
+| `INVALID_KEY` | Every `cipher.*` and `sign.*` KeyObject check. Also `deriveSharedSecret` when the two keys are on incompatible curves. |
+| `INVALID_CIPHERTEXT` | [`cipher.decryptFromString`](/crypto/cipher#decryptfromstring) · [`cipher.decryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase) |
+| `DECRYPT_FAILED` | [`cipher.decryptSymmetric`](/crypto/cipher#decryptsymmetric) · [`cipher.decryptAsymmetric`](/crypto/cipher#decryptasymmetric) · [`cipher.decryptHybrid`](/crypto/cipher#encrypthybrid--decrypthybrid) · [`decryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase) |
+| `INVALID_ENCODING` | Every [`encode.*.decode`](/crypto/encode) failure |
+| `TOKEN_MALFORMED` / `TOKEN_TAMPERED` / `TOKEN_EXPIRED` | [`cipher.unseal`](/crypto/cipher#seal--unseal) |
 
 ## Suggested HTTP status mappings
 
@@ -71,8 +95,8 @@ These are conventions, not enforced. Pick what matches your app.
 
 | Code | Suggested HTTP | Reason |
 | --- | --- | --- |
-| `INVALID_ARGUMENT` | `500` | Programmer error — the client shouldn't cause this. |
-| `UNSUPPORTED_ALGORITHM` | `500` | Same. |
+| `INVALID_ARGUMENT` | `500` | Programmer error — the client shouldn't be able to cause this. |
+| `UNSUPPORTED_ALGORITHM` | `500` | Same — you picked the algorithm, not the client. |
 | `INVALID_KEY` | `500` | Same. |
 | `INVALID_CIPHERTEXT` | `400` | Client sent malformed data. |
 | `INVALID_ENCODING` | `400` | Same. |
@@ -107,7 +131,7 @@ try {
 ### Multi-secret rotation
 
 Trying multiple secrets is standard practice during key rotation. Errors
-from `unseal` are catchable and don't need to bubble up:
+from `unseal` are catchable; loop and continue on tamper.
 
 ```js
 function unsealAny(token, secrets) {
@@ -116,31 +140,82 @@ function unsealAny(token, secrets) {
       return cipher.unseal(token, secret)
     } catch (err) {
       if (!(err instanceof CryptoError)) throw err
-      if (err.code === ErrorCode.TOKEN_TAMPERED) continue
-      throw err                     // MALFORMED or EXPIRED — same for every key
+      if (err.code === ErrorCode.TOKEN_TAMPERED) continue    // wrong secret, try next
+      throw err                                              // MALFORMED / EXPIRED same for every key
     }
   }
-  throw new CryptoError(ErrorCode.TOKEN_TAMPERED, 'no candidate secret verified')
+  throw new CryptoError(ErrorCode.TOKEN_TAMPERED, 'no candidate secret verified this token')
 }
 ```
 
 ### Never string-match
 
 ```js
-// ❌ Fragile
+// ❌ Fragile — message wording is not stable
 if (err.message.includes('expired')) { /* ... */ }
 
-// ✅ Stable
+// ✅ Stable — code names never change
 if (err.code === ErrorCode.TOKEN_EXPIRED) { /* ... */ }
 ```
 
+### Enumerate the ErrorCode enum for typing
+
+```ts
+import type { ErrorCode as ECShape } from '@exortek/crypto'
+
+type Code = keyof typeof ECShape
+// 'INVALID_ARGUMENT' | 'UNSUPPORTED_ALGORITHM' | 'INVALID_KEY' | ...
+
+function isRecoverable(code: Code): boolean {
+  return code === 'TOKEN_EXPIRED'
+      || code === 'TOKEN_TAMPERED'
+      || code === 'TOKEN_MALFORMED'
+      || code === 'DECRYPT_FAILED'
+      || code === 'INVALID_ENCODING'
+      || code === 'INVALID_CIPHERTEXT'
+}
+```
+
+## Common mistakes
+
+<Callout type="error">
+  **`err.message.includes('...')`.** Messages get reworded between
+  versions to be more helpful. `err.code` is the contract. Every code
+  check reads the enum, not the string.
+</Callout>
+
+<Callout type="error">
+  **Rendering `err.message` or `err.cause` to end users.** These often
+  include the offending argument's contents ("got 'abc0xyz'"), a stack
+  trace, or an internal path. Log them, don't leak them.
+</Callout>
+
+<Callout type="error">
+  **Distinguishing `TOKEN_TAMPERED` from `TOKEN_MALFORMED` to the
+  client.** Both mean "this is not a token I issued." Return the same
+  HTTP status and the same body — never confirm to a probing client
+  that they hit the framing right but missed the crypto.
+</Callout>
+
+<Callout type="warning">
+  **Assuming the enum is closed.** New codes may appear in minor
+  versions. Add a `default` branch to your `switch` so unknown codes
+  fall through to a generic 500 + log, not "silently succeed".
+</Callout>
+
+<Callout type="warning">
+  **Catching every `Error`.** `catch (err) { ... }` at a boundary is
+  fine — but check `err instanceof CryptoError` before switching on
+  `code`, and rethrow anything else.
+</Callout>
+
 ## Compatibility policy
 
-- **Codes are stable.** Once a code appears in a released version, it will
-  not be renamed or repurposed. If we need a new semantic, we add a new
-  code.
+- **Codes are stable.** Once a code appears in a released version, it
+  will not be renamed or repurposed. If we need a new semantic, we add
+  a new code.
 - **Messages can change.** The human-readable `message` may be reworded
-  between versions. Do not parse it.
+  between versions to be more helpful. Do not parse it.
 - **New codes may appear** in minor versions. Add a `default` branch to
   your `switch` so unknown codes fall through to a generic 500.
 - **Wrapped `cause`** — the underlying `node:crypto` error is preserved
