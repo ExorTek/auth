@@ -1,5 +1,6 @@
 {
   "name": "web",
+  "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build && pagefind --site .next/server/app --output-path public/_pagefind",
