@@ -34,7 +34,10 @@ const generateKeyPairAsync = promisify(crypto.generateKeyPair);
 export async function generateSignKeyPair(algo) {
   const spec = SIGN[algo];
   if (!spec) {
-    throw new CryptoError(ErrorCode.UNSUPPORTED_ALGORITHM, `sign algo must be one of: ${SIGN_ALGOS.join(', ')}`);
+    throw new CryptoError(
+      ErrorCode.UNSUPPORTED_ALGORITHM,
+      `generateSignKeyPair algo ${JSON.stringify(algo)} is not supported. Expected one of: ${SIGN_ALGOS.join(', ')}. Recommended defaults: 'es256' (ECDSA P-256) or 'eddsa' (Ed25519).`,
+    );
   }
   if (spec.type === 'rsa') {
     return generateKeyPairAsync('rsa', { modulusLength: spec.modulusLength });

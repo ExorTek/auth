@@ -7,6 +7,7 @@ import { encryptWithPassphrase, decryptWithPassphrase } from './passphrase.js';
 import { seal, unseal } from './seal.js';
 import { SYMMETRIC_ALGOS, ASYMMETRIC_ALGOS, KEY_AGREEMENT_ALGOS } from './algorithms.js';
 import { CryptoError, ErrorCode } from '../errors.js';
+import { _keyProblemHint } from '../internal/validate.js';
 
 /**
  * Polymorphic encrypt — dispatches based on the key type.
@@ -25,7 +26,7 @@ import { CryptoError, ErrorCode } from '../errors.js';
  */
 function encrypt(data, key, options) {
   if (!key || typeof key !== 'object' || typeof key.type !== 'string') {
-    throw new CryptoError(ErrorCode.INVALID_KEY, 'key must be a KeyObject');
+    throw new CryptoError(ErrorCode.INVALID_KEY, `key must be a KeyObject; ${_keyProblemHint(key)}`);
   }
   if (key.type === 'secret') {
     return encryptSymmetric(data, key, options);
@@ -37,7 +38,7 @@ function encrypt(data, key, options) {
   }
   throw new CryptoError(
     ErrorCode.INVALID_KEY,
-    'encrypt requires a secret (symmetric) or public (asymmetric) KeyObject',
+    `encrypt requires a secret (symmetric) or public (asymmetric) KeyObject; got a ${key.type} KeyObject`,
   );
 }
 
@@ -54,7 +55,7 @@ function encrypt(data, key, options) {
  */
 function decrypt(ciphertext, key, options) {
   if (!key || typeof key !== 'object' || typeof key.type !== 'string') {
-    throw new CryptoError(ErrorCode.INVALID_KEY, 'key must be a KeyObject');
+    throw new CryptoError(ErrorCode.INVALID_KEY, `key must be a KeyObject; ${_keyProblemHint(key)}`);
   }
   if (key.type === 'secret') {
     return decryptSymmetric(ciphertext, key, options);
@@ -66,7 +67,7 @@ function decrypt(ciphertext, key, options) {
   }
   throw new CryptoError(
     ErrorCode.INVALID_KEY,
-    'decrypt requires a secret (symmetric) or private (asymmetric) KeyObject',
+    `decrypt requires a secret (symmetric) or private (asymmetric) KeyObject; got a ${key.type} KeyObject`,
   );
 }
 

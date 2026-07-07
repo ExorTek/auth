@@ -41,7 +41,10 @@ export function encode(input) {
 export function decode(input) {
   assertString(input, 'input');
   if (!HEX_RE.test(input)) {
-    throw new CryptoError(ErrorCode.INVALID_ENCODING, 'input is not a valid hex string (even length, hex chars only)');
+    throw new CryptoError(
+      ErrorCode.INVALID_ENCODING,
+      'input is not a valid hex string — allowed chars: 0-9, a-f, A-F. Length must be even (each byte encodes to two chars).',
+    );
   }
   return Buffer.from(input, 'hex');
 }

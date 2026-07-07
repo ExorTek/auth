@@ -68,7 +68,10 @@ export function encryptAsymmetric(data, publicKey, options) {
  */
 export function decryptAsymmetric(ciphertext, privateKey, options) {
   if (!(ciphertext instanceof Uint8Array)) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'ciphertext must be a Buffer');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      'ciphertext must be a Buffer or Uint8Array — pass the exact bytes returned by encryptAsymmetric().',
+    );
   }
   assertObject(options, 'options');
   const spec = _resolveAsymmetric(options);
@@ -84,7 +87,11 @@ export function decryptAsymmetric(ciphertext, privateKey, options) {
       Buffer.isBuffer(ciphertext) ? ciphertext : Buffer.from(ciphertext),
     );
   } catch (err) {
-    throw new CryptoError(ErrorCode.DECRYPT_FAILED, 'RSA-OAEP decryption failed', { cause: err });
+    throw new CryptoError(
+      ErrorCode.DECRYPT_FAILED,
+      'RSA-OAEP decryption failed — wrong key, corrupted ciphertext, or an OAEP hash mismatch (encrypt and decrypt must both use options.algo=rsa-oaep-256 or both rsa-oaep). Never render this hint to the caller.',
+      { cause: err },
+    );
   }
 }
 
@@ -96,7 +103,7 @@ function _resolveAsymmetric(options) {
   if (!spec) {
     throw new CryptoError(
       ErrorCode.UNSUPPORTED_ALGORITHM,
-      `asymmetric algo must be one of: ${ASYMMETRIC_ALGOS.join(', ')}`,
+      `options.algo ${JSON.stringify(options.algo)} is not a supported asymmetric algorithm. Expected one of: ${ASYMMETRIC_ALGOS.join(', ')}. Prefer 'rsa-oaep-256' (SHA-256 padding).`,
     );
   }
   return spec;

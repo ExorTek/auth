@@ -82,16 +82,25 @@ export function seal(payload, secret, options) {
   assertBytesOrString(secret, 'secret');
   assertOptionalObject(options, 'options');
   if (options === undefined || options.ttl === undefined) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.ttl is required');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      "options.ttl is required — pass either a positive integer of seconds or a duration string like '1h' / '15m' / '7d'",
+    );
   }
   const ttlMs = _parseTtl(options.ttl);
   const now = options.now ?? Date.now();
   if (!Number.isFinite(now) || now < 0) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.now must be a non-negative finite number');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `options.now must be a non-negative finite number (ms since epoch); got ${_describe(now)}`,
+    );
   }
   const expiresAt = now + ttlMs;
   if (!Number.isSafeInteger(expiresAt)) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'expiry timestamp is not a safe integer');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `expiry (now + ttl) exceeds Number.MAX_SAFE_INTEGER — pick a shorter ttl or a smaller now (got ${now} + ${ttlMs})`,
+    );
   }
   const plaintext = _serialise(payload);
   const key = _deriveKey(secret);
@@ -138,16 +147,25 @@ export function seal(payload, secret, options) {
  */
 export function unseal(token, secret, options) {
   if (typeof token !== 'string') {
-    throw new CryptoError(ErrorCode.TOKEN_MALFORMED, 'token must be a string');
+    throw new CryptoError(
+      ErrorCode.TOKEN_MALFORMED,
+      `token must be a string (base64url from seal()); got ${_describe(token)}`,
+    );
   }
   assertBytesOrString(secret, 'secret');
   assertOptionalObject(options, 'options');
   const bytes = Buffer.from(token, 'base64url');
   if (bytes.length < HEADER_LEN + TAG_LEN) {
-    throw new CryptoError(ErrorCode.TOKEN_MALFORMED, 'token is truncated');
+    throw new CryptoError(
+      ErrorCode.TOKEN_MALFORMED,
+      `token is truncated — need at least ${HEADER_LEN + TAG_LEN} bytes after base64url decode, got ${bytes.length}. Ensure the value was not clipped by URL length limits or logging redaction.`,
+    );
   }
   if (bytes[0] !== VERSION) {
-    throw new CryptoError(ErrorCode.TOKEN_MALFORMED, `unknown token version 0x${bytes[0].toString(16)}`);
+    throw new CryptoError(
+      ErrorCode.TOKEN_MALFORMED,
+      `unknown token version 0x${bytes[0].toString(16)} (this library emits 0x${VERSION.toString(16).padStart(2, '0')}). The token was probably not produced by @exortek/crypto.`,
+    );
   }
   const iv = bytes.subarray(1, 1 + IV_LEN);
   const expiresAt = Number(bytes.readBigUInt64BE(1 + IV_LEN));
@@ -163,21 +181,34 @@ export function unseal(token, secret, options) {
   try {
     plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
   } catch (cause) {
-    throw new CryptoError(ErrorCode.TOKEN_TAMPERED, 'token authentication failed', { cause });
+    throw new CryptoError(
+      ErrorCode.TOKEN_TAMPERED,
+      'token authentication failed — wrong secret, tampered bytes, or a token issued with a rotated secret. Never render this hint to end users; treat it as unauthenticated.',
+      { cause },
+    );
   }
 
   // Expiry is inside the AAD, so we only trust it after auth succeeds.
   const now = options?.now ?? Date.now();
   const skewMs = (options?.clockSkew ?? 0) * 1000;
   if (now > expiresAt + skewMs) {
-    throw new CryptoError(ErrorCode.TOKEN_EXPIRED, 'token expired', { cause: { expiresAt, now } });
+    const overdueSec = Math.round((now - expiresAt) / 1000);
+    throw new CryptoError(
+      ErrorCode.TOKEN_EXPIRED,
+      `token expired ${overdueSec}s ago (expiresAt=${new Date(expiresAt).toISOString()}, now=${new Date(now).toISOString()}). Ask the user to request a fresh one.`,
+      { cause: { expiresAt, now } },
+    );
   }
 
   let payload;
   try {
     payload = JSON.parse(plaintext.toString('utf8'));
   } catch (cause) {
-    throw new CryptoError(ErrorCode.TOKEN_MALFORMED, 'token payload is not valid JSON', { cause });
+    throw new CryptoError(
+      ErrorCode.TOKEN_MALFORMED,
+      'token payload is not valid JSON — the token authenticated correctly but its plaintext could not be parsed. This indicates a producer / consumer version mismatch.',
+      { cause },
+    );
   }
   return { payload, expiresAt };
 }
@@ -187,12 +218,31 @@ function _serialise(payload) {
   try {
     s = JSON.stringify(payload);
   } catch (cause) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'payload is not JSON-serialisable', { cause });
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      'payload is not JSON-serialisable — remove BigInt, cyclic references, or non-plain objects before sealing',
+      { cause },
+    );
   }
   if (s === undefined) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'payload serialises to undefined (function / symbol at root)');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      'payload serialises to undefined — the root value is undefined, a function, or a symbol. Wrap it in an object: seal({ value: yourPayload }, secret, { ttl })',
+    );
   }
   return Buffer.from(s, 'utf8');
+}
+
+/**
+ * @private — cheap describe helper for arguments in error messages.
+ */
+function _describe(v) {
+  if (v === null || v === undefined) return String(v);
+  if (typeof v === 'string') return `a string of length ${v.length}`;
+  if (typeof v === 'number' || typeof v === 'boolean') return `${typeof v} ${v}`;
+  if (Buffer.isBuffer(v)) return `Buffer of length ${v.length}`;
+  if (v instanceof Uint8Array) return `Uint8Array of length ${v.length}`;
+  return typeof v === 'object' ? (v.constructor?.name ?? 'object') : typeof v;
 }
 
 function _deriveKey(secret) {
@@ -207,7 +257,10 @@ function _deriveKey(secret) {
 function _parseTtl(ttl) {
   if (typeof ttl === 'number') {
     if (!Number.isFinite(ttl) || ttl <= 0 || !Number.isSafeInteger(ttl)) {
-      throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.ttl (number) must be a positive integer of seconds');
+      throw new CryptoError(
+        ErrorCode.INVALID_ARGUMENT,
+        `options.ttl (number) must be a positive integer of seconds; got ${ttl}. For sub-second granularity use a duration string like '500ms'.`,
+      );
     }
     return ttl * 1000;
   }
@@ -216,14 +269,17 @@ function _parseTtl(ttl) {
     if (!m) {
       throw new CryptoError(
         ErrorCode.INVALID_ARGUMENT,
-        "options.ttl must be a positive number of seconds or a duration string ('15m', '1h', '24h', '7d')",
+        `options.ttl string ${JSON.stringify(ttl)} does not parse — use '<number><ms|s|m|h|d|w>' (e.g. '500ms', '15m', '1h', '24h', '7d', '2w'). No spaces, no fractional numbers, unit is required.`,
       );
     }
     const n = Number(m[1]);
     if (n <= 0) {
-      throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.ttl duration must be positive');
+      throw new CryptoError(ErrorCode.INVALID_ARGUMENT, `options.ttl duration must be positive; got ${ttl}`);
     }
     return n * DURATION_UNITS[m[2]];
   }
-  throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.ttl must be a number of seconds or a duration string');
+  throw new CryptoError(
+    ErrorCode.INVALID_ARGUMENT,
+    `options.ttl must be a positive number of seconds or a duration string ('1h', '24h', '7d'); got ${_describe(ttl)}`,
+  );
 }

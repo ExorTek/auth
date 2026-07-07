@@ -75,7 +75,10 @@ export async function encryptWithPassphrase(data, passphrase, options) {
   const kdf = options?.kdf ?? DEFAULT_KDF_DIGEST;
   const encoding = options?.encoding ?? 'base64url';
   if (encoding !== 'hex' && encoding !== 'base64url') {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "encoding must be 'hex' or 'base64url'");
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `options.encoding must be 'hex' or 'base64url' (URL-safe); got ${JSON.stringify(encoding)}`,
+    );
   }
 
   const salt = crypto.randomBytes(SALT_LENGTH);
@@ -134,12 +137,18 @@ export async function decryptWithPassphrase(token, passphrase, options) {
   const kdf = options?.kdf ?? DEFAULT_KDF_DIGEST;
   const encoding = options?.encoding ?? 'base64url';
   if (encoding !== 'hex' && encoding !== 'base64url') {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "encoding must be 'hex' or 'base64url'");
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `options.encoding must be 'hex' or 'base64url' (URL-safe); got ${JSON.stringify(encoding)}`,
+    );
   }
 
   const packed = Buffer.from(token, encoding);
   if (packed.length < HEADER_LENGTH) {
-    throw new CryptoError(ErrorCode.INVALID_CIPHERTEXT, 'token is too short to be a valid PBE ciphertext');
+    throw new CryptoError(
+      ErrorCode.INVALID_CIPHERTEXT,
+      `token is too short to be a valid PBE ciphertext — need at least ${HEADER_LENGTH} bytes for salt (${SALT_LENGTH}) + iv (${IV_LENGTH}) + tag (${TAG_LENGTH}), got ${packed.length} after ${encoding} decode`,
+    );
   }
 
   const salt = packed.subarray(0, SALT_LENGTH);
@@ -162,7 +171,7 @@ export async function decryptWithPassphrase(token, passphrase, options) {
   } catch (err) {
     throw new CryptoError(
       ErrorCode.DECRYPT_FAILED,
-      'passphrase decryption failed — wrong passphrase, mismatched KDF options, or tampered token',
+      `passphrase decryption failed — wrong passphrase, tampered token, or mismatched KDF options (iterations must be ${iterations}, kdf must be '${kdf}' — the same values used at encryption time)`,
       { cause: err },
     );
   }

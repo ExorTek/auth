@@ -209,7 +209,7 @@ export function uuid5(namespace, name) {
   if (!UUID_RE.test(namespace)) {
     throw new CryptoError(
       ErrorCode.INVALID_ARGUMENT,
-      'namespace must be a valid UUID string in canonical 8-4-4-4-12 form',
+      `namespace must be a valid UUID string in canonical 8-4-4-4-12 form; got ${JSON.stringify(namespace)}. Use one of the exported constants (NAMESPACE_DNS / NAMESPACE_URL / NAMESPACE_OID / NAMESPACE_X500) or your own uuid4().`,
     );
   }
   assertString(name, 'name');

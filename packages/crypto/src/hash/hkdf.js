@@ -66,13 +66,19 @@ export function hkdf(ikm, options) {
 
   const hash = options?.hash ?? 'sha256';
   if (!_SUPPORTED.has(hash)) {
-    throw new CryptoError(ErrorCode.UNSUPPORTED_ALGORITHM, `hash must be one of: ${SUPPORTED_HKDF_HASHES.join(', ')}`);
+    throw new CryptoError(
+      ErrorCode.UNSUPPORTED_ALGORITHM,
+      `options.hash ${JSON.stringify(hash)} is not supported for HKDF. Expected one of: ${SUPPORTED_HKDF_HASHES.join(', ')}. Prefer sha256.`,
+    );
   }
   const length = options?.length ?? 32;
   assertPositiveInt(length, 'options.length');
   // HKDF max output = 255 * hashLen. Conservative upper bound (SHA-256 hashLen = 32).
   if (length > 255 * 64) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.length exceeds HKDF maximum (255 × hashLength)');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `options.length ${length} exceeds HKDF maximum of ${255 * 64} bytes (255 × 64 for sha512). For more key material, call hkdf multiple times with distinct info strings.`,
+    );
   }
   const salt = options?.salt !== undefined ? toBuffer(options.salt, 'options.salt') : Buffer.alloc(0);
   const info = options?.info !== undefined ? toBuffer(options.info, 'options.info') : Buffer.alloc(0);

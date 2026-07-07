@@ -86,7 +86,10 @@ export function decryptHybrid(envelope, privateKey, options) {
   assertObject(envelope, 'envelope');
   for (const field of ['encryptedKey', 'iv', 'tag', 'ciphertext']) {
     if (!(envelope[field] instanceof Uint8Array)) {
-      throw new CryptoError(ErrorCode.INVALID_ARGUMENT, `envelope.${field} must be a Buffer`);
+      throw new CryptoError(
+        ErrorCode.INVALID_ARGUMENT,
+        `envelope.${field} must be a Buffer/Uint8Array — pass the same object shape returned by encryptHybrid(): { encryptedKey, iv, tag, ciphertext }`,
+      );
     }
   }
   assertOptionalObject(options, 'options');
@@ -98,8 +101,10 @@ export function decryptHybrid(envelope, privateKey, options) {
     decipher.setAuthTag(envelope.tag);
     return Buffer.concat([decipher.update(envelope.ciphertext), decipher.final()]);
   } catch (err) {
-    throw new CryptoError(ErrorCode.DECRYPT_FAILED, 'hybrid AES-GCM decryption failed', {
-      cause: err,
-    });
+    throw new CryptoError(
+      ErrorCode.DECRYPT_FAILED,
+      'hybrid AES-GCM decryption failed — the RSA-wrapped key unwrapped correctly but the AES stage rejected the ciphertext. Wrong iv, wrong tag, or tampered ciphertext.',
+      { cause: err },
+    );
   }
 }

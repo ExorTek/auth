@@ -106,16 +106,25 @@ export function encryptSymmetric(data, key, options) {
  */
 export function decryptSymmetric(ciphertext, key, options) {
   if (!(ciphertext instanceof Uint8Array)) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'ciphertext must be a Buffer');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      'ciphertext must be a Buffer or Uint8Array — the raw bytes produced by encryptSymmetric().ciphertext. For a base64url string, use decryptFromString() instead.',
+    );
   }
   assertKeyObject(key, 'secret', 'symmetric key');
   assertObject(options, 'options');
   const spec = _resolveSymmetric(options);
   if (!(options.iv instanceof Uint8Array)) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.iv is required and must be a Buffer');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `options.iv is required and must be a Buffer — pass the iv returned from encryptSymmetric() (${spec.spec.ivLength} bytes for ${spec.algo})`,
+    );
   }
   if (spec.spec.mode === 'aead' && !(options.tag instanceof Uint8Array)) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.tag is required for AEAD modes');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `options.tag is required for AEAD mode ${spec.algo} — pass the tag returned from encryptSymmetric() (${spec.spec.tagLength} bytes)`,
+    );
   }
   if (options.aad !== undefined) {
     assertBytesOrString(options.aad, 'options.aad');
@@ -131,9 +140,11 @@ export function decryptSymmetric(ciphertext, key, options) {
     }
     return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
   } catch (err) {
-    throw new CryptoError(ErrorCode.DECRYPT_FAILED, 'authenticated decryption failed', {
-      cause: err,
-    });
+    throw new CryptoError(
+      ErrorCode.DECRYPT_FAILED,
+      `authenticated decryption failed — wrong key, tampered ciphertext, wrong iv/tag, or altered AAD. This is an authentication failure, not a bug; treat as unauthorized.`,
+      { cause: err },
+    );
   }
 }
 
@@ -186,7 +197,10 @@ export function decryptFromString(token, key, options) {
   const packed = Buffer.from(token, 'base64url');
   const minLen = spec.spec.ivLength + spec.spec.tagLength;
   if (packed.length < minLen) {
-    throw new CryptoError(ErrorCode.INVALID_CIPHERTEXT, 'token is too short to be a valid ciphertext');
+    throw new CryptoError(
+      ErrorCode.INVALID_CIPHERTEXT,
+      `token is too short to be a valid ${spec.algo} ciphertext — need at least ${minLen} bytes (iv:${spec.spec.ivLength} + tag:${spec.spec.tagLength}), got ${packed.length} after base64url decode`,
+    );
   }
   const iv = packed.subarray(0, spec.spec.ivLength);
   const tag = packed.subarray(spec.spec.ivLength, minLen);
@@ -210,7 +224,7 @@ function _resolveSymmetric(options) {
   if (!spec) {
     throw new CryptoError(
       ErrorCode.UNSUPPORTED_ALGORITHM,
-      `symmetric algo must be one of: ${SYMMETRIC_ALGOS.join(', ')}`,
+      `options.algo ${JSON.stringify(algo)} is not a supported symmetric algorithm. Expected one of: ${SYMMETRIC_ALGOS.join(', ')}. Prefer aes-256-gcm or chacha20-poly1305 (both AEAD).`,
     );
   }
   return { algo, spec };

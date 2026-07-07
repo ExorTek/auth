@@ -88,6 +88,71 @@ pnpm add     @exortek/crypto
 
 Requires **Node.js 22 or newer**.
 
+## Setup — ESM, CJS, or TypeScript
+
+The package ships **both** ESM and CJS builds with the same public
+surface. Types are emitted from JSDoc, so TypeScript consumers get IDE
+hints without any extra config.
+
+<Tabs items={['ESM (`import`)', 'CommonJS (`require`)', 'TypeScript']}>
+  <Tabs.Tab>
+    ```js
+    // package.json → "type": "module", or file ends with .mjs
+    import { random, hash, cipher, sign } from '@exortek/crypto'
+
+    console.log(random.uuid4())
+    console.log(hash('hello'))
+    ```
+    The default in every example on this site. Node picks the ESM
+    build from the `import` field in our exports map.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    // Plain .js in a package without "type": "module"
+    const { random, hash, cipher, sign } = require('@exortek/crypto')
+    // or as a namespace:
+    const crypto = require('@exortek/crypto')
+
+    console.log(random.uuid4())
+    console.log(hash('hello'))
+    console.log(crypto.random.uuid4())
+    ```
+    Node picks the CJS build from the `require` field. All async
+    functions still return Promises — `await` them or use `.then()`.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```ts
+    import { random, hash, cipher, sign, CryptoError, ErrorCode }
+      from '@exortek/crypto'
+
+    // Every function is typed via JSDoc → .d.ts
+    const otp: string = random.pin(6)
+    const key = await cipher.generateKey()
+    ```
+    Requires `"moduleResolution": "bundler"` or `"node16"` /
+    `"nodenext"` in `tsconfig.json` so TypeScript honours our
+    `exports` map for subpath types.
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  **`generateKey`, `generateKeyPair`, `generateSignKeyPair`, `pbkdf2`,
+  `scrypt`, `encryptWithPassphrase`, `decryptWithPassphrase` are all
+  `async`.** They return a `Promise` — you must `await` them (or use
+  `.then()`). Passing a bare `Promise` where a `KeyObject` is expected
+  is the single most common trip-up:
+
+  ```js
+  // ❌ wrong — key is a Promise
+  const key = cipher.generateKey()
+  cipher.encryptSymmetric('data', key)   // "key must be a KeyObject"
+
+  // ✅ correct
+  const key = await cipher.generateKey()
+  cipher.encryptSymmetric('data', key)
+  ```
+</Callout>
+
 ## Modules at a glance
 
 Every module has a dedicated page with full API reference and worked examples.

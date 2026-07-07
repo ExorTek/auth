@@ -43,7 +43,10 @@ const PLACEHOLDERS = {
 export function code(pattern) {
   assertString(pattern, 'pattern');
   if (pattern.length === 0) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'pattern must be a non-empty string');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      "pattern must be a non-empty string. Use placeholders X (alphanumeric), A (uppercase letter), a (lowercase letter), # (digit); anything else stays literal. Example: 'XXXX-####' → 'AB3F-8127'.",
+    );
   }
 
   let out = '';

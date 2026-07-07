@@ -46,7 +46,7 @@ export async function generateKey(algo = 'aes-256-gcm') {
   if (!spec) {
     throw new CryptoError(
       ErrorCode.UNSUPPORTED_ALGORITHM,
-      `symmetric algo must be one of: ${SYMMETRIC_ALGOS.join(', ')}`,
+      `generateKey algo ${JSON.stringify(algo)} is not a supported symmetric algorithm. Expected one of: ${SYMMETRIC_ALGOS.join(', ')}. If you want a signing keypair use generateSignKeyPair(); for RSA-OAEP or X25519 use generateKeyPair().`,
     );
   }
   // Node's generateKey only accepts 'aes' or 'hmac' families; for ChaCha20 we
@@ -83,6 +83,6 @@ export async function generateKeyPair(algo) {
   }
   throw new CryptoError(
     ErrorCode.UNSUPPORTED_ALGORITHM,
-    `key-pair algo must be one of: ${[...ASYMMETRIC_ALGOS, ...KEY_AGREEMENT_ALGOS].join(', ')}`,
+    `generateKeyPair algo ${JSON.stringify(algo)} is not supported. Expected one of: ${[...ASYMMETRIC_ALGOS, ...KEY_AGREEMENT_ALGOS].join(', ')}. For a signing keypair use generateSignKeyPair(); for symmetric use generateKey().`,
   );
 }

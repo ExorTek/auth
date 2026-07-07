@@ -62,7 +62,10 @@ export async function scrypt(password, options) {
   assertBytesOrString(password, 'password');
   assertOptionalObject(options, 'options');
   if (options === undefined || options.salt === undefined) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.salt is required');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      "options.salt is required — pass at least 16 random bytes unique per password. Example: scrypt('pw', { salt: random.bytes(16) })",
+    );
   }
   assertBytesOrString(options.salt, 'options.salt');
 
@@ -94,7 +97,11 @@ export async function scrypt(password, options) {
     );
   } catch (err) {
     // Node throws for out-of-range N/r/p combinations or maxmem exhaustion.
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'scrypt derivation failed', { cause: err });
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      'scrypt derivation failed — usually because (N × r × p × 128) exceeded the default memory limit. Pass options.maxmem to raise the ceiling, or lower N.',
+      { cause: err },
+    );
   }
   return encoding === 'buffer' ? derived : derived.toString(encoding);
 }

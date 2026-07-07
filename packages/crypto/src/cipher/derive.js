@@ -57,9 +57,11 @@ export function deriveSharedSecret(privateKey, publicKey, options) {
   try {
     shared = crypto.diffieHellman({ privateKey, publicKey });
   } catch (err) {
-    throw new CryptoError(ErrorCode.INVALID_KEY, 'key agreement failed — mismatched curves?', {
-      cause: err,
-    });
+    throw new CryptoError(
+      ErrorCode.INVALID_KEY,
+      'key agreement failed — the two keys are on different curves or use incompatible algorithms. Both sides must use the same generateKeyPair(algo) — e.g. both x25519, or both ecdh-p256.',
+      { cause: err },
+    );
   }
 
   // Delegate to the public hkdf() helper — same primitive both places, single

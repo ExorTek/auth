@@ -87,7 +87,10 @@ export function _resolveOptions(options) {
   assertOptionalObject(options, 'options');
   const algo = options?.algo ?? 'sha256';
   if (!_SUPPORTED.has(algo)) {
-    throw new CryptoError(ErrorCode.UNSUPPORTED_ALGORITHM, `algo must be one of: ${SUPPORTED_HASHES.join(', ')}`);
+    throw new CryptoError(
+      ErrorCode.UNSUPPORTED_ALGORITHM,
+      `options.algo ${JSON.stringify(algo)} is not a supported hash. Expected one of: ${SUPPORTED_HASHES.join(', ')}. Prefer sha256 unless you have a reason to use another.`,
+    );
   }
   const encoding = options?.encoding ?? 'hex';
   assertEncoding(encoding, 'encoding');

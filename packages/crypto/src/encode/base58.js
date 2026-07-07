@@ -85,7 +85,7 @@ export function decode(input) {
     if (v === -1) {
       throw new CryptoError(
         ErrorCode.INVALID_ENCODING,
-        `input contains a non-Base58 character '${input[i]}' at index ${i}`,
+        `input contains a non-Base58 character '${input[i]}' at index ${i}. Base58 alphabet is 1-9 A-H J-N P-Z a-k m-z (skips 0, O, I, l).`,
       );
     }
     n = n * 58n + BigInt(v);

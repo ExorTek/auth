@@ -41,7 +41,10 @@ export function encode(input) {
 export function decode(input) {
   assertString(input, 'input');
   if (!BASE64URL_RE.test(input)) {
-    throw new CryptoError(ErrorCode.INVALID_ENCODING, 'input is not a valid base64url string');
+    throw new CryptoError(
+      ErrorCode.INVALID_ENCODING,
+      'input is not a valid base64url string — allowed chars: A-Z a-z 0-9 - _ and optional trailing = padding. No + or / (that is standard base64; use base64.decode instead).',
+    );
   }
   return Buffer.from(input, 'base64url');
 }

@@ -106,7 +106,10 @@ export function encode(input, options) {
 export function decode(input) {
   assertString(input, 'input');
   if (!BASE32_RE.test(input)) {
-    throw new CryptoError(ErrorCode.INVALID_ENCODING, 'input is not a valid Base32 string');
+    throw new CryptoError(
+      ErrorCode.INVALID_ENCODING,
+      'input is not a valid Base32 string — allowed chars: A-Z (case-insensitive) and 2-7 with optional trailing = padding. RFC 4648 §6.',
+    );
   }
   // Strip padding for the bit-unpacking pass.
   const stripped = input.replace(/=+$/, '');

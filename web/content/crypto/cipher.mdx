@@ -11,9 +11,70 @@ Authenticated symmetric encryption (AES-GCM / AES-CBC / ChaCha20-Poly1305),
 asymmetric encryption (RSA-OAEP), hybrid encryption, key agreement
 (ECDH / X25519), password-based encryption, and time-boxed sealed tokens.
 
-```js
-import { cipher } from '@exortek/crypto'
-```
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import { cipher } from '@exortek/crypto'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { cipher } = require('@exortek/crypto')
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  **Key generation is async — you MUST `await`.** `generateKey`,
+  `generateKeyPair`, `encryptWithPassphrase`, and `decryptWithPassphrase`
+  all return `Promise`. Forgetting `await` hands a `Promise` to
+  `encryptSymmetric` and produces `INVALID_KEY: key must be a
+  KeyObject`.
+
+  ```js
+  const key = await cipher.generateKey()          // ← await here
+  const { ciphertext, iv, tag } = cipher.encryptSymmetric('data', key)
+  ```
+</Callout>
+
+## Copy-paste — the three most common patterns
+
+<Tabs items={['One-shot token', 'Explicit iv/tag', 'Passphrase']}>
+  <Tabs.Tab>
+    ```js
+    // Simple round-trip — everything packed into a single base64url string
+    const key   = await cipher.generateKey()
+    const token = cipher.encryptToString({ userId: 42 }, key)
+    const plain = cipher.decryptFromString(token, key)
+    // plain: { userId: 42 }
+    ```
+    Use when the caller doesn't care about the framing — cookies,
+    query params, opaque handles.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    // Store ciphertext / iv / tag in separate DB columns
+    const key = await cipher.generateKey()
+    const { ciphertext, iv, tag } = cipher.encryptSymmetric('data', key)
+
+    const plain = cipher.decryptSymmetric(ciphertext, key, { iv, tag })
+    // plain: Buffer<...>
+    ```
+    Use when you need the three parts as distinct byte blobs (schema,
+    at-rest encryption, envelope layouts).
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    // Encrypt with a human passphrase — no separate key management
+    const token = await cipher.encryptWithPassphrase('secret data', 'my-passphrase')
+    const plain = await cipher.decryptWithPassphrase(token, 'my-passphrase')
+    // plain: Buffer<'secret data'>
+    ```
+    Use when the caller supplies a passphrase and there's no separate
+    key to store — backup files, exported config, envelope-encrypted
+    user data.
+  </Tabs.Tab>
+</Tabs>
 
 ## Decision tree
 

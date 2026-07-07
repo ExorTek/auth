@@ -77,14 +77,17 @@ export async function pbkdf2(password, options) {
   assertBytesOrString(password, 'password');
   assertOptionalObject(options, 'options');
   if (options === undefined || options.salt === undefined) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.salt is required');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      "options.salt is required — pass at least 16 random bytes unique per password. Example: pbkdf2('pw', { salt: random.bytes(16) })",
+    );
   }
   assertBytesOrString(options.salt, 'options.salt');
   const digest = options.digest ?? 'sha512';
   if (!_SUPPORTED.has(digest)) {
     throw new CryptoError(
       ErrorCode.UNSUPPORTED_ALGORITHM,
-      `digest must be one of: ${SUPPORTED_PBKDF2_HASHES.join(', ')}`,
+      `options.digest ${JSON.stringify(digest)} is not supported for PBKDF2. Expected one of: ${SUPPORTED_PBKDF2_HASHES.join(', ')}. sha512 is the default.`,
     );
   }
   const iterations = options.iterations ?? OWASP_MIN_ITERATIONS[digest];

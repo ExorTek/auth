@@ -54,11 +54,17 @@ export function signValue(value, secret, options) {
   assertBytesOrString(secret, 'secret');
   assertOptionalObject(options, 'options');
   if (value.includes(SEPARATOR)) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, "value must not contain '.'; encode as base64url or hex first");
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      "value must not contain '.' (used as the value/mac separator). If value is arbitrary binary or contains dots, encode as base64url first: signValue(base64url.encode(v), secret).",
+    );
   }
   const algo = options?.algo ?? 'sha256';
   if (!_SUPPORTED.has(algo)) {
-    throw new CryptoError(ErrorCode.UNSUPPORTED_ALGORITHM, 'algo must be one of: sha256, sha384, sha512');
+    throw new CryptoError(
+      ErrorCode.UNSUPPORTED_ALGORITHM,
+      `signValue algo must be 'sha256', 'sha384', or 'sha512'; got ${JSON.stringify(algo)}. sha256 is the sensible default.`,
+    );
   }
   const mac = crypto.createHmac(algo, secret).update(value).digest('base64url');
   return `${value}${SEPARATOR}${mac}`;

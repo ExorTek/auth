@@ -40,7 +40,10 @@ export function xor(a, b) {
   const bufA = toBuffer(a, 'a');
   const bufB = toBuffer(b, 'b');
   if (bufA.length !== bufB.length) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'xor operands must have equal length');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `xor operands must have equal length; got a=${bufA.length} bytes, b=${bufB.length} bytes`,
+    );
   }
   const out = Buffer.allocUnsafe(bufA.length);
   for (let i = 0; i < bufA.length; i++) {
@@ -69,7 +72,10 @@ export function xor(a, b) {
  */
 export function wipe(buf) {
   if (!Buffer.isBuffer(buf) && !(buf instanceof Uint8Array)) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'buf must be a Buffer or Uint8Array');
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `wipe target must be a Buffer or Uint8Array (strings are immutable — nothing to wipe); got ${typeof buf}`,
+    );
   }
   buf.fill(0);
 }

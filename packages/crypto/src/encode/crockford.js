@@ -102,7 +102,7 @@ export function decode(input) {
     if (v === -1) {
       throw new CryptoError(
         ErrorCode.INVALID_ENCODING,
-        `input contains a non-Crockford character '${input[i]}' at index ${i}`,
+        `input contains a non-Crockford character '${input[i]}' at index ${i}. Crockford base32 alphabet is 0-9 A-Z minus I L O U (case-insensitive); I/L decode as 1, O decodes as 0.`,
       );
     }
     value = (value << 5) | v;

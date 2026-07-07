@@ -49,12 +49,18 @@ import { assertEncoding, assertKeyObject, assertOptionalObject } from '../intern
  */
 export function thumbprint(key, options) {
   if (!key || typeof key !== 'object' || (key.type !== 'public' && key.type !== 'private')) {
-    throw new CryptoError(ErrorCode.INVALID_KEY, 'key must be a public or private KeyObject');
+    throw new CryptoError(
+      ErrorCode.INVALID_KEY,
+      'thumbprint key must be a public or private KeyObject — generate one via await generateSignKeyPair(algo), or import a PEM with crypto.createPublicKey(pem)',
+    );
   }
   assertOptionalObject(options, 'options');
   const hash = options?.hash ?? 'sha256';
   if (hash !== 'sha256' && hash !== 'sha384' && hash !== 'sha512') {
-    throw new CryptoError(ErrorCode.UNSUPPORTED_ALGORITHM, "options.hash must be 'sha256', 'sha384', or 'sha512'");
+    throw new CryptoError(
+      ErrorCode.UNSUPPORTED_ALGORITHM,
+      `options.hash must be 'sha256', 'sha384', or 'sha512'; got ${JSON.stringify(hash)}`,
+    );
   }
   const encoding = options?.encoding ?? 'base64url';
   assertEncoding(encoding, 'options.encoding');

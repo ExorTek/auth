@@ -74,7 +74,10 @@ export function token(size, options) {
     if (options.separator !== undefined) {
       assertString(options.separator, 'options.separator');
       if (options.separator === '') {
-        throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'options.separator must be a non-empty string');
+        throw new CryptoError(
+          ErrorCode.INVALID_ARGUMENT,
+          "options.separator must be a non-empty string; got ''. Omit the option to use the default '_', or pass a single character like '-'.",
+        );
       }
     }
     if (options.encoding !== undefined && !(options.encoding in ENCODERS)) {

@@ -90,7 +90,10 @@ export function _keyInput(key, spec) {
 function _resolveSpec(options) {
   const spec = SIGN[options.algo];
   if (!spec) {
-    throw new CryptoError(ErrorCode.UNSUPPORTED_ALGORITHM, `options.algo must be one of: ${SIGN_ALGOS.join(', ')}`);
+    throw new CryptoError(
+      ErrorCode.UNSUPPORTED_ALGORITHM,
+      `options.algo ${JSON.stringify(options.algo)} is not a supported signing algorithm. Expected one of: ${SIGN_ALGOS.join(', ')}. For symmetric MAC use hmac(); for signing use one of these JOSE algorithms.`,
+    );
   }
   return spec;
 }
