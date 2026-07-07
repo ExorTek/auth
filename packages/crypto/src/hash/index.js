@@ -5,3 +5,5 @@ export { verifyHmac } from './verify-hmac.js';
 export { pbkdf2, SUPPORTED_PBKDF2_HASHES } from './pbkdf2.js';
 export { hkdf, SUPPORTED_HKDF_HASHES } from './hkdf.js';
 export { scrypt } from './scrypt.js';
+export { signValue, unsignValue } from './signed-value.js';
+export { fingerprint } from './fingerprint.js';
