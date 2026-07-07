@@ -1,5 +1,5 @@
 import { bytes } from './bytes.js';
-import { BASE58 } from '../internal/alphabets.js';
+import { encode } from '../encode/base58.js';
 
 /**
  * Bitcoin base58 random string.
@@ -20,24 +20,5 @@ import { BASE58 } from '../internal/alphabets.js';
  * base58(16)  // 'V1StGXR8Z5jdHi6BmyT' — 128 bits of entropy, ~22 chars
  */
 export function base58(size) {
-  const buf = bytes(size);
-  if (buf.length === 0) {
-    return '';
-  }
-
-  let n = 0n;
-  for (let i = 0; i < buf.length; i++) {
-    n = (n << 8n) | BigInt(buf[i]);
-  }
-
-  let out = '';
-  while (n > 0n) {
-    out = BASE58[Number(n % 58n)] + out;
-    n /= 58n;
-  }
-  // Preserve leading zero bytes as leading '1' characters (Base58Check convention).
-  for (let i = 0; i < buf.length && buf[i] === 0; i++) {
-    out = '1' + out;
-  }
-  return out;
+  return encode(bytes(size));
 }
