@@ -1,0 +1,333 @@
+---
+title: 'crypto/random — CSPRNG helpers'
+sidebarTitle: random
+---
+
+import { Callout } from 'nextra/components';
+
+# `random`
+
+Cryptographically secure random helpers. Every function is backed by the
+operating-system CSPRNG (Node's `crypto.randomBytes`), never
+`Math.random`. Use these for anything a user shouldn't be able to guess —
+session IDs, verification codes, tokens, salts, nonces.
+
+```js
+import { random } from '@exortek/crypto'
+random.uuid4()               // '550e8400-e29b-41d4-a716-446655440000'
+random.pin(6)                // '847291' — never '000000'
+random.token(32, { prefix: 'sk_live' })
+```
+
+<Callout type="info">
+  **Alphabet primitives** (`base64url`, `base58`, `crockford`, `hex`,
+  `alphanumeric`, `numeric`) are shortcuts that generate `size` random
+  bytes and encode them. Prefer them over `bytes(...).toString(...)` — the
+  helpers handle non-power-of-two alphabets (base58, crockford) correctly.
+</Callout>
+
+## When to use what
+
+| Use case | Function | Notes |
+| --- | --- | --- |
+| Session ID / opaque handle | [`uuid4()`](#uuid4) or [`uuid7()`](#uuid7) | v7 sorts by time, useful in DB indexes. |
+| Sortable event / log ID | [`ulid()`](#ulid) | 128-bit, monotonic per-ms. |
+| API key | [`token(32, { prefix })`](#token) | Stripe-style `sk_live_...`. |
+| User-visible OTP | [`pin(6)`](#pin) | Rejection sampling — never `000000`. |
+| Backup / recovery code | [`code(8)`](#code) | Uppercase, dash-grouped, look-alike free. |
+| Serial number | [`serial(...)`](#serial) | Fixed-format receipt / order ID. |
+| Raw entropy | [`bytes(n)`](#bytes) | For KDF salt, IV, key material. |
+
+## Reference
+
+### `bytes`
+
+```ts
+bytes(size: number): Buffer
+```
+
+Return `size` cryptographically-secure random bytes as a `Buffer`.
+
+The foundation every other helper builds on. `size` must be a non-negative
+safe integer. `bytes(0)` returns an empty Buffer.
+
+```js
+const salt = random.bytes(16)     // 128-bit salt for a KDF
+const iv   = random.bytes(12)     // 96-bit AES-GCM nonce
+const key  = random.bytes(32)     // 256-bit symmetric key
+```
+
+**Throws** `CryptoError(INVALID_ARGUMENT)` if `size` isn't a non-negative
+integer.
+
+### `hex`
+
+```ts
+hex(size: number): string
+```
+
+`size` random bytes encoded as a lowercase hex string, length `size * 2`.
+
+```js
+random.hex(16)   // 'a3f9b2c1...' — 32-char hex, e.g. a CSRF token or session id
+```
+
+### `base64url` / `base64`
+
+```ts
+base64url(size: number): string    // URL-safe, no padding
+base64(size:    number): string    // standard, with '=' padding
+```
+
+`size` random bytes encoded as base64. Prefer `base64url` for anything URL /
+cookie / JWT-adjacent — it never contains `+`, `/`, or `=`.
+
+```js
+random.base64url(32)   // 'V1StGXR8_Z5jdHi6...' — 43 chars, URL-safe
+random.base64(32)      // 'V1StGXR8+Z5jdHi6...=' — 44 chars, padded
+```
+
+### `base58`
+
+```ts
+base58(size: number): string
+```
+
+Bitcoin/Solana-style base58 — drops the four look-alike glyphs `0`, `O`,
+`I`, `l`. Denser than hex, safer to read aloud, standard for cryptocurrency
+addresses. Output is variable length (~1.365× the input).
+
+```js
+random.base58(16)   // 'V1StGXR8Z5jdHi6BmyT' — 128 bits of entropy
+```
+
+### `crockford`
+
+```ts
+crockford(size: number): string
+```
+
+Crockford base32 — drops `I`, `L`, `O`, `U` (look-alike + accidental
+profanity). Case-insensitive on read, URL-safe, sortable when concatenated
+with a fixed-width timestamp. Same algorithm ULID uses for its 80-bit tail.
+
+```js
+random.crockford(10)  // '01ARZ3NDEKTSV4RR' — 16 chars, 80 bits
+random.crockford(16)  // 26 chars, 128 bits — the ULID length
+```
+
+### `alphanumeric`
+
+```ts
+alphanumeric(length: number): string
+```
+
+Uniform sample from `A–Z a–z 0–9` (62 symbols). Rejection-sampled for
+unbiased output — the naive `chars[byte % 62]` approach favours the first
+four characters.
+
+```js
+random.alphanumeric(20)  // 'aB3xF9mZ2kQ7pR4tYnLj'
+```
+
+### `numeric`
+
+```ts
+numeric(length: number): string
+```
+
+Uniform sample from `0–9`. Rejection-sampled. `length` characters,
+including leading zeros.
+
+```js
+random.numeric(9)   // '084729153'
+```
+
+### `pin`
+
+```ts
+pin(length: number): string
+```
+
+Same alphabet as `numeric` but with a guaranteed non-zero first digit —
+`pin(6)` will never return `'000000'` or `'042819'`. Use for user-visible
+one-time codes (SMS OTP, magic-link code, MFA fallback).
+
+```js
+random.pin(6)   // '847291' — first digit ∈ 1..9
+random.pin(4)   // '3852'
+```
+
+<Callout type="warning">
+  A PIN is not a session ID. Six digits is ~20 bits of entropy — meant to
+  be entered by a human within seconds, then invalidated. Store the hash,
+  cap attempts, expire quickly.
+</Callout>
+
+### `code`
+
+```ts
+code(groupCount: number, groupSize?: number): string  // default groupSize: 4
+```
+
+Uppercase Crockford base32 sample, grouped with `-` for readability. Ideal
+for backup / recovery codes (WhatsApp, Google, GitHub-style).
+
+```js
+random.code(4)      // 'ABCD-EF12-GHJK-MNPQ' — 16 chars, 80 bits
+random.code(3, 5)   // 'ABCDE-FGHJK-MNPQR'   — 15 chars, 75 bits
+```
+
+### `serial`
+
+```ts
+serial(prefix: string, groups: number[]): string
+```
+
+Fixed-format alphanumeric serial for receipts, licenses, invoice IDs.
+Each `groups[i]` produces that many uppercase alphanumeric chars,
+separated by `-`.
+
+```js
+random.serial('ORD', [4, 4, 4])   // 'ORD-A3F9-B2C1-D7E4'
+random.serial('LIC', [5, 5, 5, 5])// 'LIC-A3F9K-B2C1D-D7E4X-YZ12N'
+```
+
+### `token`
+
+```ts
+token(size: number, options?: TokenOptions): string
+
+interface TokenOptions {
+  prefix?:    string                                     // e.g. 'sk_live'
+  separator?: string                                     // default '_'
+  encoding?:  'base64url' | 'base64' | 'hex' | 'crockford' | 'base58'
+}
+```
+
+A Stripe-style prefixed random token. `size` is the number of random bytes
+before encoding — 32 bytes → 43-char base64url body → 256 bits of entropy.
+
+```js
+random.token(32)                                     // 'V1StGXR8_Z5jdHi6...'
+random.token(32, { prefix: 'usr' })                  // 'usr_V1StGXR8_Z5jdHi6...'
+random.token(32, { prefix: 'sk_live', separator: '-' }) // 'sk_live-V1StGXR8...'
+random.token(16, { encoding: 'crockford' })          // 'V1STGXR8Z5JDHI6B'
+random.token(16, { encoding: 'base58', prefix: 'wallet' })
+```
+
+Sensible sizes: **32 bytes** for API keys or long-lived tokens, **16 bytes**
+for session or verification tokens.
+
+### `uuid4`
+
+```ts
+uuid4(): string
+```
+
+RFC 9562 UUID version 4 — 122 bits of random, no timestamp.
+
+```js
+random.uuid4()   // '550e8400-e29b-41d4-a716-446655440000'
+```
+
+Use it whenever you want an opaque handle. If you need database-index
+locality (recent records cluster on disk), reach for `uuid7` instead.
+
+### `uuid5`
+
+```ts
+uuid5(namespace: string, name: string | Buffer): string
+```
+
+RFC 9562 UUID version 5 — deterministic SHA-1 of `(namespace, name)`.
+Same input always produces the same output. Useful for stable IDs derived
+from user data (e.g. hashing an email into a UUID for a public identifier
+that leaks no info).
+
+The `namespace` must be an existing UUID string. Common ones are
+re-exported: `NAMESPACE_DNS`, `NAMESPACE_URL`, `NAMESPACE_OID`,
+`NAMESPACE_X500`.
+
+```js
+import { uuid5, NAMESPACE_URL } from '@exortek/crypto'
+uuid5(NAMESPACE_URL, 'https://example.com/user/42')
+// → 'a7f9d3c1-...' — always the same for this URL
+```
+
+### `uuid7`
+
+```ts
+uuid7(): string
+```
+
+RFC 9562 UUID version 7 — 48-bit millisecond timestamp + 74 random bits +
+Method 1 monotonic counter (RFC 9562 §6.2) so multiple IDs generated in
+the same millisecond stay sortable.
+
+```js
+random.uuid7()   // '018f8e2c-3d5a-7...' — timestamp prefix
+```
+
+Use for anything that lands in a database index — MySQL / Postgres index
+clustering is friendlier to time-sortable IDs than to v4.
+
+### `ulid`
+
+```ts
+ulid(): string
+```
+
+26-character Crockford base32 — 48-bit millisecond timestamp + 80 random
+bits. Time-sortable, URL-safe, monotonic within a millisecond.
+
+```js
+random.ulid()   // '01ARZ3NDEKTSV4RRFFQ69G5FAV'
+```
+
+ULID and UUID v7 solve the same problem with different encodings. Pick
+one:
+
+| | ULID | UUID v7 |
+| --- | --- | --- |
+| Length | 26 chars | 36 chars |
+| Alphabet | Crockford base32 | hex + `-` |
+| Sortability | ✅ | ✅ |
+| Recognisable as "an ID" | less so | ✅ |
+| Interop with UUID-typed DB columns | ❌ | ✅ |
+
+### `isUUID` / `isULID`
+
+```ts
+isUUID(value: unknown): boolean
+isULID(value: unknown): boolean
+```
+
+Cheap format checks (version-agnostic for UUID). Use in request validation
+before hitting the database.
+
+```js
+if (!random.isUUID(req.params.id)) return res.status(400).end()
+```
+
+## Security notes
+
+- **Every helper reads from the OS CSPRNG** — the same entropy source
+  `openssl rand` and Linux `/dev/urandom` use. No fallbacks, no polyfills.
+- **Sampling helpers use rejection sampling.** `alphanumeric`, `numeric`,
+  `pin`, `code` reject bytes outside the uniform window rather than modulo-
+  ing, so the distribution is exactly uniform across the alphabet.
+- **PIN entropy is low by design.** A 6-digit PIN is ~20 bits — meant for
+  short-lived, rate-limited, single-use flows (SMS OTP, MFA fallback).
+  Combine with expiry + attempt limits at the application layer.
+- **UUID v4 is not sortable.** If you index it in a database with high
+  insert volume, expect index fragmentation. Use `uuid7` or `ulid`.
+- **UUID v5 is deterministic.** Deriving an ID from a user's email means
+  anyone with the same email produces the same UUID — great for public
+  identifiers, terrible for anything that shouldn't leak email-membership.
+
+## Errors
+
+Every helper throws `CryptoError(INVALID_ARGUMENT)` when `size` / `length`
+/ `groupCount` is not a non-negative safe integer, or when option types
+are wrong. See the [errors page](/crypto/errors) for the full enum.

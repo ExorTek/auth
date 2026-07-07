@@ -1,40 +1,9 @@
-# @exortek/auth
+---
+title: '@exortek/auth'
+sidebarTitle: Introduction
+---
 
-Framework-agnostic, zero-dependency, pure JavaScript authentication library for Node.js — a modern successor to Passport.js.
+# `@exortek/auth`
 
-## Why
-
-- **Zero external deps.** Everything is built on `node:crypto`.
-- **Pure JavaScript with JSDoc types.** No TypeScript source — `.d.ts` is emitted from JSDoc.
-- **Framework-agnostic.** Works under Express, Fastify, Hono and Elysia.
-- **Opinionated defaults.** Developer writes one line, gets a safe primitive.
-
-## Package status
-
-| Package | Purpose | Status |
-| --- | --- | --- |
-| `@exortek/crypto` | hash, hmac, cipher, sign, encode, random, KDFs, binary | ✅ v0.0.1 |
-| `@exortek/password` | Argon2 / bcrypt + strength + HIBP breach check | ⏳ next |
-| `@exortek/jwt` | JOSE-standard signed tokens | ⏳ |
-| `@exortek/otp` | TOTP / HOTP + backup codes | ⏳ |
-| others | 20+ auth-stack packages | ⏳ |
-
-## Quick start
-
-```bash
-npm install @exortek/crypto
-```
-
-```js
-import { hash, cipher, random, sign } from '@exortek/crypto'
-
-const otp    = random.pin(6)                              // '847291'
-const digest = hash('hello')                              // sha256 hex
-const key    = await cipher.generateKey()                 // AES-256-GCM
-const token  = cipher.encryptToString('state', key)       // safe for cookies
-
-const kp  = await sign.generateSignKeyPair('es256')
-const sig = sign.sign('payload', kp.privateKey, { algo: 'es256' })
-```
-
-Read on → [`@exortek/crypto` reference](/crypto)
+Docs are being written. In the meantime, the only package shipping today is
+[`@exortek/crypto`](/crypto) — start there.

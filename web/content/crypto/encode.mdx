@@ -1,0 +1,188 @@
+---
+title: 'crypto/encode — codecs'
+sidebarTitle: encode
+---
+
+import { Callout } from 'nextra/components';
+
+# `encode`
+
+Encoders and decoders for the byte-string alphabets that show up in
+authentication code — base64url for JWTs, base32 for TOTP secrets,
+Crockford for ULIDs, base58 for cryptocurrency addresses, hex for
+debugging. Every codec pair round-trips exactly.
+
+```js
+import { encode } from '@exortek/crypto'
+// or
+import { base64url, base32, base58, crockford, base64, hex } from '@exortek/crypto/encode'
+```
+
+## Which encoding for what?
+
+| Alphabet | Use for | Case | URL-safe | Padding | Alphabet size |
+| --- | --- | --- | --- | --- | --- |
+| **base64url** | JWT / JWS / JWE, cookies, URL params | mixed | ✅ | no | 64 |
+| **base64** | Legacy, mail (MIME) | mixed | ❌ | `=` | 64 |
+| **base32** | TOTP secret sharing, DNS TXT | upper | ✅ | optional `=` | 32 |
+| **crockford** | ULID, sortable IDs | upper | ✅ | no | 32 |
+| **base58** | Bitcoin / Solana addresses, invite codes | mixed | ✅ | no | 58 |
+| **hex** | Debugging, fixed-width fingerprints | lower | ✅ | no | 16 |
+
+## API shape
+
+Every codec is a module with two exports:
+
+```ts
+encode(input:  string | Buffer | Uint8Array): string
+decode(input:  string): Buffer
+```
+
+Encode accepts strings (UTF-8) or bytes. Decode accepts a string and
+returns a `Buffer`. Every decode rejects out-of-alphabet characters with
+`CryptoError(INVALID_ENCODING)` including the offending character and
+its index.
+
+```js
+import { base64url } from '@exortek/crypto/encode'
+
+const buf = Buffer.from([1, 2, 3])
+const s   = base64url.encode(buf)     // 'AQID'
+const b   = base64url.decode(s)       // <Buffer 01 02 03>
+```
+
+## base64url
+
+```js
+base64url.encode('hello')             // 'aGVsbG8'
+base64url.decode('aGVsbG8')           // <Buffer 68 65 6c 6c 6f>
+```
+
+RFC 4648 §5. URL-safe alphabet (`A–Z a–z 0–9 - _`), no `=` padding.
+
+**Prefer this over standard base64** for anything that ever touches a URL,
+cookie, header, or JWT. Every JWT library on npm speaks base64url.
+
+## base64
+
+```js
+base64.encode('hello')                // 'aGVsbG8='
+base64.decode('aGVsbG8=')             // <Buffer 68 65 6c 6c 6f>
+```
+
+RFC 4648 §4. Standard alphabet (`A–Z a–z 0–9 + / =`), padded to a
+multiple of 4 chars.
+
+Included for interop with mail (MIME) and legacy protocols. Do not use
+in URLs — `+` and `/` require percent-encoding.
+
+## base32
+
+```js
+base32.encode('Hello')                        // 'JBSWY3DPEE'
+base32.encode('Hello', { padding: true })     // 'JBSWY3DPEE======'
+base32.decode('JBSWY3DPEE')                   // <Buffer 48 65 6c 6c 6f>
+base32.decode('jbswy3dpee')                   // same — case-insensitive
+```
+
+RFC 4648 §6. Uppercase alphabet (`A–Z 2–7`), padding optional.
+
+**Use for:** TOTP / HOTP secret sharing. The QR code your MFA app scans
+carries the shared secret in base32.
+
+```js
+// TOTP secret provisioning URI
+const secret = base32.encode(random.bytes(20))
+const uri    = `otpauth://totp/App:${email}?secret=${secret}&issuer=App`
+```
+
+## crockford (base32)
+
+```js
+crockford.encode('Hello')             // '91JPRV3F'
+crockford.decode('91jprv3f')          // same — case-insensitive
+crockford.decode('9IJPRV3F')          // decodes 'I' as '1'
+crockford.decode('9OJPRV3F')          // decodes 'O' as '0'
+```
+
+Douglas Crockford's base32 variant — `0-9 A-Z` minus the four look-alike
+glyphs `I` (looks like `1`), `L` (looks like `1`), `O` (looks like `0`),
+and `U` (accidental profanity).
+
+Case-insensitive on decode. Recognises the standard aliases: `I` and `L`
+decode as `1`, `O` decodes as `0`.
+
+**Use for:** ULIDs, user-visible IDs that get read aloud or typed.
+
+<Callout type="info">
+  **RFC 4648 vs. BigInt encoding.** `encode.crockford` uses RFC 4648 §6
+  bit-window packing. `random.crockford(n)` uses BigInt number encoding
+  for ULID compatibility. The two produce identical output for
+  aligned-to-5-bit inputs (10 bytes → 16 chars, 16 bytes → 26 chars) and
+  differ for non-aligned sizes.
+</Callout>
+
+## base58
+
+```js
+base58.encode(Buffer.from('hello'))   // 'Cn8eVZg'
+base58.decode('Cn8eVZg')              // <Buffer 68 65 6c 6c 6f>
+base58.encode(Buffer.from([0, 0, 0xff]))  // '115Q' — leading zeros as leading 1s
+```
+
+Satoshi's alphabet: `1-9 A-Z a-z` minus `0`, `O`, `I`, `l`. Denser than
+hex, safer to read out loud, standard for cryptocurrency addresses.
+
+**Base58Check convention.** Leading zero bytes in the input become
+leading `'1'` characters in the output. This preserves length for
+fixed-width prefixes (e.g. an address version byte).
+
+**Use for:** cryptocurrency addresses, short human-visible IDs (invite
+codes, invoice numbers, license keys).
+
+```js
+// A random human-visible ID
+random.base58(8)   // 'V1StGXR8'
+```
+
+## hex
+
+```js
+hex.encode('Hello')                   // '48656c6c6f'
+hex.decode('48656c6c6f')              // <Buffer 48 65 6c 6c 6f>
+```
+
+Lowercase hex (`0-9 a-f`). Length of the output is exactly `2 × input.length`.
+
+**Use for:** debugging, fixed-width fingerprints in logs, CSRF tokens,
+anything you'll compare visually. Terrible for URL / cookie payloads
+(twice the size of base64url).
+
+## Error handling
+
+Every decode raises `CryptoError(INVALID_ENCODING)` on any character
+outside the target alphabet, with the offending character and index:
+
+```js
+try {
+  base58.decode('abc0xyz')   // '0' is not in the base58 alphabet
+} catch (err) {
+  console.log(err.code)      // 'INVALID_ENCODING'
+  console.log(err.message)   // "input contains a non-Base58 character '0' at index 3"
+}
+```
+
+Non-string arguments throw `INVALID_ARGUMENT`.
+
+## Security notes
+
+- **Encoders are not encryption.** Base64-encoding a secret does not hide
+  it. Use `cipher.*` for confidentiality.
+- **Constant-time comparison for encoded secrets.** Use
+  [`hash.compare`](/crypto/hash#compare) on the *decoded* bytes when you
+  need to check an encoded token against an expected value.
+- **URL-safety matters.** If a value is going in a URL, cookie or header,
+  encode as base64url — not base64. `+` and `/` will be percent-mangled
+  by intermediaries.
+- **Look-alike alphabets matter for human-facing IDs.** Prefer Crockford
+  or base58 over hex / base64 for anything a user reads or types.

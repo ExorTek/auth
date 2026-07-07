@@ -1,0 +1,123 @@
+---
+title: 'crypto/binary — byte utilities'
+sidebarTitle: binary
+---
+
+import { Callout } from 'nextra/components';
+
+# `binary`
+
+Four small helpers for byte manipulation — the operations you keep needing
+when working with keys, MACs, and packed ciphertext framing.
+
+```js
+import { binary } from '@exortek/crypto'
+// or
+import { concat, xor, wipe, equal } from '@exortek/crypto/binary'
+```
+
+## `concat`
+
+```ts
+concat(...parts: (string | Buffer | Uint8Array)[]): Buffer
+```
+
+Concatenate byte-shaped inputs into a single `Buffer`. Accepts strings
+(UTF-8) or bytes; returns bytes.
+
+```js
+const packed = binary.concat(salt, iv, tag, ciphertext)
+```
+
+Handy for building framed ciphertext, HMAC inputs (concatenating fields
+before signing), or key-agreement outputs. Equivalent to
+`Buffer.concat([...])` after a `toBuffer` coercion — the point is that
+you can drop a UTF-8 string in without pre-encoding.
+
+## `xor`
+
+```ts
+xor(a: Buffer | Uint8Array, b: Buffer | Uint8Array): Buffer
+```
+
+Byte-wise XOR of two equal-length buffers. Throws
+`INVALID_ARGUMENT` if lengths differ.
+
+```js
+const otp = binary.xor(cipherKey, sharedSecret)
+```
+
+**Use for:** one-time-pad style masking, combining two random values
+into one, HKDF-Expand-style constructions.
+
+<Callout type="warning">
+  **XOR is not encryption.** A single-pad XOR is only secure if the pad
+  is truly random, at least as long as the plaintext, and never reused.
+  Almost all "XOR encryption" schemes on the internet fail one of those
+  three. If you need encryption, use `cipher.encryptSymmetric`.
+</Callout>
+
+## `wipe`
+
+```ts
+wipe(buf: Buffer | Uint8Array): void
+```
+
+Overwrite `buf` with zeros in place.
+
+```js
+const privateKey = someHighEntropySecret()
+try {
+  useTheKey(privateKey)
+} finally {
+  binary.wipe(privateKey)
+}
+```
+
+**Why bother?** V8 doesn't zero freed buffers. A private key you loaded
+into a `Buffer` will linger in memory until the region is reused for
+something else — a memory dump or a heap-inspection attack can recover
+it. `wipe` reduces that window to zero.
+
+<Callout type="info">
+  **This is a defence-in-depth measure, not a silver bullet.** V8 can
+  and does copy Buffers around during garbage collection — a wiped
+  Buffer's *original* contents may still exist elsewhere in memory. The
+  fully-mitigated version of this problem requires a `SecureBuffer`
+  outside the JS heap; that's out of scope here. Wipe what you can.
+</Callout>
+
+## `equal`
+
+```ts
+equal(a: Buffer | Uint8Array, b: Buffer | Uint8Array): boolean
+```
+
+Timing-safe equality on two Buffers. Returns `false` for different
+lengths (unlike `crypto.timingSafeEqual`, which throws).
+
+```js
+if (binary.equal(computedTag, providedTag)) {
+  // authentic
+}
+```
+
+For comparing secrets that come in as strings — HMAC hex digests,
+signed tokens — use [`hash.compare`](/crypto/hash#compare) instead;
+it handles the string → buffer coercion timing-safely.
+
+## Security notes
+
+- **`equal` and `compare` are the same tool, different types.** Use
+  `binary.equal` for raw bytes; use `hash.compare` when either side
+  might be a string.
+- **`wipe` is best-effort.** V8 can copy Buffers during GC; the original
+  contents may persist in memory. Use it anyway — it reduces the window.
+- **`xor` is a primitive, not a scheme.** If you find yourself building
+  a "custom encryption" out of `xor`, stop and reach for
+  `cipher.encryptSymmetric` instead.
+- **`concat` does not add framing.** If you concatenate `A || B` and
+  hash the result, an attacker can rearrange the boundary — that's the
+  length-extension family of attacks in a nutshell. When the framing
+  matters, use HMAC of `length-prefixed` fields or feed each field as
+  separate AAD.

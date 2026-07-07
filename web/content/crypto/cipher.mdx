@@ -1,0 +1,393 @@
+---
+title: 'crypto/cipher — encryption & seals'
+sidebarTitle: cipher
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `cipher`
+
+Authenticated symmetric encryption (AES-GCM / AES-CBC / ChaCha20-Poly1305),
+asymmetric encryption (RSA-OAEP), hybrid encryption, key agreement
+(ECDH / X25519), password-based encryption, and time-boxed sealed tokens.
+
+```js
+import { cipher } from '@exortek/crypto'
+```
+
+## Decision tree
+
+```
+Do you have a key already?
+  ├── yes  →  encryptSymmetric / decryptSymmetric        (fastest, ~any size)
+  └── no
+      ├── you have a human passphrase
+      │     →  encryptWithPassphrase / decryptWithPassphrase
+      │
+      ├── you have a *high-entropy* secret and need a TTL
+      │     →  seal / unseal                              (auto-expiring token)
+      │
+      ├── you have a peer's public key (RSA)
+      │     →  encryptAsymmetric  (small payloads only)
+      │     →  encryptHybrid       (any size)
+      │
+      └── you and a peer both have EC keypairs
+            →  deriveSharedSecret  (then encryptSymmetric)
+```
+
+## Algorithms
+
+| Algorithm | Kind | Key | IV / nonce | Auth |
+| --- | --- | --- | --- | --- |
+| `aes-256-gcm` (default) | AEAD | 256 bit | 96 bit | 128 bit tag |
+| `aes-192-gcm` | AEAD | 192 bit | 96 bit | 128 bit tag |
+| `aes-128-gcm` | AEAD | 128 bit | 96 bit | 128 bit tag |
+| `chacha20-poly1305` | AEAD | 256 bit | 96 bit | 128 bit tag |
+| `aes-256-cbc` | non-AEAD | 256 bit | 128 bit | — |
+| `aes-128-cbc` | non-AEAD | 128 bit | 128 bit | — |
+| `rsa-oaep-256` | asymmetric | RSA 2048+ | — | intrinsic |
+
+<Callout type="warning">
+  **Prefer an AEAD** (AES-GCM / ChaCha20-Poly1305). CBC is included for
+  legacy interop only — it provides confidentiality but not integrity,
+  and CBC padding oracles are a classic vulnerability class. If you use
+  CBC you MUST wrap it with a separate HMAC.
+</Callout>
+
+## Symmetric encryption
+
+### `generateKey`
+
+```ts
+generateKey(options?: { algo?: SymmetricAlgorithm }): Promise<KeyObject>
+```
+
+Produce a fresh secret `KeyObject` sized for the chosen algorithm. Default
+is `aes-256-gcm`.
+
+```js
+const key = await cipher.generateKey()                              // 256-bit AES key
+const key = await cipher.generateKey({ algo: 'chacha20-poly1305' }) // 256-bit ChaCha
+```
+
+Store the key in a KMS, a secrets manager, or an env var — never in the
+same repository as the encrypted data.
+
+### `encryptSymmetric`
+
+```ts
+encryptSymmetric(data: string | Buffer | Uint8Array,
+                 key:  KeyObject,
+                 options?: { algo?: SymmetricAlgorithm, aad?: string | Buffer }
+                ): { ciphertext: Buffer, iv: Buffer, tag: Buffer }
+```
+
+Encrypt with an AEAD. Returns three parts you store or transmit together:
+`ciphertext`, `iv` (nonce), and `tag` (auth tag).
+
+```js
+const key = await cipher.generateKey()
+const { ciphertext, iv, tag } = cipher.encryptSymmetric('secret data', key)
+
+// Store all three — they're needed for decryption
+db.records.insert({ ciphertext, iv, tag })
+```
+
+**AAD** (additional authenticated data) is authenticated but not
+encrypted — a header field you want tied to the ciphertext:
+
+```js
+const { ciphertext, iv, tag } = cipher.encryptSymmetric(body, key, {
+  aad: `user:${userId}`,
+})
+// Decryption fails if `aad` differs — a token from another user won't decrypt.
+```
+
+<Callout type="error">
+  **Never reuse an `iv` under the same key.** AES-GCM catastrophically
+  fails on nonce reuse — an attacker recovers the auth key and every
+  message under it. `encryptSymmetric` generates a fresh IV per call;
+  never pass your own unless you know what you're doing.
+</Callout>
+
+### `decryptSymmetric`
+
+```ts
+decryptSymmetric(ciphertext: Buffer | Uint8Array,
+                 key:        KeyObject,
+                 options:    { iv: Buffer, tag: Buffer, algo?: SymmetricAlgorithm, aad?: string | Buffer }
+                ): Buffer
+```
+
+Reverse of the above. Throws `CryptoError(DECRYPT_FAILED)` on any
+authentication failure — wrong key, tampered bytes, wrong AAD.
+
+```js
+try {
+  const plaintext = cipher.decryptSymmetric(ciphertext, key, { iv, tag })
+} catch (err) {
+  if (err.code === ErrorCode.DECRYPT_FAILED) {
+    // wrong key or tampered bytes — treat as "unauthorised"
+  }
+}
+```
+
+### `encryptToString` / `decryptFromString`
+
+```ts
+encryptToString(data: any, key: KeyObject, options?: { algo?, aad?, encoding?: 'base64url' | 'hex' }): string
+decryptFromString(token: string, key: KeyObject, options?: { algo?, aad?, encoding? }): any
+```
+
+Convenience wrapper that packs `iv || tag || ciphertext` into a single
+base64url token and JSON-serialises the payload. Perfect for cookies,
+URL parameters, or opaque tokens.
+
+```js
+const key   = await cipher.generateKey()
+const token = cipher.encryptToString({ userId: 42, roles: ['admin'] }, key)
+res.cookie('sess', token, { httpOnly: true, sameSite: 'strict' })
+
+// Later
+const { userId } = cipher.decryptFromString(req.cookies.sess, key)
+```
+
+## Password-based encryption
+
+### `encryptWithPassphrase` / `decryptWithPassphrase`
+
+```ts
+encryptWithPassphrase(data:       string | Buffer | Uint8Array,
+                      passphrase: string | Buffer | Uint8Array,
+                      options?:   PassphraseOptions): Promise<string>
+
+decryptWithPassphrase(token:      string,
+                      passphrase: string | Buffer | Uint8Array,
+                      options?:   PassphraseOptions): Promise<Buffer>
+
+interface PassphraseOptions {
+  iterations?: number                                  // default 210_000 (OWASP)
+  kdf?:        'sha256' | 'sha384' | 'sha512'          // default 'sha512'
+  encoding?:   'hex' | 'base64url'                     // default 'base64url'
+}
+```
+
+Password-Based Encryption (RFC 8018): PBKDF2 derives a key from the
+passphrase, AES-256-GCM encrypts. The output is a fully self-contained
+token — salt, IV, tag and ciphertext packed together.
+
+```js
+const token = await cipher.encryptWithPassphrase('secret data', 'my-passphrase')
+// → 'V1StGXR8Z5jdHi6BmyTQ...' safe to store or transmit
+
+const plain = await cipher.decryptWithPassphrase(token, 'my-passphrase')
+```
+
+**Use for:** encrypting backup files, config secrets, envelope-encrypted
+user data — anywhere a human-typed secret unlocks something.
+
+**Don't use for:** storing password verifiers (login flows). PBE encrypts
+data with a passphrase key; password *verification* wants a one-way,
+memory-hard hash like Argon2id — a different primitive.
+
+If you tune `iterations` or `kdf`, you must pass the same values on
+decrypt. They're not embedded in the token to keep it compact.
+
+## Sealed tokens
+
+### `seal` / `unseal`
+
+```ts
+seal(payload: any,
+     secret:  string | Buffer | Uint8Array,
+     options: SealOptions): string
+
+unseal(token:  string,
+       secret: string | Buffer | Uint8Array,
+       options?: { now?: number, clockSkew?: number }
+      ): { payload: any, expiresAt: number }
+
+interface SealOptions {
+  ttl:  number | string           // seconds, or '15m' / '1h' / '24h' / '7d' / '2w'
+  now?: number                    // injectable clock (ms), for tests
+}
+```
+
+Encrypt and time-stamp a payload into a short opaque token, suitable for
+password-reset links, email-verification codes, magic-link tokens, or any
+single-use ticket that needs to expire on its own.
+
+```js
+// Mint a 1-hour password-reset ticket
+const token = cipher.seal({ userId: 42, purpose: 'pw-reset' }, RESET_SECRET, {
+  ttl: '1h',
+})
+res.redirect(`/reset?t=${token}`)
+```
+
+The token is **authenticated** (AES-256-GCM) — tampering flips it to
+invalid on `unseal`. The expiry is part of the authenticated data, so an
+attacker can't extend a token by editing bytes. The encryption key is
+derived from `secret` via HKDF-SHA-256; the same `secret` will always
+derive the same key.
+
+**`unseal` throws with three distinct codes** so you can render
+different UX per case:
+
+```js
+try {
+  const { payload } = cipher.unseal(req.query.t, RESET_SECRET)
+  await resetPassword(payload.userId)
+} catch (err) {
+  if (!(err instanceof CryptoError)) throw err
+  switch (err.code) {
+    case ErrorCode.TOKEN_EXPIRED:   return res.render('link-expired')
+    case ErrorCode.TOKEN_TAMPERED:  return res.status(404).end()   // don't leak
+    case ErrorCode.TOKEN_MALFORMED: return res.status(400).end()
+  }
+}
+```
+
+**`clockSkew`** allows a small grace window (in seconds) past nominal
+expiry — useful when validating tokens across servers whose clocks aren't
+perfectly aligned.
+
+<Callout type="info">
+  **`seal` vs. JWT.** JWT is a *signed*, publicly readable envelope
+  built to a JOSE standard, meant for stateless auth between services.
+  `seal` is an *encrypted* opaque token — smaller, no standard to argue
+  about, payload is private. Reach for it when the payload ("reset user
+  42's password", "confirm this email") shouldn't be visible to the
+  bearer.
+</Callout>
+
+## Asymmetric encryption
+
+### `generateKeyPair`
+
+```ts
+generateKeyPair(options?: { algo?: 'rsa-oaep-256', modulusLength?: number }): Promise<{ publicKey, privateKey }>
+```
+
+Generate an RSA keypair for `encryptAsymmetric` / `decryptAsymmetric`.
+Default 2048-bit modulus.
+
+```js
+const { publicKey, privateKey } = await cipher.generateKeyPair()
+// modulusLength: 3072 for a longer safety margin
+```
+
+### `encryptAsymmetric` / `decryptAsymmetric`
+
+```ts
+encryptAsymmetric(data: string | Buffer | Uint8Array,
+                  publicKey: KeyObject,
+                  options?: { algo?: 'rsa-oaep-256' }): Buffer
+
+decryptAsymmetric(ciphertext: Buffer,
+                  privateKey: KeyObject,
+                  options?:   { algo?: 'rsa-oaep-256' }): Buffer
+```
+
+RSA-OAEP encryption. Payload size is capped by the modulus (roughly
+`modulusLength / 8 − 66` bytes for OAEP-SHA-256) — for a 2048-bit key
+you get ~190 bytes.
+
+<Callout type="warning">
+  **Do not use RSA-OAEP for payloads larger than ~190 bytes.** Use
+  [`encryptHybrid`](#encrypthybrid--decrypthybrid) instead — it wraps a
+  fresh AES key with RSA and encrypts the payload with AES.
+</Callout>
+
+### `encryptHybrid` / `decryptHybrid`
+
+```ts
+encryptHybrid(data: string | Buffer | Uint8Array,
+              publicKey: KeyObject
+             ): { encryptedKey: Buffer, ciphertext: Buffer, iv: Buffer, tag: Buffer }
+
+decryptHybrid(payload: { encryptedKey, ciphertext, iv, tag },
+              privateKey: KeyObject): Buffer
+```
+
+Standard hybrid pattern: generate a fresh AES-256-GCM key, encrypt the
+payload with AES, wrap the AES key with RSA-OAEP. Handles payloads of
+any size while retaining the "anyone with the public key can encrypt to
+me" property.
+
+```js
+const blob = cipher.encryptHybrid(bigFile, publicKey)
+// Send blob over the wire; recipient decrypts with their privateKey
+const plaintext = cipher.decryptHybrid(blob, privateKey)
+```
+
+## Key agreement
+
+### `deriveSharedSecret`
+
+```ts
+deriveSharedSecret(privateKey: KeyObject,
+                   peerPublicKey: KeyObject,
+                   options?: { algo?: 'ecdh' | 'x25519' }): Buffer
+```
+
+Establish a shared secret between two parties who each hold half of a
+Diffie-Hellman keypair. The output is 32 raw bytes suitable for feeding
+into `hkdf` — DH secrets are **not** uniformly distributed, so always
+run them through a KDF before using them as a key.
+
+```js
+// Alice's side
+const shared = cipher.deriveSharedSecret(alicePrivate, bobPublic)
+const key    = hkdf(shared, { info: 'session-v1', length: 32 })
+
+// Bob's side computes the same shared secret from his private + Alice's public
+```
+
+Supports NIST curves via `ecdh` (P-256 / P-384 / P-521 depending on the
+keys) and Curve25519 via `x25519`. Prefer X25519 when both sides can
+choose — smaller keys, faster, immune to a few implementation pitfalls
+NIST curves have.
+
+## Polymorphic `encrypt` / `decrypt`
+
+```ts
+encrypt(data, key, options?)  // dispatches on key.type
+decrypt(ciphertext, key, options)
+```
+
+Convenience wrappers that pick symmetric vs asymmetric based on the key
+type. Handy for REPL-style code; prefer the explicit variants at call
+sites where the return type matters — the polymorphic form's return
+type is ambiguous.
+
+## Security notes
+
+- **AEAD only.** For new work use AES-GCM or ChaCha20-Poly1305. CBC is
+  included for legacy interop; if you use it, wrap it in HMAC yourself.
+- **Nonce/IV per call, never reused.** `encryptSymmetric` and `seal`
+  generate fresh nonces. Do not pass your own unless you're implementing
+  a specific protocol.
+- **Key management is your job.** Nothing in this module persists keys
+  — use a KMS, a secrets manager, or a vault. Rotate secrets on a
+  schedule; the sealed-token verify path can try multiple candidates.
+- **RSA-OAEP has size limits.** Use `encryptHybrid` for anything larger
+  than a few hundred bytes.
+- **DH secrets need HKDF.** A raw ECDH / X25519 shared secret is not a
+  uniformly distributed key. Always run it through `hkdf` before use.
+- **Timing.** Every `decrypt*` path returns in constant time relative
+  to key/tag comparison — a wrong key is not distinguishable from a
+  wrong tag from a timing perspective.
+
+## Errors
+
+- `INVALID_ARGUMENT` — bad type on an argument.
+- `INVALID_KEY` — wrong `KeyObject` type for the operation.
+- `INVALID_CIPHERTEXT` — malformed ciphertext framing (truncated, bad
+  version byte).
+- `DECRYPT_FAILED` — authentication failed (wrong key, tampered).
+- `UNSUPPORTED_ALGORITHM` — algo not in the whitelist.
+- `TOKEN_MALFORMED` / `TOKEN_TAMPERED` / `TOKEN_EXPIRED` — from
+  `seal` / `unseal`.
+
+See the [errors page](/crypto/errors) for the full enum.

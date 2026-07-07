@@ -1,0 +1,147 @@
+---
+title: 'crypto/errors — CryptoError'
+sidebarTitle: errors
+---
+
+import { Callout } from 'nextra/components';
+
+# `errors`
+
+Every entry point in `@exortek/crypto` that can fail throws a `CryptoError`
+carrying a stable, machine-readable `code`. Branch on `code`, never on the
+message — messages may change between versions.
+
+```js
+import { CryptoError, ErrorCode } from '@exortek/crypto'
+```
+
+## `CryptoError`
+
+```ts
+class CryptoError extends Error {
+  name:  'CryptoError'
+  code:  string           // one of ErrorCode
+  cause?: unknown         // wrapped underlying error (e.g. an OpenSSL exception)
+}
+```
+
+Extends the built-in `Error`. Adds a `code` property (stable) and an
+optional `cause` (the underlying `node:crypto` error, useful for
+diagnostics but never for user-facing messages).
+
+```js
+try {
+  cipher.decryptSymmetric(ct, key, { iv, tag })
+} catch (err) {
+  if (err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED) {
+    // wrong key or tampered ciphertext
+  } else {
+    throw err
+  }
+}
+```
+
+<Callout type="info">
+  **No HTTP status mapping is built in.** This library is framework-
+  agnostic; how you turn `TOKEN_EXPIRED` into `401` or `410` or `400` is
+  your application's decision. See the [suggested
+  mappings](#suggested-http-status-mappings) below.
+</Callout>
+
+## `ErrorCode`
+
+The complete enum. Codes are **stable across minor versions** — new codes
+may be added; existing codes are never renamed or repurposed.
+
+| Code | Meaning | Common source |
+| --- | --- | --- |
+| `INVALID_ARGUMENT` | Type / range / shape validation failed on a function argument. | Every module. |
+| `UNSUPPORTED_ALGORITHM` | Algorithm name not in the module's whitelist. | `hash`, `cipher`, `sign` — passing an unknown `algo`. |
+| `INVALID_KEY` | `KeyObject` missing, wrong type, or unusable with the algorithm. | `cipher`, `sign` — passing a public key where a private is expected, etc. |
+| `INVALID_CIPHERTEXT` | Ciphertext blob is malformed (truncated, bad framing). | `cipher.decryptFromString`, `cipher.decryptWithPassphrase`. |
+| `DECRYPT_FAILED` | Authenticated decryption failed — wrong key, tag mismatch, or tampering. | `cipher.decryptSymmetric`, `cipher.decryptWithPassphrase`. |
+| `INVALID_ENCODING` | Encoded input has characters outside the target alphabet. | `encode.*.decode`, `Buffer.from(str, encoding)` failures. |
+| `TOKEN_MALFORMED` | Sealed token's structure or framing is unparseable. | `cipher.unseal` — bad length, wrong version byte, non-base64url. |
+| `TOKEN_TAMPERED` | Sealed token failed authenticated decryption. | `cipher.unseal` — wrong secret, edited bytes. |
+| `TOKEN_EXPIRED` | Sealed token's TTL has passed. | `cipher.unseal` — the token was valid but now isn't. |
+
+## Suggested HTTP status mappings
+
+These are conventions, not enforced. Pick what matches your app.
+
+| Code | Suggested HTTP | Reason |
+| --- | --- | --- |
+| `INVALID_ARGUMENT` | `500` | Programmer error — the client shouldn't cause this. |
+| `UNSUPPORTED_ALGORITHM` | `500` | Same. |
+| `INVALID_KEY` | `500` | Same. |
+| `INVALID_CIPHERTEXT` | `400` | Client sent malformed data. |
+| `INVALID_ENCODING` | `400` | Same. |
+| `DECRYPT_FAILED` | `401` | Wrong key / tampered — treat as auth failure. |
+| `TOKEN_MALFORMED` | `400` | Not a token at all. |
+| `TOKEN_TAMPERED` | `404` (recommended) | Don't leak that a valid token exists; render "not found". |
+| `TOKEN_EXPIRED` | `410` or a custom UX page | The token was valid — tell the user to request a fresh one. |
+
+## Patterns
+
+### Distinguish user errors from programmer errors
+
+```js
+try {
+  const { payload } = cipher.unseal(req.query.t, RESET_SECRET)
+  await handleReset(payload)
+} catch (err) {
+  if (!(err instanceof CryptoError)) throw err            // real bug — propagate
+
+  switch (err.code) {
+    case ErrorCode.TOKEN_EXPIRED:   return res.render('link-expired')
+    case ErrorCode.TOKEN_TAMPERED:
+    case ErrorCode.TOKEN_MALFORMED: return res.status(404).end()
+    default:
+      // Anything else from CryptoError is a programmer bug — log and 500.
+      logger.error({ err }, 'unexpected CryptoError')
+      return res.status(500).end()
+  }
+}
+```
+
+### Multi-secret rotation
+
+Trying multiple secrets is standard practice during key rotation. Errors
+from `unseal` are catchable and don't need to bubble up:
+
+```js
+function unsealAny(token, secrets) {
+  for (const secret of secrets) {
+    try {
+      return cipher.unseal(token, secret)
+    } catch (err) {
+      if (!(err instanceof CryptoError)) throw err
+      if (err.code === ErrorCode.TOKEN_TAMPERED) continue
+      throw err                     // MALFORMED or EXPIRED — same for every key
+    }
+  }
+  throw new CryptoError(ErrorCode.TOKEN_TAMPERED, 'no candidate secret verified')
+}
+```
+
+### Never string-match
+
+```js
+// ❌ Fragile
+if (err.message.includes('expired')) { /* ... */ }
+
+// ✅ Stable
+if (err.code === ErrorCode.TOKEN_EXPIRED) { /* ... */ }
+```
+
+## Compatibility policy
+
+- **Codes are stable.** Once a code appears in a released version, it will
+  not be renamed or repurposed. If we need a new semantic, we add a new
+  code.
+- **Messages can change.** The human-readable `message` may be reworded
+  between versions. Do not parse it.
+- **New codes may appear** in minor versions. Add a `default` branch to
+  your `switch` so unknown codes fall through to a generic 500.
+- **Wrapped `cause`** — the underlying `node:crypto` error is preserved
+  as `err.cause` when relevant. Log it, don't display it.

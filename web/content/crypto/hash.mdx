@@ -1,0 +1,392 @@
+---
+title: 'crypto/hash — digests, MAC, KDFs'
+sidebarTitle: hash
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `hash`
+
+Digests, keyed message authentication, key derivation, timing-safe
+compare, signed cookies, and content-addressed fingerprints. Everything a
+non-encrypting checksum-shaped primitive can be.
+
+```js
+import { hash, hmac, compare, verifyHmac, pbkdf2, hkdf, scrypt,
+         signValue, unsignValue, fingerprint } from '@exortek/crypto'
+```
+
+## When to use what
+
+| Use case | Function |
+| --- | --- |
+| Fingerprint a file / blob | [`hash`](#hash) |
+| Verify a Stripe / GitHub webhook signature | [`verifyHmac`](#verifyhmac) |
+| Sign a cookie value | [`signValue`](#signvalue--unsignvalue) |
+| Derive an encryption key from a passphrase | [`pbkdf2`](#pbkdf2) or [`scrypt`](#scrypt) |
+| Derive N keys from one master secret | [`hkdf`](#hkdf) |
+| Compare two secrets (timing-safe) | [`compare`](#compare) |
+| Cache key / ETag for a request body | [`fingerprint`](#fingerprint) |
+
+## Digests
+
+### `hash`
+
+```ts
+hash(data: string | Buffer | Uint8Array, options?: HashOptions): string | Buffer
+
+interface HashOptions {
+  algo?:     'sha256' | 'sha384' | 'sha512'
+           | 'sha3-256' | 'sha3-384' | 'sha3-512'
+           | 'blake2b512' | 'blake2s256'
+           | 'sha1' | 'md5'                       // legacy, interop only
+  encoding?: 'hex' | 'base64' | 'base64url' | 'buffer'  // default 'hex'
+}
+```
+
+Compute a cryptographic hash. SHA-256 by default; see the algorithm table
+below for the full whitelist.
+
+```js
+hash('hello world')                          // sha256 hex
+hash(fileBuf, { algo: 'sha512' })            // sha512 hex
+hash(buf, { encoding: 'base64url' })         // sha256 URL-safe
+hash(buf, { encoding: 'buffer' })            // raw digest bytes
+```
+
+**Algorithm groups:**
+
+| Family | Members | Use for |
+| --- | --- | --- |
+| SHA-2 | `sha256` · `sha384` · `sha512` | Modern default. `sha256` is the sane choice for almost everything. |
+| SHA-3 | `sha3-256` · `sha3-384` · `sha3-512` | Structurally distinct from SHA-2 (Keccak sponge). Hedge against SHA-2 cryptanalysis. |
+| BLAKE2 | `blake2b512` · `blake2s256` | Faster than SHA-3 on modern CPUs, comparable security. |
+| Legacy | `sha1` · `md5` | **Broken.** Included only for interop with existing digests you can't change. |
+
+<Callout type="error">
+  **Never use `md5` or `sha1` on untrusted input.** They are collision-
+  vulnerable — an attacker can craft two different inputs with the same
+  digest. Fine for a checksum on a file you control; catastrophic anywhere
+  security matters.
+</Callout>
+
+### `hmac`
+
+```ts
+hmac(data:   string | Buffer | Uint8Array,
+     secret: string | Buffer | Uint8Array,
+     options?: HashOptions): string | Buffer
+```
+
+Compute a keyed HMAC (RFC 2104) — the standard way to prove "I know the
+key and this data has not been tampered with". Suitable for signed
+cookies, webhook signatures, cache keys derived from user input.
+
+```js
+hmac('user:42', COOKIE_SECRET)                      // sha256 hex
+hmac(webhookBody, WHSEC, { algo: 'sha256' })        // Stripe / GitHub style
+hmac(data, key, { encoding: 'base64url' })          // JOSE / URL contexts
+```
+
+Never use `md5` or `sha1` for HMAC of untrusted input. HMAC is more
+resilient than the underlying hash but prefer `sha256`+ for security-
+sensitive verification.
+
+For verification, prefer [`verifyHmac`](#verifyhmac) — it wraps this call
+in a timing-safe compare so you never accidentally use `===`.
+
+### `compare`
+
+```ts
+compare(a: string | Buffer | Uint8Array,
+        b: string | Buffer | Uint8Array): boolean
+```
+
+Timing-safe equality check for secrets. Returns `false` for different-
+length inputs instead of throwing (unlike `crypto.timingSafeEqual`).
+
+```js
+compare(givenToken, expectedToken)   // true / false, no timing leak
+```
+
+<Callout type="warning">
+  Do not use `===` to compare an HMAC, a token, or a password hash.
+  Character-by-character comparison leaks how many prefix characters
+  matched, which is enough to brute-force the value across many requests.
+</Callout>
+
+### `verifyHmac`
+
+```ts
+verifyHmac(data:     string | Buffer | Uint8Array,
+           expected: string | Buffer | Uint8Array,
+           secret:   string | Buffer | Uint8Array,
+           options?: HashOptions): boolean
+```
+
+Compute the HMAC of `data` under `secret` and compare it timing-safely to
+`expected`. This is the primitive Stripe, GitHub, Slack, Twilio, Vercel
+and every webhook-shipping SaaS use.
+
+```js
+// Express handler for a Stripe webhook
+app.post('/webhook', express.raw({ type: '*/*' }), (req, res) => {
+  const ok = verifyHmac(
+    req.body,
+    req.headers['stripe-signature'],
+    process.env.STRIPE_WHSEC,
+  )
+  if (!ok) return res.status(401).end()
+  // ... handle the event
+})
+```
+
+`expected` can be a Buffer or a string. Strings are decoded per
+`options.encoding` (default `hex`). Match the format your webhook provider
+uses.
+
+## Key derivation (KDFs)
+
+Three KDFs, three different jobs. Pick by input entropy:
+
+| KDF | Input entropy | Speed | Use for |
+| --- | --- | --- | --- |
+| [`hkdf`](#hkdf) | high (already-random secret) | fast | derive N subkeys from a master key |
+| [`pbkdf2`](#pbkdf2) | low (human passphrase) | tunable slow | interoperable password KDF |
+| [`scrypt`](#scrypt) | low (human passphrase) | memory-hard slow | GPU-resistant password KDF |
+
+<Callout type="info">
+  **These KDFs derive keys from passwords, they don't verify user logins.**
+  If you're building password authentication, reach for a memory-hard,
+  purpose-built password hasher (Argon2id or bcrypt). PBKDF2 and scrypt
+  are here for deriving *cipher key material* from a passphrase, not for
+  storing password verifiers.
+</Callout>
+
+### `hkdf`
+
+```ts
+hkdf(ikm:    string | Buffer | Uint8Array,
+     options?: HkdfOptions): string | Buffer
+
+interface HkdfOptions {
+  salt?:     string | Buffer | Uint8Array    // default empty
+  info?:     string | Buffer | Uint8Array    // default empty — DOMAIN SEPARATION
+  length?:   number                          // default 32
+  hash?:     'sha256' | 'sha384' | 'sha512'  // default 'sha256'
+  encoding?: 'hex' | 'base64' | 'base64url' | 'buffer'  // default 'buffer'
+}
+```
+
+HKDF (RFC 5869) — extract-and-expand key derivation from high-entropy
+input keying material. The `info` parameter provides **domain
+separation** — same IKM + different info = cryptographically independent
+subkeys.
+
+```js
+// Two keys from one master secret, guaranteed independent
+const encKey = hkdf(masterSecret, { info: 'encryption', length: 32 })
+const macKey = hkdf(masterSecret, { info: 'authentication', length: 32 })
+
+// Session key with salt + application context
+const sessionKey = hkdf(sharedSecret, {
+  salt:   userId,
+  info:   'session-v1',
+  length: 32,
+})
+```
+
+**Rule of thumb.** Any time you're about to use the same secret for two
+different purposes, run each through HKDF with a unique `info` string
+first. This is what TLS 1.3, Signal, and Age all do internally.
+
+### `pbkdf2`
+
+```ts
+pbkdf2(password: string | Buffer | Uint8Array,
+       options:  Pbkdf2Options): Promise<string | Buffer>
+
+interface Pbkdf2Options {
+  salt:         string | Buffer | Uint8Array  // required, ≥ 16 bytes
+  iterations?:  number                        // OWASP 2023 defaults per digest
+  keyLength?:   number                        // default 32
+  digest?:      'sha256' | 'sha384' | 'sha512'  // default 'sha512'
+  encoding?:    'hex' | 'base64' | 'base64url' | 'buffer'  // default 'buffer'
+}
+```
+
+PBKDF2 (RFC 8018) — derives a fixed-size key from a passphrase.
+Deliberately slow to make brute-force expensive. Defaults are OWASP 2023
+minimum iteration counts per digest:
+
+| Digest | Default iterations |
+| --- | --- |
+| `sha256` | 600,000 |
+| `sha384` | 250,000 |
+| `sha512` | 210,000 |
+
+```js
+const salt = random.bytes(16)
+const key  = await pbkdf2('user passphrase', { salt })  // 32-byte AES-256 key
+
+// Explicit tuning
+const key = await pbkdf2('secret', {
+  salt,
+  iterations: 600_000,
+  keyLength:  64,
+  digest:     'sha512',
+})
+```
+
+<Callout type="warning">
+  **`iterations`, `keyLength`, `digest` are part of the recipe.** To
+  recover the key later you need the exact same values — treat them as
+  part of the ciphertext framing (that's how [`encryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase)
+  handles it).
+</Callout>
+
+### `scrypt`
+
+```ts
+scrypt(password: string | Buffer | Uint8Array,
+       options:  ScryptOptions): Promise<string | Buffer>
+
+interface ScryptOptions {
+  salt:       string | Buffer | Uint8Array
+  keyLength?: number    // default 32
+  N?:         number    // CPU/memory cost, default 2^15 (32768)
+  r?:         number    // block size, default 8
+  p?:         number    // parallelisation, default 1
+  maxmem?:    number    // memory ceiling
+  encoding?:  'hex' | 'base64' | 'base64url' | 'buffer'  // default 'buffer'
+}
+```
+
+scrypt (RFC 7914) — a **memory-hard** KDF. Unlike PBKDF2, scrypt makes
+GPU / ASIC attacks expensive because each derivation needs a large chunk
+of RAM.
+
+```js
+const key = await scrypt('user passphrase', {
+  salt: random.bytes(16),
+})   // 32-byte key, ~64 MB peak RAM, ~100 ms on a modern laptop
+```
+
+`N` must be a power of two; the defaults (`N=32768, r=8, p=1`) match the
+scrypt paper's "interactive login" tuning.
+
+## Signed values
+
+### `signValue` / `unsignValue`
+
+```ts
+signValue(value:  string,
+          secret: string | Buffer | Uint8Array,
+          options?: { algo?: 'sha256' | 'sha384' | 'sha512' }): string
+
+unsignValue(signed: string,
+            secret: string | Buffer | Uint8Array,
+            options?: { algo?: 'sha256' | 'sha384' | 'sha512' }): string | null
+```
+
+Sign an opaque string value with a secret, producing a self-verifying
+string you can round-trip through a cookie, header, URL fragment, or
+link.
+
+Output shape is `<value>.<base64url_hmac>` — the exact scheme Express's
+`cookie-signature` and Django's `signing` module use.
+
+```js
+// Sign a session cookie value
+const cookie = signValue('sid:8f2a', process.env.COOKIE_SECRET)
+res.cookie('sid', cookie, { httpOnly: true, sameSite: 'lax' })
+
+// Verify on the next request
+const sid = unsignValue(req.cookies.sid, process.env.COOKIE_SECRET)
+if (sid === null) return res.status(401).end()   // tampered / wrong secret
+```
+
+<Callout type="info">
+  **Not encryption.** The value stays visible in the output — the
+  signature only proves the client hasn't tampered with it. If the value
+  itself is sensitive, use [`cipher.seal`](/crypto/cipher#seal--unseal)
+  instead.
+</Callout>
+
+**Rotation.** Sign new cookies with the newest secret; verify by trying
+each candidate secret until one succeeds:
+
+```js
+const value = SECRETS.map(s => unsignValue(cookie, s)).find(v => v !== null)
+```
+
+**Constraints:**
+
+- `value` must be a string.
+- `value` must not contain `.` (the separator). Encode as base64url or
+  hex first for arbitrary bytes.
+- `unsignValue` returns `null` on any failure — bad separator, tampered
+  MAC, wrong secret, unsupported algo. This is the boundary-check convention
+  used by cookie-signature and Django; do not try/catch.
+
+## Fingerprint
+
+### `fingerprint`
+
+```ts
+fingerprint(value: unknown, options?: HashOptions): string | Buffer
+```
+
+Deterministic content-addressed hash of any JSON-shaped value.
+
+`JSON.stringify` doesn't guarantee key order — two equivalent objects can
+serialise differently. `fingerprint` first **canonicalises** the input
+(sorted keys per RFC 8785 UTF-16 code-unit order, no whitespace,
+`.toJSON()` unwrap, `Date` handling) and then hashes.
+
+```js
+fingerprint({ b: 2, a: 1 }) === fingerprint({ a: 1, b: 2 })   // true
+fingerprint({ items: [{ id: 2 }, { id: 1 }] })                // stable across runtimes
+fingerprint(payload, { algo: 'sha512', encoding: 'base64url' })
+```
+
+Use cases:
+
+- **Cache keys / ETags** derived from a request body.
+- **Idempotency keys** for at-least-once APIs — reject a duplicate POST
+  if the body fingerprint matches a previous request.
+- **Dedup IDs** in an event stream — compute once at the producer.
+
+**Accepted:** `null`, `boolean`, finite `number`, `string`, `Array`,
+plain object, any object with a `.toJSON()` method (e.g. `Date`).
+
+**Rejected** (throws `INVALID_ARGUMENT`): `undefined`, `bigint`,
+`symbol`, `function`, `NaN`, `±Infinity`, `Buffer` / `Uint8Array` at any
+depth (encode as base64 or hex first), cyclic references.
+
+## Security notes
+
+- **HMAC is timing-safe by construction** in [`verifyHmac`](#verifyhmac)
+  and [`compare`](#compare). Use those, not `===`.
+- **Never use `md5` or `sha1` on untrusted input.** Available for legacy
+  interop only.
+- **KDF outputs are keys, not password verifiers.** PBKDF2 and scrypt
+  derive cipher key material from a passphrase — they are not the right
+  tool for storing a user's login credentials. Use a memory-hard password
+  hasher (Argon2id) for that.
+- **Fingerprint canonicalisation is JSON-shaped only.** It rejects
+  BigInt, Symbol, Buffer at any depth — encode them explicitly first to
+  make the canonical form part of *your* contract, not ours.
+- **Domain-separate everything.** If you're deriving multiple keys from
+  one secret, run each through HKDF with a distinct `info` string. This
+  is the single most under-used precaution in production systems.
+
+## Errors
+
+See the [errors page](/crypto/errors) for the full `ErrorCode` enum. From
+this module you may see:
+
+- `INVALID_ARGUMENT` — bad input type, non-finite number, missing salt.
+- `UNSUPPORTED_ALGORITHM` — algo not in the whitelist.
+- `INVALID_ENCODING` (via `Buffer.from(str, encoding)`) — malformed
+  encoded strings.
