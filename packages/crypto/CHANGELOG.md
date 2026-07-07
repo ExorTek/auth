@@ -1,5 +1,14 @@
 # @exortek/crypto
 
+## 1.0.2
+
+### Patch Changes
+
+- Replaces terse error messages across the whole surface with actionable ones that name what the caller passed and point
+  at the fix. Example: `cipher.encrypt(data, promise)` now throws
+  `key must be a KeyObject; got a Promise — did you forget "await"?`. Every message change is text only — no `ErrorCode`
+  renames, no API changes.
+
 ## 1.0.1
 
 ### Patch Changes
