@@ -6,11 +6,29 @@ import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 const WEAK_4 = new Set([
   // all identical
-  ...'0123456789'.split('').map((d) => d.repeat(4)),
+  ...'0123456789'.split('').map(d => d.repeat(4)),
   // ascending (wraps 9→0)
-  '0123', '1234', '2345', '3456', '4567', '5678', '6789', '7890', '8901', '9012',
+  '0123',
+  '1234',
+  '2345',
+  '3456',
+  '4567',
+  '5678',
+  '6789',
+  '7890',
+  '8901',
+  '9012',
   // descending
-  '3210', '4321', '5432', '6543', '7654', '8765', '9876', '0987', '1098', '2109',
+  '3210',
+  '4321',
+  '5432',
+  '6543',
+  '7654',
+  '8765',
+  '9876',
+  '0987',
+  '1098',
+  '2109',
 ]);
 
 describe('pin', () => {
@@ -54,16 +72,37 @@ describe('pin', () => {
   });
 
   it('rejects non-positive length', () => {
-    assert.throws(() => pin(0), (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT);
-    assert.throws(() => pin(-1), (err) => err instanceof CryptoError);
-    assert.throws(() => pin(1.5), (err) => err instanceof CryptoError);
-    assert.throws(() => pin(NaN), (err) => err instanceof CryptoError);
+    assert.throws(
+      () => pin(0),
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+    assert.throws(
+      () => pin(-1),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => pin(1.5),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => pin(NaN),
+      err => err instanceof CryptoError,
+    );
   });
 
   it('rejects non-object options', () => {
-    assert.throws(() => pin(4, 'true'), (err) => err instanceof CryptoError);
-    assert.throws(() => pin(4, null), (err) => err instanceof CryptoError);
-    assert.throws(() => pin(4, []), (err) => err instanceof CryptoError);
+    assert.throws(
+      () => pin(4, 'true'),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => pin(4, null),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => pin(4, []),
+      err => err instanceof CryptoError,
+    );
   });
 
   it('accepts short lengths (1-2) without applying the weak filter', () => {

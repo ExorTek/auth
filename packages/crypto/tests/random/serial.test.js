@@ -61,23 +61,50 @@ describe('serial', () => {
   });
 
   it('rejects non-object options', () => {
-    assert.throws(() => serial('bad'), (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT);
-    assert.throws(() => serial(null), (err) => err instanceof CryptoError);
-    assert.throws(() => serial([]), (err) => err instanceof CryptoError);
+    assert.throws(
+      () => serial('bad'),
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+    assert.throws(
+      () => serial(null),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => serial([]),
+      err => err instanceof CryptoError,
+    );
   });
 
   it('rejects non-string prefix', () => {
-    assert.throws(() => serial({ prefix: 123 }), (err) => err instanceof CryptoError);
+    assert.throws(
+      () => serial({ prefix: 123 }),
+      err => err instanceof CryptoError,
+    );
   });
 
   it('rejects non-positive blocks or blockLen', () => {
-    assert.throws(() => serial({ blocks: 0 }), (err) => err instanceof CryptoError);
-    assert.throws(() => serial({ blockLen: 0 }), (err) => err instanceof CryptoError);
-    assert.throws(() => serial({ blocks: -1 }), (err) => err instanceof CryptoError);
-    assert.throws(() => serial({ blockLen: 1.5 }), (err) => err instanceof CryptoError);
+    assert.throws(
+      () => serial({ blocks: 0 }),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => serial({ blockLen: 0 }),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => serial({ blocks: -1 }),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => serial({ blockLen: 1.5 }),
+      err => err instanceof CryptoError,
+    );
   });
 
   it('rejects non-string separator', () => {
-    assert.throws(() => serial({ separator: 42 }), (err) => err instanceof CryptoError);
+    assert.throws(
+      () => serial({ separator: 42 }),
+      err => err instanceof CryptoError,
+    );
   });
 });

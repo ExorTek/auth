@@ -1,12 +1,7 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  cipher,
-  encryptAsymmetric,
-  decryptAsymmetric,
-  ASYMMETRIC_ALGOS,
-} from '../../src/cipher/index.js';
+import { cipher, encryptAsymmetric, decryptAsymmetric, ASYMMETRIC_ALGOS } from '../../src/cipher/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 describe('cipher asymmetric (RSA-OAEP)', () => {
@@ -41,7 +36,7 @@ describe('cipher asymmetric (RSA-OAEP)', () => {
     const other = await cipher.generateKeyPair('rsa-oaep-256');
     assert.throws(
       () => cipher.decrypt(enc, other.privateKey),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
+      err => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
     );
   });
 
@@ -54,7 +49,7 @@ describe('cipher asymmetric (RSA-OAEP)', () => {
   it('encrypt rejects a private key input', () => {
     assert.throws(
       () => cipher.encrypt('x', privateKey),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_KEY,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_KEY,
     );
   });
 
@@ -62,16 +57,13 @@ describe('cipher asymmetric (RSA-OAEP)', () => {
     const enc = cipher.encrypt('x', publicKey);
     assert.throws(
       () => cipher.decrypt(enc, publicKey),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_KEY,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_KEY,
     );
   });
 
   it('encryptAsymmetric / decryptAsymmetric round-trip via explicit named exports', () => {
     const enc = encryptAsymmetric('explicit', publicKey, { algo: 'rsa-oaep-256' });
-    assert.equal(
-      decryptAsymmetric(enc, privateKey, { algo: 'rsa-oaep-256' }).toString('utf8'),
-      'explicit',
-    );
+    assert.equal(decryptAsymmetric(enc, privateKey, { algo: 'rsa-oaep-256' }).toString('utf8'), 'explicit');
   });
 
   it('ASYMMETRIC_ALGOS lists both RSA-OAEP variants', () => {

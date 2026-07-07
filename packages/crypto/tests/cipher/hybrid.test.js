@@ -36,7 +36,7 @@ describe('cipher hybrid (RSA-wrapped AES)', () => {
     env.ciphertext[0] ^= 0xff;
     assert.throws(
       () => cipher.decryptHybrid(env, privateKey),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
+      err => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
     );
   });
 
@@ -45,14 +45,14 @@ describe('cipher hybrid (RSA-wrapped AES)', () => {
     env.encryptedKey[0] ^= 0xff;
     assert.throws(
       () => cipher.decryptHybrid(env, privateKey),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
+      err => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
     );
   });
 
   it('rejects an envelope missing required fields', () => {
     assert.throws(
       () => cipher.decryptHybrid({ iv: Buffer.alloc(12), tag: Buffer.alloc(16) }, privateKey),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 });

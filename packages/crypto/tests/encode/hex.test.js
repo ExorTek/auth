@@ -33,7 +33,7 @@ describe('encode.hex.encode', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => encode(bad),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -60,11 +60,11 @@ describe('encode.hex.decode', () => {
   it('rejects odd-length strings', () => {
     assert.throws(
       () => decode('abc'),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ENCODING,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ENCODING,
     );
     assert.throws(
       () => decode('deadbee'),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ENCODING,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ENCODING,
     );
   });
 
@@ -72,7 +72,7 @@ describe('encode.hex.decode', () => {
     for (const bad of ['xyzz', 'gg', 'deadbeeg', '0x1234']) {
       assert.throws(
         () => decode(bad),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ENCODING,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ENCODING,
       );
     }
   });
@@ -81,7 +81,7 @@ describe('encode.hex.decode', () => {
     for (const bad of [null, undefined, 42, Buffer.from('x'), {}, []]) {
       assert.throws(
         () => decode(bad),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

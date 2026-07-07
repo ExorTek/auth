@@ -34,10 +34,7 @@ const generateKeyPairAsync = promisify(crypto.generateKeyPair);
 export async function generateSignKeyPair(algo) {
   const spec = SIGN[algo];
   if (!spec) {
-    throw new CryptoError(
-      ErrorCode.UNSUPPORTED_ALGORITHM,
-      `sign algo must be one of: ${SIGN_ALGOS.join(', ')}`,
-    );
+    throw new CryptoError(ErrorCode.UNSUPPORTED_ALGORITHM, `sign algo must be one of: ${SIGN_ALGOS.join(', ')}`);
   }
   if (spec.type === 'rsa') {
     return generateKeyPairAsync('rsa', { modulusLength: spec.modulusLength });

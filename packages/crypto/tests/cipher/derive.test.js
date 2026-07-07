@@ -61,7 +61,7 @@ describe('cipher.deriveSharedSecret', () => {
     const b = await cipher.generateKeyPair('x25519');
     assert.throws(
       () => cipher.deriveSharedSecret(a.privateKey, b.publicKey),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_KEY,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_KEY,
     );
   });
 
@@ -69,7 +69,7 @@ describe('cipher.deriveSharedSecret', () => {
     const a = await cipher.generateKeyPair('x25519');
     assert.throws(
       () => cipher.deriveSharedSecret(a.publicKey, a.publicKey), // both public
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_KEY,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_KEY,
     );
   });
 

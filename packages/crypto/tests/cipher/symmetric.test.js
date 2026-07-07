@@ -1,12 +1,7 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  cipher,
-  encryptSymmetric,
-  decryptSymmetric,
-  SYMMETRIC_ALGOS,
-} from '../../src/cipher/index.js';
+import { cipher, encryptSymmetric, decryptSymmetric, SYMMETRIC_ALGOS } from '../../src/cipher/index.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 describe('cipher symmetric (AES-256-GCM default)', () => {
@@ -52,7 +47,7 @@ describe('cipher symmetric (AES-256-GCM default)', () => {
     ciphertext[0] ^= 0xff;
     assert.throws(
       () => cipher.decrypt(ciphertext, key, { iv, tag }),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
+      err => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
     );
   });
 
@@ -61,7 +56,7 @@ describe('cipher symmetric (AES-256-GCM default)', () => {
     const wrong = await cipher.generateKey();
     assert.throws(
       () => cipher.decrypt(ciphertext, wrong, { iv, tag }),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
+      err => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
     );
   });
 
@@ -73,7 +68,7 @@ describe('cipher symmetric (AES-256-GCM default)', () => {
     // Wrong AAD fails.
     assert.throws(
       () => cipher.decrypt(ciphertext, key, { iv, tag, aad: 'user:99' }),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
+      err => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
     );
   });
 
@@ -81,7 +76,7 @@ describe('cipher symmetric (AES-256-GCM default)', () => {
     const kp = await cipher.generateKeyPair('x25519');
     assert.throws(
       () => cipher.encrypt('x', kp.privateKey),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_KEY,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_KEY,
     );
   });
 });
@@ -122,27 +117,21 @@ describe('cipher symmetric — algorithm variants', () => {
   it('supports chacha20-poly1305', async () => {
     const key = await cipher.generateKey('chacha20-poly1305');
     const { ciphertext, iv, tag } = cipher.encrypt('hello', key, { algo: 'chacha20-poly1305' });
-    assert.equal(
-      cipher.decrypt(ciphertext, key, { iv, tag, algo: 'chacha20-poly1305' }).toString('utf8'),
-      'hello',
-    );
+    assert.equal(cipher.decrypt(ciphertext, key, { iv, tag, algo: 'chacha20-poly1305' }).toString('utf8'), 'hello');
   });
 
   it('supports aes-256-cbc (no auth tag)', async () => {
     const key = await cipher.generateKey('aes-256-cbc');
     const { ciphertext, iv, tag } = cipher.encrypt('hello', key, { algo: 'aes-256-cbc' });
     assert.equal(tag.length, 0);
-    assert.equal(
-      cipher.decrypt(ciphertext, key, { iv, algo: 'aes-256-cbc' }).toString('utf8'),
-      'hello',
-    );
+    assert.equal(cipher.decrypt(ciphertext, key, { iv, algo: 'aes-256-cbc' }).toString('utf8'), 'hello');
   });
 
   it('rejects unsupported algorithm', async () => {
     const key = await cipher.generateKey();
     assert.throws(
       () => cipher.encrypt('x', key, { algo: 'aes-128-ecb' }),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.UNSUPPORTED_ALGORITHM,
+      err => err instanceof CryptoError && err.code === ErrorCode.UNSUPPORTED_ALGORITHM,
     );
   });
 });
@@ -164,7 +153,7 @@ describe('cipher encryptToString / decryptFromString', () => {
     const short = token.slice(0, 10); // too short to contain iv+tag+ciphertext
     assert.throws(
       () => cipher.decryptFromString(short, key),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_CIPHERTEXT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_CIPHERTEXT,
     );
   });
 
@@ -174,7 +163,7 @@ describe('cipher encryptToString / decryptFromString', () => {
     const tampered = token.slice(0, -4) + 'AAAA';
     assert.throws(
       () => cipher.decryptFromString(tampered, key),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
+      err => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
     );
   });
 });

@@ -1,10 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  encryptWithPassphrase,
-  decryptWithPassphrase,
-} from '../../src/cipher/passphrase.js';
+import { encryptWithPassphrase, decryptWithPassphrase } from '../../src/cipher/passphrase.js';
 import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 // Use a small iteration count throughout to keep the test suite fast; the

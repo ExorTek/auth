@@ -37,7 +37,7 @@ describe('encode.base64url.encode', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => encode(bad),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -59,7 +59,7 @@ describe('encode.base64url.decode', () => {
   it('rejects strings containing `+` or `/` (standard base64 alphabet)', () => {
     assert.throws(
       () => decode('aB+/xy'),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ENCODING,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ENCODING,
     );
   });
 
@@ -67,7 +67,7 @@ describe('encode.base64url.decode', () => {
     for (const bad of ['!!!', 'hello world', 'aGVsbG8!!']) {
       assert.throws(
         () => decode(bad),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ENCODING,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ENCODING,
       );
     }
   });
@@ -76,7 +76,7 @@ describe('encode.base64url.decode', () => {
     for (const bad of [null, undefined, 42, Buffer.from('x'), {}, []]) {
       assert.throws(
         () => decode(bad),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

@@ -23,7 +23,7 @@ describe('alphanumeric', () => {
     // the uniform expectation (1000/bucket); rejection sampling should deliver
     // this comfortably in a single run.
     const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    const counts = new Map(ALPHABET.split('').map((c) => [c, 0]));
+    const counts = new Map(ALPHABET.split('').map(c => [c, 0]));
     const s = alphanumeric(62_000);
     for (const ch of s) {
       counts.set(ch, counts.get(ch) + 1);
@@ -42,7 +42,7 @@ describe('alphanumeric', () => {
   it('rejects length === 0', () => {
     assert.throws(
       () => alphanumeric(0),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
@@ -50,7 +50,7 @@ describe('alphanumeric', () => {
     for (const bad of [-1, 1.5, NaN, Infinity, '21', null, undefined, {}]) {
       assert.throws(
         () => alphanumeric(bad),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

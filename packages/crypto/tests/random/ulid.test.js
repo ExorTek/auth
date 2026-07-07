@@ -32,7 +32,7 @@ describe('ulid', () => {
 
   it('is monotonic across millisecond boundaries', async () => {
     const a = ulid();
-    await new Promise((r) => setTimeout(r, 5));
+    await new Promise(r => setTimeout(r, 5));
     const b = ulid();
     assert.ok(b > a);
     // First 10 chars = timestamp; b's timestamp portion must be strictly greater.
@@ -66,20 +66,29 @@ describe('ulid', () => {
   it('rejects negative time', () => {
     assert.throws(
       () => ulid(-1),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
   it('rejects non-integer time', () => {
-    assert.throws(() => ulid(1.5), (err) => err instanceof CryptoError);
-    assert.throws(() => ulid(NaN), (err) => err instanceof CryptoError);
-    assert.throws(() => ulid('not a number'), (err) => err instanceof CryptoError);
+    assert.throws(
+      () => ulid(1.5),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => ulid(NaN),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => ulid('not a number'),
+      err => err instanceof CryptoError,
+    );
   });
 
   it('rejects time beyond 48-bit range', () => {
     assert.throws(
       () => ulid(0xffffffffffff + 1),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 

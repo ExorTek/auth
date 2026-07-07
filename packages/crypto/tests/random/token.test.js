@@ -41,30 +41,45 @@ describe('token', () => {
   it('rejects a non-string prefix', () => {
     assert.throws(
       () => token(16, { prefix: 123 }),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
-    assert.throws(() => token(16, { prefix: null }), (err) => err instanceof CryptoError);
-    assert.throws(() => token(16, { prefix: {} }), (err) => err instanceof CryptoError);
+    assert.throws(
+      () => token(16, { prefix: null }),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => token(16, { prefix: {} }),
+      err => err instanceof CryptoError,
+    );
   });
 
   it('rejects a non-string separator', () => {
     assert.throws(
       () => token(16, { prefix: 'usr', separator: 42 }),
-      (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
   it('rejects non-object options', () => {
-    assert.throws(() => token(16, 'usr'), (err) => err instanceof CryptoError);
-    assert.throws(() => token(16, null), (err) => err instanceof CryptoError);
-    assert.throws(() => token(16, 42), (err) => err instanceof CryptoError);
+    assert.throws(
+      () => token(16, 'usr'),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => token(16, null),
+      err => err instanceof CryptoError,
+    );
+    assert.throws(
+      () => token(16, 42),
+      err => err instanceof CryptoError,
+    );
   });
 
   it('propagates CryptoError from bytes() on invalid size', () => {
     for (const bad of [-1, 1.5, NaN, '16', null, undefined]) {
       assert.throws(
         () => token(bad),
-        (err) => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -90,13 +105,7 @@ describe('token', () => {
 
 describe('token — encodings', () => {
   it('exports TOKEN_ENCODINGS listing every supported encoding', () => {
-    assert.deepEqual([...TOKEN_ENCODINGS].sort(), [
-      'base58',
-      'base64',
-      'base64url',
-      'crockford',
-      'hex',
-    ]);
+    assert.deepEqual([...TOKEN_ENCODINGS].sort(), ['base58', 'base64', 'base64url', 'crockford', 'hex']);
   });
 
   it("encoding: 'hex' produces lowercase hex", () => {

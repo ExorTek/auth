@@ -33,7 +33,7 @@ describe('hex', () => {
     for (const bad of [-1, 1.5, NaN, '16', null, undefined]) {
       assert.throws(
         () => hex(bad),
-        (err) => {
+        err => {
           assert.ok(err instanceof CryptoError);
           assert.equal(err.code, ErrorCode.INVALID_ARGUMENT);
           return true;
