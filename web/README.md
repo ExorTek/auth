@@ -23,6 +23,10 @@ yarn web:build
 yarn workspace web start
 ```
 
+The build script chains `next build` with `pagefind` so the search
+index is regenerated on every deploy. `public/_pagefind/` is a build
+artifact — git-ignored and rebuilt from the shipped HTML each time.
+
 ## Layout
 
 ```

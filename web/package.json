@@ -1,9 +1,8 @@
 {
   "name": "web",
-  "packageManager": "yarn@4.16.0",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "next build && pagefind --site .next/server/app --output-path public/_pagefind",
     "start": "next start"
   },
   "dependencies": {
@@ -12,5 +11,8 @@
     "nextra-theme-docs": "patch:nextra-theme-docs@npm%3A4.6.1#~/.yarn/patches/nextra-theme-docs-npm-4.6.1-0b59bd8bbb.patch",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "pagefind": "^1.5.2"
   }
 }

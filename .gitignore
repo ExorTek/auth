@@ -5,6 +5,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 **.next/
+web/public/_pagefind/
 
 # Yarn (Berry) — keep cache/install state out
 .yarn/*
