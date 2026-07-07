@@ -4,6 +4,7 @@ node_modules/
 # Build artifacts
 dist/
 *.tsbuildinfo
+**.next/
 
 # Yarn (Berry) — keep cache/install state out
 .yarn/*
