@@ -9,6 +9,10 @@ const minify = terser({
   compress: {
     ecma: 2022,
     passes: 2,
+    module: true,
+    toplevel: true,
+    unsafe_arrows: true,
+    pure_getters: true,
   },
   mangle: {
     keep_classnames: true,
@@ -16,28 +20,31 @@ const minify = terser({
   },
 });
 
+const resolveOnce = nodeResolve();
+const minifyOnce = minify;
+
 export function createConfig(pkg, options = {}) {
   const external = [...Object.keys(pkg.dependencies || {}), ...Object.keys(pkg.peerDependencies || {}), /^node:/];
-
   const entries = options.entries || { index: 'src/index.js' };
+  const plugins = [resolveOnce, minifyOnce];
 
   return Object.entries(entries).flatMap(([name, input]) => [
     {
       input,
-      output: { file: `dist/${name}.mjs`, format: 'esm', sourcemap: true },
+      output: { file: `dist/${name}.mjs`, format: 'esm', sourcemap: false },
       external,
-      plugins: [nodeResolve(), minify],
+      plugins,
     },
     {
       input,
       output: {
         file: `dist/${name}.cjs`,
         format: 'cjs',
-        sourcemap: true,
+        sourcemap: false,
         exports: 'named',
       },
       external,
-      plugins: [nodeResolve()],
+      plugins,
     },
   ]);
 }

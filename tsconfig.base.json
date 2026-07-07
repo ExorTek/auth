@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "incremental": true,
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
@@ -8,7 +9,7 @@
     "checkJs": false,
     "declaration": true,
     "emitDeclarationOnly": true,
-    "declarationMap": true,
+    "declarationMap": false,
     "strict": true,
     "noImplicitAny": true,
     "esModuleInterop": true,
