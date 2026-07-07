@@ -1,37 +1,36 @@
----
-title: '@exortek/auth'
-sidebarTitle: Introduction
----
+# @exortek/auth
 
-import { Callout, Tabs } from 'nextra/components';
+> A framework-agnostic, zero-dependency authentication toolkit for Node.js.
 
-# `@exortek/auth`
+[![license](https://img.shields.io/github/license/ExorTek/auth?color=blue)](./LICENSE)
+[![CI](https://github.com/ExorTek/auth/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![node](https://img.shields.io/badge/node-%3E%3D22-339933)](https://nodejs.org)
+[![docs](https://img.shields.io/badge/docs-auth.memet.dev-cb3837)](https://auth.memet.dev)
 
-A framework-agnostic, zero-dependency authentication toolkit for Node.js.
-Small, sharp packages that each solve one piece of the auth problem
-correctly — and, together, replace the
-`passport + jsonwebtoken + bcrypt + speakeasy + csurf + otplib + …`
-stack most Node apps end up stitching together.
+`@exortek/auth` is a monorepo of small, sharp packages that each solve one
+piece of the auth problem correctly — and, together, replace the
+`passport + jsonwebtoken + bcrypt + speakeasy + csurf + otplib + …` stack
+most Node apps end up stitching together.
 
-Every package is built directly on `node:crypto`. No runtime
-dependencies. Pure JavaScript with JSDoc → `.d.ts`. Framework-agnostic —
-Express, Fastify, Hono, Elysia.
+Every package is built directly on `node:crypto`. No runtime dependencies.
+Pure JavaScript with JSDoc → `.d.ts`. Framework-agnostic — Express,
+Fastify, Hono, Elysia.
 
 ## Shipping today
 
-| Package | Purpose | Version | Docs |
-| --- | --- | :---: | :---: |
-| **`@exortek/crypto`** | hash · hmac · KDFs · cipher · sign · seal · encode · CSPRNG | `1.0.0` | [Reference →](/crypto) |
+| Package | Purpose | Version |
+| --- | --- | --- |
+| [`@exortek/crypto`](./packages/crypto) | hash · hmac · KDFs · cipher · sign · seal · encode · CSPRNG | [![npm](https://img.shields.io/npm/v/@exortek/crypto.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/crypto) |
 
 ## The plan
 
-Twenty-three packages, one scope. Numbering reflects dependency order —
-a lower number never imports from a higher one, so you can adopt one
+Twenty-three packages, one scope. Numbering reflects dependency order
+— a lower number never imports from a higher one, so you can adopt one
 package at a time.
 
 | # | Package | What it does |
 | :---: | --- | --- |
-| 01 | [`@exortek/crypto`](/crypto) | hash, HMAC, KDFs, AEAD ciphers, asymmetric signatures, sealed tokens, CSPRNG, encoders |
+| 01 | [`@exortek/crypto`](./packages/crypto) | hash, HMAC, KDFs, AEAD ciphers, asymmetric signatures, sealed tokens, CSPRNG, encoders |
 | 02 | `@exortek/password` | Argon2id / bcrypt hashing, strength scoring, HIBP breach check |
 | 03 | `@exortek/otp` | TOTP / HOTP, backup codes, QR provisioning URI |
 | 04 | `@exortek/challenge` | e-mail / SMS one-time code storage + verification |
@@ -57,10 +56,10 @@ package at a time.
 
 ## Install
 
+Grab the packages you need directly:
+
 ```bash
-npm  install @exortek/crypto
-yarn add     @exortek/crypto
-pnpm add     @exortek/crypto
+npm install @exortek/crypto
 ```
 
 Node.js **22 or newer**.
@@ -91,38 +90,8 @@ const sig = sign.sign('claim=1', kp.privateKey, { algo: 'es256' })
 const kid = sign.thumbprint(kp.publicKey)
 ```
 
-Full reference at [`@exortek/crypto`](/crypto).
-
-## Import styles
-
-Every package supports three import styles. All three tree-shake.
-
-<Tabs items={['Named, top level', 'Named, subpath', 'Namespace']}>
-  <Tabs.Tab>
-    ```js
-    import { hmac, cipher, uuid4, seal } from '@exortek/crypto'
-    ```
-    Most ergonomic — one import line for the whole surface.
-  </Tabs.Tab>
-  <Tabs.Tab>
-    ```js
-    import { uuid4 } from '@exortek/crypto/random'
-    import { hmac }  from '@exortek/crypto/hash'
-    import { seal }  from '@exortek/crypto/cipher'
-    ```
-    Smallest bundle — bundlers only pull the subpath.
-  </Tabs.Tab>
-  <Tabs.Tab>
-    ```js
-    import { random, cipher, hash } from '@exortek/crypto'
-
-    random.uuid4()
-    hash.hmac('data', SECRET)
-    await cipher.generateKey()
-    ```
-    Namespace form — great for REPL / interactive exploration.
-  </Tabs.Tab>
-</Tabs>
+Full reference on the [documentation site](https://auth.memet.dev) and
+in each package's README.
 
 ## Design principles
 
@@ -143,28 +112,31 @@ Every package supports three import styles. All three tree-shake.
   `*.test.js` files, native `assert/strict`. The framework ships with
   Node.
 
-## Node version, platforms, ESM / CJS
+## Layout
 
-- **Node 22 LTS or newer.** Uses `crypto.hkdfSync`, `crypto.scrypt`,
-  `Buffer.readBigUInt64BE`, and BLAKE2 / SHA-3 hashes.
-- **Pure ESM source with a matching CJS output.** Both `import` and
-  `require` work.
-- **Types.** `.d.ts` is generated from JSDoc at build time.
-- **Runs on** Linux, macOS, Windows, Docker, AWS Lambda (Node 22
-  runtime), Vercel functions, Cloudflare Workers with `nodejs_compat`.
+```
+auth/
+├── packages/
+│   ├── crypto/                # shipping
+│   ├── password/              # planned
+│   ├── jwt/                   # planned
+│   └── …                      # 20+ more per the plan above
+├── web/                       # docs site (Next.js + Nextra)
+├── ARCHITECTURE.md            # design doc for the whole stack
+├── CONTRIBUTING.md
+└── LICENSE
+```
 
-## Contributing
+## Repository
 
-Branch prefixes, commit conventions, testing, changesets — see
-[CONTRIBUTING.md](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md).
-
-## Links
-
-- **Source:** [github.com/ExorTek/auth](https://github.com/ExorTek/auth)
-- **Issues:** [github.com/ExorTek/auth/issues](https://github.com/ExorTek/auth/issues)
-- **Architecture:** [ARCHITECTURE.md](https://github.com/ExorTek/auth/blob/master/ARCHITECTURE.md)
-- **Security:** email `memet@memet.dev`
+- **Docs:** [auth.memet.dev](https://auth.memet.dev)
+- **Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md) — branch prefixes,
+  commit conventions, changeset flow.
+- **Architecture:** [ARCHITECTURE.md](./ARCHITECTURE.md) — full design doc.
+- **Issues & discussions:** [github.com/ExorTek/auth/issues](https://github.com/ExorTek/auth/issues)
+- **Security:** email `memet@memet.dev` or open a private security
+  advisory on the repo.
 
 ## License
 
-MIT © ExorTek.
+MIT © ExorTek — see [LICENSE](./LICENSE).
