@@ -2,24 +2,33 @@
   "name": "exortek-auth",
   "private": true,
   "type": "module",
-  "description": "Framework-agnostic, zero-dependency, pure JavaScript authentication library for Node.js",
+  "description": "Framework-agnostic, zero-dependency authentication toolkit for Node.js — a monorepo of ~23 focused packages under the @exortek scope.",
+  "homepage": "https://github.com/ExorTek/auth#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "license": "MIT",
   "workspaces": [
     "packages/*",
     "web"
   ],
   "scripts": {
-    "build": "yarn workspaces foreach --all --topological run build",
-    "build:watch": "yarn workspaces foreach --all --parallel run build:watch",
+    "build": "yarn workspaces foreach --all --topological --exclude web run build",
+    "build:watch": "yarn workspaces foreach --all --parallel --exclude web run build:watch",
     "test": "node --test 'packages/*/tests/**/*.test.js'",
     "test:coverage": "node --test --experimental-test-coverage 'packages/*/tests/**/*.test.js'",
-    "lint": "eslint packages/*/src/**/*.js",
-    "format": "prettier --write packages/*/src/**/*.js",
-    "format:check": "prettier --check packages/*/src/**/*.js",
-    "typecheck": "yarn workspaces foreach --all run typecheck",
+    "lint": "eslint 'packages/*/src/**/*.js' 'packages/*/tests/**/*.js'",
+    "format": "prettier --write 'packages/*/src/**/*.js' 'packages/*/tests/**/*.js'",
+    "format:check": "prettier --check 'packages/*/src/**/*.js' 'packages/*/tests/**/*.js'",
+    "typecheck": "yarn workspaces foreach --all --exclude web run typecheck",
+    "clean": "yarn workspaces foreach --all --exclude web run clean",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "changeset publish",
-    "clean": "yarn workspaces foreach --all run clean",
+    "release": "yarn build && changeset publish",
     "web:dev": "yarn workspace web dev",
     "web:build": "yarn workspace web build"
   },
@@ -35,6 +44,5 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "packageManager": "yarn@4.17.0",
-  "license": "MIT"
+  "packageManager": "yarn@4.17.0"
 }
