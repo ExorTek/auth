@@ -1,7 +1,7 @@
 {
   "name": "@exortek/crypto",
   "version": "0.0.1",
-  "description": "Zero-dependency cryptographic primitives — binary, hash, cipher, encode, random, sign — built on node:crypto",
+  "description": "Zero-dependency cryptographic primitives for Node.js — hash / hmac / KDFs (PBKDF2, HKDF, scrypt), AES-GCM / ChaCha20-Poly1305 / RSA-OAEP ciphers, RS/PS/ES/EdDSA signatures, signed cookies, sealed timed tokens, CSPRNG (UUID v4/5/7, ULID, base58, crockford), and encoders — all built on node:crypto.",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -47,7 +47,7 @@
   "files": [
     "dist",
     "README.md",
-    "../../LICENSE"
+    "LICENSE"
   ],
   "scripts": {
     "build": "rollup -c rollup.config.js && tsc -p tsconfig.json",
@@ -59,22 +59,57 @@
     "clean": "rm -rf dist"
   },
   "keywords": [
+    "auth",
     "crypto",
     "hash",
+    "sha256",
+    "sha3",
+    "blake2",
     "hmac",
+    "signed-cookie",
     "cipher",
     "aes",
+    "aes-gcm",
+    "chacha20-poly1305",
     "rsa",
+    "rsa-oaep",
     "ecdh",
+    "x25519",
+    "sign",
+    "ecdsa",
+    "ed25519",
+    "eddsa",
+    "jwt",
+    "jwk",
+    "thumbprint",
+    "pbkdf2",
+    "hkdf",
+    "scrypt",
+    "passphrase",
+    "seal",
+    "fingerprint",
     "random",
+    "uuid",
+    "uuid4",
+    "uuid7",
     "ulid",
-    "uuid"
+    "base32",
+    "base58",
+    "base64url",
+    "crockford",
+    "csprng",
+    "zero-dependency",
+    "node-crypto"
   ],
   "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/crypto#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ExorTek/auth",
+    "url": "git+https://github.com/ExorTek/auth.git",
     "directory": "packages/crypto"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
   },
   "engines": {
     "node": ">=22.0.0"
