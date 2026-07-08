@@ -1,32 +1,15 @@
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-import terser from '@rollup/plugin-terser';
 
-const minify = terser({
-  format: {
-    comments: false,
-    ecma: 2022,
-  },
-  compress: {
-    ecma: 2022,
-    passes: 2,
-    module: true,
-    toplevel: true,
-    unsafe_arrows: true,
-    pure_getters: true,
-  },
-  mangle: {
-    keep_classnames: true,
-    keep_fnames: /^[A-Z]|^assert|^is/, // classes + assertX + isX helpers stay readable
-  },
-});
-
+// Node libraries ship unminified so consumers can read node_modules,
+// debug into stack traces with real names, and audit the tarball. Size
+// matters less than legibility here — jose, jsonwebtoken, zod, drizzle
+// all follow this convention.
 const resolveOnce = nodeResolve();
-const minifyOnce = minify;
 
 export function createConfig(pkg, options = {}) {
   const external = [...Object.keys(pkg.dependencies || {}), ...Object.keys(pkg.peerDependencies || {}), /^node:/];
   const entries = options.entries || { index: 'src/index.js' };
-  const plugins = [resolveOnce, minifyOnce];
+  const plugins = [resolveOnce];
 
   return Object.entries(entries).flatMap(([name, input]) => [
     {

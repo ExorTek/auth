@@ -44,8 +44,8 @@ asymmetric encryption (RSA-OAEP), hybrid encryption, key agreement
     ```js
     // Simple round-trip — everything packed into a single base64url string
     const key   = await cipher.generateKey()
-    const token = cipher.encryptToString({ userId: 42 }, key)
-    const plain = cipher.decryptFromString(token, key)
+    const token = cipher.encryptToString(JSON.stringify({ userId: 42 }), key)
+    const plain = JSON.parse(cipher.decryptFromString(token, key).toString('utf8'))
     // plain: { userId: 42 }
     ```
     Use when the caller doesn't care about the framing — cookies,
@@ -206,7 +206,7 @@ URL parameters, or opaque tokens.
 
 ```js
 const key   = await cipher.generateKey()
-const token = cipher.encryptToString({ userId: 42, roles: ['admin'] }, key)
+const token = cipher.encryptToString(JSON.stringify({ userId: 42, roles: ['admin'] }), key)
 res.cookie('sess', token, { httpOnly: true, sameSite: 'strict' })
 
 // Later
@@ -480,13 +480,17 @@ const SESSION_KEY = crypto.createSecretKey(
 // On login — issue the cookie
 res.cookie(
   'sess',
-  cipher.encryptToString({ userId: user.id, roles: user.roles }, SESSION_KEY),
+  cipher.encryptToString(
+    JSON.stringify({ userId: user.id, roles: user.roles }),
+    SESSION_KEY,
+  ),
   { httpOnly: true, sameSite: 'strict', secure: true, maxAge: 7 * 86_400_000 },
 )
 
 // On every request — decrypt the cookie
 try {
-  const session = cipher.decryptFromString(req.cookies.sess, SESSION_KEY)
+  const buf     = cipher.decryptFromString(req.cookies.sess, SESSION_KEY)
+  const session = JSON.parse(buf.toString('utf8'))
   req.user = session
   next()
 } catch {

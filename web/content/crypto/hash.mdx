@@ -285,7 +285,10 @@ const userKey = hkdf(MASTER_SECRET, {
   info: 'session-v1',    // versioned so future rotations are painless
   length: 32,
 })
-const token = cipher.encryptToString({ userId, roles }, cipher.wrapKey(userKey))
+const token = cipher.encryptToString(
+  JSON.stringify({ userId, roles }),
+  crypto.createSecretKey(userKey),
+)
 ```
 
 <Callout type="info">

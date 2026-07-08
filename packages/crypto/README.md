@@ -56,7 +56,7 @@ const ok = hash.verifyHmac(body, req.headers['x-signature'], WEBHOOK_SECRET)
 
 // A cookie-safe encrypted, authenticated string
 const key   = await cipher.generateKey()
-const token = cipher.encryptToString({ userId: 42 }, key)
+const token = cipher.encryptToString(JSON.stringify({ userId: 42 }), key)
 
 // A 1-hour password-reset ticket — payload is private, expiry is unforgeable
 const ticket = cipher.seal({ userId: 42, purpose: 'pw-reset' }, RESET_SECRET, {
