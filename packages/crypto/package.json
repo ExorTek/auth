@@ -59,6 +59,8 @@
     "clean": "rm -rf dist"
   },
   "keywords": [
+    "backend",
+    "security",
     "auth",
     "crypto",
     "hash",

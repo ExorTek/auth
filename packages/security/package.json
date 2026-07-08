@@ -1,0 +1,116 @@
+{
+  "name": "@exortek/security",
+  "version": "0.0.0",
+  "description": "Zero-dependency defensive HTTP layer for Node.js — CSRF, rate limiting, helmet-style security headers, CORS, safe redirects, and a dozen smaller helpers (client-IP, CSP nonce, slow-down, body limit, timeout, HPP, NoSQL sanitizer, prototype pollution guard, path traversal, filename sanitizer, honeypot, webhook signature verify, bearer parse, origin check).",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./csrf": {
+      "types": "./dist/csrf/index.d.ts",
+      "import": "./dist/csrf.mjs",
+      "require": "./dist/csrf.cjs"
+    },
+    "./rate-limit": {
+      "types": "./dist/rate-limit/index.d.ts",
+      "import": "./dist/rate-limit.mjs",
+      "require": "./dist/rate-limit.cjs"
+    },
+    "./headers": {
+      "types": "./dist/headers/index.d.ts",
+      "import": "./dist/headers.mjs",
+      "require": "./dist/headers.cjs"
+    },
+    "./cors": {
+      "types": "./dist/cors/index.d.ts",
+      "import": "./dist/cors.mjs",
+      "require": "./dist/cors.cjs"
+    },
+    "./redirect": {
+      "types": "./dist/redirect/index.d.ts",
+      "import": "./dist/redirect.mjs",
+      "require": "./dist/redirect.cjs"
+    },
+    "./fastify": {
+      "types": "./dist/middleware/fastify.d.ts",
+      "import": "./dist/fastify.mjs",
+      "require": "./dist/fastify.cjs"
+    },
+    "./express": {
+      "types": "./dist/middleware/express.d.ts",
+      "import": "./dist/express.mjs",
+      "require": "./dist/express.cjs"
+    },
+    "./hono": {
+      "types": "./dist/middleware/hono.d.ts",
+      "import": "./dist/hono.mjs",
+      "require": "./dist/hono.cjs"
+    },
+    "./elysia": {
+      "types": "./dist/middleware/elysia.d.ts",
+      "import": "./dist/elysia.mjs",
+      "require": "./dist/elysia.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "auth",
+    "security",
+    "csrf",
+    "rate-limit",
+    "helmet",
+    "headers",
+    "csp",
+    "hsts",
+    "cors",
+    "safe-redirect",
+    "open-redirect",
+    "slow-down",
+    "brute-force",
+    "hpp",
+    "nosql-injection",
+    "prototype-pollution",
+    "path-traversal",
+    "honeypot",
+    "webhook",
+    "bearer",
+    "zero-dependency",
+    "node-crypto"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/security#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git",
+    "directory": "packages/security"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

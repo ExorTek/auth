@@ -348,6 +348,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@exortek/security@workspace:packages/security":
+  version: 0.0.0-use.local
+  resolution: "@exortek/security@workspace:packages/security"
+  languageName: unknown
+  linkType: soft
+
 "@floating-ui/core@npm:^1.7.5":
   version: 1.7.5
   resolution: "@floating-ui/core@npm:1.7.5"
