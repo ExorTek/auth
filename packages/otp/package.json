@@ -1,0 +1,88 @@
+{
+  "name": "@exortek/otp",
+  "version": "1.0.0",
+  "description": "TOTP (RFC 6238) and HOTP (RFC 4226) one-time passwords for Node.js — secure defaults, tunable window / algorithm / digits, opt-in replay defense via any @exortek/security store, backup codes with unambiguous alphabet, and Google-Authenticator-compatible provisioning URIs.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./totp": {
+      "types": "./dist/totp.d.ts",
+      "import": "./dist/totp.mjs",
+      "require": "./dist/totp.cjs"
+    },
+    "./hotp": {
+      "types": "./dist/hotp.d.ts",
+      "import": "./dist/hotp.mjs",
+      "require": "./dist/hotp.cjs"
+    },
+    "./backup": {
+      "types": "./dist/backup.d.ts",
+      "import": "./dist/backup.mjs",
+      "require": "./dist/backup.cjs"
+    },
+    "./uri": {
+      "types": "./dist/uri.d.ts",
+      "import": "./dist/uri.mjs",
+      "require": "./dist/uri.cjs"
+    },
+    "./enroll": {
+      "types": "./dist/enroll.d.ts",
+      "import": "./dist/enroll.mjs",
+      "require": "./dist/enroll.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "backend",
+    "security",
+    "otp",
+    "totp",
+    "hotp",
+    "2fa",
+    "mfa",
+    "authenticator",
+    "rfc-6238",
+    "rfc-4226",
+    "backup-codes",
+    "provisioning-uri",
+    "otpauth",
+    "node-crypto"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/otp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git",
+    "directory": "packages/otp"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

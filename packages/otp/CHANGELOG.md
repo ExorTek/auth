@@ -1,0 +1,32 @@
+# @exortek/otp
+
+## 1.0.0
+
+### Major Changes
+
+- Initial release. RFC 4226 HOTP + RFC 6238 TOTP for Node.js 22+ with secure defaults, tunable window / algorithm /
+  digits, and everything you need around the primitives.
+
+  Highlights:
+
+  - **TOTP** — configurable period, digits, algorithm, and `t0` epoch offset. Verify with a tunable drift window (±N
+    periods) — matches Google Authenticator's internal tolerance by default.
+  - **HOTP** — counter-based cousin plus the RFC 4226 §7.4 **resync protocol** (`resynchronize`) for drifted hardware
+    tokens.
+  - **Provisioning** — `provisioningUri` emits `otpauth://` URIs compatible with Google Authenticator, Microsoft
+    Authenticator, Authy, 1Password, Bitwarden, Aegis, Yubico Authenticator, and every other mainstream 2FA app. Refuses
+    `SHA-224` / `SHA-384` in URIs (spec doesn't ship them) but accepts them in `hotp` / `totp` for server-server flows.
+  - **Enrollment sugar** — `enroll({ label, issuer })` mints the secret, builds the URI, and issues backup codes in one
+    call. Round-trippable via `parseProvisioningUri`.
+  - **Backup codes** — unambiguous Crockford alphabet by default (no 0/O/1/I/L), plus 5 ready-made presets (`numeric`,
+    `long`, `hex`, `short`, `crockford`). `verifyBackupCode(input, list)` walks the stored list in constant time.
+  - **Replay defense** — opt-in `replay` option on `verifyTotp` makes each code single-use per counter per key. Works
+    with any store shaped like `@exortek/security`'s rate-limit stores (memory / Redis / custom).
+  - **Digit range 6-10** — matches Bitwarden / 1Password's widest support; refuses 11+ (would emit biased leading
+    digit).
+  - **All 5 SHA variants** — SHA-1 default, plus 224 / 256 / 384 / 512 for programmatic flows.
+
+  Runtime footprint: `node:crypto` only. Zero runtime dependencies.
+
+  106 tests passing including RFC 4226 Appendix D (HOTP counters 0-9) and RFC 6238 Appendix B (TOTP × SHA-1 / SHA-256 /
+  SHA-512 at five fixed timestamps). Pure JavaScript, TypeScript types from JSDoc.
