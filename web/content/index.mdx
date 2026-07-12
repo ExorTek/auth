@@ -15,8 +15,9 @@ Hono, Elysia.
 
 | Package                 | Version |        Reference         |
 | ----------------------- | :-----: | :----------------------: |
-| **`@exortek/crypto`**   | `1.0.0` |   [`/crypto`](/crypto)   |
-| **`@exortek/security`** | `1.0.0` | [`/security`](/security) |
+| **`@exortek/crypto`**   | `1.x` |   [`/crypto`](/crypto)   |
+| **`@exortek/security`** | `1.x` | [`/security`](/security) |
+| **`@exortek/otp`**      | `1.x` |      [`/otp`](/otp)      |
 
 ## The stack
 
@@ -27,7 +28,7 @@ time.
 | :-: | ---------------------------- | ------------------------------------------------------------------------------------ |
 | 01  | [`@exortek/crypto`](/crypto) | crypto primitives — the foundation the rest builds on                                |
 | 02  | `@exortek/password`          | Argon2id / bcrypt, strength scoring, HIBP breach check                               |
-| 03  | `@exortek/otp`               | TOTP / HOTP, backup codes, QR provisioning URI                                       |
+| 03  | [`@exortek/otp`](/otp)               | TOTP / HOTP, backup codes, QR provisioning URI                                       |
 | 04  | `@exortek/challenge`         | e-mail / SMS one-time code storage + verification                                    |
 | 05  | `@exortek/jwk`               | JWK ↔ PEM ↔ DER converters, key rotation                                             |
 | 06  | `@exortek/jws`               | JOSE signed payloads (compact + JSON)                                                |
@@ -35,7 +36,7 @@ time.
 | 08  | `@exortek/jwe`               | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                       |
 | 09  | `@exortek/jwks`              | JWKS URI fetching, caching, `kid` rotation                                           |
 | 10  | `@exortek/session`           | signed cookies, rotation, revocation, store adapter                                  |
-| 11  | `@exortek/security`          | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers |
+| 11  | [`@exortek/security`](/security)           | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers |
 | 12  | `@exortek/device`            | device fingerprinting, trusted-device tokens                                         |
 | 13  | `@exortek/apikey`            | prefixed API keys (`sk_live_...`), rate-limited by default                           |
 | 14  | `@exortek/magic-link`        | passwordless email / SMS link tokens                                                 |
@@ -61,6 +62,8 @@ Node.js **22 or newer**. No runtime dependencies.
 - **[`@exortek/crypto` reference →](/crypto)** — every export, every option, every edge case.
 - **[`@exortek/security` reference →](/security)** — CSRF, rate-limit, headers, CORS, safe redirects + 17 helpers +
   adapters for Fastify, Express, Hono, Elysia.
+- **[`@exortek/otp` reference →](/otp)** — RFC 4226 HOTP + RFC 6238 TOTP with secure defaults, backup codes,
+  provisioning URIs, opt-in replay defense.
 - **[Source](https://github.com/ExorTek/auth)** — GitHub repo.
 - **[Contributing](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md)** — branch prefixes, commit conventions,
   changeset flow.

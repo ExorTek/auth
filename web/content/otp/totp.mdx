@@ -1,0 +1,197 @@
+---
+title: 'otp/totp — time-based OTP'
+sidebarTitle: totp
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `totp`
+
+RFC 6238 time-based one-time passwords. Every `period` seconds (default
+30) the code rolls over; verification tolerates ±`window` periods of
+skew so a slow-typing user or a drifting phone doesn't fail login.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import { totp, verifyTotp, remainingSeconds } from '@exortek/otp'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { totp, verifyTotp, remainingSeconds } = require('@exortek/otp')
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+## `totp`
+
+```ts
+totp(secret, {
+  digits?:    6 | 7 | 8 | 9 | 10,      // default 6
+  algorithm?: 'SHA1' | 'SHA224' | 'SHA256' | 'SHA384' | 'SHA512', // default SHA1
+  period?:    number,                   // seconds, default 30
+  timestamp?: number,                   // ms since epoch — testing only
+  t0?:        number,                   // RFC 6238 epoch offset (default 0)
+}): string
+```
+
+Current TOTP for the given secret. Accepts base32 strings (with or
+without padding, mixed case, whitespace), hex, `Buffer`, or
+`Uint8Array`.
+
+```js
+const secret = 'JBSWY3DPEHPK3PXP'
+totp(secret)                                        // '287082' — right now
+totp(secret, { digits: 8 })                         // '94287082'
+totp(secret, { algorithm: 'SHA256' })               // server-server flow
+```
+
+<Callout type="info">
+  **`timestamp` is a test-only hatch.** Production code should leave it
+  undefined so Node's `Date.now()` provides the wall clock. Passing a
+  fixed value defeats time-based semantics.
+</Callout>
+
+## `verifyTotp`
+
+```ts
+verifyTotp(code, secret, {
+  digits?:    6 | 7 | 8 | 9 | 10,
+  algorithm?: 'SHA1' | 'SHA224' | 'SHA256' | 'SHA384' | 'SHA512',
+  period?:    number,
+  window?:    number,                   // default 1  (±30s slop)
+  timestamp?: number,
+  t0?:        number,
+  replay?:    { store, key: string },   // opt-in — see below
+}): Promise<boolean>
+```
+
+Returns `true` on match, `false` on any failure. **Never throws** on
+user-input problems — a wrong code is a normal auth outcome, not an
+error.
+
+```js
+const ok = await verifyTotp(userInput, secret, { window: 1 })
+if (!ok) return res.status(401).end('invalid code')
+```
+
+The compare is timing-safe. Every candidate in the window is checked
+even after a match so an attacker can't distinguish "wrong code" from
+"wrong slot" via timing.
+
+### The `window` parameter
+
+TOTP tolerates skew as `2 × window + 1` accepted codes:
+
+| `window` | Slop | When |
+| --- | --- | --- |
+| `0` | current period only | strict — will reject users whose phone drifted |
+| **`1`** (default) | ±30 s (3 codes) | matches Google Authenticator's internal window |
+| `2` | ±60 s (5 codes) | tolerant — for known-broken clocks |
+| `3` | ±90 s (7 codes) | very lax — pair with rate-limit or you widen brute-force |
+
+<Callout type="warning">
+  **Window > 1 widens brute-force.** A 6-digit code with `window: 1`
+  gives an attacker `3/1,000,000` per guess. `window: 3` gives `7/1,000,000`.
+  Always compose with rate-limiting — see [security composition](/otp/security#rate-limiting).
+</Callout>
+
+### `t0` — custom epoch (RFC 6238)
+
+TOTP counts periods from **T0**, which the RFC lets you customise. The
+default `0` means "Unix epoch" — what every mainstream Authenticator app
+expects. Some legacy SecurID migrations use a non-zero T0 to preserve
+existing counters:
+
+```js
+const T0_Y2K = 946_684_800  // seconds — Jan 1 2000 UTC
+
+// Sender + verifier must agree on T0 exactly. Enrollment step:
+const uri = provisioningUri({ label, secret, /* no t0 param — spec doesn't ship it */ })
+
+// If your client also honours T0 (custom mobile app, not stock apps):
+const code = totp(secret, { t0: T0_Y2K })
+const ok   = await verifyTotp(code, secret, { t0: T0_Y2K })
+```
+
+Stock Authenticator apps assume `t0: 0`. Use custom T0 only when you
+control the client.
+
+## `remainingSeconds`
+
+```ts
+remainingSeconds(period = 30, timestamp = Date.now()): number
+```
+
+Whole seconds before the current TOTP code rolls over. Useful for the
+countdown ring most 2FA screens render.
+
+```js
+const secs = remainingSeconds()   // 1..30 with default period
+```
+
+## Replay defense
+
+TOTP inside its skew window is technically reusable — a code accepted
+at `T-1` still verifies at `T` and `T+1`. Attackers who read a valid
+code from a phishing page have up to 90 seconds to reuse it.
+
+The `replay` option makes verify **single-use per counter per key**:
+
+```js
+import { verifyTotp } from '@exortek/otp'
+// Any store shaped like { get, set } — the @exortek/security stores fit:
+import { rateLimit } from '@exortek/security'
+
+const store = rateLimit.stores.memory()
+// Redis for multi-worker deployments:
+// const store = rateLimit.stores.redis(client)
+
+async function verify(userId, code, secret) {
+  return verifyTotp(code, secret, {
+    window: 1,
+    replay: { store, key: `user:${userId}` },
+  })
+}
+```
+
+**How it works:** on a successful verify, the matched counter is written
+to the store with a TTL that covers the remaining acceptance window.
+Subsequent verifies inside that window with the same code will fail
+silently — the caller sees a boolean `false`, no separate reason.
+
+For high-security flows across multiple workers, back the replay store
+with Redis so a code accepted on one worker can't be replayed on
+another.
+
+## Server-to-server flow example
+
+If the client is your own code (not a stock Authenticator app), you can
+pick any RFC-compliant configuration:
+
+```js
+// Sender (Server A)
+const code = totp(sharedSecret, {
+  algorithm: 'SHA512', digits: 10, period: 15,
+})
+sendToPartner({ code })
+
+// Verifier (Server B)
+const ok = await verifyTotp(receivedCode, sharedSecret, {
+  algorithm: 'SHA512', digits: 10, period: 15, window: 2,
+})
+```
+
+Both sides just need matching config. See
+[security → flows](/otp/security#flows) for the full three-flow
+breakdown.
+
+## Errors
+
+- `INVALID_ARGUMENT` — bad `digits`, `period`, `window`, or `t0`.
+- `INVALID_SECRET` — non-base32 / non-hex secret string, or empty.
+- `UNSUPPORTED_ALGORITHM` — algorithm not in `SHA1|224|256|384|512`.
+
+`verifyTotp` never throws on user-input problems — returns `false`.
+See [errors](/otp/errors) for the full enum.

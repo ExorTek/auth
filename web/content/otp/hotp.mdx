@@ -1,0 +1,144 @@
+---
+title: 'otp/hotp — counter-based OTP'
+sidebarTitle: hotp
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `hotp`
+
+RFC 4226 HMAC-based one-time passwords — the algorithm every hardware
+token (Yubico OATH-HOTP, older RSA SecurID hybrids) uses. Each successful
+authentication advances a counter on both sides.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import { hotp, verifyHotp, resynchronize } from '@exortek/otp'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { hotp, verifyHotp, resynchronize } = require('@exortek/otp')
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+## `hotp`
+
+```ts
+hotp(secret, counter, {
+  digits?:    6 | 7 | 8 | 9 | 10,
+  algorithm?: 'SHA1' | 'SHA224' | 'SHA256' | 'SHA384' | 'SHA512',
+}): string
+```
+
+Generate the OTP for a given counter. `counter` is a non-negative
+integer; JavaScript's max safe integer (2⁵³) covers any realistic
+lifetime.
+
+```js
+const code = hotp('JBSWY3DPEHPK3PXP', 0)   // '755224' (RFC 4226 Appendix D)
+hotp(secret, 42, { digits: 8 })
+```
+
+## `verifyHotp`
+
+```ts
+verifyHotp(code, secret, counter, {
+  digits?:    6 | 7 | 8 | 9 | 10,
+  algorithm?: 'SHA1' | 'SHA224' | 'SHA256' | 'SHA384' | 'SHA512',
+  window?:    number,        // default 1 — forward-only look-ahead
+}): number | null
+```
+
+Verify a candidate against `[counter, counter + window]` and return the
+**matched counter** on success or `null` on no match. HOTP only looks
+*forward*, never behind — used counters can never replay.
+
+```js
+// Server side — advance the stored counter on match.
+const matched = verifyHotp(userInput, user.tokenSecret, user.hotpCounter, {
+  window: 5,
+})
+if (matched === null) return res.status(401).end()
+await db.users.update(userId, { hotpCounter: matched + 1 })
+```
+
+The return value is the counter the code *actually* corresponded to —
+advance to `matched + 1` to keep the next verify in sync.
+
+### The `window` parameter
+
+Small clock-free devices don't drift, but a user might press the button
+twice by accident before submitting. `window` lets us accept the next
+few codes without flagging them as forgeries:
+
+| `window` | Look-ahead | When |
+| --- | --- | --- |
+| `0` | exact counter | strict — misses a single button press |
+| **`1`** (default) | one code ahead | forgive an accidental extra press |
+| `3` – `5` | up to 5 ahead | typical for hardware tokens users carry |
+| `10+` | very lax | pair with rate-limiting or [`resynchronize`](#resynchronize) |
+
+For heavier drift, use `resynchronize` instead of setting a huge
+window.
+
+## `resynchronize`
+
+```ts
+resynchronize(secret, [code1, code2], {
+  startCounter?:  number,     // default 0
+  maxLookAhead?:  number,     // default 500
+  digits?:        6 | 7 | 8 | 9 | 10,
+  algorithm?:    'SHA1' | 'SHA224' | 'SHA256' | 'SHA384' | 'SHA512',
+}): number | null
+```
+
+RFC 4226 §7.4 counter resynchronisation. Given two **consecutive** OTPs
+the user typed off a hardware token that drifted, find the counter that
+makes both codes match: code #1 at some counter `N`, code #2 at exactly
+`N + 1`. Returns the *next* counter to store (`N + 2`) on success or
+`null` when the pair is not consistent.
+
+```js
+const nextCounter = resynchronize(
+  user.tokenSecret,
+  [req.body.code1, req.body.code2],
+  { startCounter: user.hotpCounter, maxLookAhead: 500 },
+)
+if (nextCounter === null) return res.status(400).end('resync failed')
+await db.users.update(userId, { hotpCounter: nextCounter })
+```
+
+<Callout type="info">
+  **Why two codes?** A single code can't disambiguate legitimate drift
+  from a lucky guess against a wide look-ahead window. Two consecutive
+  codes constrain the search to essentially a single valid counter —
+  the pair is unforgeable without the secret.
+</Callout>
+
+The scan is O(`maxLookAhead`) HMACs — cheap. Bounded to prevent
+adversarial requests hanging the server; drift beyond `maxLookAhead`
+returns `null` rather than looping forever.
+
+## When to pick HOTP vs TOTP
+
+| Use HOTP when… | Use [TOTP](/otp/totp) when… |
+| --- | --- |
+| Client is a hardware token (Yubico OATH-HOTP, RSA SecurID) | Client is a phone app (Google Authenticator, Authy) |
+| Client has no reliable clock | Client and server can agree on wall time |
+| Every button press consumes exactly one code | Codes should roll over on a schedule |
+| Enterprise fleet with resync procedures | Consumer 2FA on a login page |
+
+Modern consumer 2FA is almost exclusively TOTP. HOTP shines for
+hardware fleets where you're programming the tokens yourself.
+
+## Errors
+
+- `INVALID_ARGUMENT` — bad `counter`, `digits`, `window`, or `maxLookAhead`.
+- `INVALID_SECRET` — non-base32 / non-hex secret, or empty.
+- `UNSUPPORTED_ALGORITHM` — algorithm not in the accepted set.
+
+`verifyHotp` and `resynchronize` never throw on user-input problems —
+return `null`. See [errors](/otp/errors) for the full enum.

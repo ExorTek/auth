@@ -24,6 +24,7 @@ export default async function RootLayout({ children }) {
           footer={footer}
           pageMap={await getPageMap()}
           docsRepositoryBase="https://github.com/ExorTek/auth/tree/master/web"
+          sidebar={{ defaultMenuCollapseLevel: 1 }}
         >
           {children}
         </Layout>

@@ -1,0 +1,145 @@
+---
+title: 'otp/errors — OtpError'
+sidebarTitle: errors
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `errors`
+
+Every entry point in `@exortek/otp` that can fail throws an `OtpError`
+carrying a stable, machine-readable `code`. **Branch on `code`, never
+on the message** — messages may change between versions, codes never
+do.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import { OtpError, ErrorCode } from '@exortek/otp'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { OtpError, ErrorCode } = require('@exortek/otp')
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+## `OtpError`
+
+```ts
+class OtpError extends Error {
+  name:    'OtpError'
+  code:    string          // one of ErrorCode
+  status:  number          // suggested HTTP status
+  cause?:  unknown         // wrapped underlying error, when applicable
+}
+```
+
+Extends the built-in `Error`. Adds a stable `code` (see
+[ErrorCode](#errorcode)) and a **suggested HTTP status** — adapters
+translate the error into a response using it.
+
+```js
+import { OtpError, ErrorCode, totp } from '@exortek/otp'
+
+try {
+  totp('too-short')
+} catch (err) {
+  if (err instanceof OtpError && err.code === ErrorCode.INVALID_SECRET) {
+    return res.status(400).end('bad secret shape')
+  }
+  throw err
+}
+```
+
+<Callout type="info">
+  **Not every failure throws.** `verifyTotp` / `verifyHotp` /
+  `verifyBackupCode` / `parseProvisioningUri` return `false` / `null`
+  on user-input problems — that's a normal auth outcome, not an error.
+  Errors are reserved for **programmer** or **configuration**
+  mistakes.
+</Callout>
+
+## `ErrorCode`
+
+Codes are **stable across minor versions** — new codes may be added;
+existing codes are never renamed or repurposed.
+
+| Code | Meaning | Typical status |
+| --- | --- | --- |
+| `INVALID_ARGUMENT` | Type / range / shape validation failed on an option (bad `digits`, `period`, `window`, missing `label`, etc.). | `400` |
+| `INVALID_SECRET` | Secret is empty, malformed base32 / hex, or the wrong type. | `401` |
+| `INVALID_CODE` | Explicit code-shape rejection at the boundary (raised by higher-level flows, not `verify*` itself). | `401` |
+| `UNSUPPORTED_ALGORITHM` | Algorithm not in `SHA1 / SHA224 / SHA256 / SHA384 / SHA512`, or a `provisioningUri` call with `SHA-224` / `SHA-384`. | `400` |
+| `REPLAY_DETECTED` | Reserved — used by higher-level flows when they want to log replay separately from silent verify-false. | `403` |
+| `THROTTLED` | Rate-limit deny (raised by application code composing `@exortek/security`'s rate-limit with OTP). | `429` |
+
+## Which code comes from where?
+
+| Function | Codes it emits |
+| --- | --- |
+| `generateSecret` | `INVALID_ARGUMENT` (bad `bytes`, unknown `encoding`) |
+| `decodeSecret` | `INVALID_SECRET` (empty, not base32 / hex) |
+| `hotp` / `totp` | `INVALID_ARGUMENT`, `INVALID_SECRET`, `UNSUPPORTED_ALGORITHM` |
+| `verifyHotp` / `verifyTotp` | `INVALID_ARGUMENT` (bad `window`) — never throws for user-input problems, returns `false` / `null` |
+| `resynchronize` | `INVALID_ARGUMENT` (bad `codes` shape, out-of-range `maxLookAhead`) |
+| `provisioningUri` | `INVALID_ARGUMENT` (missing `label` / `secret`, bad `type`), `UNSUPPORTED_ALGORITHM` (`SHA-224` / `SHA-384`) |
+| `parseProvisioningUri` | never throws — returns `null` on malformed input |
+| `backupCodes` | `INVALID_ARGUMENT` (bad `n` / `length` / `groups` / `alphabet`) |
+| `verifyBackupCode` / `compareBackupCode` | never throws — returns `null` / `false` |
+| `enroll` | `INVALID_ARGUMENT` (missing `label`) — plus everything the delegates emit |
+
+## Suggested HTTP status mappings
+
+```js
+function toHttpStatus(err) {
+  if (!(err instanceof OtpError)) return 500
+  switch (err.code) {
+    case ErrorCode.INVALID_ARGUMENT:
+    case ErrorCode.UNSUPPORTED_ALGORITHM: return 400
+    case ErrorCode.INVALID_SECRET:
+    case ErrorCode.INVALID_CODE:          return 401
+    case ErrorCode.REPLAY_DETECTED:       return 403
+    case ErrorCode.THROTTLED:             return 429
+    default:                              return 500
+  }
+}
+```
+
+## Handling patterns
+
+**Config errors — die at boot:**
+
+```js
+// Enrollment code path — bad label / secret / algorithm is a programmer bug.
+try {
+  const bundle = enroll({ label: user.email, issuer: 'MyApp' })
+  // ...
+} catch (err) {
+  if (err instanceof OtpError && err.code === ErrorCode.INVALID_ARGUMENT) {
+    console.error('otp misconfigured:', err.message)
+    process.exit(1)
+  }
+  throw err
+}
+```
+
+**Verification outcomes — branch on the return value:**
+
+```js
+// verifyTotp / verifyHotp / verifyBackupCode are all boolean-shaped.
+const ok = await verifyTotp(userInput, secret, { window: 1 })
+if (!ok) return res.status(401).end('invalid code')
+```
+
+**Adapter errors — propagate to your framework's handler:**
+
+```js
+app.setErrorHandler((err, req, reply) => {
+  if (err instanceof OtpError) {
+    return reply.code(toHttpStatus(err)).send({ error: err.code })
+  }
+  return reply.code(500).send({ error: 'InternalError' })
+})
+```

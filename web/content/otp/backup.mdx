@@ -1,0 +1,206 @@
+---
+title: 'otp/backup — recovery codes'
+sidebarTitle: backup
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `backup`
+
+One-time recovery codes for when the user loses their phone. Generated
+with a CSPRNG from an alphabet that has no ambiguous glyphs (`O` vs
+`0`, `1` vs `I` vs `l`), grouped for easy reading off a paper printout,
+and verified in constant time.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import {
+      backupCodes, backupPresets, verifyBackupCode,
+      compareBackupCode, normalizeBackupCode,
+    } from '@exortek/otp'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const {
+      backupCodes, backupPresets, verifyBackupCode,
+      compareBackupCode, normalizeBackupCode,
+    } = require('@exortek/otp')
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+## `backupCodes`
+
+```ts
+backupCodes(n = 10, {
+  length?:   number,          // default 10 chars per code (6..32)
+  groups?:   number,          // default 2 — dash-separated groups
+  alphabet?: string,          // default Crockford (no O/0/1/I/L)
+}): string[]
+```
+
+Unbiased CSPRNG draw. Default output shape: `ABCD-EFGH12` — 10
+alphanumeric chars from Crockford Base32, split into two groups for
+readability.
+
+```js
+const codes = backupCodes()
+// [ 'A3F49K2M', 'X7QP5NB2', ... 10 codes ]
+```
+
+**You** hash them before storage — bcrypt, argon2id, or a strong
+server-secret-keyed HMAC. This package does not touch persistence, so
+the return value is the human-readable form; hash on the way in, store
+the digests.
+
+## `backupPresets`
+
+Ready-made shapes for common conventions. Spread into `backupCodes`
+options to pick one; override individual fields to tweak.
+
+```js
+import { backupCodes, backupPresets } from '@exortek/otp'
+
+backupCodes(10, backupPresets.numeric)       // '1234-5678' — Google Account style
+backupCodes(10, backupPresets.long)          // 'ABCD-EFGH-JKMN' — enterprise
+backupCodes(10, backupPresets.hex)           // '3F4A-9B2C' — sysadmin look
+backupCodes(10, backupPresets.short)         // 'ABC7Y2' — low-friction
+backupCodes(10, backupPresets.crockford)     // default — 'A3F4-9K2M'
+
+// Compose — start from a preset, tweak one field:
+backupCodes(10, { ...backupPresets.numeric, groups: 4 })
+// '12-34-56-78'
+```
+
+| Preset | Shape | Entropy | Notes |
+| --- | --- | --- | --- |
+| `crockford` (default) | `ABCD-EF12` | ~50 bits | Unambiguous alphabet |
+| `numeric` | `1234-5678` | ~26 bits | Google Account convention — easiest to type on mobile |
+| `long` | `ABCD-EFGH-JKMN` | ~60 bits | Enterprise; more entropy, more typing |
+| `hex` | `3F4A-9B2C` | ~32 bits | Classic sysadmin look |
+| `short` | `ABC7Y2` | ~30 bits | Low-friction — pair with rate-limiting |
+
+<Callout type="warning">
+  **Numeric codes are the weakest.** 8 digits = 26 bits of entropy per
+  code — a determined attacker with rate-limit-friendly patience could
+  brute force one. Use `crockford` (~50 bits) or `long` (~60 bits) for
+  anything defending real value.
+</Callout>
+
+## `verifyBackupCode`
+
+```ts
+verifyBackupCode(candidate, storedList): number | null
+```
+
+Timing-safe scan across your saved codes. Returns the index of the
+first matching entry so you can mark it used, or `null` on no match.
+**Every** entry is compared even after a match, so an attacker can't
+distinguish "wrong code" from "wrong slot" through timing.
+
+```js
+const idx = verifyBackupCode(userInput, user.backupCodes)
+if (idx === null) return res.status(401).end('invalid code')
+
+// One-time use — mark this slot consumed.
+await db.users.markBackupCodeUsed(userId, idx)
+```
+
+<Callout type="info">
+  **`storedList` should be the *hashed* codes.** This helper hands off
+  the compare to [`compareBackupCode`](#comparebackupcode) — pass raw
+  strings for plain compare, or wrap in your hash routine if you're
+  storing digests (recommended).
+</Callout>
+
+## `compareBackupCode`
+
+```ts
+compareBackupCode(candidate, stored): boolean
+```
+
+Timing-safe compare between a user-submitted code and a stored
+candidate. Both sides are normalised first — whitespace, dashes, and
+case fold away. Length mismatch does not short-circuit; a fixed
+"one comparison worth" of time is burned either way.
+
+```js
+if (!compareBackupCode(userInput, storedCode)) return res.status(401).end()
+```
+
+Use this to walk a list of hashed codes yourself when you need custom
+logic (rate-limit per code, log which slot was consumed, etc.).
+`verifyBackupCode` is the sugar that does the walk for you.
+
+## `normalizeBackupCode`
+
+```ts
+normalizeBackupCode(input): string
+```
+
+Strip whitespace, dashes, and lower-case the input. Handy when you're
+about to hash the code — always normalise first so the user's typing
+noise doesn't produce different digests than what you saved.
+
+```js
+const clean = normalizeBackupCode('  abcd 1234 ')   // 'ABCD1234'
+const digest = await bcrypt.hash(clean, 12)
+```
+
+## A complete backup-code flow
+
+**Enrollment:**
+
+```js
+import { backupCodes, normalizeBackupCode } from '@exortek/otp'
+import bcrypt from 'bcrypt'
+
+// User just confirmed TOTP setup — issue backup codes.
+const codes = backupCodes(10)
+const digests = await Promise.all(
+  codes.map(code => bcrypt.hash(normalizeBackupCode(code), 12)),
+)
+await db.users.update(userId, { backupCodes: digests })
+
+// Show the *plaintext* codes to the user ONCE, on the confirmation
+// screen. Force them to acknowledge they've saved them.
+return res.render('backup-codes', { codes })
+```
+
+**Verification (user lost their phone):**
+
+```js
+import { normalizeBackupCode } from '@exortek/otp'
+import bcrypt from 'bcrypt'
+
+const clean = normalizeBackupCode(req.body.code)
+const user  = await db.users.findById(req.user.id)
+
+let matchedIdx = null
+for (let i = 0; i < user.backupCodes.length; i++) {
+  // bcrypt.compare is already timing-safe.
+  if (user.backupCodes[i] && await bcrypt.compare(clean, user.backupCodes[i])) {
+    matchedIdx = i
+    break
+  }
+}
+if (matchedIdx === null) return res.status(401).end('invalid code')
+
+// One-time use — null out this slot so it can't be reused.
+user.backupCodes[matchedIdx] = null
+await db.users.update(user.id, { backupCodes: user.backupCodes })
+```
+
+(The above walks the list itself because `verifyBackupCode` compares
+strings — bcrypt hashes need a per-entry `bcrypt.compare` call.)
+
+## Errors
+
+- `INVALID_ARGUMENT` — out-of-range `n` / `length` / `groups`, or an
+  alphabet smaller than 8 characters.
+
+`compareBackupCode` and `verifyBackupCode` never throw — they return
+`false` / `null` for anything that doesn't match. See
+[errors](/otp/errors) for the full enum.

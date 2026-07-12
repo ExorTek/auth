@@ -1,0 +1,223 @@
+---
+title: 'otp/enroll — enrollment flow'
+sidebarTitle: enroll
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `enroll`
+
+Everything you need to move a user through 2FA enrollment: mint a
+secret, generate the `otpauth://` provisioning URI (for a QR code),
+issue backup codes, and — for migration flows — parse an existing
+`otpauth://` URI back into its parts.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import {
+      enroll, generateSecret, provisioningUri, parseProvisioningUri,
+    } from '@exortek/otp'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { enroll, generateSecret, provisioningUri, parseProvisioningUri } =
+      require('@exortek/otp')
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+## `enroll` — the one-call bundle
+
+```ts
+enroll({
+  label:               string,               // usually the user's email
+  issuer?:             string,               // your app name
+  type?:               'totp' | 'hotp',      // default 'totp'
+  digits?:             6 | 7 | 8 | 9 | 10,
+  period?:             number,               // TOTP only
+  counter?:            number,               // HOTP — starting counter
+  algorithm?:          'SHA1' | 'SHA256' | 'SHA512',
+  secretOptions?:      SecretOptions,        // bytes, encoding
+  backupCodeCount?:    number,               // default 10; 0 to skip
+  backupCodeOptions?:  BackupCodesOptions,   // shape / alphabet / groups
+}): { secret: string, uri: string, backupCodes: string[] }
+```
+
+One call, three things you save server-side:
+
+```js
+const { secret, uri, backupCodes } = enroll({
+  label:  'alice@example.com',
+  issuer: 'MyApp',
+})
+
+// 1. Save the secret to your users table (encrypted or in a KMS).
+await db.users.update(userId, { totpSecret: secret })
+
+// 2. Hash the backup codes with bcrypt / argon2 / a strong keyed HMAC.
+//    Save the *hashes* — never plaintext.
+await db.users.update(userId, {
+  backupCodes: await Promise.all(backupCodes.map(hashCode)),
+})
+
+// 3. Render `uri` as a QR code on the enrollment page.
+//    Use any QR library — `qrcode` on npm is fine.
+res.render('enroll', { qrDataUrl: await qrcode.toDataURL(uri), backupCodes })
+```
+
+The user then scans the QR with their Authenticator app and confirms by
+typing the current code back — you verify that first code with
+`verifyTotp` before finalising enrollment.
+
+<Callout type="warning">
+  **Show backup codes exactly once.** You can never recover them
+  server-side (they're hashed). Force the user to acknowledge they've
+  saved them before you close the enrollment screen.
+</Callout>
+
+## `generateSecret`
+
+```ts
+generateSecret({
+  bytes?:    number,          // default 20  (RFC 4226 minimum, 16..128)
+  encoding?: 'base32'         // default — no padding
+           | 'base32padded'
+           | 'hex'
+           | 'raw',
+}): string
+```
+
+Cryptographically random. The default (20 bytes, base32, no padding)
+matches Google Authenticator's enrollment convention — the string you
+render in a QR or paste into a manual-entry field.
+
+Choose more bytes only when you're using a stronger algorithm (RFC 6238
+recommends 32 for SHA-256, 64 for SHA-512) *and* your Authenticator app
+supports it (see the [compat table](/otp)).
+
+## `provisioningUri`
+
+```ts
+provisioningUri({
+  label:      string,
+  secret:     string,          // base32
+  issuer?:    string,
+  type?:      'totp' | 'hotp',
+  digits?:    6 | 7 | 8 | 9 | 10,
+  period?:    number,          // TOTP only
+  counter?:   number,          // HOTP — required
+  algorithm?: 'SHA1' | 'SHA256' | 'SHA512',
+}): string
+```
+
+Emits the `otpauth://` URI Google Authenticator, Microsoft
+Authenticator, Authy, 1Password, Bitwarden, Aegis, Yubico Authenticator,
+and every other mainstream 2FA app understand. Non-default parameters
+are omitted for maximum scanner compatibility.
+
+```js
+const uri = provisioningUri({
+  label:  'alice@example.com',
+  issuer: 'MyApp',
+  secret: 'JBSWY3DPEHPK3PXP',
+})
+// → 'otpauth://totp/MyApp:alice%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=MyApp'
+```
+
+<Callout type="info">
+  **Only SHA-1 / SHA-256 / SHA-512 are permitted** — that's the entire
+  Google Key URI Format algorithm list. Passing `SHA-224` / `SHA-384`
+  throws `UNSUPPORTED_ALGORITHM` because no Authenticator app will
+  parse them. The raw `hotp` / `totp` functions accept them for
+  server-server flows where you control the client.
+</Callout>
+
+## `parseProvisioningUri`
+
+```ts
+parseProvisioningUri(input): {
+  type:       'totp' | 'hotp',
+  label:      string,
+  secret:     string,
+  issuer?:    string,
+  digits?:    number,
+  period?:    number,          // TOTP only
+  counter?:   number,          // HOTP only
+  algorithm?: 'SHA1' | 'SHA256' | 'SHA512' | ...,
+} | null
+```
+
+Inverse of `provisioningUri`. Handy for migration flows where a user
+scanned an `otpauth://` QR from another app and you want to import it.
+Returns `null` for anything that isn't a well-formed provisioning URI —
+never throws.
+
+```js
+const info = parseProvisioningUri(req.body.qrPayload)
+if (!info) return res.status(400).end('invalid QR')
+
+await db.users.update(userId, {
+  totpSecret:    info.secret,
+  totpAlgorithm: info.algorithm ?? 'SHA1',
+  totpDigits:    info.digits    ?? 6,
+})
+```
+
+Also handy for CI / tests where you want to assert a URI's shape
+without re-implementing the grammar.
+
+## A complete enrollment endpoint
+
+```js
+import Fastify from 'fastify'
+import { enroll, verifyTotp } from '@exortek/otp'
+import qrcode from 'qrcode'
+
+const app = Fastify()
+
+// Step 1 — user requests enrollment
+app.post('/2fa/setup', async (req, reply) => {
+  const bundle = enroll({
+    label:  req.user.email,
+    issuer: 'MyApp',
+  })
+  // Persist the pending enrollment (not yet confirmed).
+  await redis.setex(`totp:pending:${req.user.id}`, 600, JSON.stringify(bundle))
+  return {
+    qrDataUrl:   await qrcode.toDataURL(bundle.uri),
+    manualEntry: bundle.secret,        // in case the QR won't scan
+    backupCodes: bundle.backupCodes,   // show ONCE
+  }
+})
+
+// Step 2 — user confirms by typing the first code
+app.post('/2fa/confirm', async (req, reply) => {
+  const pending = JSON.parse(await redis.get(`totp:pending:${req.user.id}`) ?? 'null')
+  if (!pending) return reply.code(400).send({ error: 'no pending enrollment' })
+
+  const ok = await verifyTotp(req.body.code, pending.secret, { window: 1 })
+  if (!ok) return reply.code(401).send({ error: 'code mismatch' })
+
+  // Finalise — commit secret + hashed backup codes.
+  await db.users.update(req.user.id, {
+    totpSecret:    pending.secret,
+    backupCodes:   await Promise.all(pending.backupCodes.map(hashCode)),
+    twoFactorEnabled: true,
+  })
+  await redis.del(`totp:pending:${req.user.id}`)
+  return { ok: true }
+})
+```
+
+## Errors
+
+- `INVALID_ARGUMENT` — missing / empty `label`, bad option shape.
+- `UNSUPPORTED_ALGORITHM` — `SHA-224` / `SHA-384` in
+  `provisioningUri` (they're not in the Key URI Format spec).
+- `INVALID_SECRET` — malformed input to `generateSecret` / underlying
+  primitives.
+
+`parseProvisioningUri` never throws — returns `null` for bad input. See
+[errors](/otp/errors) for the full enum.

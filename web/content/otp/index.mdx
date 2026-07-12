@@ -1,0 +1,209 @@
+---
+title: '@exortek/otp — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `@exortek/otp`
+
+RFC 4226 HOTP and RFC 6238 TOTP for Node.js 22+ — secure defaults, tunable
+window / algorithm / digits, opt-in **replay defense**, unambiguous
+**backup codes**, and Google-Authenticator-compatible **provisioning
+URIs** for QR enrollment. Zero runtime dependencies — pure `node:crypto`.
+
+Useful on its own — if you need to add 2FA to a login flow, mint recovery
+codes, or verify a code from a Yubico Authenticator token, this is a
+one-line install.
+
+## What problem does this solve?
+
+Every auth flow that adds 2FA rewrites the same ~200 lines of code, and
+most of them get one of these wrong:
+
+- **Timing-safe compare.** `code === candidate` leaks the first matching
+  character. `crypto.timingSafeEqual` fixes it — if you remember to use it.
+- **Skew tolerance.** A user's phone drifts, the code changes while they're
+  typing. Reject the previous / next period and you reject valid users.
+- **Replay defense.** A one-time code should be one-time. Without a
+  server-side "seen" cache, an attacker who reads a valid code from a
+  phishing page can use it inside the skew window.
+- **Backup codes.** Random `Math.random()` codes with `O/0/1/I` glyphs
+  users can't tell apart on a printout. Or worse, stored in plain text.
+- **QR provisioning URI.** The `otpauth://` grammar is subtle — miss a
+  URL-encode and half your users can't scan.
+
+`@exortek/otp` ships every one of these correctly and defaults to the
+values Google Authenticator + Microsoft Authenticator + Authy + 1Password
+all agree on.
+
+## Is it safe to trust?
+
+- **Every primitive is a thin wrapper around `node:crypto`.** No
+  hand-rolled HMAC or truncation math — Node delegates to OpenSSL.
+- **Timing-safe compare everywhere.** `verifyTotp` / `verifyHotp` /
+  `compareBackupCode` all use `crypto.timingSafeEqual` on equal-length
+  Buffers.
+- **RFC test vectors covered.** Passes RFC 4226 Appendix D (HOTP,
+  counters 0-9) and RFC 6238 Appendix B (TOTP, SHA-1 / SHA-256 / SHA-512
+  at 5 fixed timestamps).
+- **Every input is validated at the boundary.** Bad-shape secrets,
+  malformed codes, out-of-range digits — all rejected with actionable
+  `OtpError` messages before touching Node.
+
+<Callout type="warning">
+  **TOTP is not phishing-resistant.** A convincing fake login page can
+  ask for the code and the attacker relays it in real time. For that
+  threat model, use FIDO2 / WebAuthn — that's what `@exortek/passkey`
+  (on the roadmap) is for. Use TOTP when you want a big improvement over
+  passwords-only without the enrollment friction of a hardware key.
+</Callout>
+
+## Install
+
+```bash
+npm  install @exortek/otp
+yarn add     @exortek/otp
+pnpm add     @exortek/otp
+```
+
+Requires **Node.js 22 or newer**. Zero runtime dependencies.
+
+## Quick start
+
+```js
+import { enroll, totp, verifyTotp } from '@exortek/otp'
+
+// Enrollment — mint a secret + QR URI + backup codes in one call
+const { secret, uri, backupCodes } = enroll({
+  label:  'alice@example.com',
+  issuer: 'MyApp',
+})
+// Save `secret` and hashed(backupCodes) server-side.
+// Render `uri` as a QR (any QR library — `qrcode` on npm is fine).
+
+// Login — verify the 6-digit code
+const ok = await verifyTotp(userInput, secret, { window: 1 })
+if (!ok) return res.status(401).end('invalid code')
+```
+
+Ten lines and you have working 2FA. Add
+[replay defense](/otp/security#replay) for high-stakes flows.
+
+## Modules at a glance
+
+Every module has a dedicated page with full API reference.
+
+| Module | Purpose | Key exports |
+| --- | --- | --- |
+| [**totp**](/otp/totp) | time-based OTP (RFC 6238) | `totp` · `verifyTotp` · `remainingSeconds` |
+| [**hotp**](/otp/hotp) | counter-based OTP + hardware token resync | `hotp` · `verifyHotp` · `resynchronize` |
+| [**enroll**](/otp/enroll) | one-call enrollment bundle | `enroll` · `generateSecret` · `provisioningUri` · `parseProvisioningUri` |
+| [**backup**](/otp/backup) | recovery codes | `backupCodes` · `backupPresets` · `verifyBackupCode` · `compareBackupCode` |
+| [**security**](/otp/security) | recommendations + composition patterns | *guides* |
+| [**errors**](/otp/errors) | typed error surface | `OtpError` · `ErrorCode` |
+
+## Common use cases
+
+| I want to… | Reach for |
+| --- | --- |
+| Add 2FA to a login flow (Google Authenticator + friends) | [`enroll`](/otp/enroll) + [`verifyTotp`](/otp/totp#verifytotp) |
+| Mint recovery codes for account restore | [`backupCodes`](/otp/backup) + [`verifyBackupCode`](/otp/backup#verifybackupcode) |
+| Migrate a user from another app (parse their `otpauth://`) | [`parseProvisioningUri`](/otp/enroll#parseprovisioninguri) |
+| Verify a code from a Yubico hardware token | [`verifyHotp`](/otp/hotp#verifyhotp) + [`resynchronize`](/otp/hotp#resynchronize) |
+| Prevent one-time code reuse inside the skew window | [replay defense](/otp/security#replay) |
+| Compose with rate-limiting to prevent brute force | [security composition](/otp/security#rate-limiting) |
+| Use TOTP for server-to-server auth | any of the primitives — [flows guide](/otp/security#flows) |
+
+## Import styles
+
+```js
+// 1. Named at the top level — most ergonomic
+import { totp, verifyTotp, hotp, enroll } from '@exortek/otp'
+
+// 2. Named from a subpath — smallest bundle
+import { totp, verifyTotp } from '@exortek/otp/totp'
+import { hotp, resynchronize } from '@exortek/otp/hotp'
+import { enroll } from '@exortek/otp/enroll'
+import { backupCodes, backupPresets } from '@exortek/otp/backup'
+```
+
+## Authenticator app compatibility
+
+If you're rendering a QR at enrollment, the values below reach every
+mainstream 2FA app. Deviate from them only when you control the client.
+
+**Universal safe defaults:**
+
+- Algorithm: **SHA-1**
+- Digits: **6**
+- Period: **30 seconds**
+
+**Per-app support** (as of 2026):
+
+| App | Algorithms | Digits | Period |
+| --- | --- | --- | --- |
+| Google Authenticator | SHA-1, SHA-256, SHA-512 | 6, 8 | 30 s |
+| Microsoft Authenticator | SHA-1 only | 6 only | 30 s only |
+| Twilio Authy | SHA-1, SHA-256 | 6, 7 | 10 s, 30 s |
+| Aegis (Android) | SHA-1, SHA-256, SHA-512 | 6, 7, 8 | 10–60 s+ |
+| 2FAS (iOS / Android) | SHA-1, SHA-256, SHA-512 | 6, 7, 8 | flexible |
+| 1Password / Bitwarden | SHA-1, SHA-256, SHA-512 | 6–10 | flexible |
+| FreeOTP (Red Hat) | SHA-1, SHA-256, SHA-512 | 6, 7, 8 | flexible |
+| Yubico Authenticator | SHA-1, SHA-256, SHA-512 | 6, 8 | 30 s, 60 s |
+
+<Callout type="info">
+  `provisioningUri` refuses to emit `SHA-224` / `SHA-384` — those work
+  in raw `hotp` / `totp` for server-server flows but are not in Google's
+  Key URI Format spec, so no Authenticator app parses them.
+</Callout>
+
+## Errors
+
+Every entry point throws `OtpError` with a stable `code`. Branch on
+`code`, never on the message.
+
+```js
+import { OtpError, ErrorCode } from '@exortek/otp'
+
+try {
+  totp(malformedSecret)
+} catch (err) {
+  if (err instanceof OtpError && err.code === ErrorCode.INVALID_SECRET) {
+    return res.status(400).end('bad secret')
+  }
+  throw err
+}
+```
+
+See [errors](/otp/errors) for the full enum.
+
+## Node version, platforms, ESM/CJS
+
+- **Node 22 LTS or newer.** Uses `Buffer.writeBigUInt64BE`, WHATWG
+  `URL`, `crypto.timingSafeEqual` — all stable on 22+.
+- **Pure ESM source with a matching CJS output.** `import` and
+  `require` both work.
+- **Types.** `.d.ts` is generated from JSDoc at build.
+- **Runs on any Node 22+ target** — Linux, macOS, Windows, Docker,
+  AWS Lambda (Node 22 runtime), Vercel functions.
+
+## What this package is **not**
+
+- **Not a QR image generator.** We produce the `otpauth://` string; you
+  pass it to `qrcode` (or any QR library) for rendering.
+- **Not a session store.** Verification is a boolean; who is logged in
+  is your session layer's job (`@exortek/session` in the roadmap).
+- **Not phishing-resistant.** Use [`@exortek/passkey`](https://github.com/ExorTek/auth)
+  (WebAuthn / FIDO2, on the roadmap) if adversarial phishing is in your
+  threat model. TOTP is a big step up from passwords-only but not the
+  strongest layer.
+- **Not SMS / email code delivery.** Those live in `@exortek/challenge`
+  (roadmap).
+- **Not a Steam Guard / Duo Push / Authy Push clone.** Those are
+  proprietary protocols — this package is standards-only (RFC 4226 /
+  6238 + Google Key URI Format).
+
+## License
+
+MIT — see the [LICENSE file](https://github.com/ExorTek/auth/blob/master/LICENSE).

@@ -1,0 +1,210 @@
+---
+title: 'otp/security — recommendations'
+sidebarTitle: security
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# Security recommendations
+
+Everything below is opinionated guidance for real deployments. The
+package works fine with defaults; these are the tuning knobs, threat
+models, and composition patterns that separate a 2FA integration that
+looks secure from one that is.
+
+## The 2FA security ladder
+
+| Level | Mechanism | Threats defeated | Threats it doesn't stop |
+| --- | --- | --- | --- |
+| 0 | Password only | Casual snooping | Password reuse, DB dumps, phishing |
+| 1 | Password + SMS OTP | Password reuse | SIM swap, phishing, MITM |
+| 2 | Password + TOTP (this package) | SIM swap, password reuse, most credential stuffing | **Real-time phishing** — attacker relays your code |
+| 3 | Password + HOTP hardware token | Same as level 2, plus device-loss recovery is unforgeable | Real-time phishing |
+| 4 | Password + WebAuthn / FIDO2 passkey | **Real-time phishing** — the browser refuses to sign for a mismatched origin | Physical device loss without backup |
+
+**TOTP is a big jump above passwords-only, but it is not
+phishing-resistant.** A convincing fake login page can ask for the code
+and relay it to the real site in real time. For that threat model, use
+FIDO2 / WebAuthn — that's the layer `@exortek/passkey` (roadmap) is
+for.
+
+Ship TOTP for the value/cost ratio; ship WebAuthn on top for
+high-value accounts.
+
+## Flows
+
+Three deployment patterns you'll encounter:
+
+### 1. Client-to-server (the common case)
+
+The user's phone (Google Authenticator, Authy, 1Password …) generates
+the code, the user types it, your server verifies.
+
+```js
+// Enrollment
+const { secret, uri, backupCodes } = enroll({
+  label: user.email, issuer: 'MyApp',
+})
+// Render `uri` as a QR — user scans with any 2FA app.
+
+// Verify
+const ok = await verifyTotp(userInput, user.secret, { window: 1 })
+```
+
+**Constraint:** whatever the client app supports. See the
+[compat table](/otp) — SHA-1 + 6 digits + 30 s is the only combo that
+works everywhere.
+
+### 2. Server-to-server
+
+Two servers use TOTP as a rolling authentication token. Rate limiter
+between microservices, IoT device authenticating an upstream, internal
+API — one side generates, the other verifies. **No mainstream client
+app in the loop.**
+
+```js
+// Server A
+const code = totp(sharedSecret, {
+  algorithm: 'SHA512', digits: 10, period: 15,
+})
+await sendToPartner({ code })
+
+// Server B
+const ok = await verifyTotp(receivedCode, sharedSecret, {
+  algorithm: 'SHA512', digits: 10, period: 15, window: 2,
+})
+```
+
+**Use whatever config makes sense** — SHA-512, 10 digits, custom
+period. The Google Key URI Format restrictions don't apply here.
+
+### 3. Hardware token (RFC 4226 classic)
+
+Yubico OATH-HOTP, older RSA SecurID hybrids. The device generates codes
+by button press with no clock. Use `verifyHotp` + `resynchronize`
+when the counter drifts.
+
+```js
+const nextCounter = resynchronize(user.tokenSecret, [c1, c2], {
+  startCounter: user.hotpCounter,
+})
+if (nextCounter === null) return res.status(400).end('resync failed')
+await db.users.update(userId, { hotpCounter: nextCounter })
+```
+
+See [`hotp` docs](/otp/hotp) for the resync protocol details.
+
+## Rate limiting
+
+TOTP with a 6-digit code and `window: 1` gives an attacker
+`3 / 1,000,000` odds per guess. Multiplied by a lax retry policy that
+becomes reachable. **Always compose with rate-limit.**
+
+```js
+import { verifyTotp, OtpError, ErrorCode } from '@exortek/otp'
+import { rateLimit } from '@exortek/security'
+
+const throttle = rateLimit.sliding({
+  requests: 5, window: '10m',
+  store: rateLimit.stores.memory(),   // Redis in multi-worker deploys
+})
+
+async function verify(userId, code, secret) {
+  const rl = await throttle.check({ key: `otp:${userId}` })
+  if (!rl.allowed) {
+    throw new OtpError(
+      ErrorCode.THROTTLED,
+      `Too many attempts. Try again in ${rl.retryAfter}s.`,
+    )
+  }
+  return verifyTotp(code, secret, {
+    window: 1,
+    replay: { store: throttle.store, key: `user:${userId}` },
+  })
+}
+```
+
+**Threshold rule of thumb:** 5 attempts per 10 minutes catches
+brute-force without impacting real users who just fat-fingered a code.
+
+## Replay defense
+
+TOTP inside its skew window is technically reusable — a code accepted
+at `T-1` still verifies at `T` and `T+1`. Attackers who read a valid
+code from a phishing page have up to 90 seconds to reuse it.
+
+The opt-in `replay` option on `verifyTotp` makes each successful
+verify **single-use per counter per key**:
+
+```js
+import { rateLimit } from '@exortek/security'
+
+const store = rateLimit.stores.redis(redisClient)   // multi-worker safe
+
+await verifyTotp(code, secret, {
+  window: 1,
+  replay: { store, key: `user:${userId}` },
+})
+```
+
+**How it works:** on a successful verify, the matched counter is
+written to the store with a TTL that covers the remaining acceptance
+window. Subsequent verifies inside that window with the same code fail
+silently — `verifyTotp` returns `false` with no separate reason.
+
+Use Redis for cluster deployments so a code accepted on one worker
+can't be replayed on another.
+
+## Secret storage
+
+TOTP secrets are **bearer credentials** — anyone with the secret can
+generate valid codes. Treat them like passwords:
+
+- **Encrypt at rest.** Use a KMS (AWS KMS, GCP KMS, Vault) or
+  application-level envelope encryption. Do not plaintext them in the
+  database.
+- **Restrict access.** Only the auth service should be able to read the
+  secret; other services should call a "verify this code" API instead
+  of pulling the secret out.
+- **Rotate on suspicious activity.** Password reset should invalidate
+  the TOTP secret too (`totpSecret = null`, re-enrol).
+
+## Backup codes
+
+- **Hash before storage.** bcrypt (cost 12+), argon2id, or a
+  server-secret-keyed HMAC. Never plaintext.
+- **Show plaintext once.** On the enrollment confirmation screen.
+  Force acknowledgement before closing.
+- **One-time use.** Null out the slot after a code redeems.
+- **Regenerate on invalidation.** If a user reports codes lost, mint a
+  fresh set and invalidate all the old digests in one transaction.
+- **Rate-limit their redemption path** just like TOTP verify.
+
+## Choosing `digits` and `algorithm`
+
+**Universal safe defaults:** SHA-1 + 6 digits + 30 s period. Works on
+every Authenticator app.
+
+Deviate only when:
+- **You control the client app** — you're building the mobile app that
+  reads the code, or the client is another server. Then use SHA-256 or
+  SHA-512 for extra entropy per code.
+- **Your users only install specific apps** — an enterprise fleet that
+  mandates Bitwarden or Yubico can safely go to 8 digits.
+
+**Never:** widen `window` past `2` without a matching rate-limit
+tightening. Every extra period accepted linearly widens the brute-force
+surface.
+
+## Threat model summary
+
+| Threat | Defence |
+| --- | --- |
+| Password reuse / DB dump | 2FA per se — even TOTP defeats stolen-password reuse |
+| SIM swap | Prefer TOTP over SMS |
+| Credential stuffing | TOTP + rate-limit |
+| Guessing the code | `window: 1` + rate-limit + `digits ≥ 6` (never lower) |
+| Replay inside the skew window | `replay` option, backed by shared store |
+| Real-time phishing (relay) | **TOTP does not defeat this.** Add WebAuthn / FIDO2 |
+| Physical device loss | Backup codes (hashed, one-time) |
+| Server DB compromise | Encrypt secrets at rest with a KMS |
