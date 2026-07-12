@@ -35,4 +35,10 @@ skills-lock.json
 .vscode/
 .DS_Store
 
+# MDX — prettier's proseWrap+embeddedLanguageFormatting collapses
+# ```js fences inside JSX components (<Tabs.Tab>, <Callout>, etc.) onto
+# a single line, which breaks the markdown code-block parser. We
+# hand-write MDX; leave it alone.
+**/*.mdx
+
 # Vendored / third-party (add as needed)

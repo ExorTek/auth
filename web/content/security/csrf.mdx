@@ -13,9 +13,17 @@ per-request storage). All verification paths are HMAC-based and timing-safe.
 
 <Tabs items={['ESM', 'CommonJS']}>
   <Tabs.Tab>
-    ```js import {csrf} from '@exortek/security' // or: import * as csrf from '@exortek/security/csrf' ```
+    ```js
+    import { csrf } from '@exortek/security'
+    // or:
+    import * as csrf from '@exortek/security/csrf'
+    ```
   </Tabs.Tab>
-  <Tabs.Tab>```js const {csrf} = require('@exortek/security') ```</Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { csrf } = require('@exortek/security')
+    ```
+  </Tabs.Tab>
 </Tabs>
 
 <Callout type="warning">

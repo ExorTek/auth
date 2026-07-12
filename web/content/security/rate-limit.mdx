@@ -11,8 +11,16 @@ Four algorithms, three stores, and two combinators (`multi`, `withBan`). Every l
 `{ check(input) → Promise<result> }` shape, so they compose freely and can be swapped without touching handler code.
 
 <Tabs items={['ESM', 'CommonJS']}>
-  <Tabs.Tab>```js import {rateLimit} from '@exortek/security' ```</Tabs.Tab>
-  <Tabs.Tab>```js const {rateLimit} = require('@exortek/security') ```</Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    import { rateLimit } from '@exortek/security'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { rateLimit } = require('@exortek/security')
+    ```
+  </Tabs.Tab>
 </Tabs>
 
 ## Which algorithm?
