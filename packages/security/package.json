@@ -1,7 +1,7 @@
 {
   "name": "@exortek/security",
   "version": "0.0.0",
-  "description": "Zero-dependency defensive HTTP layer for Node.js — CSRF, rate limiting, helmet-style security headers, CORS, safe redirects, and a dozen smaller helpers (client-IP, CSP nonce, slow-down, body limit, timeout, HPP, NoSQL sanitizer, prototype pollution guard, path traversal, filename sanitizer, honeypot, webhook signature verify, bearer parse, origin check).",
+  "description": "Framework-agnostic defensive HTTP layer for Node.js 22+ — CSRF, sliding/fixed/token-bucket/leaky-bucket rate limiting (memory / Redis / custom stores, plus withBan escalation), helmet-style headers (CSP, HSTS, COOP/COEP/CORP, Referrer, Permissions), CORS, open-redirect guard, and 17 focused helpers (client-IP, CSP nonce, slow-down, body limit, timeout, HPP, NoSQL sanitizer, prototype-safe JSON parse, prototype freezer, path traversal, filename sanitizer, honeypot, webhook signature verify, bearer parser, origin check, constant-time compare, CSP report parser). Adapters for Fastify, Express, Hono, and Elysia.",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -74,6 +74,11 @@
     "clean": "rm -rf dist"
   },
   "keywords": [
+    "backend",
+    "express",
+    "fastify",
+    "elysia",
+    "hono",
     "auth",
     "security",
     "csrf",
@@ -94,7 +99,6 @@
     "honeypot",
     "webhook",
     "bearer",
-    "zero-dependency",
     "node-crypto"
   ],
   "license": "MIT",
@@ -106,6 +110,38 @@
   },
   "bugs": {
     "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "dependencies": {
+    "fastify-plugin": "^6.0.0"
+  },
+  "peerDependencies": {
+    "elysia": ">=1",
+    "express": ">=4",
+    "fastify": ">=4",
+    "hono": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "elysia": {
+      "optional": true
+    },
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@fastify/cookie": "^11.1.1",
+    "@sinclair/typebox": "^0.34.0",
+    "cookie-parser": "^1.4.7",
+    "elysia": "^1.4.29",
+    "express": "^5.2.1",
+    "fastify": "^5.10.0",
+    "hono": "^4.12.29"
   },
   "engines": {
     "node": ">=22.0.0"
