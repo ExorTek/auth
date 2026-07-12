@@ -1,0 +1,353 @@
+---
+title: 'security/production — deployment checklist'
+sidebarTitle: production
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# Production checklist
+
+Everything on this page is an opinionated, real-world tuning guide. It's not required — `@exortek/security` runs fine
+with defaults — but these are the settings you'll want in front of paying users, behind a load balancer, in a
+multi-region deployment.
+
+## Redis: rate-limit at scale
+
+### Which client?
+
+Any Redis-compatible client with `eval`, `get`, `set`, `del` works. Verified compat:
+
+| Client                 | Notes                                                                                                                              |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **`ioredis`**          | Best fit for Node servers. `defineCommand` is auto-detected — subsequent Lua calls go out as `EVALSHA`, saving 1–2 KB per request. |
+| **`node-redis` (v4+)** | Same wire protocol, options-object `eval`. Falls back to `EVAL`.                                                                   |
+| **`@upstash/redis`**   | HTTP-based — runs on Cloudflare Workers, Vercel Edge, Deno Deploy. Falls back to `EVAL`.                                           |
+
+### Bare minimum
+
+```js
+import Redis from 'ioredis';
+import { rateLimit } from '@exortek/security';
+
+const client = new Redis(process.env.REDIS_URL, {
+  // Fail fast so we don't hang requests when Redis is unreachable.
+  maxRetriesPerRequest: 2,
+  connectTimeout: 5_000,
+  enableOfflineQueue: false,
+  // TLS for anything cross-network:
+  tls: process.env.REDIS_URL?.startsWith('rediss://') ? {} : undefined,
+});
+
+const store = rateLimit.stores.redis(client, {
+  prefix: 'app:rl:', // avoid collision with other consumers
+});
+
+const limiter = rateLimit.sliding({
+  requests: 100,
+  window: '1m',
+  store,
+});
+```
+
+### Handling Redis outages
+
+<Callout type="warning">
+  **The limiter is only as available as the store.** If Redis goes down, `check()` throws — your middleware will 500.
+  Decide *now* what should happen: fail closed (deny requests) or fail open (allow, log).
+</Callout>
+
+The library doesn't take a stand on fail-open vs fail-closed. Wrap the limiter yourself:
+
+```js
+const primary = rateLimit.stores.redis(client, { prefix: 'app:rl:' });
+const fallback = rateLimit.stores.memory({ maxKeys: 100_000 });
+
+// Fallback strategy — try Redis, degrade to memory on failure.
+const store = rateLimit.stores.custom({
+  async get(key) {
+    try {
+      return await primary.get(key);
+    } catch {
+      return fallback.get(key);
+    }
+  },
+  async read(key) {
+    try {
+      return await primary.read(key);
+    } catch {
+      return fallback.read(key);
+    }
+  },
+  async incr(key, ttlMs) {
+    try {
+      return await primary.incr(key, ttlMs);
+    } catch {
+      return fallback.incr(key, ttlMs);
+    }
+  },
+  async set(key, count, ttlMs) {
+    try {
+      await primary.set(key, count, ttlMs);
+    } catch {
+      await fallback.set(key, count, ttlMs);
+    }
+  },
+  async delete(key) {
+    try {
+      await primary.delete(key);
+    } catch {
+      await fallback.delete(key);
+    }
+  },
+});
+```
+
+This favours availability (fail-open with a per-process fallback). Reverse the branches to fail closed.
+
+### Cluster / Sentinel
+
+`ioredis` handles both transparently. The store treats each request as independent — no `MULTI`, no long-lived
+transactions — so Redis cluster's slot routing is safe. For Sentinel, initialise the client with `sentinels: [...]` and
+the store still just calls `eval` / `get` / `set` / `del`.
+
+### Multi-tenant prefixing
+
+Use one `prefix` per tenant or per limiter class:
+
+```js
+const perTenant = tenantId =>
+  rateLimit.stores.redis(client, {
+    prefix: `t:${tenantId}:rl:`,
+  });
+```
+
+Sharing a Redis with other libraries? Prefix everything so a rogue `FLUSHDB` on someone else's namespace can't nuke your
+counters.
+
+### `withBan` needs a persistent store
+
+`rateLimit.withBan` stores its ban state in a store you provide. For production, that has to be the **same Redis** as
+your base limiter — otherwise a worker restart or process rotation clears the bans and banned callers get a fresh slate.
+
+```js
+const store = rateLimit.stores.redis(client);
+const base = rateLimit.sliding({ requests: 20, window: '1m', store });
+const limiter = rateLimit.withBan(base, {
+  store, // same Redis!
+  threshold: 5,
+  banDuration: '1h',
+});
+```
+
+## Rate-limit response headers
+
+Default is the widely-deployed **legacy** shape:
+
+```
+X-RateLimit-Remaining: 42
+X-RateLimit-Reset:     1735689600
+Retry-After:           30
+```
+
+Adopt the **RFC 9331 draft** on new APIs — the ecosystem is moving there:
+
+```js
+rateLimitMiddleware({ limiter, headers: 'draft' });
+// RateLimit-Remaining: 42
+// RateLimit-Reset:     1735689600
+// Retry-After:         30
+```
+
+Hide them entirely for high-security surfaces:
+
+```js
+rateLimitMiddleware({ limiter, headers: false });
+```
+
+Custom names for orgs with existing header conventions:
+
+```js
+rateLimitMiddleware({
+  limiter,
+  headers: {
+    remaining: 'X-Quota-Remaining',
+    reset: 'X-Quota-Reset',
+    retryAfter: 'X-Wait-Seconds',
+  },
+});
+```
+
+## Trust-proxy config
+
+Behind a load balancer / reverse proxy, `req.ip` reports the **proxy** address by default — every limiter sees one
+bucket for all clients.
+
+<Tabs items={['Express', 'Fastify', 'Hono / Elysia']}>
+  <Tabs.Tab>
+    ```js
+    app.set('trust proxy', true)               // trust every proxy hop
+    // OR granular:
+    app.set('trust proxy', ['10.0.0.0/8'])     // trust only your infra
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const app = Fastify({
+      trustProxy: true,                        // or a subnet list
+    })
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    // Hono / Elysia — pass keyGenerator explicitly:
+    import { getClientIp } from '@exortek/security'
+
+    rateLimitMiddleware({
+      limiter,
+      keyGenerator: (c) => getClientIp({
+        headers: Object.fromEntries(c.req.raw.headers),
+        socket: { remoteAddress: c.env?.incoming?.socket?.remoteAddress },
+      }, { trustProxy: true }),
+    })
+    ```
+
+  </Tabs.Tab>
+</Tabs>
+
+**Test it:** with trust-proxy off, curl through your proxy — every request should see the same `req.ip`. With
+trust-proxy on, distinct callers should see distinct IPs.
+
+## CSP: turn `report-only` first
+
+CSP breakage is silent — a wrong `script-src` blocks your own scripts without a browser prompt. Roll out in report-only
+mode, watch what breaks, then flip to enforcing.
+
+```js
+headers({
+  contentSecurityPolicy: {
+    reportOnly: true, // emits Content-Security-Policy-Report-Only
+    directives: {
+      scriptSrc: ["'self'", 'https://cdn.example.com'],
+      reportUri: ['/csp-report'],
+    },
+  },
+});
+
+// Collector endpoint:
+app.post('/csp-report', express.json(), (req, res) => {
+  const report = parseCspReport(req.body);
+  if (report) log.warn('csp violation', report);
+  res.status(204).end();
+});
+```
+
+After a week of quiet reports, flip `reportOnly: false`.
+
+## CSRF: cookie-flag matrix
+
+| Deployment                           | Cookie config                                                                      |
+| ------------------------------------ | ---------------------------------------------------------------------------------- |
+| HTTPS + first-party                  | `__Host-csrf` with `Secure` + `SameSite=Strict` + `HttpOnly` (defaults)            |
+| HTTPS + cross-origin API (JS client) | Drop `HttpOnly` so JS can echo it, keep everything else                            |
+| Local http dev                       | Strip `__Host-` prefix, drop `Secure`, keep the rest                               |
+| Mobile-first app (no cookies)        | Use `csrf.generateForSession(req.session.id, secret)` and skip the cookie entirely |
+
+```js
+csrfMiddleware({
+  secret: process.env.CSRF_SECRET,
+  cookieName: '__Host-csrf',
+  cookieOptions: {
+    // Overrides — defaults are usually right for HTTPS + first-party.
+    sameSite: 'lax', // 'strict' breaks OAuth-style redirects
+  },
+});
+```
+
+## HSTS: preload eligibility
+
+`preload: true` is a one-way door — once your domain is in the browser preload list, you cannot un-list quickly.
+Requirements:
+
+- `maxAge >= 31536000` (1 year)
+- `includeSubDomains: true`
+- Every subdomain also responds with HSTS
+
+The library refuses to emit a preload directive that doesn't meet the first two.
+
+```js
+headers({
+  hsts: {
+    maxAge: 31_536_000,
+    includeSubDomains: true,
+    preload: true,
+  },
+});
+```
+
+Then submit at [hstspreload.org](https://hstspreload.org). Before submitting, deploy the full policy for at least a week
+and confirm no subdomain is misbehaving.
+
+## Health-check bypass
+
+Some CI / synthetic monitors don't want to be counted against your rate-limit budget. Give them a shortcut:
+
+```js
+app.use((req, res, next) => {
+  if (req.path === '/healthz') return next(); // skip the middleware below
+  return securityMiddleware({/* ... */})(req, res, next);
+});
+```
+
+Or add a bypass condition to your `keyGenerator`:
+
+```js
+rateLimit: {
+  limiter,
+  keyGenerator: (req) => req.headers['x-monitor-secret'] === MON_SECRET
+    ? undefined                                // undefined → skip check
+    : req.ip,
+}
+```
+
+Returning `undefined` from `keyGenerator` tells the middleware to skip the rate-limit check entirely for that request.
+
+## Observability
+
+Emit structured logs on interesting events:
+
+```js
+rateLimit: {
+  limiter,
+  onDenied: (req, res, result) => {
+    log.warn('rate.deny', {
+      ip: req.ip,
+      path: req.path,
+      retryAfter: result.retryAfter,
+      remaining: result.remaining,
+    })
+    res.status(429).json({ error: 'RateLimited', retryAfter: result.retryAfter })
+  },
+}
+```
+
+`checkOrigin`, CSP `report-uri`, `honeypot`, CSRF mismatches are all worth logging with a stable event name so your
+alerting can pattern on them.
+
+## Zero-downtime rotation
+
+**CSRF secret rotation.** All existing tokens become invalid at the moment you change `csrf.secret`. Ways to handle:
+
+- **Silent rotation.** Verify with the new secret first, fall back to the old secret for a grace period. Requires you to
+  wrap `csrf.verify` yourself — the library doesn't ship dual-secret support (it would double the crypto cost of every
+  request forever).
+- **Forced re-auth.** Rotate on a "you've been logged out" screen. Simpler, no rope.
+
+**HSTS preload rollback.** You can't. If you're preloaded and want out, you're waiting months. Don't opt in without a
+plan.
+
+## Where to look next
+
+- [`@exortek/security/rate-limit`](/security/rate-limit) — algorithm reference and store contracts.
+- [`@exortek/security/headers`](/security/headers) — CSP directive reference.
+- [`@exortek/security/middleware`](/security/middleware) — full adapter options for the framework of your choice.
+- [`@exortek/security/errors`](/security/errors) — every error code the library can emit.

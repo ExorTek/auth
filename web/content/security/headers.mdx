@@ -1,0 +1,182 @@
+---
+title: 'security/headers — HTTP security headers'
+sidebarTitle: headers
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `headers`
+
+Ships 14 security-relevant response headers behind one call. Secure defaults for HTTPS APIs and SSR apps; every policy
+can be tuned or turned off with `false`. Complements the [headersMiddleware](/security/middleware) adapters — same
+options, different wiring.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import { headers, cspNonce } from '@exortek/security'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { headers, cspNonce } = require('@exortek/security')
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+## `headers`
+
+```ts
+headers(options?: HeadersOptions): Record<string, string>
+```
+
+Returns a plain `{ [name]: value }` object — assign it to any response however your framework prefers. Called once at
+request handling time (there is no per-response state).
+
+```js
+import { headers } from '@exortek/security';
+
+const map = headers({
+  hsts: { maxAge: 31_536_000, preload: true },
+  contentSecurityPolicy: {
+    directives: {
+      scriptSrc: ["'self'", 'https://cdn.example.com'],
+    },
+  },
+  frameguard: 'SAMEORIGIN',
+});
+
+for (const [k, v] of Object.entries(map)) res.setHeader(k, v);
+```
+
+### What ships by default
+
+Calling `headers()` with no arguments emits:
+
+| Header                              | Default value                                                                                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Content-Security-Policy`           | secure baseline — `default-src 'self'`, `object-src 'none'`, `frame-ancestors 'self'`, `upgrade-insecure-requests`, `script-src 'self'`, … |
+| `Strict-Transport-Security`         | `max-age=15552000; includeSubDomains` (180 days)                                                                                           |
+| `X-Content-Type-Options`            | `nosniff`                                                                                                                                  |
+| `X-Frame-Options`                   | `DENY`                                                                                                                                     |
+| `X-XSS-Protection`                  | `0` (disables buggy legacy heuristic)                                                                                                      |
+| `X-DNS-Prefetch-Control`            | `off`                                                                                                                                      |
+| `X-Download-Options`                | `noopen`                                                                                                                                   |
+| `X-Permitted-Cross-Domain-Policies` | `none`                                                                                                                                     |
+| `Origin-Agent-Cluster`              | `?1`                                                                                                                                       |
+| `Cross-Origin-Opener-Policy`        | `same-origin`                                                                                                                              |
+| `Cross-Origin-Embedder-Policy`      | `require-corp`                                                                                                                             |
+| `Cross-Origin-Resource-Policy`      | `same-origin`                                                                                                                              |
+| `Referrer-Policy`                   | `no-referrer`                                                                                                                              |
+
+`Permissions-Policy` is **opt-in** — passing `permissionsPolicy: true` adds a locked-down default
+(`camera=(), geolocation=(), microphone=()`, …). Some apps genuinely need these features, so we don't ship the lock-down
+blindly.
+
+### Options
+
+Every policy accepts:
+
+- `false` — skip this header entirely.
+- `true` — use the default value shown above.
+- an object — customise. Shape depends on the policy.
+
+The important knobs:
+
+```ts
+headers({
+  contentSecurityPolicy: {
+    useDefaults?: boolean,   // start from empty when false
+    directives?: {           // merged over defaults
+      defaultSrc?: string[] | false,   // false removes a default
+      scriptSrc?: string[] | false,
+      styleSrc?:  string[] | false,
+      // ... any CSP directive, camelCase
+    },
+    reportOnly?: boolean,    // → Content-Security-Policy-Report-Only
+  },
+
+  hsts: {
+    maxAge?: number,             // seconds; default 15_552_000 (180d)
+    includeSubDomains?: boolean, // default true
+    preload?: boolean,           // requires maxAge ≥ 1y + subdomains
+  },
+
+  frameguard: 'DENY' | 'SAMEORIGIN' | { action: 'DENY' | 'SAMEORIGIN' },
+
+  permissionsPolicy: true | {
+    features: { [feature: string]: string[] },
+  },
+
+  // Static-value headers accept true / false / string / { value: string }:
+  contentTypeOptions, dnsPrefetchControl, downloadOptions,
+  permittedCrossDomainPolicies, originAgentCluster, xssProtection,
+  crossOriginOpenerPolicy, crossOriginEmbedderPolicy,
+  crossOriginResourcePolicy, referrerPolicy,
+})
+```
+
+### Guard rails baked in
+
+- **CSP source values are validated at build time.** Any `;`, `,`, or newline character is rejected — a single stray
+  delimiter would silently break the whole header.
+- **HSTS `preload: true`** requires `maxAge >= 31536000` (1 year) AND `includeSubDomains: true`. A misdeployed preload
+  entry is nearly irreversible; we refuse to emit one that doesn't meet the criteria.
+- **`X-Frame-Options: ALLOW-FROM`** is rejected — modern browsers ignore it. Use CSP's `frame-ancestors` for allowlists.
+- **`X-XSS-Protection` defaults to `0`** — legacy IE/Edge/Safari heuristics were themselves an exploitable vector.
+  Modern browsers rely on CSP.
+
+## `cspNonce`
+
+```ts
+cspNonce(bytes = 16): string
+```
+
+Fresh base64-encoded random nonce for per-response CSP. Embed the same value in your CSP `script-src` **and** every
+`<script nonce>` in the HTML — the browser then executes only the whitelisted inline scripts.
+
+```js
+import { headers, cspNonce } from '@exortek/security';
+
+app.get('/page', (req, res) => {
+  const nonce = cspNonce(); // 16 bytes → ~22 base64 chars
+  const secHeaders = headers({
+    contentSecurityPolicy: {
+      directives: {
+        scriptSrc: ["'self'", `'nonce-${nonce}'`],
+      },
+    },
+  });
+  for (const [k, v] of Object.entries(secHeaders)) res.setHeader(k, v);
+
+  res.type('html').send(`
+    <html>
+      <script nonce="${nonce}">initApp()</script>
+    </html>
+  `);
+});
+```
+
+<Callout type="warning">
+  **Regenerate the nonce on every response.** A reused nonce defeats the mechanism — an attacker who reads one page can
+  inline it into a later injection.
+</Callout>
+
+## Framework wiring
+
+```js
+import { headersPlugin } from '@exortek/security/fastify';
+await app.register(headersPlugin, {
+  hsts: { maxAge: 31_536_000, preload: true },
+  frameguard: 'SAMEORIGIN',
+});
+```
+
+Every adapter exposes a `headersMiddleware` / `headersPlugin` — see [middleware](/security/middleware).
+
+## Errors
+
+- `INVALID_ARGUMENT` — misconfigured options (bad directive value, HSTS preload without eligibility, ALLOW-FROM
+  frameguard, etc.).
+
+See [errors](/security/errors) for the full enum.

@@ -1,0 +1,231 @@
+---
+title: '@exortek/security — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `@exortek/security`
+
+Framework-agnostic defensive HTTP layer for Node.js 22+. CSRF, rate limiting, helmet-style headers, CORS, safe
+redirects, and 17 focused helpers — everything built on `node:crypto`, `node:path`, and (only if you import the Fastify
+adapter) `fastify-plugin`.
+
+One install replaces the usual pile: `helmet`, `csrf-csrf`, `express-rate-limit` + `rate-limit-redis`,
+`express-slow-down`, `cors`, `hpp`, `express-mongo-sanitize`. Adapters for **Fastify**, **Express**, **Hono**, and
+**Elysia** ship in the box.
+
+## What problem does this solve?
+
+The middleware every Node app needs is scattered across a dozen packages with mismatched APIs and subtle gaps:
+
+- **helmet has no CSP nonce helper.** Rolling your own nonce + templating it into the `Content-Security-Policy` header
+  is a boilerplate everyone rewrites badly.
+- **`csurf` was archived.** The community migrated to `csrf-csrf`, but its API is Express-first — no Fastify / Hono /
+  Elysia story.
+- **`express-rate-limit` needs an external Redis adapter.** `rate-limit-redis` is a separate package; the wire-up (Lua,
+  key namespacing, `EVALSHA` optimisation) is left to you.
+- **Open-redirect defence is folklore.** Everyone knows `//evil.com` is bad; fewer people catch `\evil.com`,
+  `https://evil.com@safe.com`, or `javascript:` submitted through a whitelisted-scheme allowlist.
+- **Prototype-pollution guards are a two-line pattern** you're expected to remember on every JSON.parse.
+
+`@exortek/security` ships one framework-agnostic API for all of them — CSRF, rate limiting, headers, CORS, safe
+redirects, and a set of sharp-edged helpers — plus adapter modules that reduce integration to a single
+`app.use(securityMiddleware({...}))`.
+
+## Is it safe to trust?
+
+- **Every primitive is a thin wrapper around `node:crypto` or standard URL/path parsers.** No hand-rolled crypto; the
+  code you're trusting is what Node itself is built on.
+- **Timing-safe compare everywhere.** CSRF verification, webhook signature check, `constantTimeEqual` helper — all use
+  `crypto.timingSafeEqual` on equal-length Buffers.
+- **Every input is validated at the boundary.** Bad-shape config throws `SecurityError` with an actionable message
+  before your app boots.
+- **Guard rails.** `credentials: true` with `origin: '*'` throws (browsers reject that combo). HSTS `preload: true`
+  requires a 1-year `max-age`. `javascript:` / `data:` schemes stay blocked in `safeRedirect` even if a caller opts them
+  into `allowedSchemes`. X-Frame-Options `ALLOW-FROM` is rejected — modern browsers ignore it.
+- **True LRU memory store.** A hot key can never evict itself under cap pressure (a subtle rate-limit bypass in most
+  in-process implementations).
+- **Tests:** 223 currently passing, plus 10 gated on a live Redis instance for the Redis store.
+
+<Callout type="warning">
+  **`@exortek/security` gives you the primitives and the wiring; it doesn't turn off your brain.** CSRF still requires a
+  secure cookie path. Rate-limit still needs a sensible `keyGenerator` behind a proxy. Read the module page carefully
+  before wiring up secrets.
+</Callout>
+
+## Install
+
+```bash
+npm  install @exortek/security
+yarn add     @exortek/security
+pnpm add     @exortek/security
+```
+
+Requires **Node.js 22 or newer**.
+
+## Quick start
+
+```js
+import Fastify from 'fastify';
+import fastifyCookie from '@fastify/cookie';
+import { securityPlugin } from '@exortek/security/fastify';
+import { rateLimit } from '@exortek/security';
+
+const app = Fastify();
+await app.register(fastifyCookie);
+await app.register(securityPlugin, {
+  headers: {}, // secure defaults
+  cors: { origin: ['https://app.example.com'], credentials: true },
+  csrf: { secret: process.env.CSRF_SECRET }, // ≥ 32 bytes
+  rateLimit: {
+    limiter: rateLimit.sliding({
+      requests: 100,
+      window: '1m',
+      store: rateLimit.stores.memory(),
+    }),
+  },
+});
+
+app.get('/', async () => ({ ok: true }));
+await app.listen({ port: 3000 });
+```
+
+Same shape on Express, Hono, Elysia — swap `securityPlugin` for `securityMiddleware`. See
+[middleware](/security/middleware) for the adapter-specific bits.
+
+## Setup — ESM, CJS, or TypeScript
+
+The package ships **both** ESM and CJS builds with the same public surface. Types are emitted from JSDoc.
+
+<Tabs items={['ESM (`import`)', 'CommonJS (`require`)', 'TypeScript']}>
+  <Tabs.Tab>
+    ```js
+    import { csrf, cors, headers, rateLimit } from '@exortek/security'
+    ```
+    The default in every example on this site.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { csrf, cors, headers, rateLimit } = require('@exortek/security')
+    ```
+    Node picks the CJS build from the `require` field. All async
+    functions still return Promises.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```ts
+    import { csrf, cors, rateLimit, SecurityError, ErrorCode }
+      from '@exortek/security'
+
+    // Every function is typed via JSDoc → .d.ts
+    const token: string = csrf.generate(SECRET)
+    ```
+    Requires `"moduleResolution": "bundler"` or `"node16"` /
+    `"nodenext"` in `tsconfig.json`.
+
+  </Tabs.Tab>
+</Tabs>
+
+## Modules at a glance
+
+Every module has a dedicated page with full API reference.
+
+| Module                                 | Purpose                                                               | Key exports                                                                                                                                                                                                                                                          |
+| -------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [**csrf**](/security/csrf)             | signed / unsigned / session-bound tokens                              | `generate` · `verify` · `generateUnsigned` · `verifyUnsigned` · `generateForSession` · `verifyForSession`                                                                                                                                                            |
+| [**rate-limit**](/security/rate-limit) | fixed / sliding / token-bucket / leaky-bucket + `multi` + `withBan`   | `fixed` · `sliding` · `tokenBucket` · `leakyBucket` · `multi` · `withBan` · `stores.memory` · `stores.redis` · `stores.custom`                                                                                                                                       |
+| [**headers**](/security/headers)       | CSP, HSTS, COOP/COEP/CORP, Referrer, Permissions, frameguard, noSniff | `headers` · `cspNonce`                                                                                                                                                                                                                                               |
+| [**cors**](/security/cors)             | origin allowlist + preflight + async predicates                       | `cors`                                                                                                                                                                                                                                                               |
+| [**redirect**](/security/redirect)     | open-redirect guard                                                   | `safeRedirect`                                                                                                                                                                                                                                                       |
+| [**helpers**](/security/helpers)       | 17 defensive utilities                                                | `getClientIp` · `bearer` · `checkOrigin` · `webhookVerify` · `sanitizeBody` · `sanitizeParams` · `safeJoin` · `sanitizeFilename` · `freezePrototypes` · `timeout` · `bodyLimit` · `honeypot` · `slowDown` · `safeJsonParse` · `constantTimeEqual` · `parseCspReport` |
+| [**middleware**](/security/middleware) | Fastify · Express · Hono · Elysia adapters                            | `securityMiddleware` bundle + per-concern middleware                                                                                                                                                                                                                 |
+| [**errors**](/security/errors)         | typed error surface                                                   | `SecurityError` · `ErrorCode`                                                                                                                                                                                                                                        |
+
+## Common use cases
+
+| I want to…                                     | Reach for                                                                                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Protect state-changing routes from CSRF        | [`csrf.generate`](/security/csrf#generate) / [`csrf.verify`](/security/csrf#verify), or the [middleware bundle](/security/middleware) |
+| Rate-limit an endpoint                         | [`rateLimit.sliding`](/security/rate-limit#sliding) + [store](/security/rate-limit#stores)                                            |
+| Layer 100/min AND 1k/hour AND ban abusers      | [`rateLimit.multi`](/security/rate-limit#multi) + [`withBan`](/security/rate-limit#withban)                                           |
+| Set the security headers helmet would          | [`headers()`](/security/headers)                                                                                                      |
+| Allow a browser origin cross-site with cookies | [`cors({ origin, credentials: true })`](/security/cors)                                                                               |
+| Safely redirect a user-supplied `?next=`       | [`safeRedirect`](/security/redirect)                                                                                                  |
+| Verify a Stripe / GitHub webhook               | [`webhookVerify`](/security/helpers#webhookverify)                                                                                    |
+| Get the real client IP behind an LB            | [`getClientIp`](/security/helpers#getclientip)                                                                                        |
+| Refuse `__proto__` in a JSON payload           | [`safeJsonParse`](/security/helpers#safejsonparse)                                                                                    |
+| Drop `$where` / dotted keys from a body        | [`sanitizeBody`](/security/helpers#sanitizebody)                                                                                      |
+| Slow down brute-forcers instead of denying     | [`slowDown`](/security/helpers#slowdown)                                                                                              |
+| Wire up every guard in one line                | [middleware](/security/middleware)                                                                                                    |
+
+## Import styles
+
+Three styles, all supported, all tree-shakable.
+
+<Tabs items={['Named, top level', 'Named, subpath', 'Framework middleware']}>
+  <Tabs.Tab>
+    ```js
+    import { csrf, cors, headers, rateLimit, safeRedirect }
+      from '@exortek/security'
+    ```
+    Most ergonomic — one import line for the whole surface.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    import { cors }         from '@exortek/security/cors'
+    import { rateLimit }    from '@exortek/security/rate-limit'
+    import { safeRedirect } from '@exortek/security/redirect'
+    ```
+    Smallest bundle — bundlers only pull the subpath.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    import { securityPlugin }     from '@exortek/security/fastify'
+    import { securityMiddleware } from '@exortek/security/express'
+    import { securityMiddleware } from '@exortek/security/hono'
+    import { securityMiddleware } from '@exortek/security/elysia'
+    ```
+    Framework middleware — one install, one line.
+  </Tabs.Tab>
+</Tabs>
+
+## Errors
+
+Every entry point throws `SecurityError` with a stable `code`. Branch on `code`, not on the message — see the
+[errors page](/security/errors) for the full enum.
+
+```js
+import { SecurityError, ErrorCode, csrf } from '@exortek/security';
+
+try {
+  csrf.generate('too-short');
+} catch (err) {
+  if (!(err instanceof SecurityError)) throw err;
+  if (err.code === ErrorCode.INVALID_ARGUMENT) {
+    // config bug — fix at boot
+  }
+}
+```
+
+## Node version, platforms, ESM/CJS
+
+- **Node 22 LTS or newer.** Uses the native test runner internally, and WHATWG `URL`, `Buffer`, `crypto` throughout.
+- **Pure ESM source with a matching CJS output.** Both work.
+- **Types.** `.d.ts` generated from JSDoc at build. Strict TypeScript projects consume it cleanly.
+- **Runtime footprint.** `node:crypto` + `node:path` + (only under `/fastify`) `fastify-plugin` (~3 KB). Every framework
+  itself is an optional peer.
+
+## What this package is **not**
+
+- **Not a WAF.** Rate limiting is per-key; sophisticated bot / anomaly detection is out of scope. Pair with Cloudflare /
+  DataDome / Bunny etc. if you need that layer.
+- **Not an HTML sanitizer.** Writing a safe DOMPurify equivalent takes a full-time team; we don't ship a half-good one.
+  Use DOMPurify at the render layer.
+- **Not a session store.** CSRF-session-bound mode reads a session id you already have; it doesn't manage sessions for
+  you.
+- **Not a WebAuthn / OAuth / passkey library.** Those are separate protocols with their own packages in this repo
+  (roadmap).
+
+## License
+
+MIT — see the [LICENSE file](https://github.com/ExorTek/auth/blob/master/LICENSE).

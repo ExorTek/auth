@@ -1,0 +1,179 @@
+---
+title: 'security/csrf — CSRF tokens'
+sidebarTitle: csrf
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `csrf`
+
+CSRF (Cross-Site Request Forgery) tokens in three flavors: **signed double-submit** (default, recommended), **unsigned
+double-submit** (no server secret available), and **session-bound** (already have a session? bind the token to it, no
+per-request storage). All verification paths are HMAC-based and timing-safe.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js import {csrf} from '@exortek/security' // or: import * as csrf from '@exortek/security/csrf' ```
+  </Tabs.Tab>
+  <Tabs.Tab>```js const {csrf} = require('@exortek/security') ```</Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  **CSRF is not a XSS defence.** If an attacker can inject a script into your page, they can read the CSRF cookie and
+  submit any request they want. CSRF stops requests from OTHER origins that happen to carry the user's cookies. Both
+  protections matter — this one, plus a strict CSP.
+</Callout>
+
+## `generate`
+
+```ts
+csrf.generate(secret: string | Buffer, options?: { length?: number }): string
+```
+
+Mint a signed CSRF token — the shape is `<random>.<hmac>`. The random half is unique per call; the HMAC binds it to the
+server secret so a forged cookie can't produce a valid tag.
+
+```js
+import { csrf } from '@exortek/security';
+
+const SECRET = process.env.CSRF_SECRET; // ≥ 32 bytes
+const token = csrf.generate(SECRET);
+
+// Set as a cookie on GET / HEAD:
+res.setHeader('Set-Cookie', `__Host-csrf=${token}; HttpOnly; Secure; SameSite=Strict; Path=/`);
+```
+
+- `secret` must be **at least 32 bytes** (either a string of that length or a Buffer). Shorter throws
+  `SecurityError(INVALID_ARGUMENT)`.
+- `options.length` defaults to 32 bytes of random entropy (base64url).
+
+<Callout type="info">
+  **Use the `__Host-` cookie prefix when possible.** It forbids `Domain` and requires `Secure` + `Path=/`, closing
+  subdomain-attack windows. Strip the prefix for local http dev — browsers reject `__Host-` cookies without `Secure`.
+</Callout>
+
+## `verify`
+
+```ts
+csrf.verify(
+  fromCookie: unknown,
+  fromHeader: unknown,
+  secret: string | Buffer,
+): boolean
+```
+
+Timing-safe verification of the double-submit pair. Returns `true` only when:
+
+1. Both values are present and structurally valid.
+2. The two values are identical (timing-safe compare).
+3. The HMAC tag matches the current server secret.
+
+Never throws on malformed input — a bad token is just an unauthenticated request. Only throws `SecurityError` on
+programmer error (missing / short secret).
+
+```js
+app.post('/api/*', (req, res) => {
+  const ok = csrf.verify(req.cookies['__Host-csrf'], req.headers['x-csrf-token'], SECRET);
+  if (!ok) return res.status(403).end('csrf mismatch');
+  // ... proceed
+});
+```
+
+## `generateUnsigned` / `verifyUnsigned`
+
+```ts
+csrf.generateUnsigned(options?: { length?: number }): string
+csrf.verifyUnsigned(fromCookie: unknown, fromForm: unknown): boolean
+```
+
+Unsigned double-submit — just a plain random value in the cookie AND the request. The verify path is a timing-safe
+equality on the two values.
+
+Use only when **no server secret is available**. Because there is no HMAC, an attacker who can plant a cookie can also
+submit a matching request. Signed mode (above) is the safer default.
+
+## `generateForSession` / `verifyForSession`
+
+```ts
+csrf.generateForSession(sessionId: string, secret: string | Buffer): string
+csrf.verifyForSession(token: unknown, sessionId: string, secret: string | Buffer): boolean
+```
+
+Session-bound token derived from `(sessionId, secret)`. No storage needed — verifying the token re-derives it from the
+session id you already have. When the session expires, the token stops verifying.
+
+```js
+// Inside a handler that already has a session:
+const token = csrf.generateForSession(req.session.id, SECRET);
+res.setHeader('X-CSRF-Token', token);
+
+// ... later, on POST:
+const ok = csrf.verifyForSession(req.headers['x-csrf-token'], req.session.id, SECRET);
+```
+
+<Callout type="info">
+  **Why three modes?** The right choice depends on your session architecture: - Cookie-only, no server session: **signed
+  double-submit**. - Server session already present: **session-bound** — no extra state. - Legacy service with no
+  long-lived secret: **unsigned** — plain comparison of a rotating random value.
+</Callout>
+
+## Framework wiring
+
+Every adapter ships a CSRF-only middleware plus a bundle. See [middleware](/security/middleware).
+
+<Tabs items={['Fastify', 'Express', 'Hono', 'Elysia']}>
+  <Tabs.Tab>
+    ```js
+    import fastifyCookie from '@fastify/cookie'
+    import { csrfPlugin } from '@exortek/security/fastify'
+
+    await app.register(fastifyCookie)
+    await app.register(csrfPlugin, { secret: process.env.CSRF_SECRET })
+    // Handlers get req.csrfToken() to render into forms.
+    ```
+
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    import cookieParser from 'cookie-parser'
+    import { csrfMiddleware } from '@exortek/security/express'
+
+    app.use(cookieParser())
+    app.use(csrfMiddleware({ secret: process.env.CSRF_SECRET }))
+    ```
+
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    import { csrfMiddleware } from '@exortek/security/hono'
+    app.use('*', csrfMiddleware({ secret: process.env.CSRF_SECRET }))
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    import { csrfMiddleware } from '@exortek/security/elysia'
+    app.use(csrfMiddleware({ secret: process.env.CSRF_SECRET }))
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+Middleware options:
+
+| Option             | Default                                               | What                                                 |
+| ------------------ | ----------------------------------------------------- | ---------------------------------------------------- |
+| `secret`           | _required_                                            | ≥ 32 bytes                                           |
+| `cookieName`       | `'__Host-csrf'`                                       | Set-Cookie name (strip `__Host-` for local http dev) |
+| `headerName`       | `'x-csrf-token'`                                      | Header the client submits                            |
+| `ignoreMethods`    | `['GET','HEAD','OPTIONS']`                            | Methods NOT verified                                 |
+| `cookieOptions`    | `{ httpOnly, secure, sameSite: 'strict', path: '/' }` | Override individual flags                            |
+| `tokenFromRequest` | header → form body                                    | Custom extractor                                     |
+
+On safe methods, the middleware ensures the browser has a cookie for the next unsafe request. On unsafe methods, it
+verifies the cookie-vs-header pair.
+
+## Errors
+
+Only `INVALID_ARGUMENT` is thrown (short secret, wrong type). A missing or mismatched token is a **boolean-false**
+return from `verify*`, not an exception — CSRF is a normal auth-outcome branch, not an error.
+
+See the [errors page](/security/errors) for the full enum.

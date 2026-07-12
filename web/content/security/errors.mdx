@@ -1,0 +1,163 @@
+---
+title: 'security/errors — SecurityError'
+sidebarTitle: errors
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `errors`
+
+Every entry point in `@exortek/security` that can fail throws a `SecurityError` carrying a stable, machine-readable
+`code`. **Branch on `code`, never on the message** — messages may change between versions, codes never do.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import { SecurityError, ErrorCode } from '@exortek/security'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { SecurityError, ErrorCode } = require('@exortek/security')
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+## `SecurityError`
+
+```ts
+class SecurityError extends Error {
+  name: 'SecurityError';
+  code: string; // one of ErrorCode
+  status: number; // suggested HTTP status
+  cause?: unknown; // wrapped underlying error, when applicable
+}
+```
+
+Extends the built-in `Error`. Adds a stable `code` (see [ErrorCode](#errorcode)) and a **suggested HTTP status** —
+adapters use this to translate the error into a response.
+
+```js
+import { SecurityError, ErrorCode, csrf } from '@exortek/security';
+
+try {
+  csrf.generate('too-short');
+} catch (err) {
+  if (err instanceof SecurityError && err.code === ErrorCode.INVALID_ARGUMENT) {
+    console.error('config bug:', err.message);
+    process.exit(1);
+  } else {
+    throw err;
+  }
+}
+```
+
+<Callout type="info">
+  **Not every failure throws.** `csrf.verify` returns `false` on malformed or mismatched tokens — that's a normal
+  authentication outcome, not an error. `cors()`'s decision object carries an `allowed: false` flag for denials, same
+  reasoning. Errors are reserved for **programmer** or **configuration** mistakes.
+</Callout>
+
+## `ErrorCode`
+
+Codes are **stable across minor versions** — new codes may be added; existing codes are never renamed or repurposed.
+
+| Code                 | Meaning                                                                                      | Typical status      |
+| -------------------- | -------------------------------------------------------------------------------------------- | ------------------- |
+| `INVALID_ARGUMENT`   | Type / range / shape validation failed on a function argument or config option.              | `400`               |
+| `CSRF_MISSING`       | CSRF cookie or header value is missing on a state-changing request.                          | `403`               |
+| `CSRF_MISMATCH`      | Cookie and header CSRF values don't match.                                                   | `403`               |
+| `CSRF_MALFORMED`     | CSRF token doesn't have the expected `<random>.<hmac>` shape.                                | `403`               |
+| `CSRF_TAMPERED`      | CSRF HMAC tag doesn't match the current secret.                                              | `403`               |
+| `RATE_LIMITED`       | Rate-limit deny (raised by adapters when configured to throw).                               | `429`               |
+| `ORIGIN_DENIED`      | Origin failed CORS / `checkOrigin` validation.                                               | `403`               |
+| `REDIRECT_UNSAFE`    | Redirect target failed `safeRedirect` validation (raised by adapters that convert to throw). | `400`               |
+| `PATH_TRAVERSAL`     | `safeJoin` refused a segment that would escape the base directory.                           | `400`               |
+| `BODY_TOO_LARGE`     | Request body / JSON payload exceeded the configured limit.                                   | `413`               |
+| `REQUEST_TIMEOUT`    | `timeout()` hit the deadline.                                                                | `504`               |
+| `WEBHOOK_INVALID`    | Webhook signature verification failed (raised by adapters).                                  | `401`               |
+| `HONEYPOT_TRIGGERED` | Honeypot field was filled — likely a bot.                                                    | `200` (silent drop) |
+
+## Which code comes from where?
+
+| Module                             | Codes it emits                                                                                      |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `csrf.generate`                    | `INVALID_ARGUMENT` (short / missing secret)                                                         |
+| `csrf.verify` / `verifyForSession` | never throws for auth outcomes — return `false`                                                     |
+| `headers`                          | `INVALID_ARGUMENT` (bad HSTS preload eligibility, invalid CSP source, ALLOW-FROM frameguard)        |
+| `cors`                             | `INVALID_ARGUMENT` (`credentials: true` + reflect-any, bad maxAge, non-2xx `optionsSuccessStatus`)  |
+| `safeRedirect`                     | `INVALID_ARGUMENT` (bad `defaultTo`, non-string `allowedHosts` entries) — the _input_ never throws  |
+| `rateLimit.*`                      | `INVALID_ARGUMENT` (bad options), no throws from `check()` itself                                   |
+| Helpers                            | See table above — code depends on the specific helper                                               |
+| Middleware adapters                | Wrap the above; adapter errors are `INVALID_ARGUMENT` (bad options, missing cookie plugin for CSRF) |
+
+## Suggested HTTP status mappings
+
+Adapters use this table already; roll your own error handler when using the primitives directly:
+
+```js
+function toHttpStatus(err) {
+  if (!(err instanceof SecurityError)) return 500;
+  switch (err.code) {
+    case ErrorCode.INVALID_ARGUMENT:
+      return 400;
+    case ErrorCode.CSRF_MISSING:
+    case ErrorCode.CSRF_MISMATCH:
+    case ErrorCode.CSRF_MALFORMED:
+    case ErrorCode.CSRF_TAMPERED:
+    case ErrorCode.ORIGIN_DENIED:
+      return 403;
+    case ErrorCode.WEBHOOK_INVALID:
+      return 401;
+    case ErrorCode.RATE_LIMITED:
+      return 429;
+    case ErrorCode.BODY_TOO_LARGE:
+      return 413;
+    case ErrorCode.REQUEST_TIMEOUT:
+      return 504;
+    case ErrorCode.PATH_TRAVERSAL:
+      return 400;
+    default:
+      return 500;
+  }
+}
+```
+
+## Handling patterns
+
+**Config errors — die at boot:**
+
+```js
+try {
+  await app.register(securityPlugin, options);
+} catch (err) {
+  if (err instanceof SecurityError && err.code === ErrorCode.INVALID_ARGUMENT) {
+    console.error('security misconfigured:', err.message);
+    process.exit(1);
+  }
+  throw err;
+}
+```
+
+**Verification outcomes — branch, don't throw:**
+
+```js
+// CSRF, checkOrigin, safeRedirect, cors — all return booleans / decisions
+if (!csrf.verify(cookie, header, secret)) return res.status(403).end();
+if (!checkOrigin(req, { allowedOrigins })) return res.status(403).end();
+const { safe, url } = safeRedirect(next, { allowedHosts });
+res.redirect(url); // safe or not, url is always safe
+```
+
+**Adapter errors — propagate to your framework's handler:**
+
+```js
+// Nothing to do — Fastify / Express / Hono / Elysia all catch async
+// throws and route them to their error handlers.
+app.setErrorHandler((err, req, reply) => {
+  if (err instanceof SecurityError) {
+    return reply.code(toHttpStatus(err)).send({ error: err.code });
+  }
+  return reply.code(500).send({ error: 'InternalError' });
+});
+```

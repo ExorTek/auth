@@ -1,0 +1,312 @@
+---
+title: 'security/rate-limit — throttling'
+sidebarTitle: rate-limit
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `rate-limit`
+
+Four algorithms, three stores, and two combinators (`multi`, `withBan`). Every limiter has the same
+`{ check(input) → Promise<result> }` shape, so they compose freely and can be swapped without touching handler code.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>```js import {rateLimit} from '@exortek/security' ```</Tabs.Tab>
+  <Tabs.Tab>```js const {rateLimit} = require('@exortek/security') ```</Tabs.Tab>
+</Tabs>
+
+## Which algorithm?
+
+| Use case                                                  | Pick                                     |
+| --------------------------------------------------------- | ---------------------------------------- |
+| User-facing API — smooth, no boundary bursts              | [`sliding`](#sliding)                    |
+| Cheap counter, don't care about edge bursts               | [`fixed`](#fixed)                        |
+| Allow controlled bursts (idle → spend budget)             | [`tokenBucket`](#tokenbucket)            |
+| Hard throughput ceiling, no bursts (SMTP, upstream quota) | [`leakyBucket`](#leakybucket)            |
+| Layered quotas (100/min AND 1k/hour)                      | [`multi`](#multi)                        |
+| Auto-ban after N denials                                  | [`withBan`](#withban)                    |
+| Slow down abusers without denying                         | [`slowDown`](/security/helpers#slowdown) |
+
+## Result shape
+
+Every `check()` returns:
+
+```ts
+{
+  allowed: boolean,
+  remaining: number,
+  reset: Date | null,        // when the current window / bucket resets
+  retryAfter: number | null, // seconds to wait, null when allowed
+}
+```
+
+Middleware translates this into `429` + `Retry-After` + standard `X-RateLimit-*` response headers.
+
+## `fixed`
+
+```ts
+rateLimit.fixed({ requests, window, store }): Limiter
+```
+
+Fixed window. Cheap (one `INCR` per request) but permits burst at boundary edges — a caller can spend the whole budget
+in the last second of one window and the whole budget again in the first second of the next. Prefer `sliding` for
+user-facing APIs.
+
+```js
+const limiter = rateLimit.fixed({
+  requests: 100,
+  window: '1m',
+  store: rateLimit.stores.memory(),
+});
+
+const r = await limiter.check({ key: req.ip });
+if (!r.allowed) return res.status(429).header('Retry-After', r.retryAfter).end();
+```
+
+Duration accepts `'500ms' | '30s' | '15m' | '1h' | '7d' | '2w'` or a positive integer of milliseconds.
+
+## `sliding`
+
+```ts
+rateLimit.sliding({ requests, window, store }): Limiter
+```
+
+Interpolated sliding window. Two fixed buckets — current + weighted slice of previous — cost the same as `fixed` (~1
+write) but eliminate the boundary burst. **Recommended default** for anything user-facing.
+
+Accuracy ~1% off ground truth in the worst case (Cloudflare / Kong / Envoy all ship this variant as their default).
+
+```js
+const limiter = rateLimit.sliding({
+  requests: 100,
+  window: '1m',
+  store: rateLimit.stores.memory(),
+});
+```
+
+## `tokenBucket`
+
+```ts
+rateLimit.tokenBucket({ capacity, refillRate, store }): Limiter
+```
+
+A bucket of `capacity` tokens refills at `refillRate` tokens per second. Idle callers accumulate a full bucket and can
+spend it at once, then drop to the steady rate. **Use for burst-tolerant flows.**
+
+```js
+// Allow bursts up to 20, sustained 5/sec.
+const limiter = rateLimit.tokenBucket({
+  capacity: 20,
+  refillRate: 5,
+  store: rateLimit.stores.memory(),
+});
+```
+
+<Callout type="info">
+  Bucket state is a compact string per key (`"<tokens*1000>|<updatedAt>"`),
+  so any store that treats `count` as an opaque scalar works. Two
+  concurrent requests on the same key can race in memory / custom
+  stores — good enough for typical workloads. If you need cluster-wide
+  atomicity, use the Redis store with a Lua overlay in front of it.
+</Callout>
+
+## `leakyBucket`
+
+```ts
+rateLimit.leakyBucket({ capacity, leakRate, store }): Limiter
+```
+
+Water leaks out at a constant `leakRate`. When full, incoming requests are rejected. Unlike token-bucket, **no burst
+tolerance**: outgoing rate is strictly bounded. Use for traffic shaping and protecting downstream services with a hard
+throughput ceiling.
+
+```js
+// Steady 10/sec, no bursts.
+const limiter = rateLimit.leakyBucket({
+  capacity: 10,
+  leakRate: 10,
+  store: rateLimit.stores.memory(),
+});
+```
+
+## `multi`
+
+```ts
+rateLimit.multi({ limiters }): Limiter
+```
+
+Combine multiple limiters. The request is allowed only if **every** inner limiter allows it; when any denies, the
+request is rejected with the **strictest** `retryAfter` (max over deniers).
+
+```js
+const store = rateLimit.stores.memory();
+const perMin = rateLimit.sliding({ requests: 100, window: '1m', store });
+const perHour = rateLimit.sliding({ requests: 1000, window: '1h', store });
+const perDay = rateLimit.sliding({ requests: 10_000, window: '1d', store });
+
+const limiter = rateLimit.multi({ limiters: [perMin, perHour, perDay] });
+```
+
+Every inner limiter has already recorded the hit against its own store by the time `multi` reads the result, so a
+partial-failure "roll back across layers" is not attempted. If atomicity across layers matters, use a single limiter
+with a longer window.
+
+## `withBan`
+
+```ts
+rateLimit.withBan(limiter, { store, threshold, banDuration, trackingWindow? }): Limiter
+```
+
+Escalation policy. After `threshold` denials from the wrapped limiter land within `trackingWindow` (defaults to
+`banDuration`), we ban the key entirely for `banDuration` — subsequent `check()` calls short-circuit to denied without
+touching the base limiter.
+
+```js
+const store = rateLimit.stores.memory();
+
+const base = rateLimit.sliding({ requests: 20, window: '1m', store });
+const limiter = rateLimit.withBan(base, {
+  store,
+  threshold: 5, // 5 denials …
+  banDuration: '1h', // … buys you 1 hour of hard block.
+});
+```
+
+State keys inside the store: `bs:v:<key>` (violation counter) and `bs:b:<key>` (ban marker). Prefixes chosen so they
+don't collide with the base limiter's own keys — you can reuse the same store.
+
+## Stores
+
+Every store implements the same async interface:
+
+```ts
+interface RateLimitStore {
+  get(key): Promise<{ count; expiresAt } | null>;
+  read(key): Promise<{ count; expiresAt } | null>; // non-mutating
+  incr(key, ttlMs): Promise<{ count; expiresAt }>; // atomic
+  set(key, count, ttlMs): Promise<void>;
+  delete(key): Promise<void>;
+  reset(key): Promise<void>;
+}
+```
+
+### `memory`
+
+```ts
+rateLimit.stores.memory({ maxKeys?, sweepMs? }): RateLimitStore
+```
+
+In-process. **True LRU** (least-recently-_used_, not least-recently- inserted) so a hot key can't push itself over the
+cap and get its own counter evicted. Lazy TTL removal + periodic sweep (setInterval, `.unref()`d).
+
+Defaults: `maxKeys: 10_000`, `sweepMs: 60_000`.
+
+**Not cluster-safe** — every worker has its own map. Use the Redis store or a custom backend for multi-process
+deployments.
+
+### `redis`
+
+```ts
+rateLimit.stores.redis(client, { prefix? }): RateLimitStore
+```
+
+Redis-compatible. Verified against **`ioredis`**, **`node-redis` (v4+)**, and **`@upstash/redis`** (HTTP — works on
+Cloudflare Workers / Vercel Edge / Deno Deploy).
+
+- `incr` runs one Lua script (`INCR` + `PEXPIRE`-when-fresh) so atomicity across concurrent callers is guaranteed by
+  Redis.
+- `read` runs a Lua script (`GET` + `PTTL`) — one round-trip, consistent snapshot.
+- When the client is `ioredis` (detected via `defineCommand`), both scripts are registered as named commands; subsequent
+  calls go out as `EVALSHA`.
+
+```js
+import Redis from 'ioredis';
+const client = new Redis(process.env.REDIS_URL);
+const store = rateLimit.stores.redis(client, { prefix: 'rl:' });
+```
+
+Default prefix is `rl:`. Choose your own if you share a Redis with other libraries.
+
+### `custom`
+
+```ts
+rateLimit.stores.custom(impl): RateLimitStore
+```
+
+Bring-your-own backend. Validates that `get` / `incr` / `set` / `delete` exist and wraps them into the interface. `read`
+defaults to `get`, `reset` defaults to `delete`.
+
+```js
+const store = rateLimit.stores.custom({
+  get: async k => {
+    /* return { count, expiresAt } | null */
+  },
+  incr: async (k, ttlMs) => {
+    /* MUST be atomic */
+  },
+  set: async (k, count, ttlMs) => {
+    /* upsert */
+  },
+  delete: async k => {
+    /* remove */
+  },
+});
+```
+
+<Callout type="warning">
+  **`incr` must be atomic across concurrent callers.** On Redis, wrap `INCR + EXPIRE` in a Lua script. On Mongo, use
+  `findOneAndUpdate` with upsert. Non-atomic implementations race and let requests bypass the limit under load.
+</Callout>
+
+## Framework wiring
+
+```js
+import { rateLimit } from '@exortek/security';
+import { rateLimitMiddleware } from '@exortek/security/express';
+
+app.use(
+  rateLimitMiddleware({
+    limiter: rateLimit.sliding({
+      requests: 100,
+      window: '1m',
+      store: rateLimit.stores.memory(),
+    }),
+    keyGenerator: req => req.ip, // default: req.ip
+    onDenied: (req, res, result) => {
+      // optional custom denial
+      res.status(429).json({ error: 'chill' });
+    },
+  }),
+);
+```
+
+Standard response headers on every request: `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and (on deny) `Retry-After`.
+
+### Customising response headers
+
+Every rate-limit middleware accepts a `headers` option:
+
+```js
+rateLimitMiddleware({
+  limiter,
+  headers: 'legacy', // default — X-RateLimit-* + Retry-After
+  // headers: 'draft', // RFC 9331 draft — RateLimit-* + Retry-After
+  // headers: false,   // emit nothing (info-leak posture)
+  // headers: {                               // per-field override
+  //   remaining:  'X-Quota-Remaining',
+  //   reset:      false,                     // skip just this one
+  //   retryAfter: 'X-Wait-Seconds',
+  // },
+});
+```
+
+- **`'legacy'` (default)** — matches `express-rate-limit`, helmet demos, and most existing clients that parse rate-limit
+  headers.
+- **`'draft'`** — [RFC 9331 draft-ietf-httpapi-ratelimit-headers][rfc9331]. Adopt this on new APIs; the ecosystem is
+  slowly moving here.
+- **`false`** — emit nothing. Useful when you don't want to hint your quotas to potential abusers.
+- **object** — replace individual names, or set any field to `false` to skip just that header.
+
+[rfc9331]: https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/
+
+See [middleware](/security/middleware) and the [production checklist](/security/production) for details.

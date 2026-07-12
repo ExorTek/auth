@@ -1,0 +1,159 @@
+---
+title: 'security/cors — origin allowlist'
+sidebarTitle: cors
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `cors`
+
+Framework-agnostic CORS with six ways to spell `origin`, preflight handling, credentials support, async predicates, and
+defensive guard rails built in.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>```js import {cors} from '@exortek/security' ```</Tabs.Tab>
+  <Tabs.Tab>```js const {cors} = require('@exortek/security') ```</Tabs.Tab>
+</Tabs>
+
+## `cors`
+
+```ts
+cors(options?: CorsOptions): (input: CorsInput) => CorsDecision | Promise<CorsDecision>
+```
+
+Returns a **pure function**. Call it with a request-shaped input and you get back a decision — the framework middleware
+just wires the inputs and mutates the response accordingly.
+
+```js
+const check = cors({
+  origin: ['https://app.example.com', /\.staging\.example\.com$/],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 3600,
+});
+
+// In your middleware:
+const d = check({
+  method: req.method,
+  origin: req.headers.origin,
+  requestMethod: req.headers['access-control-request-method'],
+  requestHeaders: req.headers['access-control-request-headers'],
+});
+for (const [k, v] of Object.entries(d.headers)) res.setHeader(k, v);
+if (d.preflight) {
+  res.statusCode = d.status;
+  res.end();
+  return;
+}
+if (!d.allowed && req.headers.origin) {
+  return res.status(403).end();
+}
+```
+
+## Six ways to spell `origin`
+
+```js
+cors({ origin: true }); // reflect any (dev / open API)
+cors({ origin: false }); // CORS off
+cors({ origin: 'https://app.example.com' }); // exact string
+cors({ origin: /\.example\.com$/i }); // regex
+cors({ origin: ['https://a.com', /\.dev$/, 'https://b.com'] }); // any-of
+cors({ origin: o => o?.endsWith('.trusted.dev') }); // sync predicate
+cors({ origin: async o => db.hasOrigin(o) }); // async predicate
+```
+
+Sync predicates keep `check()` synchronous — no allocation, no `await`. Async predicates make `check()` return
+`Promise<CorsDecision>`; the adapters handle both automatically.
+
+## Full options
+
+```ts
+cors({
+  origin?:          boolean | string | RegExp
+                    | Array<string | RegExp>
+                    | ((origin: string | undefined) => boolean | Promise<boolean>),
+  methods?:         string | string[],   // default: GET,HEAD,PUT,PATCH,POST,DELETE
+  allowedHeaders?:  true | string | string[], // true = echo request's Access-Control-Request-Headers
+  exposedHeaders?:  string | string[],   // sent on actual responses (not preflight)
+  credentials?:     boolean,             // Access-Control-Allow-Credentials: true
+  maxAge?:          number,              // preflight cache seconds
+  optionsSuccessStatus?: number,         // default 204 (some legacy setups need 200)
+})
+```
+
+## Guard rails baked in
+
+- **`credentials: true` + `origin: true`** → **throws at boot** with a `SecurityError`. Browsers reject that combo;
+  better to fail at config time than at first request.
+- **`Vary: Origin`** is emitted whenever the Allow-Origin value depends on the request (required by RFC 9110 §12.5.5 so
+  shared caches don't mix responses from different origins).
+- **Wildcard `*` is only used when explicitly reflecting-any AND credentials are off.** Everything else echoes the
+  incoming origin.
+- **Preflight without `Access-Control-Request-Method`** is treated as a normal OPTIONS request, not a preflight — avoids
+  stealing OPTIONS routes users actually defined.
+- **`Access-Control-Expose-Headers` is NOT emitted on preflight** — browsers ignore it there.
+
+## Decision shape
+
+```ts
+interface CorsDecision {
+  headers: Record<string, string>; // CORS headers to merge onto response
+  allowed: boolean; // did origin pass the policy?
+  preflight: boolean; // was this an OPTIONS + Access-Control-Request-Method?
+  status?: number; // suggested status for preflight (default 204)
+}
+```
+
+Middleware layers translate this:
+
+- `preflight === true` — respond with `status`, no body, headers merged.
+- `preflight === false && !allowed && origin present` — respond `403` (cross-origin from a non-allowlisted origin).
+- `preflight === false && !allowed && !origin` — pass through (same-origin, doesn't need CORS).
+- `preflight === false && allowed` — merge headers, continue to handler.
+
+## Async predicate example
+
+```js
+const check = cors({
+  origin: async o => {
+    if (!o) return false;
+    const row = await db.query('SELECT 1 FROM allowed_origins WHERE origin = $1 AND active = true', [o]);
+    return row.length > 0;
+  },
+  credentials: true,
+});
+
+// check() is now async:
+app.use(async (req, res, next) => {
+  const d = await check({
+    method: req.method,
+    origin: req.headers.origin,
+    requestMethod: req.headers['access-control-request-method'],
+    requestHeaders: req.headers['access-control-request-headers'],
+  });
+  // ... same as sync path
+});
+```
+
+## Framework wiring
+
+```js
+import { corsMiddleware } from '@exortek/security/express';
+
+app.use(
+  corsMiddleware({
+    origin: ['https://app.example.com'],
+    credentials: true,
+    maxAge: 3600,
+  }),
+);
+```
+
+Every adapter exposes a `corsMiddleware` / `corsPlugin` — see [middleware](/security/middleware).
+
+## Errors
+
+- `INVALID_ARGUMENT` — misconfigured options (`credentials: true` + reflect-any, negative `maxAge`, non-2xx
+  `optionsSuccessStatus`).
+
+See [errors](/security/errors) for the full enum.

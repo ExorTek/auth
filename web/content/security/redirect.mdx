@@ -1,0 +1,184 @@
+---
+title: 'security/redirect — open-redirect guard'
+sidebarTitle: redirect
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `redirect`
+
+Three helpers for the "come back to a URL after login" pattern: [`extractReturnUrl`](#extractreturnurl) grabs the intent
+from wherever the client stashed it, [`safeRedirect`](#saferedirect) validates the target, and
+[`isSameOrigin`](#issameorigin) compares URLs when a check against a single origin is all you need.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import { safeRedirect, extractReturnUrl, isSameOrigin }
+      from '@exortek/security'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { safeRedirect, extractReturnUrl, isSameOrigin } =
+      require('@exortek/security')
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  **Never redirect to raw user input.** Always pass it through `safeRedirect` first and redirect to the returned `url`,
+  not the input. Open-redirect isn't dramatic on its own, but it's a common ingredient in credential phishing and SSO
+  token exfiltration flows.
+</Callout>
+
+## `safeRedirect`
+
+```ts
+safeRedirect(input: unknown, options?: SafeRedirectOptions): {
+  safe: boolean,
+  url: string,                // safe target — always use THIS
+  reason?: 'empty' | 'illegal-chars' | 'protocol-relative'
+         | 'relative-not-allowed' | 'malformed' | 'scheme'
+         | 'userinfo' | 'host',
+}
+```
+
+Given a user-supplied redirect target, return either that target (when it passes every check) or a safe fallback.
+
+```js
+const { safe, url, reason } = safeRedirect(req.query.next, {
+  allowedHosts: ['app.example.com', '*.example.com'],
+  defaultTo: '/dashboard',
+});
+if (!safe) log.warn('unsafe redirect blocked', { input: req.query.next, reason });
+res.redirect(url);
+```
+
+### Vectors caught
+
+| Input                                                                                                          | `reason`               |
+| -------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `//evil.com/pwn`                                                                                               | `protocol-relative`    |
+| `/\evil.com`, `foo\x00bar`, whitespace-prefixed input                                                          | `illegal-chars`        |
+| `javascript:alert(1)`, `data:text/html,…`, `vbscript:`, `file:`, `blob:` — even if opted into `allowedSchemes` | `scheme` (hard-banned) |
+| `https://evil.com@safe.com/`                                                                                   | `userinfo`             |
+| `https://other.com/` (not on allowlist)                                                                        | `host`                 |
+| `ftp://…` (not on `allowedSchemes`)                                                                            | `scheme`               |
+| `dashboard/tab` (no leading `/`)                                                                               | `malformed`            |
+| `undefined` / `''` / non-string                                                                                | `empty`                |
+
+### Options
+
+```ts
+safeRedirect(input, {
+  defaultTo?:    string,               // fallback URL (must be a same-origin path)
+  allowedHosts?: string | string[],    // trusted external targets
+  allowedSchemes?: string[],           // default ['http', 'https']
+  allowRelative?: boolean,             // default true
+})
+```
+
+- `defaultTo` **must be a same-origin path starting with `/`** — the option itself is validated at parse time so you
+  can't accidentally fall back to an attacker-friendly URL.
+- `allowedHosts` supports subdomain wildcards: `*.example.com` matches `sub.example.com` but not the apex `example.com`
+  itself. Include both entries if you need the apex.
+- **Hard-banned schemes** (`javascript`, `data`, `vbscript`, `file`, `blob`) are refused even if you list them in
+  `allowedSchemes` — a bug in your allowlist shouldn't turn into XSS.
+
+## `extractReturnUrl`
+
+```ts
+extractReturnUrl(req: {
+  query?: Record<string, unknown>,
+  headers?: Record<string, string | string[] | undefined>,
+  cookies?: Record<string, string | undefined>,
+}, options?: {
+  queryParams?: string[],              // priority list, default common names
+  headerName?: string | string[],
+  cookieName?: string,
+}): string | undefined
+```
+
+Pick the "come back to" URL from wherever the client stashed it — query string, header, or cookie — and return the first
+non-empty candidate. **Does NOT validate** — pipe the result into `safeRedirect`.
+
+```js
+import { extractReturnUrl, safeRedirect } from '@exortek/security';
+
+app.get('/login/callback', async (req, res) => {
+  const raw = extractReturnUrl(req, {
+    queryParams: ['next', 'return_to'],
+    headerName: 'x-return-to',
+  });
+  const { url } = safeRedirect(raw, {
+    allowedHosts: ['app.example.com'],
+    defaultTo: '/dashboard',
+  });
+  res.redirect(url);
+});
+```
+
+Default query param names checked, in order:
+
+```ts
+['next', 'return_to', 'returnTo', 'redirect', 'redirect_uri'];
+```
+
+Override with `queryParams` if your convention differs.
+
+## `isSameOrigin`
+
+```ts
+isSameOrigin(a: string | URL | null, b: string | URL | null): boolean
+```
+
+Compare two URLs by origin (scheme + host + port). Uses WHATWG URL parsing, so `https://example.com` and
+`https://example.com:443/foo` compare equal. Returns `false` on any parse failure — never throws.
+
+```js
+if (!isSameOrigin(req.headers.referer, 'https://app.example.com')) {
+  return res.status(403).end();
+}
+```
+
+Complements [`checkOrigin`](/security/helpers#checkorigin), which reads `Origin` / `Referer` headers off a request.
+`isSameOrigin` is the primitive both callers land on when they need direct URL-to-URL comparison — OAuth callback
+validation, Referer-based flow checks, allowlist-of-one matching.
+
+## A worked example
+
+```js
+import { extractReturnUrl, safeRedirect, isSameOrigin } from '@exortek/security';
+
+app.post('/login', async (req, res) => {
+  const user = await authenticate(req.body);
+  if (!user) return res.redirect('/login?error=creds');
+
+  // Where did they want to go?
+  const raw = extractReturnUrl(req, {
+    queryParams: ['next', 'return_to'],
+  });
+
+  const { url } = safeRedirect(raw, {
+    allowedHosts: ['app.example.com', '*.example.com'],
+    defaultTo: '/dashboard',
+  });
+
+  // Optional: refuse Referer-based returns from off-site
+  if (req.headers.referer && !isSameOrigin(req.headers.referer, req.headers.origin)) {
+    return res.redirect('/dashboard');
+  }
+
+  await startSession(res, user);
+  res.redirect(url);
+});
+```
+
+## Errors
+
+- `INVALID_ARGUMENT` — thrown by `safeRedirect` when its own options are malformed (`defaultTo` that isn't a same-origin
+  path, non-string `allowedHosts` entries). User input never throws — a bad `next=` just yields
+  `{ safe: false, reason }`.
+
+See [errors](/security/errors) for the full enum.

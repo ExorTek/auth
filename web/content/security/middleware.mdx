@@ -1,0 +1,224 @@
+---
+title: 'security/middleware — framework adapters'
+sidebarTitle: middleware
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `middleware`
+
+Every adapter exposes a **bundle** (`securityMiddleware` / `securityPlugin`) that wires CSRF, CORS, headers, and
+rate-limit in one call, plus **per-concern middleware** you can pick and choose. All built on the same pure functions
+documented on the other pages.
+
+Every framework itself is an **optional peer** — install the ones you use.
+
+## Fastify
+
+```bash
+npm install @fastify/cookie   # only needed if you enable CSRF
+```
+
+```js
+import Fastify from 'fastify';
+import fastifyCookie from '@fastify/cookie';
+import { securityPlugin } from '@exortek/security/fastify';
+import { rateLimit } from '@exortek/security';
+
+const app = Fastify();
+await app.register(fastifyCookie);
+await app.register(securityPlugin, {
+  headers: {},
+  cors: { origin: ['https://app.example.com'], credentials: true },
+  csrf: { secret: process.env.CSRF_SECRET },
+  rateLimit: {
+    limiter: rateLimit.sliding({
+      requests: 100,
+      window: '1m',
+      store: rateLimit.stores.memory(),
+    }),
+  },
+});
+```
+
+The plugin is wrapped with `fastify-plugin` so its hooks apply globally, not just to routes registered on the plugin
+itself. CSRF enforcement checks at boot that `@fastify/cookie` is registered — you get an actionable error message if
+you forgot to add it.
+
+Individual plugins:
+
+```js
+import { headersPlugin, corsPlugin, csrfPlugin, rateLimitPlugin } from '@exortek/security/fastify';
+
+await app.register(corsPlugin, { origin: ['https://app.example.com'] });
+await app.register(headersPlugin, { hsts: { maxAge: 31_536_000 } });
+```
+
+## Express
+
+```bash
+npm install cookie-parser     # optional, but nice to have with CSRF
+```
+
+```js
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import { securityMiddleware } from '@exortek/security/express';
+import { rateLimit } from '@exortek/security';
+
+const app = express();
+app.set('trust proxy', true); // required for accurate req.ip behind an LB
+app.use(express.json());
+app.use(cookieParser()); // only needed if you enable CSRF
+
+app.use(
+  securityMiddleware({
+    headers: {},
+    cors: { origin: ['https://app.example.com'], credentials: true },
+    csrf: { secret: process.env.CSRF_SECRET },
+    rateLimit: {
+      limiter: rateLimit.sliding({
+        requests: 100,
+        window: '1m',
+        store: rateLimit.stores.memory(),
+      }),
+    },
+  }),
+);
+```
+
+Works on Express 4 and 5. If `cookie-parser` isn't registered, the CSRF layer falls back to parsing `req.headers.cookie`
+itself — you don't strictly need it, but installing it also gives your handlers `req.cookies`.
+
+Individual middleware:
+
+```js
+import { headersMiddleware, corsMiddleware, csrfMiddleware, rateLimitMiddleware } from '@exortek/security/express';
+```
+
+## Hono
+
+```js
+import { Hono } from 'hono';
+import { securityMiddleware } from '@exortek/security/hono';
+import { rateLimit } from '@exortek/security';
+
+const app = new Hono();
+app.use(
+  '*',
+  securityMiddleware({
+    headers: {},
+    cors: { origin: ['https://app.example.com'], credentials: true },
+    csrf: { secret: process.env.CSRF_SECRET },
+    rateLimit: {
+      limiter: rateLimit.sliding({
+        requests: 100,
+        window: '1m',
+        store: rateLimit.stores.memory(),
+      }),
+      // On non-Node runtimes there's no req.ip — read your platform's IP header:
+      keyGenerator: c => c.req.header('cf-connecting-ip'),
+    },
+  }),
+);
+```
+
+Hono runs on the Web-standard `Request`/`Response` contract, so the middleware works unchanged on **Node**, **Bun**,
+**Cloudflare Workers**, **Deno**, and **Vercel Edge**.
+
+<Callout type="info">
+  **IP resolution on edge runtimes.** There is no `req.ip` on Workers / Vercel Edge / Deno. Pass `keyGenerator` to read
+  from whatever header your platform populates (`CF-Connecting-IP`, `X-Forwarded-For`, `Fastly-Client-IP`, …).
+</Callout>
+
+## Elysia
+
+```js
+import { Elysia } from 'elysia';
+import { securityMiddleware } from '@exortek/security/elysia';
+import { rateLimit } from '@exortek/security';
+
+const app = new Elysia()
+  .use(
+    securityMiddleware({
+      headers: {},
+      cors: { origin: ['https://app.example.com'], credentials: true },
+      csrf: { secret: process.env.CSRF_SECRET },
+      rateLimit: {
+        limiter: rateLimit.sliding({
+          requests: 100,
+          window: '1m',
+          store: rateLimit.stores.memory(),
+        }),
+      },
+    }),
+  )
+  .get('/', () => ({ ok: true }));
+```
+
+Follows the same named-sub-instance pattern as `@elysiajs/cors`. Preflight is caught via explicit
+`app.options('/', h).options('/*', h)` so it works even for endpoints without a registered OPTIONS handler.
+
+## Unified options
+
+All four adapters accept the same `securityMiddleware(options)` shape:
+
+```ts
+{
+  headers?:   HeadersOptions | boolean,
+  cors?:      CorsOptions | false,
+  csrf?: {
+    secret:          string | Buffer,           // ≥ 32 bytes
+    cookieName?:     string,                    // default '__Host-csrf'
+    headerName?:     string,                    // default 'x-csrf-token'
+    ignoreMethods?:  string[],                  // default ['GET','HEAD','OPTIONS']
+    cookieOptions?:  object,                    // override Set-Cookie flags
+    tokenFromRequest?: (req) => string | undefined,
+  } | false,
+  rateLimit?: {
+    limiter:       Limiter,
+    keyGenerator?: (req) => string | undefined,
+    onDenied?:     (req, res, result) => unknown,
+    headers?:      'legacy' | 'draft' | false | {  // default 'legacy'
+      remaining?:  string | false,                 // default 'X-RateLimit-Remaining'
+      reset?:      string | false,                 // default 'X-RateLimit-Reset'
+      retryAfter?: string | false,                 // default 'Retry-After'
+    },
+  } | false,
+}
+```
+
+Set any concern to `false` (or omit) to skip. The per-concern middlewares (`corsMiddleware`, `csrfMiddleware`,
+`rateLimitMiddleware`, `headersMiddleware`) accept just that concern's options directly, not nested.
+
+## Response headers emitted
+
+Regardless of adapter, on a successful (non-denied) request:
+
+| Header                                                                                                                    | Source                                                 |
+| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `Access-Control-*`                                                                                                        | CORS                                                   |
+| `Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, … | Headers                                                |
+| `Set-Cookie: __Host-csrf=...`                                                                                             | CSRF (only on safe methods when there's no cookie yet) |
+| `X-RateLimit-Remaining`, `X-RateLimit-Reset`                                                                              | Rate-limit                                             |
+
+On denial:
+
+| Header         | When                      |
+| -------------- | ------------------------- |
+| `Retry-After`  | Rate-limit deny (seconds) |
+| `Vary: Origin` | Origin was echoed back    |
+
+## Errors
+
+Middleware translates library errors into HTTP responses:
+
+- Rate-limit deny → `429` + standard headers + `{ error: 'RateLimited', message, retryAfter }` (override with
+  `onDenied`).
+- CORS deny (cross-origin from non-allowlisted origin) → `403` + `{ error: 'ForbiddenOrigin' }`.
+- CSRF mismatch → `403` + `{ error: 'CsrfInvalid' }`.
+- Anything else — including a `SecurityError` thrown from options parsing — propagates to your framework's error
+  handler.
+
+Configuration mistakes (short CSRF secret, `credentials: true` + reflect-any CORS, HSTS preload without eligibility)
+throw `SecurityError` at boot — better to know at deploy than in production.

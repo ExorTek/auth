@@ -1,0 +1,386 @@
+---
+title: 'security/helpers — defensive utilities'
+sidebarTitle: helpers
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `helpers`
+
+Sixteen small, focused defensive utilities that would otherwise be scattered across `hpp`, `express-mongo-sanitize`,
+custom sanitizers, one-off `getIP`, `bearer`, `webhook`, `honeypot`, `slow-down` snippets found in every codebase.
+
+All exported from `@exortek/security`.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import {
+      getClientIp, bearer, checkOrigin, webhookVerify,
+      sanitizeBody, sanitizeParams, safeJoin, sanitizeFilename,
+      freezePrototypes, timeout, bodyLimit, honeypot, slowDown,
+      safeJsonParse, constantTimeEqual, parseCspReport,
+    } from '@exortek/security'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { getClientIp, bearer, /* ... */ } = require('@exortek/security')
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+## `getClientIp`
+
+```ts
+getClientIp(req, {
+  trustProxy?: boolean | string[],
+  headers?: string[],
+}): string | undefined
+```
+
+Extract the real client IP, honoring a trust-proxy allowlist. Node behind a load balancer sees the LB's IP in
+`req.socket.remoteAddress` — the real client is in the **left-most** entry of `X-Forwarded-For`, but only if the direct
+connection actually came from a trusted proxy.
+
+```js
+const ip = getClientIp(req, {
+  trustProxy: ['10.0.0.1', '10.0.0.2'],
+});
+```
+
+- `trustProxy: false` (default) — always return `req.socket.remoteAddress`.
+- `trustProxy: true` — always read `X-Forwarded-For`.
+- `trustProxy: string[]` — read XFF only when the direct peer is on the list.
+
+## `bearer`
+
+```ts
+bearer(headerValue: string | undefined | null): string | null
+```
+
+Parse `Authorization: Bearer <token>`. Case-insensitive on the scheme (RFC 7235). Returns the token or `null`.
+
+```js
+const token = bearer(req.headers.authorization);
+if (!token) return res.status(401).end();
+```
+
+## `checkOrigin`
+
+```ts
+checkOrigin(req: { method?: string, headers?: object }, {
+  allowedOrigins: Array<string | RegExp>,
+  safeMethods?: string[],  // default ['GET','HEAD','OPTIONS']
+}): boolean
+```
+
+Defensive `Origin` / `Referer` check for state-changing requests. Complements CORS: CORS controls cross-origin
+**reads**; `checkOrigin` catches CSRF-adjacent posts where a cookie is present but the origin doesn't match.
+
+```js
+if (!checkOrigin(req, { allowedOrigins: ['https://app.example.com'] })) {
+  return res.status(403).end();
+}
+```
+
+## `webhookVerify`
+
+```ts
+webhookVerify(
+  payload:         string | Buffer,       // RAW body — do not JSON.stringify
+  signatureHeader: string,
+  secret:          string | Buffer,
+  options?: { algorithm?: string },
+): boolean
+```
+
+Timing-safe HMAC verification. Accepts plain hex digests **and** scheme-prefixed forms:
+
+- `sha256=<hex>` (GitHub / Slack / generic)
+- `t=<timestamp>,v1=<hex>` (Stripe rotation envelope)
+
+Any candidate that matches wins.
+
+```js
+const ok = webhookVerify(rawBody, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+```
+
+<Callout type="warning">
+  **Pass the RAW body.** If you've already run `JSON.parse` and then `JSON.stringify` on it, the whitespace / key order
+  will differ from the bytes the sender hashed. Buffer the raw stream before your JSON middleware runs.
+</Callout>
+
+## `sanitizeBody`
+
+```ts
+sanitizeBody(input: unknown, options?: {
+  mode?:       'strip' | 'reject',   // default 'strip'
+  suspicious?: RegExp,               // default /^\$|\./
+  maxDepth?:   number,               // default 8
+}): unknown
+```
+
+Defensive NoSQL / operator-injection sanitizer. Walks the value tree and drops keys matching the pattern — the default
+catches MongoDB operators (`$where`, `$ne`, `$gt`, `$or`, …) and dotted keys (`a.b.c`) that Mongoose interprets as
+nested paths.
+
+```js
+const safe = sanitizeBody(req.body);
+db.users.find(safe);
+```
+
+- `mode: 'reject'` throws `SecurityError(INVALID_ARGUMENT)` instead of stripping — useful on trusted APIs where a bad
+  shape means a bug or attack worth alerting on.
+- Recursion guard: refuses to walk beyond `maxDepth`.
+- **Allocates a new object** — the input is not mutated.
+
+## `sanitizeParams`
+
+```ts
+sanitizeParams(query: Record<string, unknown>, options?: {
+  mode?:      'first' | 'last' | 'array',   // default 'first'
+  maxParams?: number,                       // default 1000
+}): Record<string, unknown>
+```
+
+HTTP Parameter Pollution (HPP) guard. Different runtimes disagree on `?x=1&x=2`; attackers exploit the divergence
+between parser and business logic. This collapses to a single value per key.
+
+```js
+const clean = sanitizeParams(req.query);
+```
+
+## `safeJoin`
+
+```ts
+safeJoin(base: string, ...segments: string[]): string
+```
+
+Path resolver that refuses to escape `base`. Guards against `..` traversal, absolute-path smuggling, and NUL-byte
+truncation.
+
+```js
+const path = safeJoin('/var/data/uploads', req.params.file);
+// Throws SecurityError(PATH_TRAVERSAL) on '../../etc/passwd'.
+```
+
+## `sanitizeFilename`
+
+```ts
+sanitizeFilename(input: unknown, options?: {
+  replacement?: string,   // default '_'
+  maxLength?:   number,   // default 255
+  fallback?:    string,   // default 'file'
+}): string
+```
+
+Cross-platform filename normalizer. Strips path separators, control chars, illegal punctuation (`< > : " | ? *`),
+Windows reserved names (`CON`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`), leading dots, and trailing spaces / dots.
+
+```js
+sanitizeFilename('../etc/passwd'); // → 'passwd'
+sanitizeFilename('C:\\Windows\\file.txt'); // → 'file.txt'
+sanitizeFilename('CON.txt'); // → '_CON.txt'
+```
+
+## `freezePrototypes`
+
+```ts
+freezePrototypes(options?: { additional?: object[] }): number
+```
+
+Freezes built-in prototypes to defend against prototype pollution. After calling, `req.body.__proto__.isAdmin = true`
+becomes a no-op (silent in sloppy mode, `TypeError` in strict). Idempotent.
+
+**Call once at boot** before third-party modules load and start setting legitimate prototype properties.
+
+```js
+import { freezePrototypes } from '@exortek/security';
+freezePrototypes();
+// ... now load your app.
+```
+
+## `timeout`
+
+```ts
+timeout<T>(promise: Promise<T>, ms: number, options?: {
+  label?: string,
+  signal?: AbortSignal,
+}): Promise<T>
+```
+
+Race a promise against a deadline. Throws `SecurityError(REQUEST_TIMEOUT)` when the deadline hits. Accepts an
+`AbortSignal` for external cancellation.
+
+```js
+try {
+  const result = await timeout(fetch(url), 5000, { label: 'upstream' });
+} catch (err) {
+  // upstream timed out after 5000ms
+}
+```
+
+<Callout type="info">
+  **The underlying operation keeps running.** `timeout` only rejects the returned Promise — it can't cancel a
+  `setTimeout` or `fetch` for you. Pass an `AbortController` through to those APIs if you need real cancellation.
+</Callout>
+
+## `bodyLimit`
+
+```ts
+bodyLimit(contentLength: number | string | undefined, maxBytes: number): {
+  ok: boolean,
+  reason?: 'missing' | 'invalid' | 'too-large',
+}
+```
+
+Content-Length guard. Check before you allocate a buffer to hold the request body.
+
+```js
+const check = bodyLimit(req.headers['content-length'], 1_000_000);
+if (!check.ok) return res.status(413).end('too large');
+```
+
+<Callout type="warning">
+  **A lying Content-Length is still an attack surface.** Enforce the same limit while reading the body — count bytes as
+  they arrive and abort past the threshold.
+</Callout>
+
+## `honeypot`
+
+```ts
+honeypot(body: Record<string, unknown> | null, options?: {
+  fieldName?: string,        // default 'website'
+  caseInsensitive?: boolean, // default false
+}): boolean
+```
+
+Bot trap. Real users leave hidden form fields blank; naïve bots fill everything. Returns `true` when the honeypot came
+back with content.
+
+```html
+<form>
+  <input name="email" />
+  <input name="website" style="display: none" tabindex="-1" autocomplete="off" />
+  <button>Sign up</button>
+</form>
+```
+
+```js
+if (honeypot(req.body)) return res.status(200).end(); // silently drop
+```
+
+## `slowDown`
+
+```ts
+slowDown({
+  store:       RateLimitStore,
+  window:      string | number,
+  delayAfter:  number,
+  delayMs:     number,
+  maxDelayMs?: number,           // default 20_000
+  growth?:     'linear' | 'exponential',  // default 'linear'
+}): Limiter
+```
+
+Progressive-delay throttle — a **soft** limiter that never rejects but slows abusers down. Composable with hard limiters
+via [`rateLimit.multi(...)`](/security/rate-limit#multi).
+
+```js
+const throttle = slowDown({
+  store: rateLimit.stores.memory(),
+  window: '1m',
+  delayAfter: 5,
+  delayMs: 100, // add 100ms per request over threshold
+  maxDelayMs: 5000,
+  growth: 'exponential', // 100, 200, 400, 800, 1600 ...
+});
+
+// Wrap into a limiter chain:
+const composed = rateLimit.multi({
+  limiters: [throttle, rateLimit.sliding({ requests: 30, window: '1m', store })],
+});
+```
+
+## `safeJsonParse`
+
+```ts
+safeJsonParse(input: string | Buffer, options?: {
+  mode?:     'reject' | 'strip' | 'throw',   // default 'reject'
+  maxBytes?: number,                          // default 1_000_000
+  maxDepth?: number,                          // default 32
+  banned?:   Set<string>,                     // default {__proto__, constructor, prototype}
+}): unknown | null
+```
+
+`JSON.parse` with a prototype-pollution guard. Refuses payloads that carry `__proto__`, `constructor`, or `prototype`
+keys anywhere in the tree.
+
+Complements [`freezePrototypes()`](#freezeprototypes) — that closes the door globally at boot; `safeJsonParse` closes it
+at the request boundary where user JSON enters.
+
+```js
+const parsed = safeJsonParse(rawBody);
+if (parsed === null) return res.status(400).end('bad json');
+req.body = parsed;
+```
+
+- `mode: 'reject'` (default) — returns `null` on any failure (parse error, banned key, oversize).
+- `mode: 'strip'` — silently drops the banned keys, keeps the rest.
+- `mode: 'throw'` — raises `SecurityError` for actionable failure.
+- **Never** mutates `Object.prototype`, even on adversarial input.
+
+## `constantTimeEqual`
+
+```ts
+constantTimeEqual(
+  a: string | Buffer | Uint8Array | null | undefined,
+  b: string | Buffer | Uint8Array | null | undefined,
+): boolean
+```
+
+Constant-time equality for tokens / signatures / MACs. Wraps `node:crypto`'s `timingSafeEqual` — accepts strings or byte
+views, returns `false` on length mismatch **without throwing** (so callers can't leak length via the exception path).
+
+```js
+if (!constantTimeEqual(req.headers['x-token'], expected)) {
+  return res.status(401).end();
+}
+```
+
+## `parseCspReport`
+
+```ts
+parseCspReport(body: unknown): {
+  documentUri?:        string,
+  referrer?:           string,
+  blockedUri?:         string,
+  effectiveDirective?: string,
+  violatedDirective?:  string,
+  disposition?:        string,       // 'enforce' | 'report'
+  statusCode?:         number,
+  sourceFile?:         string,
+  lineNumber?:         number,
+  columnNumber?:       number,
+  sample?:             string,
+  originalPolicy?:     string,
+} | null
+```
+
+Normalize a CSP violation report submitted to a `report-uri` (legacy `{ "csp-report": { ... } }`) or `report-to` (modern
+array of `{ type: 'csp-violation', body: { ... } }`) endpoint into a single flat object with camelCase keys. Returns
+`null` for non-CSP payloads.
+
+```js
+app.post('/csp-report', express.json(), (req, res) => {
+  const report = parseCspReport(req.body);
+  if (report) {
+    log.warn('csp violation', report);
+  }
+  res.status(204).end();
+});
+```
+
+Handles both dialects transparently. Also accepts string / Buffer input — internally uses
+[`safeJsonParse`](#safejsonparse) so a hostile CSP report can't pollute your prototypes.
