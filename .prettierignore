@@ -1,0 +1,38 @@
+# Prettier already respects .gitignore automatically. This file adds
+# extras that don't belong in .gitignore but should still be skipped
+# by the formatter.
+
+# Generated build output
+dist/
+**/dist/
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Generated TypeScript declaration files (produced from JSDoc)
+**/*.d.ts
+
+# Next.js build artifacts
+.next/
+**/.next/
+web/public/_pagefind/
+
+# Yarn / lockfiles / package manager
+.yarn/
+yarn.lock
+.pnp.*
+
+# Changesets machinery — the CLI writes and formats these itself
+.changeset/*.md
+!.changeset/README.md
+!.changeset/config.json
+
+# Personal / local
+CLAUDE.md
+ARCHITECTURE.md
+skills-lock.json
+.claude/
+.idea/
+.vscode/
+.DS_Store
+
+# Vendored / third-party (add as needed)

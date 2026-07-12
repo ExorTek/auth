@@ -19,7 +19,7 @@ export default [
       'no-console': 'warn',
       'prefer-const': 'error',
       'no-var': 'error',
-      eqeqeq: ['error', 'always'],
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
       curly: ['error', 'all'],
     },
   },
@@ -49,4 +49,4 @@ export default [
   {
     ignores: ['**/dist/**', '**/node_modules/**'],
   },
-]
+];
