@@ -7,10 +7,9 @@ import { Callout, Tabs } from 'nextra/components';
 
 # `random`
 
-Cryptographically secure random helpers. Every function is backed by the
-operating-system CSPRNG (Node's `crypto.randomBytes`) — **never**
-`Math.random`. Use these for anything a user shouldn't be able to guess:
-session IDs, verification codes, API keys, salts, nonces.
+Cryptographically secure random helpers. Every function is backed by the operating-system CSPRNG (Node's
+`crypto.randomBytes`) — **never** `Math.random`. Use these for anything a user shouldn't be able to guess: session IDs,
+verification codes, API keys, salts, nonces.
 
 <Tabs items={['ESM', 'CommonJS']}>
   <Tabs.Tab>
@@ -31,24 +30,23 @@ session IDs, verification codes, API keys, salts, nonces.
 
 ## Which one for what?
 
-| Use case | Function | Notes |
-| --- | --- | --- |
-| Session ID / opaque handle | [`uuid4()`](#uuid4) or [`uuid7()`](#uuid7) | v7 sorts by time — friendlier to DB indexes. |
-| Sortable event / log ID | [`ulid()`](#ulid) | 128-bit, monotonic within a millisecond. |
-| API key with prefix | [`token(32, { prefix })`](#token) | Stripe-style `sk_live_...`. |
-| SMS / MFA OTP | [`pin(6)`](#pin) | Rejection sampling — never `000000`, no repeated digits, no ascending runs. |
-| Backup / recovery code | [`code(4)`](#code) | Uppercase, dash-grouped, look-alike free. |
-| Order / license serial | [`serial(...)`](#serial) | Fixed-format template. |
-| Raw entropy (salt, IV, key) | [`bytes(n)`](#bytes) | The foundation every other helper uses. |
-| Cryptocurrency address | [`base58(20)`](#base58) | Bitcoin/Solana alphabet, no look-alike chars. |
-| DB PK you'll never sort by | [`uuid4()`](#uuid4) | Standard UUID, easily recognisable. |
-| Public identifier derived from user data | [`uuid5(ns, name)`](#uuid5) | Deterministic — same input → same UUID. |
+| Use case                                 | Function                                   | Notes                                                                       |
+| ---------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------- |
+| Session ID / opaque handle               | [`uuid4()`](#uuid4) or [`uuid7()`](#uuid7) | v7 sorts by time — friendlier to DB indexes.                                |
+| Sortable event / log ID                  | [`ulid()`](#ulid)                          | 128-bit, monotonic within a millisecond.                                    |
+| API key with prefix                      | [`token(32, { prefix })`](#token)          | Stripe-style `sk_live_...`.                                                 |
+| SMS / MFA OTP                            | [`pin(6)`](#pin)                           | Rejection sampling — never `000000`, no repeated digits, no ascending runs. |
+| Backup / recovery code                   | [`code(4)`](#code)                         | Uppercase, dash-grouped, look-alike free.                                   |
+| Order / license serial                   | [`serial(...)`](#serial)                   | Fixed-format template.                                                      |
+| Raw entropy (salt, IV, key)              | [`bytes(n)`](#bytes)                       | The foundation every other helper uses.                                     |
+| Cryptocurrency address                   | [`base58(20)`](#base58)                    | Bitcoin/Solana alphabet, no look-alike chars.                               |
+| DB PK you'll never sort by               | [`uuid4()`](#uuid4)                        | Standard UUID, easily recognisable.                                         |
+| Public identifier derived from user data | [`uuid5(ns, name)`](#uuid5)                | Deterministic — same input → same UUID.                                     |
 
 <Callout type="info">
-  **Alphabet helpers** (`base64url`, `base58`, `crockford`, `hex`,
-  `alphanumeric`, `numeric`) generate `size` random bytes and encode them.
-  Prefer these shortcuts over `bytes(...).toString(...)` — they handle
-  non-power-of-two alphabets (base58, crockford) correctly.
+  **Alphabet helpers** (`base64url`, `base58`, `crockford`, `hex`, `alphanumeric`, `numeric`) generate `size` random
+  bytes and encode them. Prefer these shortcuts over `bytes(...).toString(...)` — they handle non-power-of-two alphabets
+  (base58, crockford) correctly.
 </Callout>
 
 ## Reference
@@ -59,20 +57,20 @@ session IDs, verification codes, API keys, salts, nonces.
 bytes(size: number): Buffer
 ```
 
-Return `size` cryptographically-secure random bytes as a `Buffer`. The
-foundation every other helper builds on. `size` must be a non-negative
-safe integer; `bytes(0)` returns an empty Buffer.
+Return `size` cryptographically-secure random bytes as a `Buffer`. The foundation every other helper builds on. `size`
+must be a non-negative safe integer; `bytes(0)` returns an empty Buffer.
 
 ```js
-const salt = random.bytes(16)     // 128-bit salt for a KDF
-const iv   = random.bytes(12)     // 96-bit AES-GCM nonce
-const key  = random.bytes(32)     // 256-bit symmetric key
+const salt = random.bytes(16); // 128-bit salt for a KDF
+const iv = random.bytes(12); // 96-bit AES-GCM nonce
+const key = random.bytes(32); // 256-bit symmetric key
 ```
 
-**Common uses:** salt for PBKDF2/scrypt, IV for AES-GCM, raw random bytes
-you'll base64url/hex yourself, seeds for other helpers.
+**Common uses:** salt for PBKDF2/scrypt, IV for AES-GCM, raw random bytes you'll base64url/hex yourself, seeds for other
+helpers.
 
 **Errors:**
+
 - `INVALID_ARGUMENT` — `size` is not a non-negative integer.
 
 ---
@@ -86,12 +84,12 @@ hex(size: number): string
 `size` random bytes encoded as a lowercase hex string of length `size * 2`.
 
 ```js
-random.hex(16)      // 'a3f9b2c1...' — 32-char hex, e.g. a CSRF token
-random.hex(32)      // 64-char hex — 256 bits of entropy
+random.hex(16); // 'a3f9b2c1...' — 32-char hex, e.g. a CSRF token
+random.hex(32); // 64-char hex — 256 bits of entropy
 ```
 
-**Use for:** debug-friendly IDs where readability trumps density; CSRF
-tokens; anything you'll compare visually in a log.
+**Use for:** debug-friendly IDs where readability trumps density; CSRF tokens; anything you'll compare visually in a
+log.
 
 ---
 
@@ -102,13 +100,12 @@ base64url(size: number): string    // URL-safe, no padding
 base64(size:    number): string    // standard, with '=' padding
 ```
 
-`size` random bytes encoded as base64. **Prefer `base64url`** for
-anything URL / cookie / JWT-adjacent — it never contains `+`, `/`, or
-`=`.
+`size` random bytes encoded as base64. **Prefer `base64url`** for anything URL / cookie / JWT-adjacent — it never
+contains `+`, `/`, or `=`.
 
 ```js
-random.base64url(32)   // 'V1StGXR8_Z5jdHi6...' — 43 chars, URL-safe
-random.base64(32)      // 'V1StGXR8+Z5jdHi6...=' — 44 chars, padded
+random.base64url(32); // 'V1StGXR8_Z5jdHi6...' — 43 chars, URL-safe
+random.base64(32); // 'V1StGXR8+Z5jdHi6...=' — 44 chars, padded
 ```
 
 **Common mistake:** using `base64` in a URL — `+` gets percent-mangled.
@@ -121,20 +118,17 @@ random.base64(32)      // 'V1StGXR8+Z5jdHi6...=' — 44 chars, padded
 base58(size: number): string
 ```
 
-Bitcoin/Solana-style base58 — drops the four look-alike glyphs `0`,
-`O`, `I`, `l`. Denser than hex, safer to read aloud, standard for
-cryptocurrency addresses.
+Bitcoin/Solana-style base58 — drops the four look-alike glyphs `0`, `O`, `I`, `l`. Denser than hex, safer to read aloud,
+standard for cryptocurrency addresses.
 
 ```js
-random.base58(16)   // 'V1StGXR8Z5jdHi6BmyT' — 128 bits, ~22 chars
-random.base58(20)   // Bitcoin-address length
+random.base58(16); // 'V1StGXR8Z5jdHi6BmyT' — 128 bits, ~22 chars
+random.base58(20); // Bitcoin-address length
 ```
 
-Output is variable length (~1.365× the input) because 58 is not a power
-of two.
+Output is variable length (~1.365× the input) because 58 is not a power of two.
 
-**Use for:** cryptocurrency addresses, short human-visible IDs that
-people might read aloud.
+**Use for:** cryptocurrency addresses, short human-visible IDs that people might read aloud.
 
 ---
 
@@ -144,14 +138,12 @@ people might read aloud.
 crockford(size: number): string
 ```
 
-Crockford base32 — drops `I`, `L`, `O`, `U` (look-alike + accidental
-profanity). Case-insensitive on read, URL-safe, sortable when
-concatenated with a fixed-width timestamp. Same algorithm ULID uses for
-its random tail.
+Crockford base32 — drops `I`, `L`, `O`, `U` (look-alike + accidental profanity). Case-insensitive on read, URL-safe,
+sortable when concatenated with a fixed-width timestamp. Same algorithm ULID uses for its random tail.
 
 ```js
-random.crockford(10)   // '01ARZ3NDEKTSV4RR' — 16 chars, 80 bits
-random.crockford(16)   // 26 chars, 128 bits — ULID's length
+random.crockford(10); // '01ARZ3NDEKTSV4RR' — 16 chars, 80 bits
+random.crockford(16); // 26 chars, 128 bits — ULID's length
 ```
 
 **Use for:** IDs users will type or read aloud; anything ULID-adjacent.
@@ -164,13 +156,12 @@ random.crockford(16)   // 26 chars, 128 bits — ULID's length
 alphanumeric(length: number): string
 ```
 
-Uniform sample from `A–Z a–z 0–9` (62 symbols). Rejection-sampled for
-unbiased output — the naive `chars[byte % 62]` favours the first four
-characters (bias of ~1.6%).
+Uniform sample from `A–Z a–z 0–9` (62 symbols). Rejection-sampled for unbiased output — the naive `chars[byte % 62]`
+favours the first four characters (bias of ~1.6%).
 
 ```js
-random.alphanumeric(20)   // 'aB3xF9mZ2kQ7pR4tYnLj'
-random.alphanumeric(6)    // 'A3xF9m' — invite code, short link
+random.alphanumeric(20); // 'aB3xF9mZ2kQ7pR4tYnLj'
+random.alphanumeric(6); // 'A3xF9m' — invite code, short link
 ```
 
 **Use for:** invite codes, short share links, coupon codes.
@@ -183,16 +174,14 @@ random.alphanumeric(6)    // 'A3xF9m' — invite code, short link
 numeric(length: number): string
 ```
 
-Uniform sample from `0–9`. Rejection-sampled. Preserves leading zeros
-(unlike `Math.random`-based approaches).
+Uniform sample from `0–9`. Rejection-sampled. Preserves leading zeros (unlike `Math.random`-based approaches).
 
 ```js
-random.numeric(9)   // '084729153'
-random.numeric(4)   // '0093'  ← leading zero preserved
+random.numeric(9); // '084729153'
+random.numeric(4); // '0093'  ← leading zero preserved
 ```
 
-**Prefer [`pin`](#pin) for user-visible codes** — `pin` additionally
-rejects "weak" outputs like `000000` and `123456`.
+**Prefer [`pin`](#pin) for user-visible codes** — `pin` additionally rejects "weak" outputs like `000000` and `123456`.
 
 ---
 
@@ -202,8 +191,7 @@ rejects "weak" outputs like `000000` and `123456`.
 pin(length: number, options?: { avoidWeak?: boolean }): string
 ```
 
-User-visible one-time PIN — same alphabet as `numeric` but rejects a
-weak subset by default:
+User-visible one-time PIN — same alphabet as `numeric` but rejects a weak subset by default:
 
 - All-same-digit (`000000`, `111111`, ...)
 - Sequential ascending (`012345`, `123456`, ...)
@@ -212,45 +200,44 @@ weak subset by default:
 Turn off with `{ avoidWeak: false }` if you need pure uniform distribution.
 
 ```js
-random.pin(6)                          // '847291' — never '000000' or '123456'
-random.pin(4)                          // '3852'
-random.pin(6, { avoidWeak: false })    // pure uniform, may return '111111'
+random.pin(6); // '847291' — never '000000' or '123456'
+random.pin(4); // '3852'
+random.pin(6, { avoidWeak: false }); // pure uniform, may return '111111'
 ```
 
 **Real-world flow — SMS OTP:**
 
 ```js
 // Send code
-const code = random.pin(6)
-await sms.send(user.phone, `Your code: ${code}`)
+const code = random.pin(6);
+await sms.send(user.phone, `Your code: ${code}`);
 await db.otp.insert({
-  userId:    user.id,
-  hash:      hash(code, { algo: 'sha256' }),
+  userId: user.id,
+  hash: hash(code, { algo: 'sha256' }),
   expiresAt: Date.now() + 5 * 60_000,
-  attempts:  0,
-})
+  attempts: 0,
+});
 
 // Verify code (rate-limit by attempts, expire in 5m)
-const record = await db.otp.findLatest({ userId })
+const record = await db.otp.findLatest({ userId });
 if (!record || record.attempts >= 5 || record.expiresAt < Date.now()) {
-  return respond(401)
+  return respond(401);
 }
-await db.otp.increment(record.id, { attempts: 1 })
+await db.otp.increment(record.id, { attempts: 1 });
 if (!compare(hash(inputCode, { algo: 'sha256' }), record.hash)) {
-  return respond(401)
+  return respond(401);
 }
-await db.otp.delete(record.id)   // single-use
+await db.otp.delete(record.id); // single-use
 ```
 
 <Callout type="warning">
-  **A PIN is not a session ID.** 6 digits is ~20 bits of entropy — meant
-  for short-lived, rate-limited, single-use flows. Combine with expiry
-  and attempt limits at the application layer.
+  **A PIN is not a session ID.** 6 digits is ~20 bits of entropy — meant for short-lived, rate-limited, single-use
+  flows. Combine with expiry and attempt limits at the application layer.
 </Callout>
 
 **Errors:**
-- `INVALID_ARGUMENT` — `length` is not a positive integer, or `options`
-  is not an object.
+
+- `INVALID_ARGUMENT` — `length` is not a positive integer, or `options` is not an object.
 
 ---
 
@@ -260,31 +247,28 @@ await db.otp.delete(record.id)   // single-use
 code(pattern: string): string
 ```
 
-Template-driven code generator. Placeholder characters expand to random
-picks; anything else stays literal.
+Template-driven code generator. Placeholder characters expand to random picks; anything else stays literal.
 
-| Placeholder | Alphabet |
-| :---: | --- |
-| `X` | `A-Z a-z 0-9` (alphanumeric) |
-| `A` | `A-Z` (uppercase letter) |
-| `a` | `a-z` (lowercase letter) |
-| `#` | `0-9` (digit) |
+| Placeholder | Alphabet                     |
+| :---------: | ---------------------------- |
+|     `X`     | `A-Z a-z 0-9` (alphanumeric) |
+|     `A`     | `A-Z` (uppercase letter)     |
+|     `a`     | `a-z` (lowercase letter)     |
+|     `#`     | `0-9` (digit)                |
 
 ```js
-random.code('XXXX-XXXX')            // 'aB3F-9xLp'
-random.code('####-####-####-####')  // '8194-2074-6613-5528'
-random.code('SK-AAAA-####')         // 'SK-XYRA-4712'
-random.code('coupon-XXXXXX')        // 'coupon-aB3F9x'
+random.code('XXXX-XXXX'); // 'aB3F-9xLp'
+random.code('####-####-####-####'); // '8194-2074-6613-5528'
+random.code('SK-AAAA-####'); // 'SK-XYRA-4712'
+random.code('coupon-XXXXXX'); // 'coupon-aB3F9x'
 ```
 
-**Use for:** license keys, coupon codes, redeem codes, gift-card codes,
-any format that mixes letters and digits with visible separators.
+**Use for:** license keys, coupon codes, redeem codes, gift-card codes, any format that mixes letters and digits with
+visible separators.
 
 <Callout type="info">
-  For a random-alphabet-only fill without a fixed template, use
-  [`alphanumeric`](#alphanumeric) / [`numeric`](#numeric). For look-alike
-  free serial numbers (dashes + uppercase-alphanumeric), use
-  [`serial`](#serial) with a shared prefix.
+  For a random-alphabet-only fill without a fixed template, use [`alphanumeric`](#alphanumeric) / [`numeric`](#numeric).
+  For look-alike free serial numbers (dashes + uppercase-alphanumeric), use [`serial`](#serial) with a shared prefix.
 </Callout>
 
 ---
@@ -303,17 +287,17 @@ interface SerialOptions {
 }
 ```
 
-Fixed-format uppercase alphanumeric serial. Every block is
-rejection-sampled from `A-Z 0-9` (no look-alike chars from lowercase).
+Fixed-format uppercase alphanumeric serial. Every block is rejection-sampled from `A-Z 0-9` (no look-alike chars from
+lowercase).
 
 ```js
-random.serial({ prefix: 'ORD' })
+random.serial({ prefix: 'ORD' });
 // 'ORD-A3F9-B2C1'
 
-random.serial({ prefix: 'ORD', year: true, blocks: 3, blockLen: 5 })
+random.serial({ prefix: 'ORD', year: true, blocks: 3, blockLen: 5 });
 // 'ORD-2026-A3F9K-B2C1D-D7E4X'
 
-random.serial({ prefix: 'INV', blocks: 4, blockLen: 4, separator: '/' })
+random.serial({ prefix: 'INV', blocks: 4, blockLen: 4, separator: '/' });
 // 'INV/A3F9/B2C1/D7E4/YZ12'
 ```
 
@@ -333,19 +317,19 @@ interface TokenOptions {
 }
 ```
 
-Stripe-style prefixed random token. `size` is the number of random bytes
-*before* encoding — 32 bytes → 43-char base64url body → 256 bits of
-entropy.
+Stripe-style prefixed random token. `size` is the number of random bytes _before_ encoding — 32 bytes → 43-char
+base64url body → 256 bits of entropy.
 
 ```js
-random.token(32)                                      // 'V1StGXR8_Z5jdHi6...'
-random.token(32, { prefix: 'usr' })                   // 'usr_V1StGXR8...'
-random.token(32, { prefix: 'sk_live', separator: '-' }) // 'sk_live-V1St...'
-random.token(16, { encoding: 'crockford' })           // 'V1STGXR8Z5JDHI6B'
-random.token(16, { encoding: 'base58', prefix: 'wallet' })
+random.token(32); // 'V1StGXR8_Z5jdHi6...'
+random.token(32, { prefix: 'usr' }); // 'usr_V1StGXR8...'
+random.token(32, { prefix: 'sk_live', separator: '-' }); // 'sk_live-V1St...'
+random.token(16, { encoding: 'crockford' }); // 'V1STGXR8Z5JDHI6B'
+random.token(16, { encoding: 'base58', prefix: 'wallet' });
 ```
 
 **Recommended sizes:**
+
 - **32 bytes** for API keys and long-lived tokens (256 bits).
 - **16 bytes** for session or verification tokens (128 bits).
 - **8 bytes with `crockford`** for short shareable IDs (~64 bits, 13 chars).
@@ -354,27 +338,26 @@ random.token(16, { encoding: 'base58', prefix: 'wallet' })
 
 ```js
 // Mint
-const raw    = random.token(32, { prefix: 'sk_live' })
-const digest = hash(raw, { algo: 'sha256' })
-await db.apiKeys.insert({ userId, digest, createdAt: Date.now() })
-res.json({ key: raw, warning: 'Save this — it will not be shown again.' })
+const raw = random.token(32, { prefix: 'sk_live' });
+const digest = hash(raw, { algo: 'sha256' });
+await db.apiKeys.insert({ userId, digest, createdAt: Date.now() });
+res.json({ key: raw, warning: 'Save this — it will not be shown again.' });
 
 // Verify (on every request)
-const digest = hash(req.headers.authorization.slice(7), { algo: 'sha256' })
-const key    = await db.apiKeys.findOne({ digest })
-if (!key) return res.status(401).end()
+const digest = hash(req.headers.authorization.slice(7), { algo: 'sha256' });
+const key = await db.apiKeys.findOne({ digest });
+if (!key) return res.status(401).end();
 ```
 
 <Callout type="warning">
-  **Never store the raw token in the database — store its hash.** A
-  compromised DB should not leak usable keys. `token()` gives you the
-  raw; you hash it, save the hash, show the raw once, discard.
+  **Never store the raw token in the database — store its hash.** A compromised DB should not leak usable keys.
+  `token()` gives you the raw; you hash it, save the hash, show the raw once, discard.
 </Callout>
 
 **Errors:**
-- `INVALID_ARGUMENT` — `size` is not a non-negative integer,
-  `options.prefix` / `options.separator` are wrong types, `options.encoding`
-  is not one of `base64url` / `base64` / `hex` / `crockford` / `base58`.
+
+- `INVALID_ARGUMENT` — `size` is not a non-negative integer, `options.prefix` / `options.separator` are wrong types,
+  `options.encoding` is not one of `base64url` / `base64` / `hex` / `crockford` / `base58`.
 
 ---
 
@@ -384,19 +367,16 @@ if (!key) return res.status(401).end()
 uuid4(): string
 ```
 
-RFC 9562 UUID version 4 — 122 bits of random, no timestamp, no
-metadata. The generic opaque handle.
+RFC 9562 UUID version 4 — 122 bits of random, no timestamp, no metadata. The generic opaque handle.
 
 ```js
-random.uuid4()   // '550e8400-e29b-41d4-a716-446655440000'
+random.uuid4(); // '550e8400-e29b-41d4-a716-446655440000'
 ```
 
-**Use for:** session IDs, opaque public identifiers, any place you want
-an unguessable value that carries no context.
+**Use for:** session IDs, opaque public identifiers, any place you want an unguessable value that carries no context.
 
-**Trade-off vs `uuid7` / `ulid`:** v4 does **not** sort by time. If
-records are indexed on ID and inserted at high volume, expect B-tree
-fragmentation. Reach for `uuid7` or `ulid` in that case.
+**Trade-off vs `uuid7` / `ulid`:** v4 does **not** sort by time. If records are indexed on ID and inserted at high
+volume, expect B-tree fragmentation. Reach for `uuid7` or `ulid` in that case.
 
 ---
 
@@ -406,17 +386,15 @@ fragmentation. Reach for `uuid7` or `ulid` in that case.
 uuid7(): string
 ```
 
-RFC 9562 UUID version 7 — 48-bit millisecond timestamp + 74 random bits.
-Uses the RFC 9562 §6.2 Method 1 monotonic counter so multiple IDs
-generated in the same millisecond stay sortable.
+RFC 9562 UUID version 7 — 48-bit millisecond timestamp + 74 random bits. Uses the RFC 9562 §6.2 Method 1 monotonic
+counter so multiple IDs generated in the same millisecond stay sortable.
 
 ```js
-random.uuid7()   // '018f8e2c-3d5a-7a1e-9a2c-4e6b8f2d5c3a'
+random.uuid7(); // '018f8e2c-3d5a-7a1e-9a2c-4e6b8f2d5c3a'
 ```
 
-**Use for:** anything landing in a database index — MySQL / Postgres
-insert clustering is friendlier to time-sortable IDs than to v4.
-Interop-compatible with any `UUID` typed column.
+**Use for:** anything landing in a database index — MySQL / Postgres insert clustering is friendlier to time-sortable
+IDs than to v4. Interop-compatible with any `UUID` typed column.
 
 ---
 
@@ -426,29 +404,24 @@ Interop-compatible with any `UUID` typed column.
 uuid5(namespace: string, name: string | Buffer): string
 ```
 
-RFC 9562 UUID version 5 — deterministic SHA-1 of
-`(namespace, name)`. Same input **always** produces the same output.
+RFC 9562 UUID version 5 — deterministic SHA-1 of `(namespace, name)`. Same input **always** produces the same output.
 
-`namespace` must be an existing UUID string. Four common ones are
-re-exported:
+`namespace` must be an existing UUID string. Four common ones are re-exported:
 
 ```js
-import { uuid5, NAMESPACE_DNS, NAMESPACE_URL, NAMESPACE_OID, NAMESPACE_X500 }
-  from '@exortek/crypto'
+import { uuid5, NAMESPACE_DNS, NAMESPACE_URL, NAMESPACE_OID, NAMESPACE_X500 } from '@exortek/crypto';
 
-uuid5(NAMESPACE_URL, 'https://example.com/user/42')
+uuid5(NAMESPACE_URL, 'https://example.com/user/42');
 // → 'a7f9d3c1-...' — always the same for this URL
 ```
 
-**Use for:** stable public identifiers derived from private data (hash
-an email into a UUID for a public follow-URL) — but see the warning.
+**Use for:** stable public identifiers derived from private data (hash an email into a UUID for a public follow-URL) —
+but see the warning.
 
 <Callout type="error">
-  **Deterministic = enumerable.** Deriving a UUID from a user's email
-  means anyone with the same email input produces the same UUID —
-  useful for public identifiers, catastrophic for anything that
-  shouldn't leak email-membership. If you need "public but not
-  guessable", use `uuid4` / `uuid7` and store the mapping.
+  **Deterministic = enumerable.** Deriving a UUID from a user's email means anyone with the same email input produces
+  the same UUID — useful for public identifiers, catastrophic for anything that shouldn't leak email-membership. If you
+  need "public but not guessable", use `uuid4` / `uuid7` and store the mapping.
 </Callout>
 
 ---
@@ -459,23 +432,23 @@ an email into a UUID for a public follow-URL) — but see the warning.
 ulid(): string
 ```
 
-26-character Crockford base32 — 48-bit millisecond timestamp + 80
-random bits. Time-sortable, URL-safe, monotonic within a millisecond.
+26-character Crockford base32 — 48-bit millisecond timestamp + 80 random bits. Time-sortable, URL-safe, monotonic within
+a millisecond.
 
 ```js
-random.ulid()   // '01ARZ3NDEKTSV4RRFFQ69G5FAV'
+random.ulid(); // '01ARZ3NDEKTSV4RRFFQ69G5FAV'
 ```
 
 **ULID vs UUID v7 — pick one:**
 
-| | ULID | UUID v7 |
-| --- | --- | --- |
-| Length | 26 chars | 36 chars |
-| Alphabet | Crockford base32 | hex + `-` |
-| Sortable | ✅ | ✅ |
-| Looks like an ID | less so | ✅ |
-| Interop with `UUID` DB column | ❌ | ✅ |
-| Human-typable | ✅ | slightly less |
+|                               | ULID             | UUID v7       |
+| ----------------------------- | ---------------- | ------------- |
+| Length                        | 26 chars         | 36 chars      |
+| Alphabet                      | Crockford base32 | hex + `-`     |
+| Sortable                      | ✅               | ✅            |
+| Looks like an ID              | less so          | ✅            |
+| Interop with `UUID` DB column | ❌               | ✅            |
+| Human-typable                 | ✅               | slightly less |
 
 Rule of thumb: **`uuid7` for DB primary keys, `ulid` for user-visible IDs.**
 
@@ -488,48 +461,42 @@ isUUID(value: unknown): boolean
 isULID(value: unknown): boolean
 ```
 
-Cheap format checks. **Version-agnostic** for UUID — matches v1 through
-v7. Use in request validation before hitting the database (fail fast on
-malformed input, save a round trip).
+Cheap format checks. **Version-agnostic** for UUID — matches v1 through v7. Use in request validation before hitting the
+database (fail fast on malformed input, save a round trip).
 
 ```js
-if (!random.isUUID(req.params.id)) return res.status(400).end()
-if (!random.isULID(req.params.eventId)) return res.status(400).end()
+if (!random.isUUID(req.params.id)) return res.status(400).end();
+if (!random.isULID(req.params.eventId)) return res.status(400).end();
 ```
 
 ## Common mistakes
 
 <Callout type="error">
-  **Do not use `Math.random`** for anything a user shouldn't be able to
-  guess. It's a *statistical* PRNG, not a *cryptographic* one — the
-  internal state is recoverable from a few consecutive outputs.
-  **Always** use these helpers or `crypto.randomBytes` directly.
+  **Do not use `Math.random`** for anything a user shouldn't be able to guess. It's a *statistical* PRNG, not a
+  *cryptographic* one — the internal state is recoverable from a few consecutive outputs. **Always** use these helpers
+  or `crypto.randomBytes` directly.
 </Callout>
 
 <Callout type="error">
-  **Do not truncate `bytes()` output for entropy.** `bytes(32).slice(0,
-  4)` gives you 4 bytes, not "a subset of 32 bytes worth of entropy" —
-  the security level is 32 bits, not 256.
+  **Do not truncate `bytes()` output for entropy.** `bytes(32).slice(0, 4)` gives you 4 bytes, not "a subset of 32 bytes
+  worth of entropy" — the security level is 32 bits, not 256.
 </Callout>
 
 <Callout type="warning">
-  **Storing raw tokens is a data-breach amplifier.** Whether you called
-  `token()`, `hex()`, or `base64url()`, hash the result and store the
-  hash. On lookup, hash the incoming candidate and compare hashes.
-  Never `SELECT ... WHERE token = ?` on the raw value.
+  **Storing raw tokens is a data-breach amplifier.** Whether you called `token()`, `hex()`, or `base64url()`, hash the
+  result and store the hash. On lookup, hash the incoming candidate and compare hashes. Never `SELECT ... WHERE token =
+  ?` on the raw value.
 </Callout>
 
 <Callout type="warning">
-  **`pin(6)` alone is not authentication.** It's ~20 bits of entropy;
-  three uses per second and a naive attacker exhausts the space in
-  under a day. Combine with expiry + attempt cap + rate limit.
+  **`pin(6)` alone is not authentication.** It's ~20 bits of entropy; three uses per second and a naive attacker
+  exhausts the space in under a day. Combine with expiry + attempt cap + rate limit.
 </Callout>
 
 ## Related error codes
 
-- **`INVALID_ARGUMENT`** — bad `size` / `length` / `pattern` / `options`
-  type. See the [errors page](/crypto/errors#errorcode).
+- **`INVALID_ARGUMENT`** — bad `size` / `length` / `pattern` / `options` type. See the
+  [errors page](/crypto/errors#errorcode).
 
-Every helper defers input validation to a single point; wrong-type
-arguments raise `CryptoError(INVALID_ARGUMENT)` with a message naming
-the offending argument.
+Every helper defers input validation to a single point; wrong-type arguments raise `CryptoError(INVALID_ARGUMENT)` with
+a message naming the offending argument.

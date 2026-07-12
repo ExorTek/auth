@@ -5,48 +5,48 @@ sidebarTitle: Introduction
 
 # `@exortek/auth`
 
-A framework-agnostic, zero-dependency authentication toolkit for
-Node.js — built as 22 small packages under one scope. Pick the one
-you need, or install the umbrella.
+A framework-agnostic, zero-dependency authentication toolkit for Node.js — built as 22 small packages under one scope.
+Pick the one you need, or install the umbrella.
 
-Every package is built directly on `node:crypto`. Pure JavaScript with
-JSDoc → `.d.ts`. Runs under Express, Fastify, Hono, Elysia.
+Every package is built directly on `node:crypto`. Pure JavaScript with JSDoc → `.d.ts`. Runs under Express, Fastify,
+Hono, Elysia.
 
 ## Shipping
 
-| Package | Version | Reference |
-| --- | :---: | :---: |
-| **`@exortek/crypto`** | `1.0.0` | [`/crypto`](/crypto) |
+| Package                 | Version |        Reference         |
+| ----------------------- | :-----: | :----------------------: |
+| **`@exortek/crypto`**   | `1.0.0` |   [`/crypto`](/crypto)   |
+| **`@exortek/security`** | `1.0.0` | [`/security`](/security) |
 
 ## The stack
 
-Numbers reflect dependency order — a lower number never imports from
-a higher one, so you can adopt one package at a time.
+Numbers reflect dependency order — a lower number never imports from a higher one, so you can adopt one package at a
+time.
 
-| # | Package | What it does |
-| :---: | --- | --- |
-| 01 | [`@exortek/crypto`](/crypto) | crypto primitives — the foundation the rest builds on |
-| 02 | `@exortek/password` | Argon2id / bcrypt, strength scoring, HIBP breach check |
-| 03 | `@exortek/otp` | TOTP / HOTP, backup codes, QR provisioning URI |
-| 04 | `@exortek/challenge` | e-mail / SMS one-time code storage + verification |
-| 05 | `@exortek/jwk` | JWK ↔ PEM ↔ DER converters, key rotation |
-| 06 | `@exortek/jws` | JOSE signed payloads (compact + JSON) |
-| 07 | `@exortek/jwt` | JWT sign / verify with algorithm allowlists, clock skew |
-| 08 | `@exortek/jwe` | JWE encrypted payloads (RSA-OAEP, A256KW, dir) |
-| 09 | `@exortek/jwks` | JWKS URI fetching, caching, `kid` rotation |
-| 10 | `@exortek/session` | signed cookies, rotation, revocation, store adapter |
-| 11 | `@exortek/security` | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers |
-| 12 | `@exortek/device` | device fingerprinting, trusted-device tokens |
-| 13 | `@exortek/apikey` | prefixed API keys (`sk_live_...`), rate-limited by default |
-| 14 | `@exortek/magic-link` | passwordless email / SMS link tokens |
-| 15 | `@exortek/passkey` | WebAuthn / FIDO2 (server + browser client) |
-| 16 | `@exortek/opaque` | OPAQUE (aPAKE) — zero-knowledge password auth |
-| 17 | `@exortek/paseto` | PASETO v4 (`local` / `public`) |
-| 18 | `@exortek/oauth2` | OAuth 2.1 client (PKCE) + provider presets |
-| 19 | `@exortek/oidc` | OpenID Connect on top of `oauth2` |
-| 20 | `@exortek/web3-evm` | SIWE — Sign-In With Ethereum |
-| 21 | `@exortek/web3-solana` | SIWS — Sign-In With Solana |
-| 22 | `@exortek/auth` | umbrella — re-exports every package above |
+|  #  | Package                      | What it does                                                                         |
+| :-: | ---------------------------- | ------------------------------------------------------------------------------------ |
+| 01  | [`@exortek/crypto`](/crypto) | crypto primitives — the foundation the rest builds on                                |
+| 02  | `@exortek/password`          | Argon2id / bcrypt, strength scoring, HIBP breach check                               |
+| 03  | `@exortek/otp`               | TOTP / HOTP, backup codes, QR provisioning URI                                       |
+| 04  | `@exortek/challenge`         | e-mail / SMS one-time code storage + verification                                    |
+| 05  | `@exortek/jwk`               | JWK ↔ PEM ↔ DER converters, key rotation                                             |
+| 06  | `@exortek/jws`               | JOSE signed payloads (compact + JSON)                                                |
+| 07  | `@exortek/jwt`               | JWT sign / verify with algorithm allowlists, clock skew                              |
+| 08  | `@exortek/jwe`               | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                       |
+| 09  | `@exortek/jwks`              | JWKS URI fetching, caching, `kid` rotation                                           |
+| 10  | `@exortek/session`           | signed cookies, rotation, revocation, store adapter                                  |
+| 11  | `@exortek/security`          | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers |
+| 12  | `@exortek/device`            | device fingerprinting, trusted-device tokens                                         |
+| 13  | `@exortek/apikey`            | prefixed API keys (`sk_live_...`), rate-limited by default                           |
+| 14  | `@exortek/magic-link`        | passwordless email / SMS link tokens                                                 |
+| 15  | `@exortek/passkey`           | WebAuthn / FIDO2 (server + browser client)                                           |
+| 16  | `@exortek/opaque`            | OPAQUE (aPAKE) — zero-knowledge password auth                                        |
+| 17  | `@exortek/paseto`            | PASETO v4 (`local` / `public`)                                                       |
+| 18  | `@exortek/oauth2`            | OAuth 2.1 client (PKCE) + provider presets                                           |
+| 19  | `@exortek/oidc`              | OpenID Connect on top of `oauth2`                                                    |
+| 20  | `@exortek/web3-evm`          | SIWE — Sign-In With Ethereum                                                         |
+| 21  | `@exortek/web3-solana`       | SIWS — Sign-In With Solana                                                           |
+| 22  | `@exortek/auth`              | umbrella — re-exports every package above                                            |
 
 ## Install
 
@@ -58,8 +58,9 @@ Node.js **22 or newer**. No runtime dependencies.
 
 ## Where to next
 
-- **[`@exortek/crypto` reference →](/crypto)** — every export, every
-  option, every edge case for the package shipping today.
+- **[`@exortek/crypto` reference →](/crypto)** — every export, every option, every edge case.
+- **[`@exortek/security` reference →](/security)** — CSRF, rate-limit, headers, CORS, safe redirects + 17 helpers +
+  adapters for Fastify, Express, Hono, Elysia.
 - **[Source](https://github.com/ExorTek/auth)** — GitHub repo.
-- **[Contributing](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md)**
-  — branch prefixes, commit conventions, changeset flow.
+- **[Contributing](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md)** — branch prefixes, commit conventions,
+  changeset flow.

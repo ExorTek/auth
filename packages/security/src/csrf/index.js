@@ -169,4 +169,3 @@ export function verifyForSession(token, sessionId, secret) {
   assertSecret(secret, 'secret');
   return timingSafeEqual(token, hmacBase64Url(sessionId, secret));
 }
-

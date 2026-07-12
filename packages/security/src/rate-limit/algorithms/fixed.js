@@ -10,8 +10,8 @@ import { assertLimiterOptions, assertKey } from '../options.js';
  * the first second of the next. Prefer sliding for user-facing APIs; fixed
  * is fine for "cheap-and-lax" scenarios like debounce or dedup.
  *
- * @param {{ requests: number, window: string | number, store: object }} config
- * @returns {{ check: (ctx: { key: string }) => Promise<{ allowed: boolean, remaining: number, reset: Date, retryAfter: number | null }> }}
+ * @param {import('../index.js').WindowLimiterConfig} config
+ * @returns {import('../index.js').Limiter}
  */
 export function fixed(config) {
   assertLimiterOptions(config, 'fixed');

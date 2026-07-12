@@ -7,9 +7,8 @@ import { Callout, Tabs } from 'nextra/components';
 
 # `sign`
 
-Asymmetric signatures — RSA (PKCS1-v1.5 and PSS), ECDSA (NIST curves),
-Ed25519. Full JOSE-standard algorithm family, correct signature encoding
-for JWT / JWS interop, and JWK thumbprints for the `kid` header.
+Asymmetric signatures — RSA (PKCS1-v1.5 and PSS), ECDSA (NIST curves), Ed25519. Full JOSE-standard algorithm family,
+correct signature encoding for JWT / JWS interop, and JWK thumbprints for the `kid` header.
 
 <Tabs items={['ESM', 'CommonJS']}>
   <Tabs.Tab>
@@ -32,47 +31,45 @@ for JWT / JWS interop, and JWK thumbprints for the `kid` header.
   `INVALID_KEY: key must be a KeyObject; got a Promise — did you forget
   "await"?`.
 
-  ```js
-  const kp  = await generateSignKeyPair('es256')   // ← await here
-  const sig = sign('data', kp.privateKey, { algo: 'es256' })
-  ```
+```js
+const kp = await generateSignKeyPair('es256'); // ← await here
+const sig = sign('data', kp.privateKey, { algo: 'es256' });
+```
+
 </Callout>
 
 ## Which one for what?
 
-| I want to… | Reach for |
-| --- | --- |
-| Sign a JWT payload | [`sign`](#sign) with `algo: 'es256'` (recommended) or `'rs256'` (broadest interop) |
-| Verify a JWT signature | [`verify`](#verify) |
-| Produce a keypair | [`generateSignKeyPair`](#generatesignkeypair) |
-| Get the JWT `kid` for a key | [`thumbprint`](#thumbprint) |
-| List every supported `algo` | `SIGN_ALGOS` (frozen array) |
+| I want to…                  | Reach for                                                                          |
+| --------------------------- | ---------------------------------------------------------------------------------- |
+| Sign a JWT payload          | [`sign`](#sign) with `algo: 'es256'` (recommended) or `'rs256'` (broadest interop) |
+| Verify a JWT signature      | [`verify`](#verify)                                                                |
+| Produce a keypair           | [`generateSignKeyPair`](#generatesignkeypair)                                      |
+| Get the JWT `kid` for a key | [`thumbprint`](#thumbprint)                                                        |
+| List every supported `algo` | `SIGN_ALGOS` (frozen array)                                                        |
 
 <Callout type="info">
-  This module is **the primitive** — bytes in, signature bytes out. For
-  end-to-end JWT with header + claims validation (`exp`, `nbf`, `iss`,
-  `aud`, algorithm-confusion defence), compose these calls yourself
-  against RFC 7519 (worked example [below](#full-jwt-signing-example)).
+  This module is **the primitive** — bytes in, signature bytes out. For end-to-end JWT with header + claims validation
+  (`exp`, `nbf`, `iss`, `aud`, algorithm-confusion defence), compose these calls yourself against RFC 7519 (worked
+  example [below](#full-jwt-signing-example)).
 </Callout>
 
 ## Algorithms
 
-Every `algo` matches the JOSE `alg` header value, lowercased. There are
-no custom names.
+Every `algo` matches the JOSE `alg` header value, lowercased. There are no custom names.
 
-| `algo` | Family | Key | Notes |
-| --- | --- | --- | --- |
-| `rs256` / `rs384` / `rs512` | RSA PKCS1-v1.5 | RSA 2048+ | Legacy JWT default. Interoperable with everything. |
-| `ps256` / `ps384` / `ps512` | RSA-PSS | RSA 2048+ | Modern RSA choice — randomised, provably secure padding. |
-| `es256` | ECDSA P-256 | EC secp256r1 | Small, fast, ubiquitous. Emits IEEE-P1363 (the JOSE format), not DER. |
-| `es384` | ECDSA P-384 | EC secp384r1 | Longer safety margin. |
-| `es512` | ECDSA P-521 | EC secp521r1 | Even longer margin; slow. |
-| `eddsa` | Ed25519 | Ed25519 | Modern default. Deterministic, immune to a class of nonce-reuse bugs ECDSA has. |
+| `algo`                      | Family         | Key          | Notes                                                                           |
+| --------------------------- | -------------- | ------------ | ------------------------------------------------------------------------------- |
+| `rs256` / `rs384` / `rs512` | RSA PKCS1-v1.5 | RSA 2048+    | Legacy JWT default. Interoperable with everything.                              |
+| `ps256` / `ps384` / `ps512` | RSA-PSS        | RSA 2048+    | Modern RSA choice — randomised, provably secure padding.                        |
+| `es256`                     | ECDSA P-256    | EC secp256r1 | Small, fast, ubiquitous. Emits IEEE-P1363 (the JOSE format), not DER.           |
+| `es384`                     | ECDSA P-384    | EC secp384r1 | Longer safety margin.                                                           |
+| `es512`                     | ECDSA P-521    | EC secp521r1 | Even longer margin; slow.                                                       |
+| `eddsa`                     | Ed25519        | Ed25519      | Modern default. Deterministic, immune to a class of nonce-reuse bugs ECDSA has. |
 
 <Callout type="info">
-  **Which one should I pick?** For new systems, **`eddsa`** if your
-  consumers support it, **`es256`** otherwise. For maximum interop with
-  existing JWT ecosystems, **`rs256`**.
+  **Which one should I pick?** For new systems, **`eddsa`** if your consumers support it, **`es256`** otherwise. For
+  maximum interop with existing JWT ecosystems, **`rs256`**.
 </Callout>
 
 ## Reference
@@ -84,40 +81,37 @@ generateSignKeyPair(algo: SignAlgorithm)
   : Promise<{ publicKey: KeyObject, privateKey: KeyObject }>
 ```
 
-Produce a keypair matched to the algorithm. Key size, curve, and other
-parameters are picked automatically:
+Produce a keypair matched to the algorithm. Key size, curve, and other parameters are picked automatically:
 
-| `algo` | What you get |
-| --- | --- |
-| `rs*` / `ps*` | RSA 2048-bit modulus |
-| `es256` | EC on P-256 (secp256r1) |
-| `es384` | EC on P-384 (secp384r1) |
-| `es512` | EC on P-521 (secp521r1) |
-| `eddsa` | Ed25519 |
+| `algo`        | What you get            |
+| ------------- | ----------------------- |
+| `rs*` / `ps*` | RSA 2048-bit modulus    |
+| `es256`       | EC on P-256 (secp256r1) |
+| `es384`       | EC on P-384 (secp384r1) |
+| `es512`       | EC on P-521 (secp521r1) |
+| `eddsa`       | Ed25519                 |
 
 ```js
-const { publicKey, privateKey } = await generateSignKeyPair('es256')
+const { publicKey, privateKey } = await generateSignKeyPair('es256');
 ```
 
 **Persisting keys — export to PEM once at generation, import per-request:**
 
 ```js
 // One-time at deploy
-const { publicKey, privateKey } = await generateSignKeyPair('es256')
-await secretManager.put('SIGNING_PRIV_PEM',
-  privateKey.export({ type: 'pkcs8', format: 'pem' }))
-await secretManager.put('SIGNING_PUB_PEM',
-  publicKey.export({ type: 'spki', format: 'pem' }))
+const { publicKey, privateKey } = await generateSignKeyPair('es256');
+await secretManager.put('SIGNING_PRIV_PEM', privateKey.export({ type: 'pkcs8', format: 'pem' }));
+await secretManager.put('SIGNING_PUB_PEM', publicKey.export({ type: 'spki', format: 'pem' }));
 
 // At startup
-import crypto from 'node:crypto'
-const privateKey = crypto.createPrivateKey(await secretManager.get('SIGNING_PRIV_PEM'))
-const publicKey  = crypto.createPublicKey(await secretManager.get('SIGNING_PUB_PEM'))
+import crypto from 'node:crypto';
+const privateKey = crypto.createPrivateKey(await secretManager.get('SIGNING_PRIV_PEM'));
+const publicKey = crypto.createPublicKey(await secretManager.get('SIGNING_PUB_PEM'));
 ```
 
 **Errors:**
-- `UNSUPPORTED_ALGORITHM` — `algo` not in `SIGN_ALGOS`. Error message
-  lists every supported name.
+
+- `UNSUPPORTED_ALGORITHM` — `algo` not in `SIGN_ALGOS`. Error message lists every supported name.
 
 ---
 
@@ -134,32 +128,27 @@ interface SignOptions {
 }
 ```
 
-Compute a signature over `data` with `privateKey` and the chosen
-algorithm.
+Compute a signature over `data` with `privateKey` and the chosen algorithm.
 
 ```js
-const kp = await generateSignKeyPair('es256')
+const kp = await generateSignKeyPair('es256');
 
-const sig    = sign('claim=1', kp.privateKey, { algo: 'es256' })            // Buffer
-const sigStr = sign(header + '.' + payload, kp.privateKey,
-                    { algo: 'ps256', encoding: 'base64url' })                // JWS-ready
+const sig = sign('claim=1', kp.privateKey, { algo: 'es256' }); // Buffer
+const sigStr = sign(header + '.' + payload, kp.privateKey, { algo: 'ps256', encoding: 'base64url' }); // JWS-ready
 ```
 
-**ECDSA encoding matters.** ECDSA signatures come in two shapes — DER
-(ASN.1-encoded, Node's default) and IEEE-P1363 (raw R‖S, what JOSE/JWS
-expects). This library uses **IEEE-P1363 for every `es*` algorithm**,
-so `sign` output is directly usable as a JWT signature. No adapter
-needed.
+**ECDSA encoding matters.** ECDSA signatures come in two shapes — DER (ASN.1-encoded, Node's default) and IEEE-P1363
+(raw R‖S, what JOSE/JWS expects). This library uses **IEEE-P1363 for every `es*` algorithm**, so `sign` output is
+directly usable as a JWT signature. No adapter needed.
 
-**RSA-PSS parameters.** For `ps*` algorithms, salt length is
-`RSA_PSS_SALTLEN_DIGEST` (equal to the hash length) — the widely-adopted
-JOSE convention.
+**RSA-PSS parameters.** For `ps*` algorithms, salt length is `RSA_PSS_SALTLEN_DIGEST` (equal to the hash length) — the
+widely-adopted JOSE convention.
 
 **Errors:**
+
 - `INVALID_ARGUMENT` — bad `data` or missing `options`.
-- `INVALID_KEY` — `privateKey` is not a private KeyObject. Error message
-  spells out the fix path (`await generateSignKeyPair`,
-  `crypto.createPrivateKey(pem)`).
+- `INVALID_KEY` — `privateKey` is not a private KeyObject. Error message spells out the fix path
+  (`await generateSignKeyPair`, `crypto.createPrivateKey(pem)`).
 - `UNSUPPORTED_ALGORITHM` — `algo` not in `SIGN_ALGOS`.
 
 ---
@@ -178,17 +167,15 @@ interface VerifyOptions {
 }
 ```
 
-Verify a signature. Returns `true` / `false` — mismatched signature,
-wrong key, wrong algorithm, tampered data, and malformed ASN.1 all
-resolve to `false` (not a thrown error).
+Verify a signature. Returns `true` / `false` — mismatched signature, wrong key, wrong algorithm, tampered data, and
+malformed ASN.1 all resolve to `false` (not a thrown error).
 
 ```js
-const ok = verify('claim=1', sig, kp.publicKey, { algo: 'es256' })
-if (!ok) throw new Error('bad signature')
+const ok = verify('claim=1', sig, kp.publicKey, { algo: 'es256' });
+if (!ok) throw new Error('bad signature');
 
 // Signature as a base64url string (JWS-style)
-const ok = verify(payload, sigStr, kp.publicKey,
-                  { algo: 'ps256', encoding: 'base64url' })
+const ok = verify(payload, sigStr, kp.publicKey, { algo: 'ps256', encoding: 'base64url' });
 ```
 
 Only **argument type errors** or **wrong `KeyObject` types** throw:
@@ -198,11 +185,9 @@ Only **argument type errors** or **wrong `KeyObject` types** throw:
 - `UNSUPPORTED_ALGORITHM` — `algo` not in `SIGN_ALGOS`.
 
 <Callout type="error">
-  **Never trust the `alg` from the token itself.** If your service
-  accepts JWTs signed with `rs256` but the token header says `alg:
-  eddsa`, do not verify with the token-declared algorithm. Pin `algo`
-  server-side to what your service expects. Every "JWT algorithm
-  confusion" CVE is exactly this pitfall.
+  **Never trust the `alg` from the token itself.** If your service accepts JWTs signed with `rs256` but the token header
+  says `alg: eddsa`, do not verify with the token-declared algorithm. Pin `algo` server-side to what your service
+  expects. Every "JWT algorithm confusion" CVE is exactly this pitfall.
 </Callout>
 
 ---
@@ -217,33 +202,32 @@ thumbprint(key: KeyObject,
            }): string | Buffer
 ```
 
-Compute a stable, short fingerprint of a public key — the value you put
-in a JWT's `kid` header so verifiers know which key to use.
+Compute a stable, short fingerprint of a public key — the value you put in a JWT's `kid` header so verifiers know which
+key to use.
 
-Accepts either a public `KeyObject` (thumbprint of the key itself) or a
-private `KeyObject` (thumbprint of the paired public key).
+Accepts either a public `KeyObject` (thumbprint of the key itself) or a private `KeyObject` (thumbprint of the paired
+public key).
 
 ```js
-const kp  = await generateSignKeyPair('es256')
-const kid = thumbprint(kp.publicKey)
+const kp = await generateSignKeyPair('es256');
+const kid = thumbprint(kp.publicKey);
 // → 'FdP-B7yrpuHZ...' — 43-char base64url
 
 // For a rotation dashboard — human-readable short fingerprint
-thumbprint(kp.publicKey, { encoding: 'hex' }).slice(0, 16)   // '3a7f8b2c9d1e4f56'
+thumbprint(kp.publicKey, { encoding: 'hex' }).slice(0, 16); // '3a7f8b2c9d1e4f56'
 ```
 
-Default output is base64url — matches the format most JWT libraries
-emit for `kid`. Options let you switch encoding or hash.
+Default output is base64url — matches the format most JWT libraries emit for `kid`. Options let you switch encoding or
+hash.
 
 <Callout type="info">
-  **This is a fingerprint of the DER-encoded SubjectPublicKeyInfo**, not
-  the strictly canonical RFC 7638 JWK thumbprint (which requires JWK
-  member ordering). For `kid` interop with libraries that also
-  fingerprint the DER form, the two agree; for cross-library JWK
-  interop, run the same key through this helper on both sides.
+  **This is a fingerprint of the DER-encoded SubjectPublicKeyInfo**, not the strictly canonical RFC 7638 JWK thumbprint
+  (which requires JWK member ordering). For `kid` interop with libraries that also fingerprint the DER form, the two
+  agree; for cross-library JWK interop, run the same key through this helper on both sides.
 </Callout>
 
 **Errors:**
+
 - `INVALID_KEY` — `key` is not a public or private KeyObject.
 - `UNSUPPORTED_ALGORITHM` — `options.hash` is not sha256/384/512.
 
@@ -252,115 +236,104 @@ emit for `kid`. Options let you switch encoding or hash.
 ## Full JWT-signing example
 
 ```js
-import { sign, verify, thumbprint, generateSignKeyPair }
-  from '@exortek/crypto'
+import { sign, verify, thumbprint, generateSignKeyPair } from '@exortek/crypto';
 
 // ── Keypair (generated once, PEM stored in a KMS / vault) ──
-const { publicKey, privateKey } = await generateSignKeyPair('es256')
-const kid = thumbprint(publicKey)
+const { publicKey, privateKey } = await generateSignKeyPair('es256');
+const kid = thumbprint(publicKey);
 
 // ── Signing side ──
-const b64 = obj => Buffer.from(JSON.stringify(obj)).toString('base64url')
+const b64 = obj => Buffer.from(JSON.stringify(obj)).toString('base64url');
 
-const header  = { alg: 'ES256', typ: 'JWT', kid }
+const header = { alg: 'ES256', typ: 'JWT', kid };
 const payload = {
   sub: 'user-42',
   iat: Math.floor(Date.now() / 1000),
-  exp: Math.floor(Date.now() / 1000) + 3600,   // 1 hour
+  exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
   iss: 'https://api.example.com',
   aud: 'https://app.example.com',
-}
+};
 
-const signingInput = `${b64(header)}.${b64(payload)}`
-const sigStr = sign(signingInput, privateKey,
-                    { algo: 'es256', encoding: 'base64url' })
-const jwt = `${signingInput}.${sigStr}`
+const signingInput = `${b64(header)}.${b64(payload)}`;
+const sigStr = sign(signingInput, privateKey, { algo: 'es256', encoding: 'base64url' });
+const jwt = `${signingInput}.${sigStr}`;
 
 // ── Verifying side ──
-const [h64, p64, s64] = jwt.split('.')
+const [h64, p64, s64] = jwt.split('.');
 
 // PIN algo server-side — never trust the header's declared alg
-const ok = verify(`${h64}.${p64}`, s64, publicKey,
-                  { algo: 'es256', encoding: 'base64url' })
-if (!ok) throw new Error('bad signature')
+const ok = verify(`${h64}.${p64}`, s64, publicKey, { algo: 'es256', encoding: 'base64url' });
+if (!ok) throw new Error('bad signature');
 
-const claims = JSON.parse(Buffer.from(p64, 'base64url').toString())
+const claims = JSON.parse(Buffer.from(p64, 'base64url').toString());
 
 // Validate claims explicitly
-const now = Math.floor(Date.now() / 1000)
-if (claims.exp < now)                     throw new Error('expired')
-if (claims.iss !== 'https://api.example.com') throw new Error('wrong issuer')
-if (claims.aud !== 'https://app.example.com') throw new Error('wrong audience')
+const now = Math.floor(Date.now() / 1000);
+if (claims.exp < now) throw new Error('expired');
+if (claims.iss !== 'https://api.example.com') throw new Error('wrong issuer');
+if (claims.aud !== 'https://app.example.com') throw new Error('wrong audience');
 
 // claims.sub is now trusted
 ```
 
-**For claim validation** (`exp`, `nbf`, `iss`, `aud`, algorithm-confusion
-defence), wrap these primitives with your own JWT logic.
+**For claim validation** (`exp`, `nbf`, `iss`, `aud`, algorithm-confusion defence), wrap these primitives with your own
+JWT logic.
 
 ## Multi-key rotation (JWKS-style)
 
-Real deployments run **two** current keys at once — new tokens are signed
-with the "current" key, but the "previous" key still verifies until every
-issued token expires.
+Real deployments run **two** current keys at once — new tokens are signed with the "current" key, but the "previous" key
+still verifies until every issued token expires.
 
 ```js
 const KEYS = {
-  [thumbprint(currentPub)]:  { public: currentPub,  algo: 'es256' },
+  [thumbprint(currentPub)]: { public: currentPub, algo: 'es256' },
   [thumbprint(previousPub)]: { public: previousPub, algo: 'es256' },
-}
+};
 
 // Verify
-const kidFromHeader = JSON.parse(Buffer.from(h64, 'base64url').toString()).kid
-const record = KEYS[kidFromHeader]
-if (!record) throw new Error('unknown kid')
+const kidFromHeader = JSON.parse(Buffer.from(h64, 'base64url').toString()).kid;
+const record = KEYS[kidFromHeader];
+if (!record) throw new Error('unknown kid');
 
-const ok = verify(`${h64}.${p64}`, s64, record.public,
-                  { algo: record.algo, encoding: 'base64url' })
+const ok = verify(`${h64}.${p64}`, s64, record.public, { algo: record.algo, encoding: 'base64url' });
 ```
 
-**Sign** with the current key; **verify** by looking up `kid` in the
-JWKS. When you rotate, expire the previous key only after the longest-
-lived token has passed its `exp`.
+**Sign** with the current key; **verify** by looking up `kid` in the JWKS. When you rotate, expire the previous key only
+after the longest- lived token has passed its `exp`.
 
 ## Common mistakes
 
 <Callout type="error">
-  **Forgetting `await` on `generateSignKeyPair`.** You'll hit
-  `INVALID_KEY: key must be a KeyObject; got a Promise — did you forget
-  "await"?` at `sign` / `verify` / `thumbprint`.
+  **Forgetting `await` on `generateSignKeyPair`.** You'll hit `INVALID_KEY: key must be a KeyObject; got a Promise — did
+  you forget "await"?` at `sign` / `verify` / `thumbprint`.
 </Callout>
 
 <Callout type="error">
-  **Trusting the token's declared `alg` at verify time.** Always pin
-  `options.algo` server-side to what your service issued. This is the
-  root cause of every "JWT algorithm confusion" CVE.
+  **Trusting the token's declared `alg` at verify time.** Always pin `options.algo` server-side to what your service
+  issued. This is the root cause of every "JWT algorithm confusion" CVE.
 </Callout>
 
 <Callout type="error">
-  **Handing a raw signature Buffer where a base64url string is expected
-  (or vice versa).** `verify` accepts both, but you must set
-  `options.encoding` when passing a string. If you signed with
-  `encoding: 'base64url'`, verify with the same.
+  **Handing a raw signature Buffer where a base64url string is expected (or vice versa).** `verify` accepts both, but
+  you must set `options.encoding` when passing a string. If you signed with `encoding: 'base64url'`, verify with the
+  same.
 </Callout>
 
 <Callout type="warning">
-  **Sharing a keypair across environments.** Development / staging /
-  production must each have their own signing key. Compromising a lower
-  environment then signs valid tokens for prod.
+  **Sharing a keypair across environments.** Development / staging / production must each have their own signing key.
+  Compromising a lower environment then signs valid tokens for prod.
 </Callout>
 
 <Callout type="warning">
-  **Persisting a `KeyObject` in memory only.** A restart wipes the key
-  and every issued token becomes unverifiable. Export to PEM and store
-  in a KMS / secret store; import on startup.
+  **Persisting a `KeyObject` in memory only.** A restart wipes the key and every issued token becomes unverifiable.
+  Export to PEM and store in a KMS / secret store; import on startup.
 </Callout>
 
 ## Related error codes
 
 - `INVALID_ARGUMENT` — bad input type on `data` / `signature` / `options`.
-- `INVALID_KEY` — wrong `KeyObject` type. The message names the fix
-  (`await generateSignKeyPair(...)`, `crypto.createPublicKey(pem)`, etc.).
+- `INVALID_KEY` — wrong `KeyObject` type. The message names the fix (`await generateSignKeyPair(...)`,
+  `crypto.createPublicKey(pem)`, etc.).
 - `UNSUPPORTED_ALGORITHM` — `algo` not in `SIGN_ALGOS`.
 
 See the [errors page](/crypto/errors#errorcode) for the full enum.

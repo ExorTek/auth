@@ -7,8 +7,8 @@ import { Callout, Tabs } from 'nextra/components';
 
 # `binary`
 
-Four small helpers for byte manipulation — the operations you keep
-needing when working with keys, MACs, and packed ciphertext framing.
+Four small helpers for byte manipulation — the operations you keep needing when working with keys, MACs, and packed
+ciphertext framing.
 
 <Tabs items={['ESM', 'CommonJS']}>
   <Tabs.Tab>
@@ -29,12 +29,12 @@ needing when working with keys, MACs, and packed ciphertext framing.
 
 ## Which one for what?
 
-| I want to… | Reach for |
-| --- | --- |
+| I want to…                                       | Reach for           |
+| ------------------------------------------------ | ------------------- |
 | Concatenate strings + bytes into a single Buffer | [`concat`](#concat) |
-| XOR two equal-length buffers | [`xor`](#xor) |
-| Zero-fill a key Buffer after use | [`wipe`](#wipe) |
-| Compare two buffers without leaking timing | [`equal`](#equal) |
+| XOR two equal-length buffers                     | [`xor`](#xor)       |
+| Zero-fill a key Buffer after use                 | [`wipe`](#wipe)     |
+| Compare two buffers without leaking timing       | [`equal`](#equal)   |
 
 ## Reference
 
@@ -44,54 +44,56 @@ needing when working with keys, MACs, and packed ciphertext framing.
 concat(...parts: (string | Buffer | Uint8Array)[]): Buffer
 ```
 
-Concatenate byte-shaped inputs into a single `Buffer`. Accepts strings
-(interpreted as UTF-8) or bytes; returns bytes.
+Concatenate byte-shaped inputs into a single `Buffer`. Accepts strings (interpreted as UTF-8) or bytes; returns bytes.
 
-Equivalent to `Buffer.concat([...])` after a `toBuffer` coercion — but
-you can drop a UTF-8 string in without pre-encoding.
+Equivalent to `Buffer.concat([...])` after a `toBuffer` coercion — but you can drop a UTF-8 string in without
+pre-encoding.
 
 ```js
-import { binary } from '@exortek/crypto'
+import { binary } from '@exortek/crypto';
 
-const packed = binary.concat(salt, iv, tag, ciphertext)
+const packed = binary.concat(salt, iv, tag, ciphertext);
 // Buffer of length salt.length + iv.length + tag.length + ciphertext.length
 ```
 
 **Real-world — packed ciphertext framing:**
 
 ```js
-import { random, binary, cipher } from '@exortek/crypto'
+import { random, binary, cipher } from '@exortek/crypto';
 
-const key = await cipher.generateKey()
-const { ciphertext, iv, tag } = cipher.encryptSymmetric('secret', key)
+const key = await cipher.generateKey();
+const { ciphertext, iv, tag } = cipher.encryptSymmetric('secret', key);
 
 // Ship a single blob instead of three
-const packed = binary.concat(iv, tag, ciphertext).toString('base64url')
+const packed = binary.concat(iv, tag, ciphertext).toString('base64url');
 
 // Unpack on the other side
-const buf = Buffer.from(packed, 'base64url')
-const [rIv, rTag, rCt] = [buf.subarray(0, 12), buf.subarray(12, 28), buf.subarray(28)]
-const plain = cipher.decryptSymmetric(rCt, key, { iv: rIv, tag: rTag })
+const buf = Buffer.from(packed, 'base64url');
+const [rIv, rTag, rCt] = [buf.subarray(0, 12), buf.subarray(12, 28), buf.subarray(28)];
+const plain = cipher.decryptSymmetric(rCt, key, { iv: rIv, tag: rTag });
 ```
 
 **Real-world — build HMAC input from length-prefixed fields:**
 
 ```js
-import { concat } from '@exortek/crypto/binary'
-import { hmac } from '@exortek/crypto'
+import { concat } from '@exortek/crypto/binary';
+import { hmac } from '@exortek/crypto';
 
 // Length-prefix each field so an attacker can't shuffle boundaries
 const input = concat(
-  Buffer.from([userId.length]), userId,
-  Buffer.from([action.length]), action,
-  Buffer.from([target.length]), target,
-)
-const mac = hmac(input, SECRET)
+  Buffer.from([userId.length]),
+  userId,
+  Buffer.from([action.length]),
+  action,
+  Buffer.from([target.length]),
+  target,
+);
+const mac = hmac(input, SECRET);
 ```
 
 **Errors:**
-- `INVALID_ARGUMENT` — a `parts[i]` is neither a string nor a
-  Buffer/Uint8Array. Message names the index.
+
+- `INVALID_ARGUMENT` — a `parts[i]` is neither a string nor a Buffer/Uint8Array. Message names the index.
 
 ---
 
@@ -101,41 +103,38 @@ const mac = hmac(input, SECRET)
 xor(a: Buffer | Uint8Array, b: Buffer | Uint8Array): Buffer
 ```
 
-Byte-wise XOR of two equal-length buffers. Throws
-`INVALID_ARGUMENT` if lengths differ (message includes both lengths).
+Byte-wise XOR of two equal-length buffers. Throws `INVALID_ARGUMENT` if lengths differ (message includes both lengths).
 
 ```js
-import { binary } from '@exortek/crypto'
+import { binary } from '@exortek/crypto';
 
-const otp = binary.xor(cipherKey, sharedSecret)
+const otp = binary.xor(cipherKey, sharedSecret);
 ```
 
 **Real-world — masking a token with a per-request salt:**
 
 ```js
-import { random, binary, hash } from '@exortek/crypto'
+import { random, binary, hash } from '@exortek/crypto';
 
 // Server has TOKEN_SECRET; wants to give client a per-request-masked variant
-const rawToken = random.bytes(32)
-const mask     = hash(clientNonce, { algo: 'sha256', encoding: 'buffer' })
-const masked   = binary.xor(rawToken, mask)
+const rawToken = random.bytes(32);
+const mask = hash(clientNonce, { algo: 'sha256', encoding: 'buffer' });
+const masked = binary.xor(rawToken, mask);
 // Client can recover: binary.xor(masked, mask) === rawToken (only if they know clientNonce)
 ```
 
 <Callout type="error">
-  **XOR is not encryption.** A one-pad XOR is only secure if the pad is
-  truly random, at least as long as the plaintext, and **never
-  reused**. Most "XOR encryption" schemes on the internet fail one of
-  those three. If you need confidentiality, use
-  [`cipher.encryptSymmetric`](/crypto/cipher#encryptsymmetric) or
+  **XOR is not encryption.** A one-pad XOR is only secure if the pad is truly random, at least as long as the plaintext,
+  and **never reused**. Most "XOR encryption" schemes on the internet fail one of those three. If you need
+  confidentiality, use [`cipher.encryptSymmetric`](/crypto/cipher#encryptsymmetric) or
   [`cipher.seal`](/crypto/cipher#seal--unseal).
 </Callout>
 
-**Use for:** one-time-pad style masking, combining two random values
-into one, HKDF-Expand-style constructions where you already have a KDF
-around it.
+**Use for:** one-time-pad style masking, combining two random values into one, HKDF-Expand-style constructions where you
+already have a KDF around it.
 
 **Errors:**
+
 - `INVALID_ARGUMENT` — lengths differ (message includes both).
 
 ---
@@ -149,45 +148,42 @@ wipe(buf: Buffer | Uint8Array): void
 Overwrite `buf` with zeros in place.
 
 ```js
-import { binary, hash } from '@exortek/crypto'
+import { binary, hash } from '@exortek/crypto';
 
-const key = await hash.pbkdf2('user passphrase', { salt })
+const key = await hash.pbkdf2('user passphrase', { salt });
 try {
-  await useTheKey(key)
+  await useTheKey(key);
 } finally {
-  binary.wipe(key)   // hint that this Buffer is spent
+  binary.wipe(key); // hint that this Buffer is spent
 }
 ```
 
 **Real-world — clear a keypair private half after signing a token:**
 
 ```js
-import { generateSignKeyPair, sign } from '@exortek/crypto'
-import { binary } from '@exortek/crypto'
+import { generateSignKeyPair, sign } from '@exortek/crypto';
+import { binary } from '@exortek/crypto';
 
-const kp  = await generateSignKeyPair('es256')
-const sig = sign(payload, kp.privateKey, { algo: 'es256' })
+const kp = await generateSignKeyPair('es256');
+const sig = sign(payload, kp.privateKey, { algo: 'es256' });
 // You no longer need the private key material for the rest of this request
-const der = kp.privateKey.export({ type: 'pkcs8', format: 'der' })
-binary.wipe(der)
+const der = kp.privateKey.export({ type: 'pkcs8', format: 'der' });
+binary.wipe(der);
 ```
 
-**Why bother?** V8 doesn't zero freed Buffers. A private key or password
-you loaded into a `Buffer` lingers in memory until the region is reused
-for something else — a memory dump or a heap-inspection attack can
-recover it. `wipe` reduces that window to zero.
+**Why bother?** V8 doesn't zero freed Buffers. A private key or password you loaded into a `Buffer` lingers in memory
+until the region is reused for something else — a memory dump or a heap-inspection attack can recover it. `wipe` reduces
+that window to zero.
 
 <Callout type="warning">
-  **This is defence-in-depth, not a silver bullet.** V8 can and does
-  copy Buffers around during garbage collection — a wiped Buffer's
-  *original* contents may still exist elsewhere in memory. The fully
-  mitigated version of this problem requires a `SecureBuffer` outside
-  the JS heap; that's out of scope here. Wipe what you can.
+  **This is defence-in-depth, not a silver bullet.** V8 can and does copy Buffers around during garbage collection — a
+  wiped Buffer's *original* contents may still exist elsewhere in memory. The fully mitigated version of this problem
+  requires a `SecureBuffer` outside the JS heap; that's out of scope here. Wipe what you can.
 </Callout>
 
 **Errors:**
-- `INVALID_ARGUMENT` — `buf` is neither a Buffer nor a Uint8Array
-  (strings are immutable — nothing to wipe).
+
+- `INVALID_ARGUMENT` — `buf` is neither a Buffer nor a Uint8Array (strings are immutable — nothing to wipe).
 
 ---
 
@@ -197,9 +193,8 @@ recover it. `wipe` reduces that window to zero.
 equal(a: Buffer | Uint8Array, b: Buffer | Uint8Array): boolean
 ```
 
-Timing-safe equality on two Buffers. Returns `false` for different
-lengths (unlike `crypto.timingSafeEqual`, which throws on length
-mismatch).
+Timing-safe equality on two Buffers. Returns `false` for different lengths (unlike `crypto.timingSafeEqual`, which
+throws on length mismatch).
 
 ```js
 if (binary.equal(computedTag, providedTag)) {
@@ -210,67 +205,59 @@ if (binary.equal(computedTag, providedTag)) {
 **Real-world — verify a raw MAC:**
 
 ```js
-import { hmac } from '@exortek/crypto'
-import { binary } from '@exortek/crypto'
+import { hmac } from '@exortek/crypto';
+import { binary } from '@exortek/crypto';
 
-const expected = hmac(body, SECRET, { encoding: 'buffer' })
-const provided = Buffer.from(req.headers['x-signature'], 'hex')
+const expected = hmac(body, SECRET, { encoding: 'buffer' });
+const provided = Buffer.from(req.headers['x-signature'], 'hex');
 
 if (!binary.equal(expected, provided)) {
-  return res.status(401).end()
+  return res.status(401).end();
 }
 ```
 
 <Callout type="info">
-  **When either side might be a string,** use
-  [`hash.compare`](/crypto/hash#compare) instead — it handles the string
-  → Buffer coercion timing-safely. `binary.equal` is the raw-bytes
-  variant.
+  **When either side might be a string,** use [`hash.compare`](/crypto/hash#compare) instead — it handles the string →
+  Buffer coercion timing-safely. `binary.equal` is the raw-bytes variant.
 </Callout>
 
 **Errors:**
-- `INVALID_ARGUMENT` — an argument is neither a string nor a Buffer/Uint8Array
-  (via internal `toBuffer` coercion).
+
+- `INVALID_ARGUMENT` — an argument is neither a string nor a Buffer/Uint8Array (via internal `toBuffer` coercion).
 
 ---
 
 ## Common mistakes
 
 <Callout type="error">
-  **`===` on secrets.** Character-by-character comparison leaks how
-  many prefix chars matched. Use `binary.equal` for raw bytes,
-  [`hash.compare`](/crypto/hash#compare) for strings.
+  **`===` on secrets.** Character-by-character comparison leaks how many prefix chars matched. Use `binary.equal` for
+  raw bytes, [`hash.compare`](/crypto/hash#compare) for strings.
 </Callout>
 
 <Callout type="error">
-  **XOR "encryption".** XOR only encrypts when combined with a
-  cryptographically random one-time pad. Every DIY "XOR cipher" fails
-  in practice — use `cipher.encryptSymmetric`.
+  **XOR "encryption".** XOR only encrypts when combined with a cryptographically random one-time pad. Every DIY "XOR
+  cipher" fails in practice — use `cipher.encryptSymmetric`.
 </Callout>
 
 <Callout type="warning">
-  **`Buffer#equals` on secrets.** Node's built-in `Buffer#equals` is
-  **not** timing-safe. It short-circuits on the first mismatched byte.
-  Use `binary.equal` for anything a caller might time.
+  **`Buffer#equals` on secrets.** Node's built-in `Buffer#equals` is **not** timing-safe. It short-circuits on the first
+  mismatched byte. Use `binary.equal` for anything a caller might time.
 </Callout>
 
 <Callout type="warning">
-  **Concatenating without framing.** `concat(A, B)` and `concat(A + '',
-  B)` produce the same bytes — an attacker can rearrange field
-  boundaries. When it matters, prefix each field with its length or
-  feed each field as a separate AEAD AAD.
+  **Concatenating without framing.** `concat(A, B)` and `concat(A + '', B)` produce the same bytes — an attacker can
+  rearrange field boundaries. When it matters, prefix each field with its length or feed each field as a separate AEAD
+  AAD.
 </Callout>
 
 <Callout type="warning">
-  **Assuming `wipe` guarantees the bytes are gone.** V8 GC can copy
-  Buffers during compaction. Wipe as defence in depth; don't rely on
-  it as your only mitigation for a highly-sensitive key.
+  **Assuming `wipe` guarantees the bytes are gone.** V8 GC can copy Buffers during compaction. Wipe as defence in depth;
+  don't rely on it as your only mitigation for a highly-sensitive key.
 </Callout>
 
 ## Related error codes
 
-- `INVALID_ARGUMENT` — bad type on any input, or length mismatch in
-  `xor`. Every message names the argument and (for length errors) both
-  actual lengths.
+- `INVALID_ARGUMENT` — bad type on any input, or length mismatch in `xor`. Every message names the argument and (for
+  length errors) both actual lengths.
 
 See the [errors page](/crypto/errors#errorcode).

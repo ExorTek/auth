@@ -9,7 +9,8 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
  * Each inner limiter is a fully-formed limiter object; they can differ in
  * algorithm, window, or even backing store.
  *
- * @param {{ limiters: Array<{ check: Function }> }} config
+ * @param {{ limiters: Array<import('./index.js').Limiter> }} config
+ * @returns {import('./index.js').Limiter}
  */
 export function multi(config) {
   if (!config || !Array.isArray(config.limiters) || config.limiters.length === 0) {
@@ -34,7 +35,7 @@ export function multi(config) {
       // recorded the hit against its own store, so partial failure on one
       // inner check would leave state drift. If atomicity across layers
       // matters to you, use a single limiter with a longer window.
-      const results = await Promise.all(limiters.map((l) => l.check(input)));
+      const results = await Promise.all(limiters.map(l => l.check(input)));
 
       let strictestRetryAfter = 0;
       let earliestReset = null;

@@ -18,6 +18,9 @@ import { SecurityError, ErrorCode } from '../../internal/errors.js';
  * Redis, wrap `INCR + EXPIRE` in a Lua script or MULTI/EXEC. On Mongo, use
  * `findOneAndUpdate` with upsert. Non-atomic implementations race and let
  * requests bypass the limit under load.
+ *
+ * @param {Partial<import('../index.js').RateLimitStore>} impl
+ * @returns {import('../index.js').RateLimitStore}
  */
 export function customStore(impl) {
   if (!impl || typeof impl !== 'object') {
@@ -38,12 +41,11 @@ export function customStore(impl) {
   }
 
   return {
-    get: (key) => Promise.resolve(impl.get(key)),
+    get: key => Promise.resolve(impl.get(key)),
+    read: key => Promise.resolve(typeof impl.read === 'function' ? impl.read(key) : impl.get(key)),
     incr: (key, ttlMs) => Promise.resolve(impl.incr(key, ttlMs)),
     set: (key, count, ttlMs) => Promise.resolve(impl.set(key, count, ttlMs)),
-    delete: (key) => Promise.resolve(impl.delete(key)),
-    reset: (key) => Promise.resolve(
-      typeof impl.reset === 'function' ? impl.reset(key) : impl.delete(key),
-    ),
+    delete: key => Promise.resolve(impl.delete(key)),
+    reset: key => Promise.resolve(typeof impl.reset === 'function' ? impl.reset(key) : impl.delete(key)),
   };
 }

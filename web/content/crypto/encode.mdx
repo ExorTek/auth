@@ -7,10 +7,9 @@ import { Callout, Tabs } from 'nextra/components';
 
 # `encode`
 
-Encoders and decoders for the byte-string alphabets that show up in
-authentication code — base64url for JWTs, base32 for TOTP secrets,
-Crockford for ULIDs, base58 for cryptocurrency addresses, hex for
-debugging. Every codec pair round-trips exactly.
+Encoders and decoders for the byte-string alphabets that show up in authentication code — base64url for JWTs, base32 for
+TOTP secrets, Crockford for ULIDs, base58 for cryptocurrency addresses, hex for debugging. Every codec pair round-trips
+exactly.
 
 <Tabs items={['ESM', 'CommonJS']}>
   <Tabs.Tab>
@@ -23,6 +22,7 @@ debugging. Every codec pair round-trips exactly.
     import { base64url, base32, base58, crockford, base64, hex }
       from '@exortek/crypto/encode'
     ```
+
   </Tabs.Tab>
   <Tabs.Tab>
     ```js
@@ -34,19 +34,20 @@ debugging. Every codec pair round-trips exactly.
     const { base64url, base32, base58, crockford, base64, hex }
       = require('@exortek/crypto/encode')
     ```
+
   </Tabs.Tab>
 </Tabs>
 
 ## Which encoding for what?
 
-| Alphabet | Use for | Case | URL-safe | Padding | Alphabet size |
-| --- | --- | --- | --- | --- | --- |
-| **base64url** | JWT / JWS / JWE, cookies, URL params | mixed | ✅ | no | 64 |
-| **base64** | Legacy interop, MIME / email | mixed | ❌ | `=` | 64 |
-| **base32** | TOTP secret sharing, DNS TXT | upper | ✅ | optional `=` | 32 |
-| **crockford** | ULID, sortable IDs, human-typable | upper | ✅ | no | 32 |
-| **base58** | Bitcoin / Solana addresses, invite codes | mixed | ✅ | no | 58 |
-| **hex** | Debugging, fixed-width fingerprints | lower | ✅ | no | 16 |
+| Alphabet      | Use for                                  | Case  | URL-safe | Padding      | Alphabet size |
+| ------------- | ---------------------------------------- | ----- | -------- | ------------ | ------------- |
+| **base64url** | JWT / JWS / JWE, cookies, URL params     | mixed | ✅       | no           | 64            |
+| **base64**    | Legacy interop, MIME / email             | mixed | ❌       | `=`          | 64            |
+| **base32**    | TOTP secret sharing, DNS TXT             | upper | ✅       | optional `=` | 32            |
+| **crockford** | ULID, sortable IDs, human-typable        | upper | ✅       | no           | 32            |
+| **base58**    | Bitcoin / Solana addresses, invite codes | mixed | ✅       | no           | 58            |
+| **hex**       | Debugging, fixed-width fingerprints      | lower | ✅       | no           | 16            |
 
 ## API shape
 
@@ -57,17 +58,15 @@ encode(input: string | Buffer | Uint8Array): string
 decode(input: string): Buffer
 ```
 
-`encode` accepts strings (UTF-8) or bytes. `decode` accepts a string and
-returns a `Buffer`. Every decode rejects out-of-alphabet characters with
-`CryptoError(INVALID_ENCODING)` including the offending character and
-its index.
+`encode` accepts strings (UTF-8) or bytes. `decode` accepts a string and returns a `Buffer`. Every decode rejects
+out-of-alphabet characters with `CryptoError(INVALID_ENCODING)` including the offending character and its index.
 
 ```js
-import { base64url } from '@exortek/crypto/encode'
+import { base64url } from '@exortek/crypto/encode';
 
-const buf = Buffer.from([1, 2, 3])
-const s   = base64url.encode(buf)     // 'AQID'
-const b   = base64url.decode(s)       // <Buffer 01 02 03>
+const buf = Buffer.from([1, 2, 3]);
+const s = base64url.encode(buf); // 'AQID'
+const b = base64url.decode(s); // <Buffer 01 02 03>
 ```
 
 ## Reference
@@ -75,8 +74,8 @@ const b   = base64url.decode(s)       // <Buffer 01 02 03>
 ### `base64url`
 
 ```js
-base64url.encode('hello')             // 'aGVsbG8'
-base64url.decode('aGVsbG8')           // <Buffer 68 65 6c 6c 6f>
+base64url.encode('hello'); // 'aGVsbG8'
+base64url.decode('aGVsbG8'); // <Buffer 68 65 6c 6c 6f>
 ```
 
 RFC 4648 §5. URL-safe alphabet (`A-Z a-z 0-9 - _`), **no `=` padding**.
@@ -84,69 +83,65 @@ RFC 4648 §5. URL-safe alphabet (`A-Z a-z 0-9 - _`), **no `=` padding**.
 **Real-world — JWT segments:**
 
 ```js
-import { base64url } from '@exortek/crypto/encode'
+import { base64url } from '@exortek/crypto/encode';
 
-const header  = { alg: 'ES256', typ: 'JWT', kid }
-const payload = { sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 }
+const header = { alg: 'ES256', typ: 'JWT', kid };
+const payload = { sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 };
 
-const b64 = obj => base64url.encode(JSON.stringify(obj))
-const signingInput = `${b64(header)}.${b64(payload)}`
+const b64 = obj => base64url.encode(JSON.stringify(obj));
+const signingInput = `${b64(header)}.${b64(payload)}`;
 // ← sign this, append '.<sig>', ship as the JWT
 ```
 
 **Real-world — decode a JWT payload without verifying (debugging only):**
 
 ```js
-const [, p64] = jwt.split('.')
-const claims  = JSON.parse(base64url.decode(p64).toString('utf8'))
-console.log(claims)
+const [, p64] = jwt.split('.');
+const claims = JSON.parse(base64url.decode(p64).toString('utf8'));
+console.log(claims);
 ```
 
 <Callout type="info">
-  **Prefer this over standard `base64`** for anything that ever touches
-  a URL, cookie, header, or JWT. Every JWT library on npm speaks
-  base64url.
+  **Prefer this over standard `base64`** for anything that ever touches a URL, cookie, header, or JWT. Every JWT library
+  on npm speaks base64url.
 </Callout>
 
 **Errors:**
-- `INVALID_ENCODING` — `input` contains characters outside the base64url
-  alphabet. Message spells out the allowed set and points at
-  `base64.decode` if it looks like standard base64.
+
+- `INVALID_ENCODING` — `input` contains characters outside the base64url alphabet. Message spells out the allowed set
+  and points at `base64.decode` if it looks like standard base64.
 
 ---
 
 ### `base64`
 
 ```js
-base64.encode('hello')                // 'aGVsbG8='
-base64.decode('aGVsbG8=')             // <Buffer 68 65 6c 6c 6f>
+base64.encode('hello'); // 'aGVsbG8='
+base64.decode('aGVsbG8='); // <Buffer 68 65 6c 6c 6f>
 ```
 
-RFC 4648 §4. Standard alphabet (`A-Z a-z 0-9 + / =`), padded to a
-multiple of 4 chars.
+RFC 4648 §4. Standard alphabet (`A-Z a-z 0-9 + / =`), padded to a multiple of 4 chars.
 
-**Use for:** interop with mail (MIME), legacy protocols, external
-services that specifically require standard base64.
+**Use for:** interop with mail (MIME), legacy protocols, external services that specifically require standard base64.
 
 <Callout type="warning">
-  **Do not put standard base64 in a URL.** `+` and `/` require
-  percent-encoding, and half the servers on the internet do it
-  differently. Use `base64url` for URLs.
+  **Do not put standard base64 in a URL.** `+` and `/` require percent-encoding, and half the servers on the internet do
+  it differently. Use `base64url` for URLs.
 </Callout>
 
 **Errors:**
-- `INVALID_ENCODING` — includes a hint suggesting `base64url.decode` for
-  URL-safe inputs.
+
+- `INVALID_ENCODING` — includes a hint suggesting `base64url.decode` for URL-safe inputs.
 
 ---
 
 ### `base32`
 
 ```js
-base32.encode('Hello')                        // 'JBSWY3DPEE'
-base32.encode('Hello', { padding: true })     // 'JBSWY3DPEE======'
-base32.decode('JBSWY3DPEE')                   // <Buffer 48 65 6c 6c 6f>
-base32.decode('jbswy3dpee')                   // <Buffer 48 65 6c 6c 6f> — case-insensitive
+base32.encode('Hello'); // 'JBSWY3DPEE'
+base32.encode('Hello', { padding: true }); // 'JBSWY3DPEE======'
+base32.decode('JBSWY3DPEE'); // <Buffer 48 65 6c 6c 6f>
+base32.decode('jbswy3dpee'); // <Buffer 48 65 6c 6c 6f> — case-insensitive
 ```
 
 RFC 4648 §6. Uppercase alphabet (`A-Z 2-7`), padding optional.
@@ -154,24 +149,24 @@ RFC 4648 §6. Uppercase alphabet (`A-Z 2-7`), padding optional.
 **Real-world — TOTP secret provisioning URI:**
 
 ```js
-import { base32 } from '@exortek/crypto/encode'
-import { random } from '@exortek/crypto'
+import { base32 } from '@exortek/crypto/encode';
+import { random } from '@exortek/crypto';
 
 // Generate + share a TOTP secret
-const secretBytes = random.bytes(20)                // 160-bit — RFC 4226 recommends this
-const secretB32   = base32.encode(secretBytes)      // Google Authenticator format
-await db.users.update({ id: user.id }, { totpSecret: secretBytes })
+const secretBytes = random.bytes(20); // 160-bit — RFC 4226 recommends this
+const secretB32 = base32.encode(secretBytes); // Google Authenticator format
+await db.users.update({ id: user.id }, { totpSecret: secretBytes });
 
 // The URI the QR code encodes
-const uri = `otpauth://totp/App:${user.email}?secret=${secretB32}&issuer=App`
-res.json({ qrCode: uri })
+const uri = `otpauth://totp/App:${user.email}?secret=${secretB32}&issuer=App`;
+res.json({ qrCode: uri });
 ```
 
-**Case-insensitive on decode** — accepts both uppercase and lowercase.
-Padding `=` at the end is optional (TOTP convention is unpadded, RFC-
-strict is padded; we accept both).
+**Case-insensitive on decode** — accepts both uppercase and lowercase. Padding `=` at the end is optional (TOTP
+convention is unpadded, RFC- strict is padded; we accept both).
 
 **Errors:**
+
 - `INVALID_ENCODING` — includes the allowed alphabet.
 
 ---
@@ -179,18 +174,16 @@ strict is padded; we accept both).
 ### `crockford`
 
 ```js
-crockford.encode('Hello')             // '91JPRV3F'
-crockford.decode('91jprv3f')          // same — case-insensitive
-crockford.decode('9IJPRV3F')          // decodes 'I' as '1'
-crockford.decode('9OJPRV3F')          // decodes 'O' as '0'
+crockford.encode('Hello'); // '91JPRV3F'
+crockford.decode('91jprv3f'); // same — case-insensitive
+crockford.decode('9IJPRV3F'); // decodes 'I' as '1'
+crockford.decode('9OJPRV3F'); // decodes 'O' as '0'
 ```
 
-Douglas Crockford's base32 variant — `0-9 A-Z` minus the four look-alike
-glyphs `I` (looks like `1`), `L` (looks like `1`), `O` (looks like `0`),
-and `U` (accidental profanity).
+Douglas Crockford's base32 variant — `0-9 A-Z` minus the four look-alike glyphs `I` (looks like `1`), `L` (looks like
+`1`), `O` (looks like `0`), and `U` (accidental profanity).
 
-Case-insensitive on decode. Recognises the Crockford check aliases:
-`I` and `L` decode as `1`, `O` decodes as `0`.
+Case-insensitive on decode. Recognises the Crockford check aliases: `I` and `L` decode as `1`, `O` decodes as `0`.
 
 **Real-world — human-visible sortable ID:**
 
@@ -199,147 +192,132 @@ Case-insensitive on decode. Recognises the Crockford check aliases:
 // This library ships that as random.ulid() — but the encoder is here
 // if you want to build custom ID formats:
 
-const now      = Date.now()
-const timeBuf  = Buffer.alloc(6)
-timeBuf.writeUIntBE(now, 0, 6)
-const timePart = crockford.encode(timeBuf)          // 10 chars, sortable
-const randPart = random.crockford(10)               // 16 chars, random
-const id       = timePart + randPart                // 26 chars total
+const now = Date.now();
+const timeBuf = Buffer.alloc(6);
+timeBuf.writeUIntBE(now, 0, 6);
+const timePart = crockford.encode(timeBuf); // 10 chars, sortable
+const randPart = random.crockford(10); // 16 chars, random
+const id = timePart + randPart; // 26 chars total
 ```
 
 <Callout type="info">
-  **RFC 4648 vs. BigInt encoding.** `encode.crockford` uses RFC 4648 §6
-  bit-window packing. `random.crockford(n)` uses BigInt number encoding
-  for ULID compatibility. The two produce identical output for
-  aligned-to-5-bit inputs (10 bytes → 16 chars, 16 bytes → 26 chars) and
-  differ for non-aligned sizes.
+  **RFC 4648 vs. BigInt encoding.** `encode.crockford` uses RFC 4648 §6 bit-window packing. `random.crockford(n)` uses
+  BigInt number encoding for ULID compatibility. The two produce identical output for aligned-to-5-bit inputs (10 bytes
+  → 16 chars, 16 bytes → 26 chars) and differ for non-aligned sizes.
 </Callout>
 
 **Errors:**
-- `INVALID_ENCODING` — includes the offending character, its index, and
-  a note that `I`/`L` decode as `1` and `O` as `0`.
+
+- `INVALID_ENCODING` — includes the offending character, its index, and a note that `I`/`L` decode as `1` and `O` as
+  `0`.
 
 ---
 
 ### `base58`
 
 ```js
-base58.encode(Buffer.from('hello'))            // 'Cn8eVZg'
-base58.decode('Cn8eVZg')                       // <Buffer 68 65 6c 6c 6f>
-base58.encode(Buffer.from([0, 0, 0xff]))       // '115Q' — leading zeros → leading 1s
+base58.encode(Buffer.from('hello')); // 'Cn8eVZg'
+base58.decode('Cn8eVZg'); // <Buffer 68 65 6c 6c 6f>
+base58.encode(Buffer.from([0, 0, 0xff])); // '115Q' — leading zeros → leading 1s
 ```
 
-Satoshi's alphabet: `1-9 A-Z a-z` minus `0`, `O`, `I`, `l`. Denser than
-hex, safer to read out loud, standard for cryptocurrency addresses.
+Satoshi's alphabet: `1-9 A-Z a-z` minus `0`, `O`, `I`, `l`. Denser than hex, safer to read out loud, standard for
+cryptocurrency addresses.
 
-**Base58Check convention.** Leading zero bytes in the input become
-leading `'1'` characters in the output. This preserves length for
-fixed-width prefixes (e.g. an address version byte).
+**Base58Check convention.** Leading zero bytes in the input become leading `'1'` characters in the output. This
+preserves length for fixed-width prefixes (e.g. an address version byte).
 
 **Real-world — short human-visible ID:**
 
 ```js
-import { random } from '@exortek/crypto'
-import { base58 } from '@exortek/crypto/encode'
+import { random } from '@exortek/crypto';
+import { base58 } from '@exortek/crypto/encode';
 
 // Invite code — 64 bits of entropy, ~11 chars
-const inviteCode = random.base58(8)   // 'V1StGXR8Z5j'
+const inviteCode = random.base58(8); // 'V1StGXR8Z5j'
 
 // Store the hash of the code, not the code itself
 await db.invites.insert({
   digest: hash(inviteCode),
   ownerId: user.id,
   expiresAt: Date.now() + 24 * 3600_000,
-})
+});
 ```
 
-**Use for:** cryptocurrency addresses, short user-visible IDs (invite
-codes, coupon codes, license keys) where people might type them.
+**Use for:** cryptocurrency addresses, short user-visible IDs (invite codes, coupon codes, license keys) where people
+might type them.
 
 **Errors:**
-- `INVALID_ENCODING` — includes the offending character and its index.
-  Also lists the alphabet so the caller can see that `0OIl` are all
-  invalid on purpose.
+
+- `INVALID_ENCODING` — includes the offending character and its index. Also lists the alphabet so the caller can see
+  that `0OIl` are all invalid on purpose.
 
 ---
 
 ### `hex`
 
 ```js
-hex.encode('Hello')                   // '48656c6c6f'
-hex.decode('48656c6c6f')              // <Buffer 48 65 6c 6c 6f>
+hex.encode('Hello'); // '48656c6c6f'
+hex.decode('48656c6c6f'); // <Buffer 48 65 6c 6c 6f>
 ```
 
-Lowercase hex (`0-9 a-f`). Length of the output is exactly
-`2 × input.length`.
+Lowercase hex (`0-9 a-f`). Length of the output is exactly `2 × input.length`.
 
 **Real-world — fingerprint display in logs:**
 
 ```js
-const kp   = await generateSignKeyPair('es256')
-const fp   = thumbprint(kp.publicKey, { encoding: 'hex' })
-logger.info({ kid: fp.slice(0, 16) }, 'signing key loaded')
+const kp = await generateSignKeyPair('es256');
+const fp = thumbprint(kp.publicKey, { encoding: 'hex' });
+logger.info({ kid: fp.slice(0, 16) }, 'signing key loaded');
 // { "kid": "3a7f8b2c9d1e4f56", "msg": "signing key loaded" }
 ```
 
-**Use for:** debug output, log fingerprints, CSRF tokens (though
-`base64url` is more compact), anything you might diff or compare
-visually.
+**Use for:** debug output, log fingerprints, CSRF tokens (though `base64url` is more compact), anything you might diff
+or compare visually.
 
 <Callout type="warning">
-  **Terrible for URL / cookie payloads.** Hex is 2× as wide as
-  base64url for the same bytes. Reach for it when readability matters
-  more than density.
+  **Terrible for URL / cookie payloads.** Hex is 2× as wide as base64url for the same bytes. Reach for it when
+  readability matters more than density.
 </Callout>
 
 **Errors:**
-- `INVALID_ENCODING` — includes the allowed alphabet and the "even
-  length" requirement.
+
+- `INVALID_ENCODING` — includes the allowed alphabet and the "even length" requirement.
 
 ---
 
 ## Common mistakes
 
 <Callout type="error">
-  **`base64` in a URL.** `+` and `/` require percent-encoding and the
-  outcome varies by client. Use `base64url` (dropping `=` and using
-  `-` `_`).
+  **`base64` in a URL.** `+` and `/` require percent-encoding and the outcome varies by client. Use `base64url`
+  (dropping `=` and using `-` `_`).
 </Callout>
 
 <Callout type="error">
-  **Encoding a secret is not encrypting it.** `base64.encode('my-secret')`
-  produces `bXktc2VjcmV0` — anyone who sees it can decode it back.
-  Encoding is for byte-string transport, not confidentiality. For
-  confidentiality use `cipher.*`.
+  **Encoding a secret is not encrypting it.** `base64.encode('my-secret')` produces `bXktc2VjcmV0` — anyone who sees it
+  can decode it back. Encoding is for byte-string transport, not confidentiality. For confidentiality use `cipher.*`.
 </Callout>
 
 <Callout type="error">
-  **Comparing decoded secrets with `===`.** After
-  `hex.decode(receivedTag)` you get a Buffer. Use
-  [`binary.equal`](/crypto/binary#equal) (timing-safe), never `===` or
-  `Buffer#equals` on secrets.
+  **Comparing decoded secrets with `===`.** After `hex.decode(receivedTag)` you get a Buffer. Use
+  [`binary.equal`](/crypto/binary#equal) (timing-safe), never `===` or `Buffer#equals` on secrets.
 </Callout>
 
 <Callout type="warning">
-  **Mixing case in a case-sensitive alphabet.** `base64`, `base64url`,
-  and `base58` are case-sensitive — `A` and `a` decode to different
-  bytes. `base32` and `crockford` are case-insensitive. Know which one
-  you're using.
+  **Mixing case in a case-sensitive alphabet.** `base64`, `base64url`, and `base58` are case-sensitive — `A` and `a`
+  decode to different bytes. `base32` and `crockford` are case-insensitive. Know which one you're using.
 </Callout>
 
 <Callout type="warning">
-  **Look-alike alphabets matter for human-facing IDs.** For anything a
-  user might read aloud or transcribe, prefer `crockford` or `base58`
-  over hex / base64 — the omitted glyphs (`0`/`O`, `1`/`I`/`l`) are the
-  ones people most often confuse.
+  **Look-alike alphabets matter for human-facing IDs.** For anything a user might read aloud or transcribe, prefer
+  `crockford` or `base58` over hex / base64 — the omitted glyphs (`0`/`O`, `1`/`I`/`l`) are the ones people most often
+  confuse.
 </Callout>
 
 ## Related error codes
 
-- `INVALID_ARGUMENT` — non-string decode input, non-string/Buffer
-  encode input.
-- `INVALID_ENCODING` — character outside the alphabet (or, for hex,
-  odd length). Every decoder's message lists its allowed characters and
-  points at the closest sibling codec.
+- `INVALID_ARGUMENT` — non-string decode input, non-string/Buffer encode input.
+- `INVALID_ENCODING` — character outside the alphabet (or, for hex, odd length). Every decoder's message lists its
+  allowed characters and points at the closest sibling codec.
 
 See the [errors page](/crypto/errors#errorcode).

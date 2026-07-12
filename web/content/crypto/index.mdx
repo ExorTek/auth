@@ -7,75 +7,58 @@ import { Callout, Tabs } from 'nextra/components';
 
 # `@exortek/crypto`
 
-Zero-dependency cryptographic primitives for Node.js — hash, HMAC, KDFs,
-authenticated encryption, asymmetric signatures, timing-safe compare,
-sealed tokens, CSPRNG helpers, and encoders. Everything is built on
-`node:crypto`. Nothing calls the network. Nothing pulls a runtime dep.
+Zero-dependency cryptographic primitives for Node.js — hash, HMAC, KDFs, authenticated encryption, asymmetric
+signatures, timing-safe compare, sealed tokens, CSPRNG helpers, and encoders. Everything is built on `node:crypto`.
+Nothing calls the network. Nothing pulls a runtime dep.
 
-Useful on its own — if you need a webhook signature verifier, a signed
-cookie, a password-reset ticket, or a stable object fingerprint,
-`@exortek/crypto` is a one-line install away.
+Useful on its own — if you need a webhook signature verifier, a signed cookie, a password-reset ticket, or a stable
+object fingerprint, `@exortek/crypto` is a one-line install away.
 
 ## What problem does this solve?
 
 Node's `crypto` module is powerful but full of foot-guns:
 
-- **Nonce reuse.** Reusing an AES-GCM nonce with the same key destroys the
-  security of every message under that key. Node doesn't stop you.
-- **Non-timing-safe compare.** `===` on an HMAC leaks the correct signature
-  a character at a time. `crypto.timingSafeEqual` exists but requires
-  equal-length Buffers or it throws.
-- **Signature encoding mismatches.** Node's ECDSA output is DER by default.
-  JOSE / JWT expects IEEE-P1363 (raw R‖S). Get this wrong and your token
-  library says "invalid signature" without a hint why.
-- **KDF parameter drift.** OWASP publishes minimum PBKDF2 iterations each
-  year. Everybody forgets to update them.
-- **Encoding accidents.** Base32 for TOTP secrets, base64url for JWT,
-  Crockford for ULID, hex for debugging — each has quirks; getting them
-  wrong silently corrupts data.
+- **Nonce reuse.** Reusing an AES-GCM nonce with the same key destroys the security of every message under that key.
+  Node doesn't stop you.
+- **Non-timing-safe compare.** `===` on an HMAC leaks the correct signature a character at a time.
+  `crypto.timingSafeEqual` exists but requires equal-length Buffers or it throws.
+- **Signature encoding mismatches.** Node's ECDSA output is DER by default. JOSE / JWT expects IEEE-P1363 (raw R‖S). Get
+  this wrong and your token library says "invalid signature" without a hint why.
+- **KDF parameter drift.** OWASP publishes minimum PBKDF2 iterations each year. Everybody forgets to update them.
+- **Encoding accidents.** Base32 for TOTP secrets, base64url for JWT, Crockford for ULID, hex for debugging — each has
+  quirks; getting them wrong silently corrupts data.
 
-`@exortek/crypto` ships the correct default for each of these, and refuses
-the wrong one. `random.pin(6)` never returns `'000000'`. `hash.hmac` is
-timing-safe by construction. `sign.sign('es256')` emits IEEE-P1363 out of
-the box. `hash.pbkdf2` defaults to OWASP 2023 minimums. Every encoder
-rejects out-of-alphabet characters with an `INVALID_ENCODING` error.
+`@exortek/crypto` ships the correct default for each of these, and refuses the wrong one. `random.pin(6)` never returns
+`'000000'`. `hash.hmac` is timing-safe by construction. `sign.sign('es256')` emits IEEE-P1363 out of the box.
+`hash.pbkdf2` defaults to OWASP 2023 minimums. Every encoder rejects out-of-alphabet characters with an
+`INVALID_ENCODING` error.
 
 ## Is it safe to trust?
 
-Short answer: yes for the primitives, with the caveats every crypto library
-has.
+Short answer: yes for the primitives, with the caveats every crypto library has.
 
-- **Every primitive is a thin wrapper around `node:crypto`.** There is no
-  hand-rolled AES, HMAC, or curve math in this codebase — Node delegates
-  to OpenSSL, which is what Node itself is built on top of. The code you're
-  trusting is OpenSSL, not this package.
-- **The algorithm choices come from RFC / OWASP / JOSE.** SHA-256 default;
-  AES-256-GCM for authenticated encryption; PBKDF2 iteration counts from
-  the OWASP cheat sheet; IEEE-P1363 for ECDSA in JOSE contexts;
-  base64url without padding for URL-safe transport.
-- **The compare paths are timing-safe.** Anywhere the library compares a
-  secret to a candidate, it uses `crypto.timingSafeEqual` on equal-length
-  Buffers.
-- **Every input is validated at the boundary.** Wrong-type arguments raise
-  `CryptoError(INVALID_ARGUMENT)` before reaching Node; you don't get a
-  cryptic OpenSSL error thrown from three layers down.
-- **Tests: 448 currently passing** on Node 22 and 24. RFC test vectors are
-  covered where they exist (HMAC-SHA256 RFC 4231, HKDF RFC 5869, PBKDF2 RFC
-  6070, Base32 RFC 4648, UUID RFC 9562).
-- **No supply chain.** Zero runtime dependencies. What you audit is what
-  you run.
+- **Every primitive is a thin wrapper around `node:crypto`.** There is no hand-rolled AES, HMAC, or curve math in this
+  codebase — Node delegates to OpenSSL, which is what Node itself is built on top of. The code you're trusting is
+  OpenSSL, not this package.
+- **The algorithm choices come from RFC / OWASP / JOSE.** SHA-256 default; AES-256-GCM for authenticated encryption;
+  PBKDF2 iteration counts from the OWASP cheat sheet; IEEE-P1363 for ECDSA in JOSE contexts; base64url without padding
+  for URL-safe transport.
+- **The compare paths are timing-safe.** Anywhere the library compares a secret to a candidate, it uses
+  `crypto.timingSafeEqual` on equal-length Buffers.
+- **Every input is validated at the boundary.** Wrong-type arguments raise `CryptoError(INVALID_ARGUMENT)` before
+  reaching Node; you don't get a cryptic OpenSSL error thrown from three layers down.
+- **Tests: 448 currently passing** on Node 22 and 24. RFC test vectors are covered where they exist (HMAC-SHA256 RFC
+  4231, HKDF RFC 5869, PBKDF2 RFC 6070, Base32 RFC 4648, UUID RFC 9562).
+- **No supply chain.** Zero runtime dependencies. What you audit is what you run.
 
-What we don't claim: side-channel resistance beyond what `node:crypto`
-gives you; formal verification; suitability for regulated environments
-that require FIPS-validated modules (though the underlying OpenSSL can be
-FIPS-configured in your Node build).
+What we don't claim: side-channel resistance beyond what `node:crypto` gives you; formal verification; suitability for
+regulated environments that require FIPS-validated modules (though the underlying OpenSSL can be FIPS-configured in your
+Node build).
 
 <Callout type="warning">
-  **Do not roll your own protocol.** The primitives are safe. The
-  *composition* is where auth libraries get broken. If you're combining
-  them into a new flow — session tokens, magic links, backup codes — read
-  the module page carefully and reuse the sealed-token or signed-value
-  helpers rather than assembling a bespoke layout.
+  **Do not roll your own protocol.** The primitives are safe. The *composition* is where auth libraries get broken. If
+  you're combining them into a new flow — session tokens, magic links, backup codes — read the module page carefully and
+  reuse the sealed-token or signed-value helpers rather than assembling a bespoke layout.
 </Callout>
 
 ## Install
@@ -90,9 +73,8 @@ Requires **Node.js 22 or newer**.
 
 ## Setup — ESM, CJS, or TypeScript
 
-The package ships **both** ESM and CJS builds with the same public
-surface. Types are emitted from JSDoc, so TypeScript consumers get IDE
-hints without any extra config.
+The package ships **both** ESM and CJS builds with the same public surface. Types are emitted from JSDoc, so TypeScript
+consumers get IDE hints without any extra config.
 
 <Tabs items={['ESM (`import`)', 'CommonJS (`require`)', 'TypeScript']}>
   <Tabs.Tab>
@@ -105,6 +87,7 @@ hints without any extra config.
     ```
     The default in every example on this site. Node picks the ESM
     build from the `import` field in our exports map.
+
   </Tabs.Tab>
   <Tabs.Tab>
     ```js
@@ -119,6 +102,7 @@ hints without any extra config.
     ```
     Node picks the CJS build from the `require` field. All async
     functions still return Promises — `await` them or use `.then()`.
+
   </Tabs.Tab>
   <Tabs.Tab>
     ```ts
@@ -132,6 +116,7 @@ hints without any extra config.
     Requires `"moduleResolution": "bundler"` or `"node16"` /
     `"nodenext"` in `tsconfig.json` so TypeScript honours our
     `exports` map for subpath types.
+
   </Tabs.Tab>
 </Tabs>
 
@@ -142,50 +127,51 @@ hints without any extra config.
   `.then()`). Passing a bare `Promise` where a `KeyObject` is expected
   is the single most common trip-up:
 
-  ```js
-  // ❌ wrong — key is a Promise
-  const key = cipher.generateKey()
-  cipher.encryptSymmetric('data', key)   // "key must be a KeyObject"
+```js
+// ❌ wrong — key is a Promise
+const key = cipher.generateKey();
+cipher.encryptSymmetric('data', key); // "key must be a KeyObject"
 
-  // ✅ correct
-  const key = await cipher.generateKey()
-  cipher.encryptSymmetric('data', key)
-  ```
+// ✅ correct
+const key = await cipher.generateKey();
+cipher.encryptSymmetric('data', key);
+```
+
 </Callout>
 
 ## Modules at a glance
 
 Every module has a dedicated page with full API reference and worked examples.
 
-| Module | Purpose | Key exports |
-| --- | --- | --- |
-| [**random**](/crypto/random) | CSPRNG helpers — bytes, IDs, tokens | `bytes` · `hex` · `base64url` · `base58` · `crockford` · `alphanumeric` · `numeric` · `pin` · `code` · `serial` · `token` · `uuid4` · `uuid5` · `uuid7` · `ulid` |
-| [**hash**](/crypto/hash) | digests, MAC, KDFs, signed values | `hash` · `hmac` · `compare` · `verifyHmac` · `pbkdf2` · `hkdf` · `scrypt` · `signValue` · `unsignValue` · `fingerprint` |
-| [**cipher**](/crypto/cipher) | encryption + sealed tokens | `generateKey` · `generateKeyPair` · `encryptSymmetric` · `decryptSymmetric` · `encryptAsymmetric` · `decryptAsymmetric` · `encryptHybrid` · `deriveSharedSecret` · `encryptWithPassphrase` · `decryptWithPassphrase` · `seal` · `unseal` |
-| [**sign**](/crypto/sign) | asymmetric signatures | `sign` · `verify` · `generateSignKeyPair` · `thumbprint` |
-| [**encode**](/crypto/encode) | codec pairs | `base64url` · `base64` · `base32` · `base58` · `crockford` · `hex` |
-| [**binary**](/crypto/binary) | byte utilities | `concat` · `xor` · `wipe` · `equal` |
-| [**errors**](/crypto/errors) | typed error surface | `CryptoError` · `ErrorCode` |
+| Module                       | Purpose                             | Key exports                                                                                                                                                                                                                              |
+| ---------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [**random**](/crypto/random) | CSPRNG helpers — bytes, IDs, tokens | `bytes` · `hex` · `base64url` · `base58` · `crockford` · `alphanumeric` · `numeric` · `pin` · `code` · `serial` · `token` · `uuid4` · `uuid5` · `uuid7` · `ulid`                                                                         |
+| [**hash**](/crypto/hash)     | digests, MAC, KDFs, signed values   | `hash` · `hmac` · `compare` · `verifyHmac` · `pbkdf2` · `hkdf` · `scrypt` · `signValue` · `unsignValue` · `fingerprint`                                                                                                                  |
+| [**cipher**](/crypto/cipher) | encryption + sealed tokens          | `generateKey` · `generateKeyPair` · `encryptSymmetric` · `decryptSymmetric` · `encryptAsymmetric` · `decryptAsymmetric` · `encryptHybrid` · `deriveSharedSecret` · `encryptWithPassphrase` · `decryptWithPassphrase` · `seal` · `unseal` |
+| [**sign**](/crypto/sign)     | asymmetric signatures               | `sign` · `verify` · `generateSignKeyPair` · `thumbprint`                                                                                                                                                                                 |
+| [**encode**](/crypto/encode) | codec pairs                         | `base64url` · `base64` · `base32` · `base58` · `crockford` · `hex`                                                                                                                                                                       |
+| [**binary**](/crypto/binary) | byte utilities                      | `concat` · `xor` · `wipe` · `equal`                                                                                                                                                                                                      |
+| [**errors**](/crypto/errors) | typed error surface                 | `CryptoError` · `ErrorCode`                                                                                                                                                                                                              |
 
 ## Common use cases
 
 Which module do you need? Start here.
 
-| I want to… | Reach for |
-| --- | --- |
-| Generate a session ID / OTP / verification code | [`random.uuid4`](/crypto/random#uuid4), [`random.pin`](/crypto/random#pin), [`random.token`](/crypto/random#token) |
-| Verify a Stripe / GitHub / Slack webhook | [`hash.verifyHmac`](/crypto/hash#verifyhmac) |
-| Sign a cookie / URL parameter | [`hash.signValue`](/crypto/hash#signvalue--unsignvalue) |
-| Derive an encryption key from a passphrase | [`hash.pbkdf2`](/crypto/hash#pbkdf2), [`hash.scrypt`](/crypto/hash#scrypt), or [`cipher.encryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase) |
-| Encrypt a value into a token | [`cipher.encryptToString`](/crypto/cipher#encrypttostring) |
-| Encrypt something with a human passphrase | [`cipher.encryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase) |
-| Mint a 1-hour password-reset ticket | [`cipher.seal`](/crypto/cipher#seal--unseal) |
-| Produce a stable cache key from an object | [`hash.fingerprint`](/crypto/hash#fingerprint) |
-| Sign / verify a JWT (asymmetric) | [`sign.sign`](/crypto/sign#sign), [`sign.verify`](/crypto/sign#verify), [`sign.thumbprint`](/crypto/sign#thumbprint) |
-| Establish a shared secret between two parties | [`cipher.deriveSharedSecret`](/crypto/cipher#derivesharedsecret) |
-| Derive multiple keys from one secret | [`hash.hkdf`](/crypto/hash#hkdf) |
-| Encode / decode bytes | [`encode.*`](/crypto/encode) |
-| Wipe a secret Buffer after use | [`binary.wipe`](/crypto/binary#wipe) |
+| I want to…                                      | Reach for                                                                                                                                                                    |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Generate a session ID / OTP / verification code | [`random.uuid4`](/crypto/random#uuid4), [`random.pin`](/crypto/random#pin), [`random.token`](/crypto/random#token)                                                           |
+| Verify a Stripe / GitHub / Slack webhook        | [`hash.verifyHmac`](/crypto/hash#verifyhmac)                                                                                                                                 |
+| Sign a cookie / URL parameter                   | [`hash.signValue`](/crypto/hash#signvalue--unsignvalue)                                                                                                                      |
+| Derive an encryption key from a passphrase      | [`hash.pbkdf2`](/crypto/hash#pbkdf2), [`hash.scrypt`](/crypto/hash#scrypt), or [`cipher.encryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase) |
+| Encrypt a value into a token                    | [`cipher.encryptToString`](/crypto/cipher#encrypttostring)                                                                                                                   |
+| Encrypt something with a human passphrase       | [`cipher.encryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase)                                                                                |
+| Mint a 1-hour password-reset ticket             | [`cipher.seal`](/crypto/cipher#seal--unseal)                                                                                                                                 |
+| Produce a stable cache key from an object       | [`hash.fingerprint`](/crypto/hash#fingerprint)                                                                                                                               |
+| Sign / verify a JWT (asymmetric)                | [`sign.sign`](/crypto/sign#sign), [`sign.verify`](/crypto/sign#verify), [`sign.thumbprint`](/crypto/sign#thumbprint)                                                         |
+| Establish a shared secret between two parties   | [`cipher.deriveSharedSecret`](/crypto/cipher#derivesharedsecret)                                                                                                             |
+| Derive multiple keys from one secret            | [`hash.hkdf`](/crypto/hash#hkdf)                                                                                                                                             |
+| Encode / decode bytes                           | [`encode.*`](/crypto/encode)                                                                                                                                                 |
+| Wipe a secret Buffer after use                  | [`binary.wipe`](/crypto/binary#wipe)                                                                                                                                         |
 
 ## Import styles
 
@@ -215,57 +201,49 @@ Three styles, all supported, all tree-shakable.
     await cipher.generateKey()
     ```
     Namespace form — great for REPL / interactive exploration.
+
   </Tabs.Tab>
 </Tabs>
 
 ## Errors
 
-Every entry point throws `CryptoError` with a stable `code`. Branch on
-`code`, not on the message — see the [errors page](/crypto/errors) for the
-full enum.
+Every entry point throws `CryptoError` with a stable `code`. Branch on `code`, not on the message — see the
+[errors page](/crypto/errors) for the full enum.
 
 ```js
-import { CryptoError, ErrorCode } from '@exortek/crypto'
+import { CryptoError, ErrorCode } from '@exortek/crypto';
 
 try {
-  const { payload } = cipher.unseal(req.query.t, RESET_SECRET)
+  const { payload } = cipher.unseal(req.query.t, RESET_SECRET);
 } catch (err) {
-  if (!(err instanceof CryptoError)) throw err
-  if (err.code === ErrorCode.TOKEN_EXPIRED)  return res.render('expired')
-  if (err.code === ErrorCode.TOKEN_TAMPERED) return res.status(404).end()
-  throw err
+  if (!(err instanceof CryptoError)) throw err;
+  if (err.code === ErrorCode.TOKEN_EXPIRED) return res.render('expired');
+  if (err.code === ErrorCode.TOKEN_TAMPERED) return res.status(404).end();
+  throw err;
 }
 ```
 
 ## Node version, platforms, ESM/CJS
 
-- **Node 22 LTS or newer.** Uses `crypto.hkdfSync`, `crypto.scrypt`,
-  `Buffer.readBigUInt64BE`, and BLAKE2 / SHA-3 hashes — all stable on 22+.
-- **Pure ESM source with a matching CJS output.** `import { hmac } from
-  '@exortek/crypto'` works; so does `const { hmac } = require('@exortek/crypto')`.
-- **Types.** `.d.ts` is generated from JSDoc at build time. Strict
-  TypeScript projects consume it cleanly.
-- **Platforms.** Runs on any Node 22+ target — Linux, macOS, Windows,
-  Docker, AWS Lambda (Node 22 runtime), Vercel functions, Cloudflare
-  Workers with `nodejs_compat`.
+- **Node 22 LTS or newer.** Uses `crypto.hkdfSync`, `crypto.scrypt`, `Buffer.readBigUInt64BE`, and BLAKE2 / SHA-3 hashes
+  — all stable on 22+.
+- **Pure ESM source with a matching CJS output.** `import { hmac } from '@exortek/crypto'` works; so does
+  `const { hmac } = require('@exortek/crypto')`.
+- **Types.** `.d.ts` is generated from JSDoc at build time. Strict TypeScript projects consume it cleanly.
+- **Platforms.** Runs on any Node 22+ target — Linux, macOS, Windows, Docker, AWS Lambda (Node 22 runtime), Vercel
+  functions, Cloudflare Workers with `nodejs_compat`.
 
 ## What this package is **not**
 
-- **Not a password hasher.** PBKDF2 / scrypt are here for deriving
-  cipher key material from a passphrase, not for storing user password
-  verifiers. Use a memory-hard password hasher (Argon2id / bcrypt) for
-  login flows.
-- **Not a full JWT library.** [`sign.sign`](/crypto/sign#sign) /
-  [`sign.verify`](/crypto/sign#verify) are the primitives — bytes in,
-  signature bytes out. JWT header / claim validation
-  (`exp`, `nbf`, `iss`, `aud`, algorithm-confusion defence) is up to
-  the caller.
-- **Not a session store.** [`cipher.seal`](/crypto/cipher#seal--unseal)
-  mints stateless tokens; anything server-side you need to invalidate,
-  rotate, or attach data to belongs in a session layer you build.
-- **Not a WebAuthn / OAuth / passkey implementation.** Those are their
-  own protocols — this package provides the crypto primitives they'd
-  build on, not the flows themselves.
+- **Not a password hasher.** PBKDF2 / scrypt are here for deriving cipher key material from a passphrase, not for
+  storing user password verifiers. Use a memory-hard password hasher (Argon2id / bcrypt) for login flows.
+- **Not a full JWT library.** [`sign.sign`](/crypto/sign#sign) / [`sign.verify`](/crypto/sign#verify) are the primitives
+  — bytes in, signature bytes out. JWT header / claim validation (`exp`, `nbf`, `iss`, `aud`, algorithm-confusion
+  defence) is up to the caller.
+- **Not a session store.** [`cipher.seal`](/crypto/cipher#seal--unseal) mints stateless tokens; anything server-side you
+  need to invalidate, rotate, or attach data to belongs in a session layer you build.
+- **Not a WebAuthn / OAuth / passkey implementation.** Those are their own protocols — this package provides the crypto
+  primitives they'd build on, not the flows themselves.
 
 ## License
 

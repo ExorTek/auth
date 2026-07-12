@@ -1,25 +1,5 @@
 import { SecurityError, ErrorCode } from '../../internal/errors.js';
 
-/**
- * Redis-compatible store. Works with any client that exposes:
- *   - `eval(script, numkeys, ...args)`  → number | string
- *   - `pttl(key)`                       → number (ms; -2 missing, -1 no ttl)
- *   - `get(key)`                        → string | null
- *   - `set(key, value, 'PX', ms)`       → 'OK'
- *   - `del(key)`                        → number
- *
- * Verified compat: `ioredis`, `node-redis` (v4+), `@upstash/redis` (HTTP,
- * works on Cloudflare Workers / Vercel Edge / Deno Deploy).
- *
- * Atomicity: `incr` uses a single EVAL Lua script that INCR's the key and
- * sets PEXPIRE only when the key is fresh (count == 1). This means the TTL
- * anchors to the first increment in the window — the correct semantics for
- * fixed / token-bucket algorithms. The sliding-window algorithm anchors
- * its own timestamp keys and doesn't need this behavior.
- *
- * Namespacing: every key is prefixed with `rl:` by default so this adapter
- * doesn't collide with your application keys. Configurable via `prefix`.
- */
 const INCR_SCRIPT = `
 local key = KEYS[1]
 local ttl = tonumber(ARGV[1])
@@ -38,6 +18,48 @@ end
 return { count, pttl }
 `.trim();
 
+const READ_SCRIPT = `
+local key = KEYS[1]
+local current = redis.call('GET', key)
+if not current then
+  return { 0, -1 }
+end
+local ttl = redis.call('PTTL', key)
+if ttl < 0 then
+  ttl = 0
+end
+return { tonumber(current), ttl }
+`.trim();
+
+/**
+ * Redis-compatible store. Works with any client that exposes:
+ *   - `eval(script, numkeys, ...args)`  → number | string
+ *   - `pttl(key)`                       → number (ms; -2 missing, -1 no ttl)
+ *   - `get(key)`                        → string | null
+ *   - `set(key, value, 'PX', ms)`       → 'OK'
+ *   - `del(key)`                        → number
+ *
+ * Verified compat: `ioredis`, `node-redis` (v4+), `@upstash/redis` (HTTP,
+ * works on Cloudflare Workers / Vercel Edge / Deno Deploy).
+ *
+ * Atomicity:
+ *   - `incr` runs a single Lua script that INCR's the key and PEXPIRE's it
+ *     only when the key is fresh (count == 1). TTL anchors to the first
+ *     increment in the window — correct for fixed / token-bucket.
+ *   - `read` runs a Lua script (GET + PTTL) so the snapshot is consistent
+ *     even under contention.
+ *
+ * Optimization: when the client is `ioredis` (detected via `defineCommand`),
+ * both scripts are registered once as named commands. Subsequent calls go
+ * out as `EVALSHA`, saving the script body on every request.
+ *
+ * Namespacing: every key is prefixed with `rl:` by default so this adapter
+ * doesn't collide with your application keys. Configurable via `prefix`.
+ *
+ * @param {object} client                 Redis-compatible client instance.
+ * @param {{ prefix?: string }} [options]
+ * @returns {import('../index.js').RateLimitStore}
+ */
 export function redisStore(client, options = {}) {
   if (!client || typeof client !== 'object') {
     throw new SecurityError(
@@ -55,49 +77,76 @@ export function redisStore(client, options = {}) {
   }
 
   const prefix = options.prefix ?? 'rl:';
-  const k = (key) => `${prefix}${key}`;
+  const k = key => `${prefix}${key}`;
 
-  async function evalScript(script, keys, args) {
-    // node-redis and Upstash accept `client.eval(script, { keys, arguments })`
-    // ioredis accepts `client.eval(script, keys.length, ...keys, ...args)`
-    // We detect ioredis by the numeric-arity signature — it's the older API.
-    // Both clients ship the same `EVAL` semantics on the wire.
-    if (client.eval.length >= 2 && !client.sendCommand) {
-      // Best-effort: ioredis path
-      return client.eval(script, keys.length, ...keys, ...args);
+  // ioredis exposes `defineCommand` — cache the scripts once so subsequent
+  // calls go out as EVALSHA (saves bandwidth + parse cost per request).
+  // We namespace the command names to avoid collision if the same client is
+  // shared with another library that also calls defineCommand.
+  const useDefined = typeof client.defineCommand === 'function';
+  if (useDefined) {
+    if (typeof client.exortekRlIncr !== 'function') {
+      client.defineCommand('exortekRlIncr', { numberOfKeys: 1, lua: INCR_SCRIPT });
     }
-    return client.eval(script, { keys, arguments: args.map(String) });
+    if (typeof client.exortekRlRead !== 'function') {
+      client.defineCommand('exortekRlRead', { numberOfKeys: 1, lua: READ_SCRIPT });
+    }
+  }
+
+  async function runIncr(fullKey, ttlMs) {
+    if (useDefined) {
+      return client.exortekRlIncr(fullKey, ttlMs);
+    }
+    // node-redis v4 / Upstash: options-object EVAL. ioredis without
+    // defineCommand support (shouldn't happen, but fall through cleanly)
+    // uses positional args.
+    if (client.eval.length >= 2 && !client.sendCommand) {
+      return client.eval(INCR_SCRIPT, 1, fullKey, ttlMs);
+    }
+    return client.eval(INCR_SCRIPT, { keys: [fullKey], arguments: [String(ttlMs)] });
+  }
+
+  async function runRead(fullKey) {
+    if (useDefined) {
+      return client.exortekRlRead(fullKey);
+    }
+    if (client.eval.length >= 2 && !client.sendCommand) {
+      return client.eval(READ_SCRIPT, 1, fullKey);
+    }
+    return client.eval(READ_SCRIPT, { keys: [fullKey], arguments: [] });
+  }
+
+  function parsePair(raw) {
+    // Response shape: [count, ttl] but Upstash may return strings.
+    const [countRaw, ttlRaw] = Array.isArray(raw) ? raw : [raw, -1];
+    return { count: Number(countRaw), ttl: Number(ttlRaw) };
   }
 
   return {
     async get(key) {
-      const [countStr, pttlStr] = await Promise.all([
-        client.get(k(key)),
-        client.pttl ? client.pttl(k(key)) : Promise.resolve(-1),
-      ]);
-      if (countStr === null || countStr === undefined) {
+      const { count, ttl } = parsePair(await runRead(k(key)));
+      if (!Number.isFinite(count) || count <= 0 || ttl < 0) {
         return null;
       }
-      const count = Number(countStr);
-      const pttl = Number(pttlStr);
-      if (!Number.isFinite(count) || pttl < 0) {
+      return { count, expiresAt: Date.now() + ttl };
+    },
+
+    async read(key) {
+      const { count, ttl } = parsePair(await runRead(k(key)));
+      if (!Number.isFinite(count) || count <= 0 || ttl < 0) {
         return null;
       }
-      return { count, expiresAt: Date.now() + pttl };
+      return { count, expiresAt: Date.now() + ttl };
     },
 
     async incr(key, ttlMs) {
-      const raw = await evalScript(INCR_SCRIPT, [k(key)], [ttlMs]);
-      // Response shape: [count, pttl] — but Upstash may return strings.
-      const [countRaw, pttlRaw] = Array.isArray(raw) ? raw : [raw, ttlMs];
-      const count = Number(countRaw);
-      const pttl = Number(pttlRaw);
-      return { count, expiresAt: Date.now() + (pttl > 0 ? pttl : ttlMs) };
+      const { count, ttl } = parsePair(await runIncr(k(key), ttlMs));
+      return { count, expiresAt: Date.now() + (ttl > 0 ? ttl : ttlMs) };
     },
 
     async set(key, count, ttlMs) {
-      // node-redis v4 uses options object; ioredis uses positional 'PX', ttl.
-      // Both accept the positional form as of current versions.
+      // node-redis v4 accepts positional 'PX', ttl on its `set` command;
+      // ioredis and Upstash do too.
       await client.set(k(key), String(count), 'PX', ttlMs);
     },
 

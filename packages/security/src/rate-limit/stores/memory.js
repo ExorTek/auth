@@ -6,15 +6,30 @@
  * node deploys, sticky-session behind an LB, tests, and background jobs.
  * For multi-process production, use the Redis adapter or a custom store.
  *
- * Implementation notes:
- *   - Backed by a Map to preserve insertion order (used for LRU eviction).
- *   - Entries carry `{ count, expiresAt }`. On access, expired entries are
- *     lazily removed. A periodic sweeper also purges stale keys so the map
- *     doesn't grow unboundedly for one-shot IPs.
- *   - `maxKeys` caps memory: when exceeded, the oldest inserted entry is
- *     evicted (Map iteration order == insertion order).
- *   - All operations are synchronous but returned as resolved Promises so
- *     the store interface stays uniform with Redis/Mongo/custom.
+ * Eviction: true LRU (least-recently-used). Every `get` / `incr` / `set`
+ * on an existing key re-inserts it so it becomes the newest entry;
+ * `map.keys().next().value` is then the least-recently-touched key and is
+ * dropped when `maxKeys` is exceeded. This matters for rate-limit: without
+ * an access-refresh, an abuser hitting the same key repeatedly can be the
+ * *oldest inserted* key and get their counter evicted (and reset) purely
+ * by pushing the map over its cap — an unintended limiter bypass. `read`
+ * is intentionally NOT refreshing, since it's an introspection call and
+ * must not shift eviction order.
+ *
+ * LRU-via-Map-delete-then-set is textbook, popularized in the JS
+ * community by projects like `toad-cache`
+ * (https://github.com/kibertoad/toad-cache, MIT). No code is copied here;
+ * we rely on the same ES2015 iteration-order guarantee.
+ *
+ * TTL: expired entries are removed lazily on read. A `setInterval` sweep
+ * (unref'd so it never blocks process exit) also purges stale keys so
+ * memory doesn't drift up for one-shot IPs.
+ *
+ * All operations are synchronous but returned as resolved Promises so the
+ * store interface stays uniform with Redis / custom backends.
+ *
+ * @param {{ maxKeys?: number, sweepMs?: number }} [options]
+ * @returns {import('../index.js').RateLimitStore & { _size: () => number, _stop: () => void }}
  */
 export function memoryStore(options = {}) {
   const maxKeys = options.maxKeys ?? 10_000;
@@ -56,14 +71,17 @@ export function memoryStore(options = {}) {
     if (map.size < maxKeys) {
       return;
     }
-    // Map iteration order === insertion order. Drop the oldest key.
-    const oldestKey = map.keys().next().value;
-    if (oldestKey !== undefined) {
-      map.delete(oldestKey);
+    // Map iteration order === insertion order + our access-time refresh:
+    // the first key returned by keys() is the least-recently-touched one.
+    const lruKey = map.keys().next().value;
+    if (lruKey !== undefined) {
+      map.delete(lruKey);
     }
   }
 
-  function readFresh(key) {
+  // Non-mutating fetch. Used by `read` and by any internal path that must
+  // not disturb LRU order.
+  function peekFresh(key) {
     const entry = map.get(key);
     if (!entry) {
       return null;
@@ -75,18 +93,41 @@ export function memoryStore(options = {}) {
     return entry;
   }
 
+  // Fetch + move to newest position. Used by `get` and `incr` — any activity
+  // on a key marks it recently-used so eviction doesn't clip a hot caller.
+  function touchFresh(key) {
+    const entry = peekFresh(key);
+    if (!entry) {
+      return null;
+    }
+    map.delete(key);
+    map.set(key, entry);
+    return entry;
+  }
+
   return {
     async get(key) {
-      const entry = readFresh(key);
+      const entry = touchFresh(key);
+      return entry ? { count: entry.count, expiresAt: entry.expiresAt } : null;
+    },
+
+    // Non-mutating read: does NOT refresh LRU position. Use for
+    // introspection (e.g. "status" endpoints) where observing a counter
+    // shouldn't keep it alive.
+    async read(key) {
+      const entry = peekFresh(key);
       return entry ? { count: entry.count, expiresAt: entry.expiresAt } : null;
     },
 
     async incr(key, ttlMs) {
       scheduleSweeper();
       const t = now();
-      const existing = readFresh(key);
+      const existing = peekFresh(key);
       if (existing) {
         existing.count += 1;
+        // Refresh LRU position on activity.
+        map.delete(key);
+        map.set(key, existing);
         return { count: existing.count, expiresAt: existing.expiresAt };
       }
       evictIfFull();
@@ -98,7 +139,14 @@ export function memoryStore(options = {}) {
 
     async set(key, count, ttlMs) {
       scheduleSweeper();
-      evictIfFull();
+      // If the key exists, Map.set preserves its old insertion position.
+      // Delete first so an overwrite moves it to newest — same LRU rule
+      // as `incr`.
+      if (map.has(key)) {
+        map.delete(key);
+      } else {
+        evictIfFull();
+      }
       const expiresAt = now() + ttlMs;
       map.set(key, { count, expiresAt });
     },

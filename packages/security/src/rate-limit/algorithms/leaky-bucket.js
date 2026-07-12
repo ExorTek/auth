@@ -15,7 +15,8 @@ import { assertBucketOptions, assertKey } from '../options.js';
  *
  * State encoding matches token-bucket: `"<level*1000>|<updatedAt>"`.
  *
- * @param {{ capacity: number, leakRate: number, store: object }} config
+ * @param {import('../index.js').BucketLimiterConfig} config
+ * @returns {import('../index.js').Limiter}
  */
 export function leakyBucket(config) {
   assertBucketOptions(config, 'leakyBucket');

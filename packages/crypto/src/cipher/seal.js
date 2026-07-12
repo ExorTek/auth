@@ -237,11 +237,21 @@ function _serialise(payload) {
  * @private — cheap describe helper for arguments in error messages.
  */
 function _describe(v) {
-  if (v === null || v === undefined) return String(v);
-  if (typeof v === 'string') return `a string of length ${v.length}`;
-  if (typeof v === 'number' || typeof v === 'boolean') return `${typeof v} ${v}`;
-  if (Buffer.isBuffer(v)) return `Buffer of length ${v.length}`;
-  if (v instanceof Uint8Array) return `Uint8Array of length ${v.length}`;
+  if (v === null || v === undefined) {
+    return String(v);
+  }
+  if (typeof v === 'string') {
+    return `a string of length ${v.length}`;
+  }
+  if (typeof v === 'number' || typeof v === 'boolean') {
+    return `${typeof v} ${v}`;
+  }
+  if (Buffer.isBuffer(v)) {
+    return `Buffer of length ${v.length}`;
+  }
+  if (v instanceof Uint8Array) {
+    return `Uint8Array of length ${v.length}`;
+  }
   return typeof v === 'object' ? (v.constructor?.name ?? 'object') : typeof v;
 }
 

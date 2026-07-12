@@ -14,7 +14,8 @@ import { assertLimiterOptions, assertKey } from '../options.js';
  * Envoy all ship this variant as their default). For strict per-user API
  * quotas this is normally within a few requests of the true count.
  *
- * @param {{ requests: number, window: string | number, store: object }} config
+ * @param {import('../index.js').WindowLimiterConfig} config
+ * @returns {import('../index.js').Limiter}
  */
 export function sliding(config) {
   assertLimiterOptions(config, 'sliding');

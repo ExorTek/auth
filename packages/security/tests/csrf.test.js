@@ -8,7 +8,7 @@ import {
   generateForSession,
   verifyForSession,
 } from '../src/csrf/index.js';
-import { SecurityError, ErrorCode } from '../src/internal/errors.js';
+import { SecurityError, ErrorCode } from '../src/index.js';
 
 const SECRET = 'a'.repeat(48); // >= 32 bytes
 const OTHER_SECRET = 'b'.repeat(48);
@@ -72,9 +72,18 @@ test('verify rejects malformed token (no dot / trailing dot / leading dot)', () 
 });
 
 test('generate throws on missing / weak secret', () => {
-  assert.throws(() => generate(undefined), (e) => e instanceof SecurityError && e.code === ErrorCode.INVALID_ARGUMENT);
-  assert.throws(() => generate('short'), (e) => e instanceof SecurityError && e.code === ErrorCode.INVALID_ARGUMENT);
-  assert.throws(() => generate(123), (e) => e instanceof SecurityError && e.code === ErrorCode.INVALID_ARGUMENT);
+  assert.throws(
+    () => generate(undefined),
+    e => e instanceof SecurityError && e.code === ErrorCode.INVALID_ARGUMENT,
+  );
+  assert.throws(
+    () => generate('short'),
+    e => e instanceof SecurityError && e.code === ErrorCode.INVALID_ARGUMENT,
+  );
+  assert.throws(
+    () => generate(123),
+    e => e instanceof SecurityError && e.code === ErrorCode.INVALID_ARGUMENT,
+  );
 });
 
 test('generate honors options.length within bounds', () => {

@@ -4,7 +4,8 @@
  * @returns {string}
  */
 export function encodeBase64Url(input) {
-  const buf = typeof input === 'string' ? Buffer.from(input) : Buffer.from(input.buffer, input.byteOffset, input.byteLength);
+  const buf =
+    typeof input === 'string' ? Buffer.from(input) : Buffer.from(input.buffer, input.byteOffset, input.byteLength);
   return buf.toString('base64url');
 }
 

@@ -19,7 +19,8 @@ import { assertBucketOptions, assertKey } from '../options.js';
  * bucket-specific Lua script (out of scope for v1 — memory + custom is
  * atomic enough for most workloads).
  *
- * @param {{ capacity: number, refillRate: number, store: object }} config
+ * @param {import('../index.js').BucketLimiterConfig} config
+ * @returns {import('../index.js').Limiter}
  */
 export function tokenBucket(config) {
   assertBucketOptions(config, 'tokenBucket');

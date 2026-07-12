@@ -2,10 +2,7 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
 
 export function assertLimiterOptions(config, name) {
   if (!config || typeof config !== 'object') {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      `rateLimit.${name}(config) requires an options object`,
-    );
+    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `rateLimit.${name}(config) requires an options object`);
   }
   if (!Number.isInteger(config.requests) || config.requests < 1) {
     throw new SecurityError(
@@ -24,10 +21,7 @@ export function assertLimiterOptions(config, name) {
 
 export function assertBucketOptions(config, name) {
   if (!config || typeof config !== 'object') {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      `rateLimit.${name}(config) requires an options object`,
-    );
+    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `rateLimit.${name}(config) requires an options object`);
   }
   if (!Number.isInteger(config.capacity) || config.capacity < 1) {
     throw new SecurityError(

@@ -51,10 +51,7 @@ export function parseDuration(input, field = 'window') {
   const unit = match[2].toLowerCase();
   const ms = Math.round(value * UNITS[unit]);
   if (ms <= 0) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      `${field} must resolve to at least 1ms; '${input}' → ${ms}ms`,
-    );
+    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `${field} must resolve to at least 1ms; '${input}' → ${ms}ms`);
   }
   return ms;
 }
