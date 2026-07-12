@@ -1,0 +1,117 @@
+name: 🐛 Bug report
+description: Something in a published package is broken or behaves wrong.
+title: '[bug] '
+labels: ['type:bug', 'status:needs-triage']
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug report. Before submitting:
+
+        - Search [existing issues](https://github.com/ExorTek/auth/issues?q=is%3Aissue) — someone may have hit the same thing.
+        - Check the [docs](https://auth.memet.dev) for the affected package.
+        - **Security bugs go through [private disclosure](https://github.com/ExorTek/auth/security/advisories/new), not this form.**
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Which package?
+      description: Pick the package that owns the bug.
+      options:
+        - '@exortek/crypto'
+        - '@exortek/security'
+        - 'Repo tooling (build, tests, CI, docs site)'
+        - "Other / I don't know"
+    validations:
+      required: true
+
+  - type: input
+    id: package_version
+    attributes:
+      label: Package version
+      description: 'Output of `npm view @exortek/<pkg> version` or from your `package.json`.'
+      placeholder: e.g. 1.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: node_version
+    attributes:
+      label: Node.js version
+      description: 'Output of `node --version`. This package requires Node 22+.'
+      placeholder: e.g. v22.5.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Docker / container
+        - Serverless (Vercel, Cloudflare Workers, AWS Lambda, …)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: >
+        A small self-contained snippet that reproduces the bug. Prefer a code block over a repo link when the case fits
+        — it's faster to triage.
+      placeholder: |
+        ```js
+        import { csrf } from '@exortek/security'
+        // ...
+        ```
+      render: js
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What did you think would happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: >
+        What happened instead? Paste error messages, stack traces, HTTP responses — verbatim, not paraphrased.
+      placeholder: |
+        Error: ...
+          at ... (index.js:42)
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: >
+        Framework you're using (Fastify/Express/…), deployment env, anything unusual about the setup.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I read the docs for the affected package
+          required: true
+        - label: My reproduction runs on a fresh install with no other libraries in the way
+          required: true
+        - label: This is not a security vulnerability (those go through private disclosure)
+          required: true

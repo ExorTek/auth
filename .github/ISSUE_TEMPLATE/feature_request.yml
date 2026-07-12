@@ -1,0 +1,84 @@
+name: ✨ Feature request
+description: Propose a new export, option, or behaviour.
+title: '[feat] '
+labels: ['type:enhancement', 'status:needs-triage']
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a feature. Before submitting:
+
+        - Skim [existing issues](https://github.com/ExorTek/auth/issues?q=is%3Aissue+label%3Atype%3Aenhancement) — someone may already be pushing this.
+        - For open-ended "should we…?" ideas, start a [discussion](https://github.com/ExorTek/auth/discussions) instead; use this template when you have a concrete proposal.
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Which package?
+      description: Pick the package this belongs in.
+      options:
+        - '@exortek/crypto'
+        - '@exortek/security'
+        - 'A new package (please describe below)'
+        - 'Repo tooling / docs site'
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case
+      description: >
+        **Why** do you need this? Describe the real-world scenario — not the API. A good use case makes the design
+        choose itself.
+      placeholder: |
+        I'm building X, and I want to Y. Currently I have to Z, which is
+        painful because …
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_api
+    attributes:
+      label: Proposed API
+      description: >
+        Sketch the call site as you'd use it. Doesn't have to be final — rough is fine.
+      placeholder: |
+        ```js
+        import { newThing } from '@exortek/<pkg>'
+
+        newThing({ … })
+        ```
+      render: js
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: >
+        Existing packages / workarounds / patterns you tried. Helps us judge whether we should add this or point at
+        something better.
+
+  - type: dropdown
+    id: importance
+    attributes:
+      label: How important is this?
+      options:
+        - Nice to have — could live without it
+        - Would meaningfully improve my project
+        - Blocker — I need this to ship
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I'm proposing an addition, not a bug (bugs use the bug template)
+          required: true

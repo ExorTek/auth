@@ -1,0 +1,64 @@
+name: 📖 Documentation issue
+description: Something on the docs site (or a package README) is wrong, missing, or unclear.
+title: '[docs] '
+labels: ['type:docs', 'status:needs-triage']
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For **content** issues (typo, wrong example, unclear explanation)
+        this is the right form. For a website **bug** (broken layout,
+        search not working, 500 error) please use the bug report
+        template instead.
+
+  - type: input
+    id: page_url
+    attributes:
+      label: Page URL
+      description: Full URL to the page with the issue.
+      placeholder: https://auth.memet.dev/security/rate-limit
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of docs issue?
+      options:
+        - Typo / grammar
+        - Wrong / broken code example
+        - Missing information
+        - Confusing explanation
+        - Outdated (says one thing, code says another)
+        - Broken link
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What's wrong?
+      description: >
+        Copy the specific sentence / code block that's off, then explain what you expected to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested fix (optional)
+      description: >
+        If you already know how to phrase it better, paste the corrected text here. Pull requests are welcome — the docs
+        source is in `web/content/` in the [repo](https://github.com/ExorTek/auth).
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I'm looking at the current docs (not a cached older version)
+          required: true

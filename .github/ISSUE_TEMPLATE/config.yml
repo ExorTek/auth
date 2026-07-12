@@ -1,0 +1,21 @@
+# Disable the "Open a blank issue" escape hatch — force everyone through
+# a real template. Contact links replace it with sensible defaults.
+blank_issues_enabled: false
+
+contact_links:
+  - name: 🔒 Security vulnerability
+    url: https://github.com/ExorTek/auth/security/advisories/new
+    about: >
+      Report privately via GitHub Security Advisories (or email memet@memet.dev). Do NOT open a public issue for
+      security bugs. See SECURITY.md for the disclosure policy.
+
+  - name: 💬 Question / discussion
+    url: https://github.com/ExorTek/auth/discussions
+    about: >
+      Not a bug or feature request? Start a discussion — better for design questions, "how do I …", and roadmap chat.
+
+  - name: 📖 Documentation
+    url: https://auth.memet.dev
+    about: >
+      Full API reference for every shipped package. Skim it first — most "does this work?" questions are already
+      answered here.
