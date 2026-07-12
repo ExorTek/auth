@@ -13,6 +13,7 @@ need, or install the umbrella. Built on `node:crypto`.
 | ------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------: | ---------------------------------------------------------- |
 | [`@exortek/crypto`](./packages/crypto) — hash · hmac · KDFs · cipher · sign · seal · encode · CSPRNG                                             |   [![npm](https://img.shields.io/npm/v/@exortek/crypto.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/crypto)   | [auth.memet.dev/crypto](https://auth.memet.dev/crypto)     |
 | [`@exortek/security`](./packages/security) — CSRF · rate-limit · headers · CORS · safe-redirect + adapters for Fastify · Express · Hono · Elysia | [![npm](https://img.shields.io/npm/v/@exortek/security.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/security) | [auth.memet.dev/security](https://auth.memet.dev/security) |
+| [`@exortek/otp`](./packages/otp) — RFC 4226 HOTP + RFC 6238 TOTP with backup codes, provisioning URI, replay defense                             |      [![npm](https://img.shields.io/npm/v/@exortek/otp.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/otp)      | [auth.memet.dev/otp](https://auth.memet.dev/otp)           |
 
 ## The stack
 
