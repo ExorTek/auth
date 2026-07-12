@@ -48,3 +48,4 @@ Thumbs.db
 skills-lock.json
 ARCHITECTURE.md
 CLAUDE.md
+/scripts/setup-labels.sh
