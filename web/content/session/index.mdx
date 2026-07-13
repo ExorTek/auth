@@ -1,0 +1,85 @@
+---
+title: '@exortek/session — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/session`
+
+Sealed-cookie session manager for Node.js — rotation, revocation, sudo
+mode, impersonation, concurrent limits, fingerprint binding, device
+labels, session events, Redis distributed revocation, CSRF derivation,
+trusted-device cookies, and adapters for Fastify, Express, Hono, and
+Elysia. Built on `@exortek/crypto`.
+
+## Quick tour
+
+```js
+import { createSessionManager } from '@exortek/session';
+
+const sessions = createSessionManager({
+  secret: process.env.SESSION_SECRET,
+  ttl:     '7d',
+  idleTtl: '30m',
+});
+
+// Login
+const { cookie } = await sessions.issue({
+  userId: user.id,
+  claims: { roles: ['admin'] },
+});
+res.setHeader('Set-Cookie', cookie);
+
+// Middleware
+const session = await sessions.verify(req);
+if (!session) return unauthorized();
+
+// Password-change flow — sign out every other device
+await sessions.revokeAllExceptCurrent(req);
+
+// Sensitive endpoint — sudo mode
+if (!(await sessions.requireFreshAuth(req, { maxAgeSeconds: 300 }))) {
+  return res.redirect('/reauth');
+}
+
+// Logout
+const { cookie: bye } = await sessions.revoke(req);
+res.setHeader('Set-Cookie', bye);
+```
+
+## Package layout
+
+| Subpath                                | What it exports                                            |
+| -------------------------------------- | ---------------------------------------------------------- |
+| `@exortek/session`                     | `createSessionManager`, `sessionStore.memory`, CSRF helpers |
+| `@exortek/session/stores/redis`        | Redis session store + pub/sub distributed revocation       |
+| `@exortek/session/trusted-device`      | Long-lived "remember this device" cookie for 2FA skip      |
+| `@exortek/session/fastify`             | Fastify plugin                                             |
+| `@exortek/session/express`             | Express middleware                                         |
+| `@exortek/session/hono`                | Hono middleware                                            |
+| `@exortek/session/elysia`              | Elysia plugin                                              |
+
+## Features (opt-in via config flags)
+
+- **`anonymous: true`** — guest sessions with `userId: null`
+- **`concurrentLimit: 3`** — max sessions per user; oldest kicked
+- **`bindTo: ['ip', 'ua']`** — fingerprint binding; mismatch → hard revoke
+- **`impersonation: true`** — admin-as-user with `impersonatedBy` audit trail
+- **`deviceLabels: true`** — auto-generated `iPhone 14 · Chrome`
+- **`events: { onIssue, ... }`** — audit trail callbacks
+- **`suspiciousActivity: true`** — IP change flagging
+- **`headerToken: {}`** — `Authorization: Bearer` extraction alongside cookie
+- **`store: redisStore(...)`** — Redis-backed session store + pub/sub
+
+## Full reference
+
+See the [README on GitHub](https://github.com/ExorTek/auth/tree/master/packages/session) for the complete API, framework
+adapter examples, error codes, and compliance impact. Expanded per-topic
+documentation is on the way to this site.
+
+<Callout type="info">
+  **Compliance impact** — enabling `@exortek/session` moves the following
+  OWASP ASVS V3 rows from 🟡 to ✅ on the
+  [compliance page](/compliance): V3.2, V3.4, V3.5, V3.7.
+</Callout>

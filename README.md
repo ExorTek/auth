@@ -15,6 +15,7 @@ need, or install the umbrella. Built on `node:crypto`.
 | [`@exortek/security`](./packages/security) — CSRF · rate-limit · headers · CORS · safe-redirect + adapters for Fastify · Express · Hono · Elysia                            | [![npm](https://img.shields.io/npm/v/@exortek/security.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/security) | [auth.memet.dev/security](https://auth.memet.dev/security) |
 | [`@exortek/otp`](./packages/otp) — RFC 4226 HOTP + RFC 6238 TOTP with backup codes, provisioning URI, replay defense                                                        |      [![npm](https://img.shields.io/npm/v/@exortek/otp.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/otp)      | [auth.memet.dev/otp](https://auth.memet.dev/otp)           |
 | [`@exortek/password`](./packages/password) — Argon2id / scrypt / bcrypt / PBKDF2 + strength / policy / generate / pepper (rotation) / history / HIBP + constant-time verify | [![npm](https://img.shields.io/npm/v/@exortek/password.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/password) | [auth.memet.dev/password](https://auth.memet.dev/password) |
+| [`@exortek/session`](./packages/session) — sealed-cookie sessions, rotation, revocation, sudo mode, impersonation, concurrent limits, Redis pub/sub + Fastify/Express/Hono/Elysia | [![npm](https://img.shields.io/npm/v/@exortek/session.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/session) | [auth.memet.dev/session](https://auth.memet.dev/session) |
 
 ## The stack
 
@@ -31,7 +32,7 @@ Numbers reflect dependency order — a lower number never imports from a higher 
 | 07 | `@exortek/jwt`         | JWT sign / verify with algorithm allowlists, clock skew                              |
 | 08 | `@exortek/jwe`         | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                       |
 | 09 | `@exortek/jwks`        | JWKS URI fetching, caching, `kid` rotation                                           |
-| 10 | `@exortek/session`     | signed cookies, rotation, revocation, store adapter                                  |
+| 10 | [`@exortek/session`](./packages/session) | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub |
 | 11 | `@exortek/security`    | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers |
 | 12 | `@exortek/device`      | device fingerprinting, trusted-device tokens                                         |
 | 13 | `@exortek/apikey`      | prefixed API keys (`sk_live_...`), rate-limited by default                           |

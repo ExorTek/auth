@@ -47,15 +47,12 @@ Focused on the auth chapters (V2, V3, V4) and secrets storage (V6).
 
 ### V3 — Session Management
 
-Session package is on the roadmap (`@exortek/session`). Current
-libraries provide the primitives:
-
 | §    | Requirement                                | Status | How                                                                      |
 |------|--------------------------------------------|:------:|--------------------------------------------------------------------------|
-| V3.2 | Session token generation via CSPRNG        |   ✅    | `crypto.random.token(bytes)`                                             |
-| V3.4 | Cookie flags: Secure, HttpOnly, SameSite   |   🟡   | `security.csrfPlugin` sets these on its own cookie; app sets on session  |
-| V3.5 | Token binding (`__Host-` prefix)           |   ✅    | CSRF cookie uses `__Host-csrf`; session package will follow same pattern |
-| V3.7 | Server-side session invalidation on logout |   🟡   | Session package roadmap                                                  |
+| V3.2 | Session token generation via CSPRNG        |   ✅    | `crypto.random.token(bytes)` + `session.generateSessionId()`             |
+| V3.4 | Cookie flags: Secure, HttpOnly, SameSite   |   ✅    | `@exortek/session` sets Secure + HttpOnly + SameSite=Lax by default      |
+| V3.5 | Token binding (`__Host-` prefix)           |   ✅    | Default cookie name is `__Host-sid`; enforced at boot                    |
+| V3.7 | Server-side session invalidation on logout |   ✅    | `sessions.revoke(req)` marks the record revoked; verify short-circuits   |
 
 ### V4 — Access Control
 

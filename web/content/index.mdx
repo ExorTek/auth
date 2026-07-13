@@ -19,6 +19,7 @@ Hono, Elysia.
 | **[`@exortek/security`](/security)** |  `1.x`  |
 | **[`@exortek/otp`](/otp)**           |  `1.x`  |
 | **[`@exortek/password`](/password)** |  `1.x`  |
+| **[`@exortek/session`](/session)**   |  `1.x`  |
 
 ## The stack
 
@@ -36,7 +37,7 @@ time.
 | 07 | `@exortek/jwt`                   | JWT sign / verify with algorithm allowlists, clock skew                              |
 | 08 | `@exortek/jwe`                   | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                       |
 | 09 | `@exortek/jwks`                  | JWKS URI fetching, caching, `kid` rotation                                           |
-| 10 | `@exortek/session`               | signed cookies, rotation, revocation, store adapter                                  |
+| 10 | [`@exortek/session`](/session)   | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub        |
 | 11 | [`@exortek/security`](/security) | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers |
 | 12 | `@exortek/device`                | device fingerprinting, trusted-device tokens                                         |
 | 13 | `@exortek/apikey`                | prefixed API keys (`sk_live_...`), rate-limited by default                           |
@@ -67,6 +68,8 @@ Node.js **22 or newer**. No runtime dependencies.
   provisioning URIs, opt-in replay defense.
 - **[`@exortek/password` reference →](/password)** — Argon2id, scrypt, bcrypt, PBKDF2 under one API +
   strength / policy / generate / passphrase / pepper (with rotation) / history / HIBP / constant-time verify.
+- **[`@exortek/session` reference →](/session)** — sealed-cookie sessions with rotation, revocation, sudo mode,
+  impersonation, concurrent limits, Redis pub/sub, CSRF derivation, trusted-device cookie, and 4 framework adapters.
 - **[Source](https://github.com/ExorTek/auth)** — GitHub repo.
 - **[Contributing](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md)** — branch prefixes, commit conventions,
   changeset flow.
