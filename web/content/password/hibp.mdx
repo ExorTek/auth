@@ -1,0 +1,132 @@
+---
+title: 'password/hibp — breach lookup'
+sidebarTitle: hibp
+---
+
+import { Callout } from 'nextra/components';
+
+# `hibp`
+
+Have-I-Been-Pwned k-anonymity client. Only the **first 5 characters** of
+`SHA-1(password)` ever leave your process — HIBP returns every hash with
+that prefix and the client checks the remaining bytes locally.
+
+Zero-dep beyond the base package — uses Node 22's global `fetch`.
+
+## Basic use
+
+```ts
+import { createHibpClient } from '@exortek/password/hibp';
+
+const hibp = createHibpClient({ userAgent: 'my-app/1.0' });
+const check = await hibp.check(candidate, { failOpen: true });
+if (check.pwned) {
+  return badRequest(`this password appears in ${check.count} known breaches`);
+}
+```
+
+Returns `{ pwned: boolean, count: number }`. `count` is HIBP's occurrence
+tally — higher means "more widely reused across the breached corpora",
+i.e., more dangerous.
+
+## Options
+
+```ts
+createHibpClient({
+  endpoint?:  'https://api.pwnedpasswords.com/range/',      // override for mirrors
+  timeoutMs?: 5000,
+  userAgent?: '@exortek/password',                          // set your app name in prod
+  fetch?:     typeof fetch,                                 // inject for tests
+}): { check(password, options?) }
+```
+
+## `check` options
+
+```ts
+check(password, {
+  failOpen?: false,   // default — throw HIBP_UNAVAILABLE on network error
+}): Promise<{ pwned: boolean, count: number }>
+```
+
+`failOpen: true` swallows network / HTTP errors and resolves to
+`{ pwned: false, count: 0 }`. Use this on **signup** flows where
+availability matters more than perfect blocking. **Never** fail-open on
+password *reset* — those should hard-fail rather than silently accept
+a possibly-breached password.
+
+<Callout type="warning">
+  Set a distinctive `userAgent` in production. [HIBP's abuse
+  guidelines](https://haveibeenpwned.com/API/AbuseGuidelines) require a
+  descriptive UA so they can reach you if you accidentally flood their
+  rate-limit. `@exortek/password/<version>` is the default and works
+  for testing, but yours should be recognisable in their logs.
+</Callout>
+
+## Recipe: signup gate
+
+```js
+import { createHibpClient } from '@exortek/password/hibp';
+
+const hibp = createHibpClient({ userAgent: 'my-app/1.0' });
+
+app.post('/auth/signup', async (req, res) => {
+  const check = await hibp.check(req.body.password, { failOpen: true });
+  if (check.pwned) {
+    return res.status(400).json({
+      error: 'breached_password',
+      message: `this password appears in ${check.count.toLocaleString()} known breaches`,
+    });
+  }
+  // ... continue signup ...
+});
+```
+
+## Recipe: change-password gate
+
+```js
+app.post('/auth/password', async (req, res) => {
+  const check = await hibp.check(req.body.newPassword);   // fail-closed
+  if (check.pwned) {
+    return res.status(400).json({ error: 'breached_password' });
+  }
+  // ... continue ...
+});
+```
+
+If HIBP is down here, the request fails with `HIBP_UNAVAILABLE` — safer
+for a change-password path than silently accepting.
+
+## Errors
+
+- `HIBP_UNAVAILABLE` — network / HTTP failure, and `failOpen` was not
+  set. Message includes the underlying reason.
+
+Both malformed input and unrecognised responses simply return
+`{ pwned: false, count: 0 }` rather than throwing.
+
+## What HIBP sees
+
+Every request looks like:
+
+```
+GET https://api.pwnedpasswords.com/range/1E4C9
+User-Agent: my-app/1.0
+Add-Padding: true
+```
+
+The `Add-Padding: true` header asks HIBP to interleave decoy entries so
+even a passive observer of your TLS-decrypted traffic can't estimate
+your response count from the payload length. The k-anonymity design
+already means only the first 5 characters of `SHA-1(pw)` are sent —
+padding is defence in depth.
+
+There are ~1M possible 5-character prefixes. On a cold cache, hitting
+HIBP for a specific prefix reveals nothing about which user typed which
+password.
+
+## Client-only alternative
+
+If your deployment is air-gapped or has strict egress rules that
+prohibit HIBP, ship a locally-hosted mirror (HIBP publishes torrent
+downloads of the full corpus) and point `endpoint` at it. The
+k-anonymity contract is identical.

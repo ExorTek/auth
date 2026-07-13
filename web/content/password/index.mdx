@@ -1,0 +1,125 @@
+---
+title: '@exortek/password — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `@exortek/password`
+
+Argon2id, scrypt, bcrypt, and PBKDF2 under one coherent API — plus a strength
+meter, CSPRNG-based generator and diceware passphrases, a policy validator,
+HMAC peppering with rotation, password history, and Have-I-Been-Pwned
+k-anonymity lookup. Built on `node:crypto`, zero **required** dependencies.
+
+The two peer dependencies (`argon2` and `bcryptjs`) are **opt-in** — you
+install only the algorithms you actually use.
+
+## What problem does this solve?
+
+Every auth flow rewrites the same ~300 lines of password code, and most get
+one of these wrong:
+
+- **Algorithm choice.** Bcrypt still fine? Scrypt or Argon2id better? PBKDF2
+  for FIPS? The right answer depends on threat model — the wrong answer is
+  baked into every "hash your passwords" tutorial from 2016.
+- **Migration.** You picked bcrypt in 2018 and want to move to Argon2id.
+  Nobody ships a `verify()` that transparently routes across algorithms so
+  you can rehash on the next login.
+- **Unicode normalization.** `"café"` typed on iOS is one code point; typed
+  on Android it's two. They hash differently. Users get locked out on new
+  devices and nobody knows why.
+- **72-byte bcrypt trap.** Bcrypt silently truncates input past 72 bytes.
+  A 100-character passphrase hashes identically to its first 72 characters.
+  Django and Passlib SHA-256 pre-hash to fix this; most Node tutorials
+  don't mention it.
+- **User enumeration.** `if (!user) return 401` short-circuits verify —
+  attackers grade "email exists" vs "doesn't" from response latency.
+- **Peppering.** Everyone talks about it, nobody ships it. A DB dump alone
+  becomes useless if the pepper lives in KMS — but you have to wire the HMAC
+  and its rotation yourself.
+- **Strength scoring.** Rolled by hand or pulled in a 400 KB `zxcvbn`
+  dependency. Both wrong for a signup form that already runs on a hot path.
+
+`@exortek/password` ships every one of these correctly with one API surface
+that's tree-shakeable, zero-dep by default, and paces industry standards
+(OWASP 2024, PHC format, RFC 9106 for Argon2).
+
+## Quick tour
+
+```js
+import { password } from '@exortek/password';
+
+// Signup — pick your algo, hash, store the PHC string
+const stored = await password.scrypt.hash(input);
+// $scrypt$ln=17,r=8,p=1$…$…
+
+// Login — auto-routes on stored hash format
+const ok = await password.verify(input, user.pwHash);
+if (!ok) return unauthorized();
+
+// Silent migration — if params are behind current defaults, rehash on the fly
+if (password.needsRehash(user.pwHash)) {
+  await db.users.update(user.id, { pw_hash: await password.scrypt.hash(input) });
+}
+```
+
+Every algorithm lives under its own namespace — no `algorithm: 'scrypt'`
+flag on a mega-hash function:
+
+```js
+await password.argon2.hash(pw)     // → $argon2id$v=19$m=19456,t=2,p=1$…
+await password.scrypt.hash(pw)     // → $scrypt$ln=17,r=8,p=1$…
+await password.bcrypt.hash(pw)     // → $2b$12$…       (requires bcryptjs peer)
+await password.pbkdf2.hash(pw)     // → $pbkdf2-sha256$i=600000$…
+```
+
+## Package layout
+
+| Subpath                          | What it exports                                    |
+| -------------------------------- | -------------------------------------------------- |
+| `@exortek/password`              | Everything under a `password.*` namespace          |
+| `@exortek/password/scrypt`       | `hash` / `verify` / `needsRehash` — zero-dep       |
+| `@exortek/password/pbkdf2`       | Same shape — zero-dep                              |
+| `@exortek/password/argon2`       | Same shape — requires `argon2` peer                |
+| `@exortek/password/bcrypt`       | Same shape — requires `bcryptjs` peer              |
+| `@exortek/password/strength`     | Strength meter only                                |
+| `@exortek/password/generate`     | Random password + diceware passphrase              |
+| `@exortek/password/policy`       | Rule-based validator                               |
+| `@exortek/password/hibp`         | HIBP k-anonymity client (network)                  |
+
+Tree-shakers see through the umbrella, but if you're on a strict bundle
+budget prefer the subpaths — they emit self-contained bundles with no
+router overhead.
+
+## Is it safe to trust?
+
+- **Standards.** Argon2 (RFC 9106), scrypt (RFC 7914), PBKDF2 (RFC 8018 §5.2),
+  bcrypt (original Provos–Mazières 1999 with the 2b format), PHC string
+  format for portability across ecosystems.
+- **Defaults are OWASP 2024.** Argon2id m=19MiB t=2 p=1, scrypt N=2^17,
+  bcrypt 12 rounds, PBKDF2-SHA-256 600k iterations.
+- **No hand-rolled crypto.** Scrypt and PBKDF2 delegate to Node's OpenSSL
+  bindings. Argon2 goes through the reference C implementation via
+  the `argon2` npm package. Bcrypt uses `bcryptjs` (pure JS, but the
+  algorithm is 25 years old and well-audited).
+- **Timing-safe compare** in every verify path (`crypto.timingSafeEqual`).
+- **135 unit tests** including PHC round-trip fuzz, RFC KAT vectors, and
+  concurrent-verify race checks. `yarn test` from the workspace root exercises
+  everything.
+
+<Callout type="info">
+  **What this package is not.** It does not run a session, mint reset tokens
+  (that's [`@exortek/crypto`'s `seal`](/crypto/cipher#seal--unseal)),
+  rate-limit login (that's [`@exortek/security`'s rate-limit](/security/rate-limit)),
+  or replace 2FA (that's [`@exortek/otp`](/otp)). It handles **password bytes
+  → PHC string → verify** and every hygiene concern around that.
+</Callout>
+
+## Next
+
+- [Install](/password/install) — peer setup for each backend
+- [Algorithms](/password/algorithms) — argon2 / scrypt / bcrypt / pbkdf2 tuning
+- [Verify](/password/verify) — auto-router + `needsRehash`
+- [Migration](/password/migration) — silent rehash on login
+- [Timing defence](/password/timing) — closing the user-enumeration side channel

@@ -1,0 +1,130 @@
+---
+title: 'password/pepper — HMAC + rotation'
+sidebarTitle: pepper
+---
+
+import { Callout } from 'nextra/components';
+
+# `pepper`
+
+Peppering wraps a password with a **server-side HMAC secret** before it
+enters the KDF. The user still types the raw password; the DB still
+stores an argon2 / scrypt / bcrypt string. What changes: an attacker who
+exfiltrates only the password-hash table cannot mount an offline
+dictionary attack — they'd need the pepper too, which lives in your KMS
+or secrets manager.
+
+```ts
+createPepper({
+  secret:   string | Buffer | Uint8Array
+          | Array<string | Buffer | Uint8Array>,       // [newest, …older] for rotation
+  hash?:    'sha256' | 'sha512',                        // default sha256
+  encoding?: 'base64' | 'hex',                          // default base64
+}): {
+  wrap:    (password) => string,        // wraps with newest secret
+  wrapAll: (password) => string[],      // wraps with EVERY configured secret
+  size:    number,                      // getter, count of secrets
+}
+```
+
+## Basic use
+
+```js
+import { createPepper, password } from '@exortek/password';
+
+const pepper = createPepper({ secret: process.env.PW_PEPPER });
+
+// Signup
+const peppered = pepper.wrap(input);
+const stored = await password.scrypt.hash(peppered);
+await db.users.insert({ email, pw_hash: stored });
+
+// Login
+const ok = await password.verify(pepper.wrap(candidate), user.pw_hash);
+```
+
+<Callout type="warning">
+  **Store the pepper separately from the hashes.** In a KMS, an env var
+  read from a secrets manager, or an HSM — **not** in the same database
+  as the `users` table. If both leak in the same dump, the pepper has
+  bought you nothing.
+</Callout>
+
+## Rotation — the whole point of `wrapAll`
+
+Peppers are compile-time forever. Rotating one invalidates every stored
+hash that used it, so you need a rotation strategy up front — otherwise
+a leaked pepper means "log everyone out permanently".
+
+Pass an array, newest first, and use `wrapAll` in your verify path:
+
+```js
+const pepper = createPepper({
+  secret: [process.env.PW_PEPPER_NEW, process.env.PW_PEPPER_OLD],
+});
+
+async function login(email, input) {
+  const user = await db.users.findByEmail(email);
+  if (!user) return unauthorized();
+
+  const candidates = pepper.wrapAll(input);
+  for (let i = 0; i < candidates.length; i++) {
+    if (await password.verify(candidates[i], user.pw_hash)) {
+      if (i > 0) {
+        // Matched under an older pepper — rehash under the current one
+        const fresh = await password.scrypt.hash(candidates[0]);
+        await db.users.update(user.id, { pw_hash: fresh });
+      }
+      return signIn(user);
+    }
+  }
+  return unauthorized();
+}
+```
+
+Cost of rotation: one extra HMAC per unmatched old pepper. Negligible
+compared to the ~200 ms of the KDF verify.
+
+Once no user hashes remain under the old pepper — either through
+organic login-time rehash or a batch job — drop it from the array on
+your next deploy.
+
+## Do I need a pepper?
+
+**Yes** for high-value corpora (financial, healthcare, government), or
+whenever a single database dump can be a "game over" event.
+
+**Optional** for consumer SaaS where you're already OK with the "attacker
+runs argon2id at 19MiB × 2 iterations per guess" cost. Argon2's memory
+hardness pushes 8-character password cracking well past
+practicality-for-most-attackers on its own.
+
+Cost is one HMAC per hash / verify — microseconds against a KDF running
+in hundreds of milliseconds. If in doubt, add it.
+
+## Not a replacement for a strong KDF
+
+Peppering is a **layer**, not a substitute. Don't do:
+
+```js
+// ❌ Wrong — HMAC alone is fast, one dictionary run breaks it
+const stored = pepper.wrap(input);
+```
+
+Always feed the peppered value into the KDF:
+
+```js
+// ✓ Right — HMAC layered before argon2/scrypt/bcrypt
+const stored = await password.scrypt.hash(pepper.wrap(input));
+```
+
+## Secret requirements
+
+- **Minimum 16 bytes.** `createPepper` throws `INVALID_ARGUMENT` for
+  anything shorter — a small pepper is guessable and defeats the point.
+- **High-entropy.** Not a memorable phrase. Generate one:
+  ```bash
+  node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+  ```
+- **Same across every server that verifies.** Load from the same
+  secrets source; don't hardcode per environment.

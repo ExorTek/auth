@@ -1,0 +1,128 @@
+---
+title: 'password/timing — enumeration defence'
+sidebarTitle: timing
+---
+
+import { Callout } from 'nextra/components';
+
+# `timing`
+
+Every naïve login handler looks like this:
+
+```js
+// ❌ Leaks user existence via response time
+const user = await db.users.findByEmail(email);
+if (!user) return unauthorized();                          // ~5 ms
+const ok = await password.verify(password, user.pw_hash);  // ~200 ms
+if (!ok) return unauthorized();
+return signIn(user);
+```
+
+An attacker walks a wordlist of emails against your endpoint. The
+"email exists" branch takes ~205 ms; "email doesn't exist" takes ~5 ms.
+That 200 ms delta grades the wordlist without ever guessing a password —
+your entire user directory leaks.
+
+## `constantTimeVerify`
+
+```ts
+constantTimeVerify(
+  input:      string | Buffer | Uint8Array,
+  storedHash: string | null | undefined,
+  options?:   VerifyOptions
+): Promise<boolean>
+```
+
+Runs the umbrella `verify` router against a real hash if you have one,
+against an internal **decoy hash** if you don't:
+
+```js
+import { password } from '@exortek/password';
+
+const user = await db.users.findByEmail(email);
+const ok = await password.constantTimeVerify(password, user?.pw_hash);
+if (!ok) return unauthorized();   // same wall-clock time either way
+return signIn(user);
+```
+
+The decoy is a `scrypt` hash of a canonical (never-user-supplied)
+password, minted **once per process** on the first call that lands in
+the missing-hash path. Successive missing-hash calls hit the cached
+decoy — no repeated 200 ms cost.
+
+## Why not just delay the missing branch?
+
+You'll see this recommendation on old blogs:
+
+```js
+if (!user) {
+  await new Promise(r => setTimeout(r, 200));
+  return unauthorized();
+}
+```
+
+Two problems:
+
+1. **The delay is uniform, verify is not.** Argon2 with a hot cache
+   takes 180 ms; with a cold one, 220 ms. An attacker measures the
+   *variance*, not the mean — a fixed 200 ms delay is trivially
+   distinguishable from the natural jitter of a real verify.
+2. **A delayed reject still ties up a socket.** Under sustained
+   enumeration you're paying wall-clock time and connection budget
+   with nothing to show for it.
+
+`constantTimeVerify` actually runs the KDF against the decoy — same
+CPU shape, same jitter distribution, same socket lifetime.
+
+## What it doesn't do
+
+<Callout type="warning">
+  This helper closes the **verify-time** side channel. It does **not**
+  close upstream side channels — a `db.users.findByEmail()` that hits a
+  covering index in one case and a full table scan in another will
+  still leak. Neither does it defend against user enumeration via
+  *signup* ("this email is already registered") or *password reset*
+  ("we sent an email — or would have").
+
+  Full defence requires:
+  1. Constant-time verify (this helper) — login endpoint
+  2. Generic "if this account exists, we've sent instructions" — reset flow
+  3. Generic "if you'd like to sign up, we've sent a link" — signup + reset unified
+</Callout>
+
+## What about brute-force?
+
+`constantTimeVerify` doesn't rate-limit. Pair it with
+[`@exortek/security`'s rate-limit](/security/rate-limit) keyed on the
+email (not the IP — IP rotation is trivial) with a slow-burn budget
+like 5 attempts per 10 minutes:
+
+```js
+import { rateLimit } from '@exortek/security';
+
+const bruteforce = rateLimit.sliding({
+  requests: 5,
+  window:  '10m',
+  store:   rateLimit.stores.memory(),
+});
+
+app.post('/auth/login', async (req, res) => {
+  const rl = await bruteforce.check({ key: `login:${req.body.email}` });
+  if (!rl.allowed) return res.status(429).end();
+
+  const user = await db.users.findByEmail(req.body.email);
+  const ok = await password.constantTimeVerify(req.body.password, user?.pw_hash);
+  if (!ok) return res.status(401).end();
+  return signIn(user);
+});
+```
+
+## Cost
+
+- **First missing-hash call in a process:** ~200 ms to mint the decoy
+- **Every subsequent missing-hash call:** identical to a real
+  wrong-password verify, ~200 ms
+- **Real-hash calls:** identical to `password.verify` — no overhead
+
+Total ~200 ms of CPU per login attempt whether the account exists or
+not. That's the whole point — the attacker can't measure a difference.

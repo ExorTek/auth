@@ -1,0 +1,120 @@
+---
+title: 'password/generate — passwords & passphrases'
+sidebarTitle: generate
+---
+
+# `generate`
+
+CSPRNG-backed password + passphrase generators. Both use rejection
+sampling so there's zero modulo bias — every character / word is equally
+likely regardless of alphabet size.
+
+## `generate(options?)`
+
+```ts
+generate({
+  length?:   number,                                        // default 24
+  alphabet?: 'crockford' | 'alnum' | 'hex' | 'ascii' | 'urlSafe' | string
+                                                            // default 'crockford'
+}): string
+```
+
+Default output is 24 characters of Crockford Base32 — no `0/O/1/I/L` and
+no glyphs a shell or JSON parser will trip over.
+
+```js
+import { password } from '@exortek/password';
+
+password.generate();                                       // 'K7VXNMHT9RBWPXFQKGH2JYCM'
+password.generate({ length: 12, alphabet: 'urlSafe' });    // 'kj7pv4hxn3wt'
+password.generate({ length: 16, alphabet: 'hex' });        // 'a91b3f7c4d820ef5'
+password.generate({ length: 40, alphabet: 'AB' });         // 'ABBABAABBABBABAABBAABBABABAABBABABBAABAB'
+```
+
+### Named alphabets
+
+| Name         | Characters                                                                                                | Notes                                          |
+| ------------ | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `crockford`  | `23456789ABCDEFGHJKMNPQRSTVWXYZ`                                                                          | No 0/O/1/I/L — terminal-safe, human-unambiguous |
+| `urlSafe`    | `abcdefghjkmnpqrstuvwxyz23456789`                                                                          | Lowercase Crockford — URL-friendly              |
+| `alnum`      | `a-zA-Z0-9`                                                                                                | 62 characters, no punctuation                   |
+| `hex`        | `0123456789abcdef`                                                                                         | For token labels / IDs                          |
+| `ascii`      | ASCII printable minus `"`, `'`, `\`                                                                        | Full alphabet minus shell / JSON hazards        |
+
+### Custom alphabet
+
+Any 2-256 character string works:
+
+```js
+password.generate({ length: 20, alphabet: 'AEIOU' });     // vowels only
+password.generate({ length: 24, alphabet: '01' });        // binary
+```
+
+### Entropy per character
+
+| Alphabet     | Bits / char | 24 chars ≈ | 32 chars ≈ |
+| ------------ | ----------- | ---------- | ---------- |
+| `crockford`  | 4.9         | 118 bits   | 157 bits   |
+| `alnum`      | 5.95        | 143 bits   | 190 bits   |
+| `ascii`      | 6.4         | 154 bits   | 205 bits   |
+| `hex`        | 4.0         | 96 bits    | 128 bits   |
+| `urlSafe`    | 4.95        | 119 bits   | 158 bits   |
+
+For a machine-generated password nobody has to type back, 128 bits is
+comfortable overkill. For a one-time code shown once, prefer
+`crockford` — it survives a bad printer, a phone camera, and a
+handwritten transcription.
+
+## `passphrase(options?)`
+
+```ts
+passphrase({
+  words?:      number,           // default 6
+  separator?:  string,           // default '-'
+  wordList?:   string[],         // custom list, must be ≥ 128 words
+  capitalize?: boolean,          // default false
+}): string
+```
+
+Diceware-style random passphrase. Uses a built-in 256-word list
+(short, common English words) for ~8 bits of entropy per word.
+
+```js
+password.passphrase();
+// → 'boat-drew-fire-lake-hold-just'
+
+password.passphrase({ words: 8, separator: ' ' });
+// → 'wave river field grow lake corn hold seed'
+
+password.passphrase({ words: 4, capitalize: true });
+// → 'Boat-Drew-Fire-Lake'
+```
+
+### Custom word list
+
+The built-in list is intentionally small (256 entries, ~8 bits per
+word). For higher entropy per word, pass an EFF-style long list:
+
+```js
+import { diceware } from './my-app/wordlists.js';   // ~7776 words
+
+password.passphrase({ words: 4, wordList: diceware });   // ~50 bits, 4 words
+```
+
+At `list.length ≥ 4096`, four words is enough to beat a 12-character
+random Crockford password on brute-force resistance — and beats it by
+a landslide on memorability.
+
+## `alphabets`
+
+The named alphabets are exposed as a frozen `alphabets` object:
+
+```js
+import { alphabets } from '@exortek/password/generate';
+
+console.log(alphabets.crockford);
+// '23456789ABCDEFGHJKMNPQRSTVWXYZ'
+```
+
+Handy for building a "which alphabet was used" UI toggle or writing a
+custom generator that shares the same characters.

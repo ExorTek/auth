@@ -1,0 +1,140 @@
+---
+title: 'password/errors — PasswordError'
+sidebarTitle: errors
+---
+
+# `errors`
+
+Every recoverable failure raised by `@exortek/password` is a
+`PasswordError` with a stable machine-readable `code`. **Branch on
+`code`, never on the message text** — messages are free-form and change
+across versions.
+
+```js
+import { PasswordError, ErrorCode } from '@exortek/password';
+
+try {
+  await password.argon2.hash(input);
+} catch (err) {
+  if (err instanceof PasswordError && err.code === ErrorCode.MISSING_PEER_DEP) {
+    logger.warn(err.message);   // includes actionable install command
+    return internalServerError();
+  }
+  throw err;
+}
+```
+
+## `PasswordError`
+
+```ts
+class PasswordError extends Error {
+  code:     string;             // one of ErrorCode
+  status:   number;             // HTTP status suggestion (see table)
+  message:  string;             // free-form, changes across versions
+  cause?:   unknown;            // upstream error, when relevant
+  details?: object;             // structured extras (violations, byte counts)
+}
+```
+
+## `ErrorCode`
+
+| Code                    | HTTP | Meaning                                                                    |
+| ----------------------- | ---- | -------------------------------------------------------------------------- |
+| `INVALID_ARGUMENT`      | 400  | Bad function argument — wrong type, wrong range, malformed record          |
+| `INVALID_PASSWORD`      | 401  | Verify path — reserved; the umbrella verify returns `false` instead        |
+| `INVALID_HASH`          | 400  | A stored hash string doesn't match the format its prefix claims            |
+| `UNSUPPORTED_ALGORITHM` | 400  | `pbkdf2.hash({ hash: 'md5' })`, `argon2.hash({ type: 'argon2xyz' })`, …    |
+| `UNSUPPORTED_PARAMS`    | 400  | Parameter set the target algorithm rejects (`ln` too high, etc.)           |
+| `MISSING_PEER_DEP`      | 500  | `argon2` or `bcryptjs` peer isn't installed — message names the package    |
+| `PASSWORD_TOO_LONG`     | 400  | Password exceeds `MAX_PASSWORD_BYTES` (1024) or bcrypt strict-mode 72      |
+| `PASSWORD_TOO_SHORT`    | 400  | Reserved — policy layer surfaces `POLICY_VIOLATION` instead                |
+| `POLICY_VIOLATION`      | 400  | `assertPolicy` rejected the password — `details.violations` lists reasons  |
+| `BREACHED_PASSWORD`     | 422  | Reserved — HIBP client returns `{ pwned: true }` and callers throw this    |
+| `REUSED_PASSWORD`       | 422  | Reserved — history helper returns `true` and callers throw this            |
+| `HIBP_UNAVAILABLE`      | 500  | HIBP network / HTTP failure and `failOpen` wasn't set                      |
+
+## `status` field
+
+Every code carries a suggested HTTP status. Middleware can translate
+directly:
+
+```js
+app.use((err, req, res, next) => {
+  if (err instanceof PasswordError) {
+    return res.status(err.status).json({
+      error: err.code,
+      message: err.message,
+      details: err.details,
+    });
+  }
+  next(err);
+});
+```
+
+You can override at throw time via the third options arg:
+
+```js
+throw new PasswordError(ErrorCode.INVALID_ARGUMENT, 'nope', { status: 418 });
+```
+
+## When errors are thrown
+
+- `hash`, `verify`, `needsRehash` throw for **misconfiguration** —
+  invalid params, missing peers, algo mismatch on `needsRehash`.
+- `verify` and `constantTimeVerify` **never throw** for a wrong
+  password. They return `false`. The only exception is
+  `MISSING_PEER_DEP` propagating from the algorithm layer.
+- `assertPolicy` throws `POLICY_VIOLATION`; `policy` (without assert)
+  returns a structured verdict.
+- `createHibpClient().check` throws `HIBP_UNAVAILABLE` on network
+  failure unless `failOpen: true`.
+
+## `details`
+
+Some errors carry a structured `details` payload:
+
+- `POLICY_VIOLATION` → `{ violations: string[], strength?: StrengthResult }`
+- `PASSWORD_TOO_LONG` → `{ bytes: number, maxBytes: number }`
+
+```js
+try {
+  assertPolicy(input, { minLength: 12, requireMinScore: 3 });
+} catch (err) {
+  console.log(err.details.violations);   // ['too-short', 'below-min-strength']
+}
+```
+
+## Recipe: express-style handler
+
+```js
+import { PasswordError } from '@exortek/password';
+
+app.use((err, req, res, next) => {
+  if (err instanceof PasswordError) {
+    return res.status(err.status).json({
+      error: err.code,
+      details: err.details,
+    });
+  }
+  return next(err);
+});
+```
+
+## Cause chain
+
+Errors carry a `cause` for upstream problems that triggered them:
+
+```js
+try {
+  await password.argon2.hash(input);
+} catch (err) {
+  if (err instanceof PasswordError && err.code === ErrorCode.MISSING_PEER_DEP) {
+    console.log(err.cause);
+    // ← Error: Cannot find package 'argon2' imported from …
+  }
+}
+```
+
+Log the cause chain but **never** render it to the user — it can
+contain filesystem paths, upstream stack traces, and other bits that
+help an attacker fingerprint your setup.

@@ -18,6 +18,7 @@ Hono, Elysia.
 | **[`@exortek/crypto`](/crypto)**     |  `1.x`  |
 | **[`@exortek/security`](/security)** |  `1.x`  |
 | **[`@exortek/otp`](/otp)**           |  `1.x`  |
+| **[`@exortek/password`](/password)** |  `1.x`  |
 
 ## The stack
 
@@ -27,7 +28,7 @@ time.
 | #  | Package                          | What it does                                                                         |
 |:--:|----------------------------------|--------------------------------------------------------------------------------------|
 | 01 | [`@exortek/crypto`](/crypto)     | crypto primitives — the foundation the rest builds on                                |
-| 02 | `@exortek/password`              | Argon2id / bcrypt, strength scoring, HIBP breach check                               |
+| 02 | [`@exortek/password`](/password) | Argon2id / scrypt / bcrypt / PBKDF2, strength scoring, HIBP breach check, peppering  |
 | 03 | [`@exortek/otp`](/otp)           | TOTP / HOTP, backup codes, QR provisioning URI                                       |
 | 04 | `@exortek/challenge`             | e-mail / SMS one-time code storage + verification                                    |
 | 05 | `@exortek/jwk`                   | JWK ↔ PEM ↔ DER converters, key rotation                                             |
@@ -64,6 +65,8 @@ Node.js **22 or newer**. No runtime dependencies.
   adapters for Fastify, Express, Hono, Elysia.
 - **[`@exortek/otp` reference →](/otp)** — RFC 4226 HOTP + RFC 6238 TOTP with secure defaults, backup codes,
   provisioning URIs, opt-in replay defense.
+- **[`@exortek/password` reference →](/password)** — Argon2id, scrypt, bcrypt, PBKDF2 under one API +
+  strength / policy / generate / passphrase / pepper (with rotation) / history / HIBP / constant-time verify.
 - **[Source](https://github.com/ExorTek/auth)** — GitHub repo.
 - **[Contributing](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md)** — branch prefixes, commit conventions,
   changeset flow.

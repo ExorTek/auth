@@ -3,4 +3,5 @@ export default {
   crypto: '@exortek/crypto',
   security: '@exortek/security',
   otp: '@exortek/otp',
+  password: '@exortek/password',
 };

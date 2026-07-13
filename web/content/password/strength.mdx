@@ -1,0 +1,96 @@
+---
+title: 'password/strength — score + entropy'
+sidebarTitle: strength
+---
+
+# `strength`
+
+Coarse offline strength meter — 0-4 score, rough Shannon entropy, and a
+machine-readable list of what's wrong. Runs entirely offline; no
+dictionary bundled.
+
+```ts
+strength(input, { userInfo?: string[] }): {
+  score:                0 | 1 | 2 | 3 | 4,
+  entropyBits:          number,
+  weaknesses:           Array<'too-short' | 'single-class' | 'repetition'
+                              | 'sequential' | 'contains-user-info'>,
+  lengthAfterNormalize: number,
+}
+```
+
+- `score` — coarse bucket:
+  - **0** trivially crackable (single character class + < 6 chars)
+  - **1** cracked in seconds on a laptop
+  - **2** cracked in hours to days on a small GPU cluster
+  - **3** cracked in years on modest hardware
+  - **4** infeasible on foreseeable hardware
+- `entropyBits` — `length × log2(effectiveAlphabet)` after collapsing
+  repeats. Treat as an upper bound: real entropy of a *human-chosen*
+  password is much lower.
+- `weaknesses` — machine-readable reasons the score is what it is.
+  Empty at score 4.
+- `lengthAfterNormalize` — NFKC-normalised character count.
+
+```js
+import { password } from '@exortek/password';
+
+const r = password.strength(input, { userInfo: [user.email, user.firstName] });
+// { score: 2, entropyBits: 47.8, weaknesses: ['single-class'], lengthAfterNormalize: 14 }
+```
+
+## Score buckets in context
+
+Attackers with 2024-era hardware crack:
+- **Score 0-1:** during the network round-trip. Reject before hashing.
+- **Score 2:** in a day of dedicated GPU time. Reject for admin accounts.
+- **Score 3:** in years. Acceptable for consumer sign-ups.
+- **Score 4:** approximate parity with a random 128-bit key. Not
+  reachable by human-chosen passwords in practice — score 4 usually
+  means a password manager output.
+
+## Detection details
+
+| Weakness              | Trigger                                                                 |
+| --------------------- | ----------------------------------------------------------------------- |
+| `too-short`           | Length &lt; 8 after NFKC normalization                                  |
+| `single-class`        | Only one of lower / upper / digit / symbol present                      |
+| `repetition`          | 3 or more of the same character in a row (`aaaa`, `1111`)               |
+| `sequential`          | 4 characters in ascending or descending code-point sequence             |
+| `contains-user-info`  | Password contains any string in `userInfo` (case-insensitive, min 3 chars) |
+
+Character classes are ASCII-only for entropy purposes: `[a-z]`, `[A-Z]`,
+`[0-9]`, ASCII punctuation. Extended Unicode is credited a conservative
+100-code-point alphabet in the entropy calc.
+
+## Not a zxcvbn
+
+`zxcvbn` is a 400 KB dependency that runs a lookup against millions of
+compromised passwords, keyboard patterns, dates, names, and l33t
+substitutions. It's excellent for a form validator that scores in real
+time as the user types. Ship it in your frontend if bundle size allows.
+
+`@exortek/password.strength` runs on your backend hot path — it's cheap,
+offline, and catches the "obvious" failures. Pair it with:
+
+- `zxcvbn` in the browser for real-time UX feedback
+- `@exortek/password.policy` for rule-based validation
+- `@exortek/password/hibp` for known-breach lookup
+
+## Recipe: form validator + backend gate
+
+```js
+// Frontend — real-time feedback
+import zxcvbn from 'zxcvbn';
+const uiScore = zxcvbn(input).score;   // 0-4, with reasons
+
+// Backend — authoritative gate
+import { password } from '@exortek/password';
+const r = password.strength(input, { userInfo: [email, firstName] });
+if (r.score < 2) {
+  return badRequest({ weaknesses: r.weaknesses });
+}
+```
+
+Frontends can be tampered with; the backend `strength` call is what
+actually stops weak passwords from landing in your database.

@@ -1,0 +1,15 @@
+export default {
+  index: 'Overview',
+  install: 'install — peer setup',
+  algorithms: 'algorithms — argon2 / scrypt / bcrypt / pbkdf2',
+  verify: 'verify — auto-router + needsRehash',
+  migration: 'migration — silent rehash on login',
+  strength: 'strength — score + entropy',
+  generate: 'generate — passwords & passphrases',
+  policy: 'policy — validation rules',
+  pepper: 'pepper — HMAC + rotation',
+  history: 'history — reuse prevention',
+  hibp: 'hibp — breach lookup',
+  timing: 'timing — enumeration defence',
+  errors: 'errors — PasswordError',
+};

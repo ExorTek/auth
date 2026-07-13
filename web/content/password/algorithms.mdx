@@ -1,0 +1,152 @@
+---
+title: 'password/algorithms — argon2 / scrypt / bcrypt / pbkdf2'
+sidebarTitle: algorithms
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `algorithms`
+
+Four algorithms under one shape. Every module exports `hash`, `verify`,
+`needsRehash`, and a `*Defaults` constant. Options are per-algorithm.
+
+## Picking one
+
+| Algorithm     | Node native? | Peer needed  | When to pick                                          |
+| ------------- | ------------ | ------------ | ----------------------------------------------------- |
+| **argon2id**  | no           | `argon2`     | New deployments — OWASP 2024 gold standard            |
+| **scrypt**    | ✓            | —            | New deployments — zero-dep, OWASP-approved default    |
+| **bcrypt**    | no           | `bcryptjs`   | Legacy migration, or teams already on bcrypt          |
+| **pbkdf2**    | ✓            | —            | FIPS 140-3 / NIST-only environments                   |
+
+Rule of thumb for new code: **argon2id** if you can afford the peer,
+**scrypt** if you want zero-dep. Bcrypt is fine but slower to reach
+OWASP-grade cost; PBKDF2 is CPU-only so GPU attackers win the arms race.
+
+## `argon2` — OWASP 2024 gold
+
+```ts
+password.argon2.hash(pw, {
+  type?:         'argon2id' | 'argon2i' | 'argon2d',   // default argon2id
+  memoryCost?:   number,                                // KiB, default 19456
+  timeCost?:     number,                                // iterations, default 2
+  parallelism?:  number,                                // lanes, default 1
+  hashLength?:   number,                                // bytes, default 32
+  saltLength?:   number,                                // bytes, default 16
+}): Promise<string>   // $argon2id$v=19$m=…$t=…$p=…$…$…
+```
+
+- **argon2id** is the recommended variant — hybrid of `argon2i`
+  (side-channel resistant) and `argon2d` (GPU-hard). Don't use `argon2d`
+  for password hashing; its memory-access pattern leaks bits via cache
+  side-channels.
+- Memory cost is in **KiB**. 19456 = ~19 MiB, matches OWASP 2024.
+- Verify takes ~200-300 ms with defaults on modern server hardware.
+
+## `scrypt` — Node native, zero-dep
+
+```ts
+password.scrypt.hash(pw, {
+  N?:          number,   // CPU/memory cost, power of 2, default 131072 (2^17)
+  r?:          number,   // block size, default 8 — do not change without a reason
+  p?:          number,   // parallelism, default 1
+  keyLength?:  number,   // output bytes, default 32
+  saltLength?: number,   // salt bytes, default 16
+}): Promise<string>   // $scrypt$ln=17,r=8,p=1$…$…
+```
+
+- `N` must be a power of two. The PHC output records it as `ln = log2(N)`.
+- Peak memory footprint is roughly `128 × N × r × p` bytes. With
+  defaults that's ~128 MiB per concurrent verify — plan container size
+  accordingly.
+- Node's built-in `crypto.scrypt` handles the primitive; no peer.
+
+## `bcrypt` — legacy migration, still meaningful
+
+```ts
+password.bcrypt.hash(pw, {
+  rounds?: number,                                  // 4-31, default 12
+  mode?:   'prehash' | 'strict' | 'truncate',       // default 'prehash'
+}): Promise<string>   // $2b$12$…
+```
+
+- Each `+1` to `rounds` **doubles** compute cost. OWASP minimum is 10;
+  12 is a modern default; 14 pushes verify past 1 s on typical
+  hardware.
+- **72-byte input trap** — see the [dedicated callout below](#72-byte-trap).
+- Requires the [`bcryptjs`](/password/install#adding-bcrypt-for-migration-or-teams-already-on-it)
+  peer.
+
+## `pbkdf2` — FIPS territory
+
+```ts
+password.pbkdf2.hash(pw, {
+  hash?:       'sha256' | 'sha512',                 // default 'sha256'
+  iterations?: number,                              // default 600000 (sha256) / 210000 (sha512)
+  keyLength?:  number,                              // default 32
+  saltLength?: number,                              // default 16
+}): Promise<string>   // $pbkdf2-sha256$i=600000$…$…
+```
+
+- The **only** NIST-approved KDF among the four. If a compliance auditor
+  demands FIPS 140-3, this is your algo.
+- Not memory-hard — an attacker with a GPU wins vs a CPU defender.
+  Prefer scrypt / argon2 when compliance doesn't require otherwise.
+
+## 72-byte trap
+
+<Callout type="warning">
+  **Bcrypt silently truncates input past 72 bytes.** A 100-character
+  passphrase hashes identically to its first 72 characters. This is a
+  known limitation of the original Blowfish key schedule.
+
+  `@exortek/password` handles this via a `mode` option, defaulting to
+  the same fix Django, Passlib, and Laravel apply — SHA-256 pre-hash so
+  every byte contributes:
+
+  ```js
+  password.bcrypt.hash(pw, { mode: 'prehash' })   // default — safe
+  password.bcrypt.hash(pw, { mode: 'strict' })    // refuse > 72 bytes
+  password.bcrypt.hash(pw, { mode: 'truncate' }) // match legacy behaviour
+  ```
+
+  Pass the same `mode` to `bcrypt.verify` — bcrypt's format has no room
+  to record it inline. If you're migrating hashes minted by a different
+  library that used silent truncation, use `mode: 'truncate'` for verify
+  compatibility, then rehash with `mode: 'prehash'` (via
+  `needsRehash → true` on your next login flow).
+</Callout>
+
+## `needsRehash`
+
+Every algo exports a `needsRehash(phc, target?)` that returns `true` when
+the stored parameters are behind the target (i.e., current defaults).
+See the [Migration](/password/migration) page for the login-time rehash
+recipe.
+
+## `identifyAlgorithm`
+
+```js
+import { password } from '@exortek/password';
+
+const which = password.identifyAlgorithm(user.pwHash);
+// → 'scrypt' | 'argon2id' | 'bcrypt' | 'pbkdf2-sha256' | … | null
+```
+
+Useful for migration telemetry ("what fraction of users are still on
+bcrypt?") without paying to verify.
+
+## Presets
+
+```js
+import { presets } from '@exortek/password';
+
+await password.argon2.hash(pw, presets.owasp2024.argon2);   // default-equivalent
+await password.scrypt.hash(pw, presets.sensitive.scrypt);   // KMS-grade, ~1 s per verify
+await password.bcrypt.hash(pw, presets.interactive.bcrypt); // ~50-80 ms per verify
+await password.pbkdf2.hash(pw, presets.fips.pbkdf2);        // NIST-approved
+```
+
+`owasp2024` (default-equivalent), `sensitive` (~1 s per verify),
+`interactive` (~50-80 ms), and `fips` (PBKDF2-SHA-256 only). Presets
+are shallow-frozen — clone if you need to tweak.

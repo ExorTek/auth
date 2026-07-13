@@ -1,0 +1,140 @@
+---
+title: 'password/policy — validation rules'
+sidebarTitle: policy
+---
+
+import { Callout } from 'nextra/components';
+
+# `policy`
+
+Rule-based validator that returns a structured verdict — no exceptions,
+no strings to parse, just a list of machine-readable violations to map
+onto your form fields.
+
+```ts
+policy(input, {
+  minLength?:       12,
+  maxLength?:       1024,
+  requireClasses?:  Array<'lower' | 'upper' | 'digit' | 'symbol'>,
+  denyList?:        string[],           // company / product names, etc.
+  userInfo?:        string[],           // email, username, etc.
+  requireMinScore?: 0 | 1 | 2 | 3 | 4,
+}): {
+  valid:      boolean,
+  violations: string[],
+  strength?:  StrengthResult,
+}
+```
+
+```js
+import { password } from '@exortek/password';
+
+const result = password.policy(input, {
+  minLength:      12,
+  requireClasses: ['lower', 'digit'],
+  denyList:       [companyName, product],
+  userInfo:       [user.email, user.firstName],
+  requireMinScore: 3,
+});
+
+if (!result.valid) {
+  return badRequest({ violations: result.violations });
+}
+```
+
+## Violations
+
+| Value                    | Trigger                                                                      |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| `too-short`              | Length &lt; `minLength` after NFKC normalization                             |
+| `too-long`               | Length &gt; `maxLength` after NFKC normalization                             |
+| `missing-class`          | Any class in `requireClasses` is absent                                      |
+| `in-deny-list`           | Case-insensitive substring match against any `denyList` entry (min 3 chars)  |
+| `contains-user-info`     | Case-insensitive substring match against any `userInfo` entry (min 3 chars)  |
+| `below-min-strength`     | `strength(input).score < requireMinScore`                                    |
+
+The `strength` result is only computed and included when
+`requireMinScore` is set — avoids the entropy calc on the hot path when
+you don't need it.
+
+## `assertPolicy(input, rules?)`
+
+Throw-if-invalid variant. Useful when you'd otherwise write
+`if (!result.valid) throw new PasswordError(...)`:
+
+```js
+import { assertPolicy, PasswordError, ErrorCode } from '@exortek/password';
+
+try {
+  assertPolicy(input, { minLength: 12, requireMinScore: 3 });
+} catch (err) {
+  if (err instanceof PasswordError && err.code === ErrorCode.POLICY_VIOLATION) {
+    return badRequest(err.details.violations);
+  }
+  throw err;
+}
+```
+
+`err.details.violations` mirrors the array returned by `policy`, and
+`err.details.strength` carries the strength result when `requireMinScore`
+was in play.
+
+## Sensible defaults
+
+The rules are all opt-in. Passing no options yields a `minLength: 12` /
+`maxLength: 1024` check with no class requirements, deny-list, or
+strength floor. If you want the OWASP-suggested baseline:
+
+```js
+password.policy(input, {
+  minLength:       12,
+  requireMinScore: 3,
+  userInfo:        [user.email, user.firstName, user.lastName],
+});
+```
+
+Backed by the [strength meter](/password/strength) — no other rules
+needed for consumer accounts.
+
+<Callout type="info">
+  **NIST SP 800-63B guidance** (2020 revision) recommends **against**
+  composition rules (upper + lower + digit + symbol) — they reduce
+  practical entropy by forcing users into predictable patterns like
+  `Password1!`. Prefer `minLength` + `requireMinScore` +
+  `banCommonPasswords` over `requireClasses` unless a compliance regime
+  forces your hand.
+</Callout>
+
+## Recipe: signup + change-password endpoints
+
+```js
+import { assertPolicy, ErrorCode, PasswordError } from '@exortek/password';
+
+app.post('/auth/signup', async (req, res) => {
+  try {
+    assertPolicy(req.body.password, {
+      minLength:      12,
+      requireMinScore: 3,
+      userInfo:       [req.body.email],
+    });
+  } catch (err) {
+    if (err instanceof PasswordError && err.code === ErrorCode.POLICY_VIOLATION) {
+      return res.status(400).json({
+        error: 'weak_password',
+        violations: err.details.violations,
+      });
+    }
+    throw err;
+  }
+  // ... continue signup ...
+});
+```
+
+## Composing with other checks
+
+`policy` handles the offline hygiene bit. For higher confidence:
+
+- Pair with [HIBP](/password/hibp) — reject known-breached passwords
+- Pair with [history](/password/history) — reject reuse
+- Pair with [pepper](/password/pepper) — layer server-side HMAC before
+  the KDF

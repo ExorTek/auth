@@ -1,0 +1,118 @@
+---
+title: 'password/history — reuse prevention'
+sidebarTitle: history
+---
+
+# `history`
+
+Stateless "don't reuse the last N passwords" helper. You feed it a list
+of previously stored hashes and it walks them via the umbrella verify
+router — the history list can be **mixed-algorithm** during migration
+without a special code path.
+
+```ts
+createHistory({ keepLast?: 5 }): {
+  isReused: (candidate, previousHashes) => Promise<boolean>,
+  append:   (freshHash, previousHashes) => string[],
+}
+```
+
+## Basic use
+
+```js
+import { createHistory, password } from '@exortek/password';
+
+const history = createHistory({ keepLast: 5 });
+
+app.post('/auth/password', async (req, res) => {
+  const user = await requireLogin(req);
+
+  if (await history.isReused(req.body.newPassword, user.previous_hashes)) {
+    return res.status(400).json({ error: 'reused_password' });
+  }
+
+  const newHash = await password.scrypt.hash(req.body.newPassword);
+  await db.users.update(user.id, {
+    pw_hash:         newHash,
+    previous_hashes: history.append(newHash, user.previous_hashes),
+  });
+  return res.json({ ok: true });
+});
+```
+
+`isReused` walks the previous list left-to-right — store newest first
+so the common case (user tries to reuse their most recent password)
+hits early.
+
+`append` prepends the fresh hash, deduplicates, and trims to `keepLast`.
+Returns a new array — the input isn't mutated.
+
+## `keepLast` sizing
+
+| Environment           | Recommended `keepLast` | Why                                                  |
+| --------------------- | ---------------------- | ---------------------------------------------------- |
+| Consumer SaaS         | 3-5                    | NIST-2020 says no forced rotation — small is fine    |
+| Enterprise            | 5-10                   | Sarbanes-Oxley / SOC 2 auditors commonly expect ≥ 5  |
+| PCI-DSS               | ≥ 4                    | PCI-DSS 8.3.7 minimum                                |
+| Government / regulated | 10-24                  | Depends on regime — check your compliance context    |
+
+## Storage cost
+
+Each stored hash is 80-200 bytes (bcrypt shortest, argon2 with defaults
+longest). At `keepLast: 5` you're adding ~1 KB per user row — trivial
+for most schemas. If your users column is space-critical, store the
+history as a JSON array in a side table:
+
+```sql
+CREATE TABLE user_password_history (
+  user_id     BIGINT REFERENCES users(id),
+  history     TEXT[] NOT NULL,   -- newest first
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id)
+);
+```
+
+## Cost of `isReused`
+
+Each entry in the history list runs a full KDF verify (~200 ms for
+scrypt with OWASP defaults, ~200-300 ms for argon2). At `keepLast: 5`
+that's ~1 second of CPU for the worst case (candidate is unique).
+
+- **Fast-path optimization** is not needed for a password-change
+  endpoint — it's rare and off the hot path.
+- **On a login endpoint**, don't use `history.isReused` — it's for
+  change-password only.
+
+## Mixed-algorithm history
+
+During migration your previous-hashes list has bcrypt from 2018 and
+argon2 from last week living side by side. The umbrella verify router
+handles both:
+
+```js
+const history = createHistory({ keepLast: 5 });
+// user.previous_hashes = ['$argon2id$…', '$scrypt$…', '$2b$12$…']
+await history.isReused(candidate, user.previous_hashes);   // works
+```
+
+## `append` semantics
+
+- Prepends `freshHash` to the head of the list
+- Removes any pre-existing occurrence of `freshHash` (dedup)
+- Trims to `keepLast`
+- Never mutates the input array
+
+```js
+history.append('h0', ['h1', 'h2', 'h3']);      // ['h0', 'h1', 'h2'] (keepLast: 3)
+history.append('h1', ['h1', 'h2', 'h3']);      // ['h1', 'h2', 'h3'] (dedup)
+```
+
+## What it doesn't do
+
+- **No password compare** — only hash compare via KDF verify. Two
+  different plaintexts can never collide.
+- **No plaintext storage** — the interface deliberately doesn't accept
+  or return raw passwords, only hashes.
+- **No timestamp tracking** — `keepLast` is count-based. If you need
+  time-based history ("no reuse in the last 90 days") wrap this with a
+  side field on the history entries.

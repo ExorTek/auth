@@ -1,0 +1,116 @@
+---
+title: 'password/verify — auto-router + needsRehash'
+sidebarTitle: verify
+---
+
+import { Callout } from 'nextra/components';
+
+# `verify`
+
+The umbrella `password.verify(input, storedHash)` inspects the stored
+hash's PHC prefix (or bcrypt's `$2b$` shape) and dispatches to the right
+algorithm. This is the login-endpoint hot path — you don't need to know
+what algorithm minted the stored hash, only that it's yours.
+
+```ts
+verify(
+  input:      string | Buffer | Uint8Array,
+  storedHash: string,
+  options?:   { bcryptMode?: 'prehash' | 'strict' | 'truncate' }
+): Promise<boolean>
+```
+
+Returns `false` on any mismatch — malformed hashes, unrecognised prefixes,
+wrong password — so login handlers never need a try/catch around it. The
+only exception raised is `MISSING_PEER_DEP`, when the stored hash's
+algorithm needs `argon2` or `bcryptjs` and neither is installed.
+
+```js
+import { password } from '@exortek/password';
+
+const user = await db.users.findByEmail(req.body.email);
+const ok = await password.verify(req.body.password, user.pw_hash);
+if (!ok) return res.status(401).end('invalid credentials');
+return signIn(user);
+```
+
+## Constant-time verify — closing the user-enumeration side channel
+
+The naïve `if (!user) return 401` shortcut lets an attacker walk a
+wordlist of emails and grade "exists" vs "doesn't exist" by response
+latency. `password.constantTimeVerify(input, storedHash)` handles the
+missing case by running a full verify against an internal decoy hash —
+same wall-clock cost either way:
+
+```js
+const user = await db.users.findByEmail(input.email);
+const ok = await password.constantTimeVerify(input.password, user?.pw_hash);
+if (!ok) return unauthorized();   // same message and timing either way
+```
+
+The decoy is minted once per process on the first missing-hash call
+(~200 ms lazy cost), then reused. See the [Timing defence](/password/timing)
+page for the full analysis.
+
+## `needsRehash` — cross-algorithm
+
+```ts
+needsRehash(storedHash: string, {
+  target?: 'scrypt' | 'argon2id' | 'argon2i' | 'argon2d'
+         | 'bcrypt' | 'pbkdf2-sha256' | 'pbkdf2-sha512',
+  params?: object,
+}): boolean
+```
+
+Returns `true` when the stored hash is either on a **different**
+algorithm than the target or on the same algorithm with **weaker**
+parameters. Default target is `scrypt` with this package's OWASP-2024
+defaults — matches the zero-dep hot path.
+
+If your deployment is standardised on Argon2id:
+
+```js
+if (password.needsRehash(user.pw_hash, { target: 'argon2id' })) {
+  const fresh = await password.argon2.hash(input);
+  await db.users.update(user.id, { pw_hash: fresh });
+}
+```
+
+See [Migration](/password/migration) for the full login-flow recipe.
+
+## `identifyAlgorithm`
+
+```ts
+identifyAlgorithm(storedHash: string): PasswordAlgorithm | null
+```
+
+Returns the algorithm label (`'scrypt'`, `'argon2id'`, `'bcrypt'`,
+`'pbkdf2-sha256'`, …) or `null` for unrecognised input. Useful for a
+migration dashboard:
+
+```js
+const totals = {};
+for await (const user of db.users.stream()) {
+  const algo = password.identifyAlgorithm(user.pw_hash) ?? 'unknown';
+  totals[algo] = (totals[algo] ?? 0) + 1;
+}
+console.log(totals);   // { bcrypt: 4212, argon2id: 8891, scrypt: 32, unknown: 3 }
+```
+
+<Callout type="info">
+  **Malformed hashes read as `null`.** If your telemetry shows a growing
+  `unknown` bucket, something upstream is corrupting the column — the
+  usual suspect is a truncation from a shorter VARCHAR (bcrypt is 60
+  chars, argon2 comfortably fits in 128, scrypt / pbkdf2 need 128+).
+</Callout>
+
+## Errors
+
+The verify router only raises for misconfiguration, never for a wrong
+password:
+
+- `MISSING_PEER_DEP` — the stored hash's algorithm needs a peer that
+  isn't installed. Actionable message names the exact package.
+
+Everything else — malformed input, unrecognised prefix, tampered PHC —
+returns `false`.

@@ -1,0 +1,156 @@
+---
+title: 'password/migration — silent rehash on login'
+sidebarTitle: migration
+---
+
+import { Callout } from 'nextra/components';
+
+# `migration`
+
+The core migration pattern is the same regardless of source / target
+algorithms: **verify with the umbrella router, rehash to the target on
+successful login, write it back**. Users never see it happen.
+
+```js
+import { password } from '@exortek/password';
+
+async function login(email, input) {
+  const user = await db.users.findByEmail(email);
+  const ok = await password.constantTimeVerify(input, user?.pw_hash);
+  if (!ok) return unauthorized();
+
+  // Silent rehash if the stored format is behind our current default
+  if (password.needsRehash(user.pw_hash, { target: 'argon2id' })) {
+    const fresh = await password.argon2.hash(input);
+    await db.users.update(user.id, { pw_hash: fresh });
+  }
+  return signIn(user);
+}
+```
+
+The verify router works across **any** combination of algorithms present
+in your database — bcrypt corpora from 2018 mix with argon2 hashes minted
+last week without a special code path.
+
+## Common scenarios
+
+### Bcrypt → Argon2id
+
+You're on `bcryptjs` today, want to move to Argon2id over the next month
+of logins:
+
+```js
+if (password.needsRehash(user.pw_hash, { target: 'argon2id' })) {
+  const fresh = await password.argon2.hash(input);
+  await db.users.update(user.id, { pw_hash: fresh });
+}
+```
+
+`needsRehash` returns `true` for **every** non-Argon2id hash — bcrypt,
+scrypt, PBKDF2 — so this single check handles all of them. Users who log
+in during the migration window silently upgrade; users who never log in
+stay on bcrypt until you run a batch rehash.
+
+<Callout type="info">
+  **Peers during migration:** you need `bcryptjs` installed to *verify*
+  the old hashes, plus `argon2` to *mint* the new ones. Remove `bcryptjs`
+  only after the last bcrypt-storing user has been rehashed — either by
+  logging in or by a background job (see below).
+</Callout>
+
+### Legacy PBKDF2 (from another Node lib) → scrypt
+
+Same shape:
+
+```js
+if (password.needsRehash(user.pw_hash, { target: 'scrypt' })) {
+  const fresh = await password.scrypt.hash(input);
+  await db.users.update(user.id, { pw_hash: fresh });
+}
+```
+
+Zero-dep — scrypt lives in `node:crypto` — so this is the cheapest
+migration if you don't need Argon2id specifically.
+
+### Params drift within the same algorithm
+
+Say you deployed with scrypt N=2^15 two years ago and want to move to
+2^17 (the current OWASP recommendation). `needsRehash` catches this too,
+since it compares stored params against the target's defaults:
+
+```js
+if (password.scrypt.needsRehash(user.pw_hash)) {
+  // Reject on param mismatch OR wrong algo — same call, same code path
+  const fresh = await password.scrypt.hash(input);
+  await db.users.update(user.id, { pw_hash: fresh });
+}
+```
+
+## Users who never log in
+
+Login-driven migration is graceful but incomplete — a dormant account
+stays on the old algorithm forever. Two options:
+
+### Option A — batch rehash on lookup (recommended)
+
+Rehash lazily when *anything* touches the account, not just logins:
+
+```js
+async function loadUser(id) {
+  const user = await db.users.findById(id);
+  if (user && password.needsRehash(user.pw_hash, { target: 'argon2id' })) {
+    // Can't rehash without the raw password — flag for the next login instead
+    queueForMigrationOnNextLogin(user.id);
+  }
+  return user;
+}
+```
+
+You can't rehash without the plaintext, so a batch job can only mark
+accounts as "needs rehash" — the actual work still happens on next login.
+
+### Option B — force rotation
+
+For high-security migrations (say, moving off a leaked-pepper hash), you
+can force-expire the password:
+
+```js
+// Migration script
+for await (const user of db.users.streamWhere({ pw_algo: 'bcrypt' })) {
+  await db.users.update(user.id, { must_reset_password: true });
+}
+
+// Login handler
+if (user.must_reset_password) {
+  return res.redirect('/reset-password');
+}
+```
+
+This is user-visible so use it sparingly — the login-time silent rehash
+covers 95% of active accounts within a few weeks.
+
+## Rotating the pepper
+
+If you use [`createPepper`](/password/pepper) and the pepper leaks (or
+you're rotating on a schedule), pass an array of secrets in newest-first
+order. `wrapAll` lets `verify` walk the list:
+
+```js
+const pepper = createPepper({ secret: [NEW_PEPPER, OLD_PEPPER] });
+
+const candidates = pepper.wrapAll(input);
+for (let i = 0; i < candidates.length; i++) {
+  if (await password.verify(candidates[i], user.pw_hash)) {
+    if (i > 0) {
+      // Matched under an older pepper — rehash under the current one
+      const fresh = await password.scrypt.hash(candidates[0]);
+      await db.users.update(user.id, { pw_hash: fresh });
+    }
+    return signIn(user);
+  }
+}
+return unauthorized();
+```
+
+Once no accounts remain under the old pepper (batch-verify or
+migration-flag pattern), drop it from the array and redeploy.

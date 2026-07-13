@@ -1,0 +1,96 @@
+---
+title: 'password/install — peer setup'
+sidebarTitle: install
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `install`
+
+The base package works on Node 22+ with **zero required dependencies** —
+scrypt and PBKDF2 both live in `node:crypto`. Argon2 and bcrypt come from
+optional peer dependencies you install only if you want them.
+
+## Base install
+
+```bash
+npm  install @exortek/password
+yarn add     @exortek/password
+pnpm add     @exortek/password
+```
+
+That's enough to use `password.scrypt.*` and `password.pbkdf2.*`, plus every
+helper: `strength`, `generate`, `passphrase`, `policy`, `createPepper`,
+`createHistory`, and `createHibpClient`. The umbrella `password.verify` also
+works — it will just refuse Argon2 / bcrypt hashes with a clear error until
+you install the corresponding peer.
+
+## Adding Argon2id
+
+Argon2id is OWASP's 2024 first-line recommendation for new deployments.
+Install the reference native binding:
+
+```bash
+yarn add argon2
+```
+
+<Callout type="info">
+  The `argon2` npm package uses `node-gyp` to build a native addon. On common
+  platforms (Linux x64/arm64, macOS, Windows) it ships prebuilt binaries — no
+  compiler required. On Alpine or musl-based Docker images you may need
+  `apk add --no-cache python3 make g++`, or switch to a Debian-slim base.
+</Callout>
+
+## Adding bcrypt (for migration or teams already on it)
+
+```bash
+yarn add bcryptjs
+```
+
+`bcryptjs` is **pure JavaScript** — no native build step, works on Alpine,
+Cloudflare Workers, Vercel Edge, and any other constrained runtime. It's
+about 4× slower than the native `bcrypt` package, which is fine for a login
+path but noticeable in bulk operations.
+
+<Callout type="warning">
+  We ship against `bcryptjs`, not the native `bcrypt`. If your legacy hashes
+  were minted with `bcrypt`, they use the same `$2b$` format and verify fine
+  against `bcryptjs` — no migration needed at storage.
+</Callout>
+
+## Adding everything
+
+```bash
+yarn add @exortek/password argon2 bcryptjs
+```
+
+Common when you're rehashing a legacy `$2b$` corpus into fresh `$argon2id$`
+strings — you need bcrypt to verify the old ones and argon2 to mint the new.
+
+## What if a peer isn't installed?
+
+The first `password.argon2.hash()` / `password.argon2.verify()` /
+`password.bcrypt.*` call throws `PasswordError` with `code:
+'MISSING_PEER_DEP'` and an install command in the message:
+
+```
+PasswordError [MISSING_PEER_DEP]:
+@exortek/password's argon2 backend requires the 'argon2' npm package.
+Install it as a peer:
+
+  yarn add argon2
+```
+
+The umbrella `password.verify` propagates this error verbatim — an
+already-stored Argon2 hash surfaces the same actionable message rather than
+returning `false` (which would look like a wrong password and mask the
+misconfiguration).
+
+## Uninstalling
+
+Peer deps are yours to manage. Removing `argon2` after users already have
+`$argon2id$…` hashes in your database means those users **cannot log in**
+until you install it again — the router has no fallback for a hash whose
+algorithm's peer is missing. Plan the removal alongside a background
+rehash job that walks the users table and rehashes onto a still-supported
+algorithm before you cut the peer.
