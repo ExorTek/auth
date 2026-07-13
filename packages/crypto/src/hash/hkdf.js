@@ -7,6 +7,9 @@ import { toBuffer } from '../internal/bytes.js';
 export const SUPPORTED_HKDF_HASHES = /** @type {const} */ (['sha256', 'sha384', 'sha512']);
 const _SUPPORTED = new Set(SUPPORTED_HKDF_HASHES);
 
+/** Output length in bytes of each supported hash — HKDF max output is 255 × hashLen. */
+const _HASH_LEN = /** @type {const} */ ({ sha256: 32, sha384: 48, sha512: 64 });
+
 /**
  * @typedef {object} HkdfOptions
  * @property {string | Buffer | Uint8Array}      [salt='']       Random salt. Empty by default;
@@ -19,8 +22,9 @@ const _SUPPORTED = new Set(SUPPORTED_HKDF_HASHES);
  *                                                                the same IKM (e.g. `'session'` vs
  *                                                                `'refresh'` vs `'csrf'`).
  * @property {number}                            [length=32]     Output length in bytes.
- *                                                                Capped at `255 × hashLength`
- *                                                                (255 × 32 = 8160 for SHA-256).
+ *                                                                Capped at `255 × hashLength` for the
+ *                                                                chosen `hash`: 8160 (sha256),
+ *                                                                12240 (sha384), 16320 (sha512).
  * @property {'sha256' | 'sha384' | 'sha512'}    [hash='sha256'] Underlying hash function.
  * @property {'hex' | 'base64' | 'base64url' | 'buffer'} [encoding='buffer']
  *                                                                Output format.
@@ -73,11 +77,14 @@ export function hkdf(ikm, options) {
   }
   const length = options?.length ?? 32;
   assertPositiveInt(length, 'options.length');
-  // HKDF max output = 255 * hashLen. Conservative upper bound (SHA-256 hashLen = 32).
-  if (length > 255 * 64) {
+  // HKDF max output = 255 * hashLen, and hashLen depends on the chosen hash —
+  // enforce the real per-hash ceiling so we raise a CryptoError instead of
+  // letting Node throw a raw RangeError for e.g. sha256 + length 10000.
+  const maxLength = 255 * _HASH_LEN[hash];
+  if (length > maxLength) {
     throw new CryptoError(
       ErrorCode.INVALID_ARGUMENT,
-      `options.length ${length} exceeds HKDF maximum of ${255 * 64} bytes (255 × 64 for sha512). For more key material, call hkdf multiple times with distinct info strings.`,
+      `options.length ${length} exceeds HKDF maximum of ${maxLength} bytes for ${hash} (255 × ${_HASH_LEN[hash]}). For more key material, call hkdf multiple times with distinct info strings.`,
     );
   }
   const salt = options?.salt !== undefined ? toBuffer(options.salt, 'options.salt') : Buffer.alloc(0);

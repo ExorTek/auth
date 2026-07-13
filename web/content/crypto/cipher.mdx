@@ -258,7 +258,8 @@ seal(payload: any,
      options: SealOptions): string
 
 unseal(token:  string,
-       secret: string | Buffer | Uint8Array,
+       secret: string | Buffer | Uint8Array
+             | Array<string | Buffer | Uint8Array>,   // for rotation — [newest, …older]
        options?: { now?: number, clockSkew?: number }
       ): { payload: any, expiresAt: number }
 
@@ -304,6 +305,18 @@ try {
 
 **`clockSkew`** allows a small grace window (in seconds) past nominal expiry — useful when validating tokens across
 servers whose clocks aren't perfectly aligned.
+
+**Secret rotation.** Pass `[newest, …older]` as the second argument to keep tokens issued under a previous secret
+valid while you cut over. Each key is tried in order; the first that authenticates wins. Cost is one HKDF + one
+AES-GCM per unmatched key — negligible for the 2–3 keys a rotation window needs.
+
+```js
+// Rotate RESET_SECRET without invalidating tokens minted before the cutover
+const { payload } = cipher.unseal(req.query.t, [RESET_SECRET_NEW, RESET_SECRET_OLD]);
+```
+
+Once the old secret's TTL horizon has passed (every in-flight token has either been consumed or expired), drop it
+from the array on your next deploy.
 
 <Callout type="info">
   **`seal` vs. JWT.** JWT is a *signed*, publicly readable envelope built to a JOSE standard, meant for stateless auth

@@ -189,3 +189,55 @@ describe('seal — argument validation', () => {
     );
   });
 });
+
+describe('unseal — secret rotation', () => {
+  const OLD = 'old-secret-32-bytes-of-material!';
+  const NEW = 'new-secret-32-bytes-of-material.';
+
+  it('accepts an array of secrets and picks the one that matches', () => {
+    const token = seal({ id: 7 }, OLD, { ttl: 60 });
+    assert.deepEqual(unseal(token, [NEW, OLD]).payload, { id: 7 });
+    assert.deepEqual(unseal(token, [OLD, NEW]).payload, { id: 7 });
+  });
+
+  it('falls through past secrets that fail auth and returns the payload of the matching one', () => {
+    const tokenNew = seal({ v: 'new' }, NEW, { ttl: 60 });
+    const tokenOld = seal({ v: 'old' }, OLD, { ttl: 60 });
+    const secrets = [NEW, OLD];
+    assert.equal(unseal(tokenNew, secrets).payload.v, 'new');
+    assert.equal(unseal(tokenOld, secrets).payload.v, 'old');
+  });
+
+  it('TOKEN_TAMPERED when no secret in the array matches', () => {
+    const token = seal({ a: 1 }, 'issuer-secret-not-in-the-list!!!', { ttl: 60 });
+    assert.throws(
+      () => unseal(token, [NEW, OLD]),
+      err =>
+        err instanceof CryptoError &&
+        err.code === ErrorCode.TOKEN_TAMPERED &&
+        /all 2 provided secrets/.test(err.message),
+    );
+  });
+
+  it('rejects an empty secret array', () => {
+    const token = seal({ a: 1 }, OLD, { ttl: 60 });
+    assert.throws(
+      () => unseal(token, []),
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+  });
+
+  it('single-secret array behaves identically to a bare secret', () => {
+    const token = seal({ ok: true }, OLD, { ttl: 60 });
+    assert.deepEqual(unseal(token, [OLD]).payload, unseal(token, OLD).payload);
+  });
+
+  it('expiry check still fires when a rotated secret matched', () => {
+    const now = 1_000_000_000_000;
+    const token = seal({ a: 1 }, OLD, { ttl: 60, now });
+    assert.throws(
+      () => unseal(token, [NEW, OLD], { now: now + 120_000 }),
+      err => err instanceof CryptoError && err.code === ErrorCode.TOKEN_EXPIRED,
+    );
+  });
+});

@@ -129,9 +129,15 @@ export function seal(payload, secret, options) {
  *   - `TOKEN_EXPIRED` — token was valid but its TTL has passed. Ask the user
  *     to request a fresh one ("this link has expired").
  *
- * @param {string}                       token   `base64url` from {@link seal}.
- * @param {string | Buffer | Uint8Array} secret  Same key material as sealing.
- * @param {UnsealOptions}                [options]
+ * **Secret rotation.** `secret` may be a single key or an array `[newest, …older]`.
+ * Each is tried in order; the first that authenticates wins. Rotate by (a) issuing
+ * new tokens with a fresh secret, (b) unsealing with `[fresh, previous]` until the
+ * previous secret's TTL horizon has passed, then (c) dropping the old entry. Cost
+ * is one HKDF + one AES-GCM per unmatched secret — cheap for 2–3 keys.
+ *
+ * @param {string}                                                           token   `base64url` from {@link seal}.
+ * @param {string | Buffer | Uint8Array | Array<string | Buffer | Uint8Array>} secret  Key material, or an array of keys for rotation.
+ * @param {UnsealOptions}                                                    [options]
  * @returns {SealResult}
  * @throws {CryptoError}
  *
@@ -144,6 +150,10 @@ export function seal(payload, secret, options) {
  *   if (err.code === ErrorCode.TOKEN_TAMPERED)  return render404()
  *   throw err
  * }
+ *
+ * @example
+ * // Rotate SEAL_SECRET without invalidating in-flight tokens:
+ * const { payload } = unseal(token, [SEAL_SECRET_NEW, SEAL_SECRET_OLD], { clockSkew: 5 })
  */
 export function unseal(token, secret, options) {
   if (typeof token !== 'string') {
@@ -152,7 +162,16 @@ export function unseal(token, secret, options) {
       `token must be a string (base64url from seal()); got ${_describe(token)}`,
     );
   }
-  assertBytesOrString(secret, 'secret');
+  const secrets = Array.isArray(secret) ? secret : [secret];
+  if (secrets.length === 0) {
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      'secret list is empty — pass at least one key (or an array of keys for rotation)',
+    );
+  }
+  for (const s of secrets) {
+    assertBytesOrString(s, 'secret');
+  }
   assertOptionalObject(options, 'options');
   const bytes = Buffer.from(token, 'base64url');
   if (bytes.length < HEADER_LEN + TAG_LEN) {
@@ -173,18 +192,25 @@ export function unseal(token, secret, options) {
   const tag = bytes.subarray(bytes.length - TAG_LEN);
   const ciphertext = bytes.subarray(HEADER_LEN, bytes.length - TAG_LEN);
 
-  const key = _deriveKey(secret);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAAD(header);
-  decipher.setAuthTag(tag);
-  let plaintext;
-  try {
-    plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  } catch (cause) {
+  let plaintext = null;
+  let lastCause;
+  for (const s of secrets) {
+    const key = _deriveKey(s);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAAD(header);
+    decipher.setAuthTag(tag);
+    try {
+      plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+      break;
+    } catch (cause) {
+      lastCause = cause;
+    }
+  }
+  if (plaintext === null) {
     throw new CryptoError(
       ErrorCode.TOKEN_TAMPERED,
-      'token authentication failed — wrong secret, tampered bytes, or a token issued with a rotated secret. Never render this hint to end users; treat it as unauthenticated.',
-      { cause },
+      `token authentication failed against ${secrets.length === 1 ? 'the provided secret' : `all ${secrets.length} provided secrets`} — wrong secret, tampered bytes, or a token issued with a rotated secret. Never render this hint to end users; treat it as unauthenticated.`,
+      { cause: lastCause },
     );
   }
 
