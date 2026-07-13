@@ -7,7 +7,12 @@ import { nodeResolve } from '@rollup/plugin-node-resolve';
 const resolveOnce = nodeResolve();
 
 export function createConfig(pkg, options = {}) {
-  const external = [...Object.keys(pkg.dependencies || {}), ...Object.keys(pkg.peerDependencies || {}), /^node:/];
+  const external = [
+    ...Object.keys(pkg.dependencies || {}),
+    ...Object.keys(pkg.peerDependencies || {}),
+    ...Object.keys(pkg.optionalDependencies || {}),
+    /^node:/,
+  ];
   const entries = options.entries || { index: 'src/index.js' };
   const plugins = [resolveOnce];
 
