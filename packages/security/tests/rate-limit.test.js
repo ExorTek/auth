@@ -598,9 +598,7 @@ test('withBan: concurrent denials past threshold all land in the ban window (no 
   };
   const limiter = rateLimit.withBan(base, { store, threshold: 5, banDuration: '10m' });
 
-  const results = await Promise.all(
-    Array.from({ length: 20 }, () => limiter.check({ key: 'ip' })),
-  );
+  const results = await Promise.all(Array.from({ length: 20 }, () => limiter.check({ key: 'ip' })));
   assert.equal(
     results.every(r => r.allowed === false),
     true,
