@@ -1,0 +1,116 @@
+---
+title: 'Compliance mapping — NIST / OWASP / PCI-DSS / FIPS'
+sidebarTitle: Compliance
+---
+
+import { Callout } from 'nextra/components';
+
+# Compliance mapping
+
+Where `@exortek/*` packages sit against the standards commonly cited by
+enterprise procurement, security architecture, and audit teams. Each
+requirement is marked:
+
+- ✅ **Covered** — the library defaults or an opt-in feature satisfies
+  the control on its own.
+- 🟡 **Assist** — the library provides the primitive; the caller has to
+  wire it up correctly.
+- ❌ **Out of scope** — the control is above our layer or belongs to a
+  package we haven't shipped yet.
+
+<Callout type="info">
+  This page mirrors [`docs/compliance.md`](https://github.com/ExorTek/auth/blob/master/docs/compliance.md)
+  in the repository. When your auditor asks for a written attestation,
+  the markdown version is a stable link that survives site redesigns.
+</Callout>
+
+## OWASP ASVS 4.0.3
+
+### V2 — Authentication
+
+| §         | Requirement                                                                | Status | How                                                                                                    |
+| --------- | -------------------------------------------------------------------------- | :----: | ------------------------------------------------------------------------------------------------------ |
+| V2.1.1    | Passwords ≥ 8 chars, ≤ 64 not truncated                                    |   ✅   | `policy({ minLength })` default 12; `bcrypt.mode='prehash'` handles the 72-byte trap                   |
+| V2.1.2    | Password length ≤ 128 accepted                                             |   ✅   | `MAX_PASSWORD_BYTES = 1024`                                                                            |
+| V2.1.7    | Passwords compared against known-breached corpus                           |   ✅   | `createHibpClient` (k-anonymity)                                                                       |
+| V2.1.8    | Password strength meter available                                          |   ✅   | `password.strength()`                                                                                  |
+| V2.1.9    | No composition rules unless justified                                      |   ✅   | `policy` defaults omit `requireClasses`                                                                |
+| V2.2.1    | Anti-automation on auth endpoints                                          |   🟡   | Wire `@exortek/security`'s `rateLimit` on `/login`                                                    |
+| V2.4.1    | Passwords salted with unique cryptographically random salt                 |   ✅   | Every hash function generates a fresh `crypto.randomBytes` salt                                        |
+| V2.4.2    | Argon2id / scrypt / bcrypt / PBKDF2 with recommended params                |   ✅   | All four, OWASP 2024 defaults                                                                          |
+| V2.4.4    | Additional secret used as part of hash (pepper)                            |   ✅   | `createPepper` with rotation                                                                           |
+| V2.7.2    | OOB out-of-band tokens use CSPRNG, ≥ 6 digits                              |   ✅   | `otp.totp` / `otp.hotp`                                                                                |
+| V2.7.3    | OOB tokens use timing-safe compare                                         |   ✅   | `otp.verifyTotp` uses `crypto.timingSafeEqual`                                                         |
+| V2.7.4    | OOB single-use (replay defence)                                            |   ✅   | `otp.verifyTotp({ replay: { store } })` — atomic incr / CAS                                            |
+| V2.8.1    | TOTP compliant with RFC 6238                                               |   ✅   | RFC 6238 Appendix B vectors                                                                            |
+| V2.8.2    | HOTP compliant with RFC 4226                                               |   ✅   | RFC 4226 Appendix D vectors                                                                            |
+| V2.8.4    | HOTP counter resynchronisation                                             |   ✅   | `otp.resynchronize`                                                                                    |
+| V2.10.4   | Backup / recovery codes stored hashed                                      |   ✅   | `otp.backupCodes` + `password.scrypt.hash`                                                             |
+
+### V6 — Stored Cryptography
+
+| §       | Requirement                                             | Status | How                                                                         |
+| ------- | ------------------------------------------------------- | :----: | --------------------------------------------------------------------------- |
+| V6.2.1  | Approved algorithms only                                |   ✅   | NIST-approved / IETF-standardised throughout                                |
+| V6.2.3  | Keys rotated                                            |   ✅   | `unseal([new, old])`, `createPepper([new, old])`, JWKS                       |
+| V6.2.4  | Algorithm agility (rehash on log-in)                    |   ✅   | `password.needsRehash` + cross-algo router                                  |
+| V6.4.1  | AEAD ciphers, no CBC without HMAC                       |   ✅   | AES-256-GCM only                                                            |
+| V6.4.2  | HMAC output ≥ 128 bits                                  |   ✅   | Minimum SHA-256                                                             |
+
+## NIST SP 800-63B — Digital Identity (AAL2)
+
+| §         | Requirement                                                    | Status | How                                                                                  |
+| --------- | -------------------------------------------------------------- | :----: | ------------------------------------------------------------------------------------ |
+| 5.1.1.2   | Memorized secret — min 8 chars, no composition rules           |   ✅   | Default `minLength: 12`; classes off by default (NIST 2020 update)                   |
+| 5.1.1.2   | Compare against list of known-breached values                  |   ✅   | `createHibpClient`                                                                   |
+| 5.1.1.2   | Approved KDF with memory-hard preference                       |   ✅   | Argon2id default recommendation                                                      |
+| 5.1.1.2   | Salted with unique per-user salt                               |   ✅   | Fresh salt every hash                                                                |
+| 5.1.1.2   | Server-side secret (pepper) SHOULD be considered               |   ✅   | `createPepper`                                                                       |
+| 5.1.5.2   | Single-factor OTP RFC 4226 / 6238 compliant                    |   ✅   | Full RFC 4226 + 6238 coverage                                                        |
+| 5.1.5.2   | OTP replay defence                                             |   ✅   | `otp.verifyTotp({ replay })`                                                         |
+
+## PCI-DSS 4.0
+
+| §        | Requirement                                                | Status | How                                                                                           |
+| -------- | ---------------------------------------------------------- | :----: | --------------------------------------------------------------------------------------------- |
+| 8.3.1    | Strong cryptography for stored passwords                   |   ✅   | argon2id / scrypt / bcrypt / pbkdf2                                                           |
+| 8.3.6    | Passwords ≥ 12 chars mixed complexity                      |   ✅   | `policy({ minLength: 12, requireClasses: […] })`                                              |
+| 8.3.7    | Password history (last ≥ 4)                                |   ✅   | `createHistory({ keepLast: 4+ })`                                                             |
+| 8.3.9    | MFA on non-console access                                  |   ✅   | `@exortek/otp` for TOTP                                                                       |
+| 8.3.10   | MFA replay protection                                      |   ✅   | `otp.verifyTotp({ replay })`                                                                  |
+| 6.2.4    | Common attacks prevented — injection, XSS, CSRF            |   ✅   | `@exortek/security` — CSRF plugin, proto-pollution defence                                    |
+
+## FIPS 140-3 — Approved algorithms
+
+| Algorithm              | Approved | Available | FIPS mode        |
+| ---------------------- | :------: | :-------: | ---------------- |
+| PBKDF2-HMAC-SHA-256    |    ✅    |    ✅     | `presets.fips.pbkdf2` |
+| Argon2id               |    ❌    |    ✅     | Rejected              |
+| scrypt                 |    ❌    |    ✅     | Rejected              |
+| bcrypt                 |    ❌    |    ✅     | Rejected              |
+| AES-256-GCM            |    ✅    |    ✅     | Default in `seal`     |
+| SHA-256 / 384 / 512    |    ✅    |    ✅     | Default              |
+| HMAC-SHA-256+          |    ✅    |    ✅     | Default              |
+| ECDSA (P-256/384/521)  |    ✅    |    ✅     | Available            |
+| Ed25519                |    ✅    |    ✅     | Available            |
+| HKDF-HMAC-SHA-256+     |    ✅    |    ✅     | Default              |
+
+When Node is started with `--enable-fips` on a FIPS-enabled OpenSSL,
+`@exortek/crypto` inherits the OS restrictions automatically.
+
+## Summary
+
+- ✅ **NIST SP 800-63B AAL2** — memorized secret + OOB OTP paths
+- ✅ **OWASP ASVS 4.0.3 V2 / V6** — password + storage controls
+- ✅ **PCI-DSS 4.0 §8.3** — strength, history, MFA
+- ✅ **FIPS-compatible mode** — via presets and Node `--enable-fips`
+- 🟡 **ASVS V3 session, V2.9 cryptographic authenticators** — coming
+  with `@exortek/session` and `@exortek/passkey`
+- 🟡 **Observability hooks** for SOC 2 / SIEM — roadmap
+
+## Reading
+
+- [NIST SP 800-63B](https://pages.nist.gov/800-63-3/sp800-63b.html)
+- [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)
+- [FIPS 140-3](https://csrc.nist.gov/publications/detail/fips/140/3/final)
+- [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)

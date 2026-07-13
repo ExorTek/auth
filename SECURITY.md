@@ -9,6 +9,8 @@ lines are not patched unless the project has an explicit LTS commitment (none do
 | ------------------- | --------------- |
 | `@exortek/crypto`   | `1.x` — current |
 | `@exortek/security` | `1.x` — current |
+| `@exortek/otp`      | `1.x` — current |
+| `@exortek/password` | `1.x` — current |
 
 Everything else in the roadmap is **not yet published** — file bug reports through the usual template once a version is
 out.
@@ -65,6 +67,36 @@ keep you off the credits.
   much", that's the documented behaviour.
 - **Docs site typos, missing pages, broken CSS.** Those go through the regular issue tracker.
 - **Feature-request-disguised-as-vulnerability** ("your library should do X"). Please use the feature request template.
+
+## Hardening guarantees
+
+Every package in this repository is written to hold these invariants. Deviations are treated as bugs and fall under the
+reporting policy above.
+
+- **No hand-rolled crypto.** Every primitive delegates to `node:crypto` (OpenSSL-backed) or a well-audited peer
+  (`argon2`, `bcryptjs`). We don't reimplement HMAC, AES-GCM, PBKDF2, scrypt, or Blake2 in JavaScript.
+- **Timing-safe comparison** for every user-supplied secret compare — passwords, OTP codes, backup codes, CSRF tokens,
+  seal tag checks. Uses `crypto.timingSafeEqual` on equal-length Buffers.
+- **Constant-time verify paths** where user-existence would otherwise leak via response latency
+  (`password.constantTimeVerify`, `otp.verifyTotp` with the CAS replay guard).
+- **No `Math.random()`** anywhere in a security-relevant path. Every randomness source is `crypto.randomBytes` with
+  rejection sampling where a bounded alphabet is involved.
+- **Prototype-pollution defence** on any user-supplied JSON in `@exortek/security` — `__proto__` / `constructor` /
+  `prototype` keys are dropped unconditionally, survivors written as own properties via `Object.defineProperty`.
+- **Default XFF distrust** on edge-runtime adapters (Hono / Elysia rate-limit) — `X-Forwarded-For` is client-controlled
+  without a proxy in front, so we require an explicit `trustProxy: true` opt-in.
+- **Every failure carries a machine-readable code** (`OtpError`, `SecurityError`, `PasswordError`, `CryptoError`) so
+  callers branch on `code`, not on message text that can change across versions.
+- **RFC test-vector coverage** for every standardised primitive: RFC 4226 Appendix D (HOTP), RFC 6238 Appendix B (TOTP),
+  RFC 7914 §12 (scrypt), RFC 8018 (PBKDF2), RFC 9106 (Argon2). `yarn test` from the workspace root exercises them.
+- **Peer isolation for optional native bindings** — `argon2` / `bcryptjs` load lazily and are cached at runtime, so a
+  scrypt-only or pbkdf2-only consumer pays nothing and the umbrella can import cleanly even when the peer is missing.
+
+## Third-party audit
+
+An external code review of the crypto- and auth-critical paths is planned. When completed, the report will be linked
+from this document and summarised in the affected packages' CHANGELOGs. Until then the packages are self-reviewed
+against the invariants above and the RFC test vectors linked from each package's README.
 
 ## Safe-harbour
 
