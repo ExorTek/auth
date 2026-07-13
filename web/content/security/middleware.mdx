@@ -126,9 +126,13 @@ app.use(
 Hono runs on the Web-standard `Request`/`Response` contract, so the middleware works unchanged on **Node**, **Bun**,
 **Cloudflare Workers**, **Deno**, and **Vercel Edge**.
 
-<Callout type="info">
-  **IP resolution on edge runtimes.** There is no `req.ip` on Workers / Vercel Edge / Deno. Pass `keyGenerator` to read
-  from whatever header your platform populates (`CF-Connecting-IP`, `X-Forwarded-For`, `Fastly-Client-IP`, …).
+<Callout type="warning">
+  **IP resolution on edge runtimes.** There is no `req.ip` on Workers / Vercel Edge / Deno. By default the Hono / Elysia
+  adapters do **not** trust `X-Forwarded-For` — it is client-controlled, so trusting it without a proxy in front lets an
+  attacker rotate it to mint unlimited rate-limit buckets. Either pass an explicit `keyGenerator` that reads your
+  platform's trusted header (`CF-Connecting-IP`, `Fastly-Client-IP`, …), or set `rateLimit: { trustProxy: true }` when a
+  proxy/CDN in front is guaranteed to overwrite `X-Forwarded-For`. With neither, no key is derived and the request is not
+  rate-limited (Elysia falls back to the real socket peer address).
 </Callout>
 
 ## Elysia
@@ -178,6 +182,7 @@ All four adapters accept the same `securityMiddleware(options)` shape:
   rateLimit?: {
     limiter:       Limiter,
     keyGenerator?: (req) => string | undefined,
+    trustProxy?:   boolean,                        // default false — Hono/Elysia XFF opt-in
     onDenied?:     (req, res, result) => unknown,
     headers?:      'legacy' | 'draft' | false | {  // default 'legacy'
       remaining?:  string | false,                 // default 'X-RateLimit-Remaining'

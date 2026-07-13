@@ -303,6 +303,15 @@ const composed = rateLimit.multi({
 });
 ```
 
+<Callout type="warning">
+  **DoS caveat.** `slowDown` implements the delay by holding the request open on `setTimeout` — each throttled
+  request continues to occupy a socket + an event-loop slot for the duration of its wait. An attacker who doesn't
+  care about latency can trivially exhaust concurrent connections. Always pair with (a) a hard `maxConnections`
+  on your HTTP server (or `limit_conn` at your reverse proxy) so the delay cannot amplify beyond a fixed budget,
+  and (b) a real rejecting limiter downstream (via `rateLimit.multi([slowDown, sliding])`) so the abuser
+  eventually gets a `429` and the socket is released.
+</Callout>
+
 ## `safeJsonParse`
 
 ```ts

@@ -20,12 +20,21 @@ import {
  * Hono runs on the Web-standard Request/Response contract, so all of these
  * work unchanged on Node, Bun, Cloudflare Workers, Deno, and Vercel Edge.
  *
- * IP resolution: on non-Node runtimes there is no `req.ip`. Pass
- * `keyGenerator` to read from your platform's IP header, e.g.
- * `keyGenerator: (c) => c.req.header('cf-connecting-ip')` on Cloudflare.
+ * IP resolution: on non-Node runtimes there is no `req.ip`. The default
+ * key generator only reads `X-Forwarded-For` when `trustProxy: true` is
+ * set — that header is client-controlled, so trusting it without a proxy
+ * in front lets an attacker rotate it to bypass the limit. Otherwise pass
+ * an explicit `keyGenerator` reading your platform's trusted IP header,
+ * e.g. `keyGenerator: (c) => c.req.header('cf-connecting-ip')` on
+ * Cloudflare. With neither `trustProxy` nor `keyGenerator`, no key can be
+ * derived and the request is not counted (fail-open on IP, but never
+ * silently spoofable).
  */
 
-function ipFromHeaders(c) {
+function ipFromHeaders(c, trustProxy) {
+  if (!trustProxy) {
+    return undefined;
+  }
   const xff = c.req.header('x-forwarded-for');
   if (typeof xff === 'string' && xff.length) {
     return xff.split(',')[0].trim();
@@ -62,7 +71,7 @@ async function runCors(corsCheck, c, responseHeadersEntries) {
 }
 
 async function runRateLimit(rateLimit, c) {
-  const key = rateLimit.keyGenerator ? rateLimit.keyGenerator(c) : ipFromHeaders(c);
+  const key = rateLimit.keyGenerator ? rateLimit.keyGenerator(c) : ipFromHeaders(c, rateLimit.trustProxy);
   if (!key) {
     return null;
   }

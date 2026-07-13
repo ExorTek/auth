@@ -18,6 +18,14 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
  * @property {{ check: Function }} limiter
  * @property {(req: unknown) => string | undefined} [keyGenerator]
  * @property {(req: unknown, res: unknown, result: object) => unknown} [onDenied]
+ * @property {boolean} [trustProxy=false]
+ *   Whether the default key generator may read the client IP from the
+ *   `X-Forwarded-For` header. That header is client-controlled, so trusting
+ *   it without a proxy in front lets an attacker rotate it to mint unlimited
+ *   rate-limit buckets (limit bypass) or spoof another user's IP. Leave
+ *   `false` unless your app sits behind a proxy/CDN that overwrites XFF.
+ *   Ignored when `keyGenerator` is supplied. (Express adapter uses `req.ip`,
+ *   which already honours the framework's own `trust proxy` setting.)
  */
 
 /**
@@ -77,6 +85,7 @@ export function normalizeRateLimit(options) {
     limiter: options.limiter,
     keyGenerator: options.keyGenerator,
     onDenied: options.onDenied,
+    trustProxy: options.trustProxy === true,
     headers: normalizeRateLimitHeaders(options.headers ?? 'legacy'),
   };
 }

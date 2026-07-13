@@ -13,12 +13,23 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
  *   Mongoose interprets as nested paths.
  * @property {number} [maxDepth=8]
  *   Recursion guard against pathological / self-referential payloads.
+ *
+ * Regardless of `suspicious`, the prototype-pollution keys `__proto__`,
+ * `constructor`, and `prototype` are ALWAYS treated as dangerous — they
+ * cannot be re-enabled by narrowing the regex.
  */
+
+const PROTO_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /**
  * Defensive NoSQL / operator-injection sanitizer. Walks the value tree
  * and either drops or rejects keys that look like operators or nested
  * paths. Idempotent, allocates a new object rather than mutating input.
+ *
+ * Also unconditionally strips the prototype-pollution vectors `__proto__`,
+ * `constructor`, and `prototype`, and writes output keys as own properties
+ * (never via the prototype chain) so a `__proto__` key in the input can't
+ * shift the returned object's prototype.
  *
  * @param {unknown} input
  * @param {SanitizeBodyOptions} [options]
@@ -48,6 +59,15 @@ export function sanitizeBody(input, options = {}) {
     /** @type {Record<string, unknown>} */
     const out = {};
     for (const key of Object.keys(value)) {
+      if (PROTO_KEYS.has(key)) {
+        if (mode === 'reject') {
+          throw new SecurityError(
+            ErrorCode.INVALID_ARGUMENT,
+            `sanitizeBody: rejected prototype-pollution key '${key}'`,
+          );
+        }
+        continue;
+      }
       if (suspicious.test(key)) {
         if (mode === 'reject') {
           throw new SecurityError(
@@ -57,7 +77,14 @@ export function sanitizeBody(input, options = {}) {
         }
         continue;
       }
-      out[key] = walk(value[key], depth + 1);
+      // Assign as an own property so a residual `__proto__`-like key can
+      // never redefine `out`'s prototype via the assignment itself.
+      Object.defineProperty(out, key, {
+        value: walk(value[key], depth + 1),
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     }
     return out;
   }

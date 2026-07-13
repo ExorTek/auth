@@ -32,10 +32,16 @@ import {
  * `.all()` handlers intercepting OPTIONS.
  */
 
-function ipFromContext(ctx) {
-  const xff = ctx.request.headers.get('x-forwarded-for');
-  if (typeof xff === 'string' && xff.length) {
-    return xff.split(',')[0].trim();
+// `X-Forwarded-For` is client-controlled; only honour it when the caller
+// opts in via `trustProxy: true` (a real proxy/CDN sits in front and
+// overwrites it). Otherwise fall back to the actual socket peer address,
+// which cannot be spoofed by the request body/headers.
+function ipFromContext(ctx, trustProxy) {
+  if (trustProxy) {
+    const xff = ctx.request.headers.get('x-forwarded-for');
+    if (typeof xff === 'string' && xff.length) {
+      return xff.split(',')[0].trim();
+    }
   }
   const serverIp = ctx.server?.requestIP?.(ctx.request);
   if (serverIp && typeof serverIp === 'object') {
@@ -120,7 +126,7 @@ async function runCorsPreflight(corsCheck, ctx, staticHeadersEntries) {
 }
 
 async function runRateLimit(rateLimit, ctx) {
-  const key = rateLimit.keyGenerator ? rateLimit.keyGenerator(ctx) : ipFromContext(ctx);
+  const key = rateLimit.keyGenerator ? rateLimit.keyGenerator(ctx) : ipFromContext(ctx, rateLimit.trustProxy);
   if (!key) {
     return null;
   }

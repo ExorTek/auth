@@ -550,3 +550,62 @@ test('redisStore: works end-to-end with fixed limiter', async () => {
   assert.equal(r2.allowed, true);
   assert.equal(r3.allowed, false);
 });
+
+test('withBan: engages ban after threshold consecutive denials', async () => {
+  const store = rateLimit.stores.memory();
+  const base = rateLimit.fixed({ requests: 1, window: '1m', store });
+  const limiter = rateLimit.withBan(base, { store, threshold: 3, banDuration: '10m' });
+
+  await limiter.check({ key: 'ip' }); // allowed
+  await limiter.check({ key: 'ip' }); // denied #1
+  await limiter.check({ key: 'ip' }); // denied #2
+  const beforeBan = await limiter.check({ key: 'ip' }); // denied #3 → violation count hits threshold
+  const afterBan = await limiter.check({ key: 'ip' }); // now short-circuited by ban
+
+  assert.equal(beforeBan.allowed, false);
+  assert.equal(afterBan.allowed, false);
+  assert.ok(afterBan.retryAfter >= 500, `ban should surface a long retryAfter, got ${afterBan.retryAfter}`);
+});
+
+test('withBan: short-circuits base limiter while banned', async () => {
+  const store = rateLimit.stores.memory();
+  let baseCalls = 0;
+  const base = {
+    check: async () => {
+      baseCalls++;
+      return { allowed: false, remaining: 0, reset: new Date(Date.now() + 60_000), retryAfter: 60 };
+    },
+  };
+  const limiter = rateLimit.withBan(base, { store, threshold: 1, banDuration: '5m' });
+
+  await limiter.check({ key: 'ip' }); // one denial → hits threshold, bans
+  const callsBefore = baseCalls;
+  await limiter.check({ key: 'ip' });
+  await limiter.check({ key: 'ip' });
+  assert.equal(baseCalls, callsBefore, 'ban must short-circuit — base limiter should not be re-consulted');
+});
+
+test('withBan: concurrent denials past threshold all land in the ban window (no violation is lost)', async () => {
+  // Regression scaffold for the classic "check → incr → set" TOCTOU: if two
+  // concurrent denials race through the wrapper, the second could compute
+  // count == threshold before the first has written the ban key. Under the
+  // memory store's atomic incr the count is monotone, so both violations
+  // are visible and the ban engages deterministically.
+  const store = rateLimit.stores.memory();
+  const base = {
+    // A limiter that denies every call — simulates a bucket already at zero.
+    check: async () => ({ allowed: false, remaining: 0, reset: new Date(Date.now() + 60_000), retryAfter: 60 }),
+  };
+  const limiter = rateLimit.withBan(base, { store, threshold: 5, banDuration: '10m' });
+
+  const results = await Promise.all(
+    Array.from({ length: 20 }, () => limiter.check({ key: 'ip' })),
+  );
+  assert.equal(
+    results.every(r => r.allowed === false),
+    true,
+  );
+  const followUp = await limiter.check({ key: 'ip' });
+  assert.equal(followUp.allowed, false);
+  assert.ok(followUp.retryAfter >= 500, 'a subsequent request should hit the ban window');
+});

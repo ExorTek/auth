@@ -22,6 +22,15 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
  * contract, so `multi({ limiters: [slowDown(...), rateLimit.fixed(...)] })`
  * composes them.
  *
+ * **DoS caveat.** The delay is implemented by holding the request open on
+ * `setTimeout` — each slowed request continues to occupy a socket + an
+ * event-loop slot for the duration of its delay. An attacker who does not
+ * care about latency can trivially exhaust concurrent connections. Always
+ * pair with (a) a hard `maxConnections` on `http.Server` or a `limit_conn`
+ * at your reverse proxy, and (b) a real rejecting limiter downstream (fed
+ * by `multi({ limiters: [slowDown(...), rateLimit.sliding(...)] })`) so the
+ * abuser eventually gets a `429` and the socket is released.
+ *
  * @param {SlowDownConfig} config
  * @returns {{ check: (input: { key: string }) => Promise<{
  *   allowed: boolean, remaining: number, reset: Date | null,
