@@ -1,0 +1,123 @@
+{
+  "name": "@exortek/password",
+  "version": "0.0.0",
+  "description": "Password hashing, verification, strength scoring, generation, policy validation, HIBP breach lookup, peppering and history helpers for Node.js — argon2id, scrypt, bcrypt, pbkdf2 under one coherent API with automatic algorithm routing on verify.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./scrypt": {
+      "types": "./dist/scrypt.d.ts",
+      "import": "./dist/scrypt.mjs",
+      "require": "./dist/scrypt.cjs"
+    },
+    "./pbkdf2": {
+      "types": "./dist/pbkdf2.d.ts",
+      "import": "./dist/pbkdf2.mjs",
+      "require": "./dist/pbkdf2.cjs"
+    },
+    "./argon2": {
+      "types": "./dist/argon2.d.ts",
+      "import": "./dist/argon2.mjs",
+      "require": "./dist/argon2.cjs"
+    },
+    "./bcrypt": {
+      "types": "./dist/bcrypt.d.ts",
+      "import": "./dist/bcrypt.mjs",
+      "require": "./dist/bcrypt.cjs"
+    },
+    "./strength": {
+      "types": "./dist/strength.d.ts",
+      "import": "./dist/strength.mjs",
+      "require": "./dist/strength.cjs"
+    },
+    "./generate": {
+      "types": "./dist/generate.d.ts",
+      "import": "./dist/generate.mjs",
+      "require": "./dist/generate.cjs"
+    },
+    "./policy": {
+      "types": "./dist/policy.d.ts",
+      "import": "./dist/policy.mjs",
+      "require": "./dist/policy.cjs"
+    },
+    "./hibp": {
+      "types": "./dist/hibp.d.ts",
+      "import": "./dist/hibp.mjs",
+      "require": "./dist/hibp.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "argon2": ">=0.44.0",
+    "bcryptjs": ">=3.0.3"
+  },
+  "peerDependenciesMeta": {
+    "argon2": {
+      "optional": true
+    },
+    "bcryptjs": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "backend",
+    "security",
+    "password",
+    "argon2",
+    "argon2id",
+    "scrypt",
+    "bcrypt",
+    "pbkdf2",
+    "phc",
+    "hash",
+    "verify",
+    "needs-rehash",
+    "peppering",
+    "password-strength",
+    "password-policy",
+    "password-generator",
+    "passphrase",
+    "diceware",
+    "hibp",
+    "have-i-been-pwned",
+    "node-crypto"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/password#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git",
+    "directory": "packages/password"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
