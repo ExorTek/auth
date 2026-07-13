@@ -1,6 +1,6 @@
 {
   "name": "@exortek/security",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Framework-agnostic defensive HTTP layer for Node.js 22+ — CSRF, sliding/fixed/token-bucket/leaky-bucket rate limiting (memory / Redis / custom stores, plus withBan escalation), helmet-style headers (CSP, HSTS, COOP/COEP/CORP, Referrer, Permissions), CORS, open-redirect guard, and 17 focused helpers (client-IP, CSP nonce, slow-down, body limit, timeout, HPP, NoSQL sanitizer, prototype-safe JSON parse, prototype freezer, path traversal, filename sanitizer, honeypot, webhook signature verify, bearer parser, origin check, constant-time compare, CSP report parser). Adapters for Fastify, Express, Hono, and Elysia.",
   "type": "module",
   "sideEffects": false,
