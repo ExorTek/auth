@@ -342,7 +342,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@exortek/crypto@workspace:packages/crypto":
+"@exortek/crypto@workspace:^, @exortek/crypto@workspace:packages/crypto":
   version: 0.0.0-use.local
   resolution: "@exortek/crypto@workspace:packages/crypto"
   languageName: unknown
@@ -393,6 +393,34 @@ __metadata:
     fastify:
       optional: true
     hono:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
+"@exortek/session@workspace:packages/session":
+  version: 0.0.0-use.local
+  resolution: "@exortek/session@workspace:packages/session"
+  dependencies:
+    "@exortek/crypto": "workspace:^"
+  peerDependencies:
+    elysia: ">=1.0.0"
+    express: ">=4.0.0"
+    fastify: ">=4.0.0"
+    hono: ">=4.0.0"
+    ioredis: ">=5.0.0"
+    redis: ">=4.0.0"
+  peerDependenciesMeta:
+    elysia:
+      optional: true
+    express:
+      optional: true
+    fastify:
+      optional: true
+    hono:
+      optional: true
+    ioredis:
+      optional: true
+    redis:
       optional: true
   languageName: unknown
   linkType: soft

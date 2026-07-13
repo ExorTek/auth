@@ -1,0 +1,117 @@
+import { seal, unseal, CryptoError, ErrorCode as CryptoErrorCode } from '@exortek/crypto';
+import { SessionError, ErrorCode } from './errors.js';
+import { parseCookies, serialiseCookie, serialiseDeleteCookie } from './cookie.js';
+import { parseDuration } from './internal/duration.js';
+
+/**
+ * "Trusted device" cookie — long-lived, opaque, HMAC-authenticated
+ * cookie separate from the session cookie. The classic use case is the
+ * 2FA "remember this device for 30 days" tick-box: on subsequent logins
+ * the caller can skip the TOTP prompt when this cookie is present and
+ * valid.
+ *
+ * Deliberately kept independent from `createSessionManager` — the two
+ * live at different scopes (the session cookie is per-session, the
+ * trusted-device cookie is per-user across many sessions), so they
+ * don't share config or a store.
+ *
+ * @param {{
+ *   secret:   string | Buffer | Uint8Array | Array<string | Buffer | Uint8Array>,
+ *   ttl:      string | number,           // e.g. '30d'
+ *   cookie?:  Omit<import('./cookie.js').CookieOptions, 'maxAge' | 'expires'> & { name?: string },
+ * }} config
+ */
+export function createTrustedDeviceCookie(config) {
+  if (!config || typeof config !== 'object') {
+    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'createTrustedDeviceCookie: config is required');
+  }
+  const secret = Array.isArray(config.secret) ? config.secret : [config.secret];
+  if (secret.length === 0 || secret.some(s => typeof s !== 'string' && !Buffer.isBuffer(s) && !(s instanceof Uint8Array))) {
+    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'createTrustedDeviceCookie: secret is required');
+  }
+  const ttlMs = parseDuration(config.ttl, 'ttl');
+  const cookieName = config.cookie?.name ?? '__Host-td';
+  const cookieOptions = { ...config.cookie };
+  delete cookieOptions.name;
+
+  return {
+    /**
+     * Mint a trusted-device cookie for a user. Call this at 2FA completion
+     * when the user ticked "remember me on this device".
+     *
+     * @param {string} userId
+     * @param {{ now?: number, extraClaims?: object }} [options]
+     * @returns {string}   Set-Cookie header value.
+     */
+    issue(userId, options = {}) {
+      if (typeof userId !== 'string' || userId.length === 0) {
+        throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'trustedDevice.issue: userId is required');
+      }
+      const now = options.now ?? Date.now();
+      const payload = {
+        uid: userId,
+        iat: now,
+        exp: now + ttlMs,
+        ...(options.extraClaims ?? {}),
+      };
+      const token = seal(payload, secret[0], { ttl: Math.max(1, Math.ceil(ttlMs / 1000)), now });
+      return serialiseCookie(cookieName, token, {
+        ...cookieOptions,
+        maxAge: Math.floor(ttlMs / 1000),
+      });
+    },
+
+    /**
+     * Check whether the incoming request carries a trusted-device
+     * cookie belonging to `userId`. Returns `true` on a valid,
+     * unexpired, correctly-scoped cookie; `false` otherwise. Never
+     * throws.
+     *
+     * @param {any} req
+     * @param {string} userId
+     * @param {{ now?: number }} [options]
+     * @returns {boolean}
+     */
+    verify(req, userId, options = {}) {
+      if (typeof userId !== 'string' || userId.length === 0) {
+        return false;
+      }
+      const headers = req?.headers;
+      if (!headers) {
+        return false;
+      }
+      const cookieHeader =
+        typeof headers.get === 'function' ? headers.get('cookie') : headers.cookie ?? headers.Cookie;
+      if (!cookieHeader) {
+        return false;
+      }
+      const token = parseCookies(cookieHeader)[cookieName];
+      if (!token) {
+        return false;
+      }
+      const now = options.now ?? Date.now();
+      try {
+        const { payload } = unseal(token, secret, { now });
+        return payload && payload.uid === userId;
+      } catch (err) {
+        if (err instanceof CryptoError && err.code === CryptoErrorCode.TOKEN_EXPIRED) {
+          return false;
+        }
+        return false;
+      }
+    },
+
+    /**
+     * Produce a delete-cookie header value — call this on explicit
+     * logout / "forget this device" flows.
+     * @returns {string}
+     */
+    revoke() {
+      return serialiseDeleteCookie(cookieName, cookieOptions);
+    },
+
+    get cookieName() {
+      return cookieName;
+    },
+  };
+}

@@ -1,0 +1,129 @@
+{
+  "name": "@exortek/session",
+  "version": "0.0.0",
+  "description": "Sealed-cookie session manager for Node.js — rotation, revocation, sudo mode, impersonation, concurrent limits, fingerprint binding, device labels, Redis distributed revocation, and adapters for Fastify, Express, Hono, and Elysia.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./stores/redis": {
+      "types": "./dist/stores/redis.d.ts",
+      "import": "./dist/stores/redis.mjs",
+      "require": "./dist/stores/redis.cjs"
+    },
+    "./trusted-device": {
+      "types": "./dist/trusted-device.d.ts",
+      "import": "./dist/trusted-device.mjs",
+      "require": "./dist/trusted-device.cjs"
+    },
+    "./fastify": {
+      "types": "./dist/fastify.d.ts",
+      "import": "./dist/fastify.mjs",
+      "require": "./dist/fastify.cjs"
+    },
+    "./express": {
+      "types": "./dist/express.d.ts",
+      "import": "./dist/express.mjs",
+      "require": "./dist/express.cjs"
+    },
+    "./hono": {
+      "types": "./dist/hono.d.ts",
+      "import": "./dist/hono.mjs",
+      "require": "./dist/hono.cjs"
+    },
+    "./elysia": {
+      "types": "./dist/elysia.d.ts",
+      "import": "./dist/elysia.mjs",
+      "require": "./dist/elysia.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@exortek/crypto": "workspace:^"
+  },
+  "peerDependencies": {
+    "elysia": ">=1.0.0",
+    "express": ">=4.0.0",
+    "fastify": ">=4.0.0",
+    "hono": ">=4.0.0",
+    "ioredis": ">=5.0.0",
+    "redis": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "elysia": {
+      "optional": true
+    },
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    },
+    "ioredis": {
+      "optional": true
+    },
+    "redis": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "backend",
+    "security",
+    "session",
+    "cookie",
+    "sealed-cookie",
+    "session-management",
+    "rotation",
+    "revocation",
+    "sudo-mode",
+    "step-up-auth",
+    "impersonation",
+    "concurrent-session-limit",
+    "csrf",
+    "fastify",
+    "express",
+    "hono",
+    "elysia",
+    "node-crypto"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/session#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git",
+    "directory": "packages/session"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

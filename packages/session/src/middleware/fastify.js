@@ -1,0 +1,52 @@
+import { createSessionManager } from '../manager.js';
+
+/**
+ * Fastify plugin factory. Registers preHandler + onSend hooks so that:
+ *
+ *   1. `request.session` is populated on every request (or `null` if
+ *      unauthenticated).
+ *   2. `reply.setSession(sessionOrToken)` and `reply.clearSession()`
+ *      convenience methods are added to the reply, wiring the
+ *      `Set-Cookie` header automatically.
+ *   3. `request.sessions` exposes the manager for handlers that need
+ *      the full API (rotate, requireFreshAuth, impersonate, …).
+ *
+ * @param {import('../manager.js').SessionManagerConfig | ReturnType<typeof createSessionManager>} configOrManager
+ */
+export function sessionPlugin(configOrManager) {
+  const sessions =
+    typeof configOrManager === 'object' && typeof configOrManager.issue === 'function'
+      ? configOrManager
+      : createSessionManager(configOrManager);
+
+  const plugin = async function (fastify) {
+    fastify.decorateRequest('session', null);
+    fastify.decorateRequest('sessions', null);
+    fastify.decorateReply('setSessionCookie', null);
+    fastify.decorateReply('clearSessionCookie', null);
+
+    fastify.addHook('preHandler', async (request, reply) => {
+      request.sessions = sessions;
+      request.session = await sessions.verify(request);
+      reply.setSessionCookie = value => {
+        reply.header('Set-Cookie', value);
+      };
+      reply.clearSessionCookie = () => {
+        // revoke() returns a delete-cookie string synchronously via the
+        // helper — but the async revoke also runs the store revoke. We
+        // fire the async work but return immediately.
+        sessions.revoke(request).then(result => {
+          reply.header('Set-Cookie', result.cookie);
+        });
+      };
+    });
+  };
+
+  plugin[Symbol.for('skip-override')] = true;
+  return {
+    manager: sessions,
+    plugin,
+  };
+}
+
+export default sessionPlugin;
