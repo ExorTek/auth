@@ -32,7 +32,7 @@ const SUPPORTED_ALGORITHMS = Object.freeze(new Set(['SHA1', 'SHA224', 'SHA256', 
 
 /**
  * @typedef {object} HotpVerifyOptions
- * @property {6 | 7 | 8} [digits=6]
+ * @property {6 | 7 | 8 | 9 | 10} [digits=6]
  * @property {OtpAlgorithm} [algorithm='SHA1']
  * @property {number} [window=1]
  *   Counter drift tolerance — accept codes in the range
@@ -159,7 +159,7 @@ export function verifyHotp(code, secret, counter, options = {}) {
  *   How far ahead of `startCounter` we scan. RFC 4226 §7.4 does not
  *   specify a bound; production deployments use 100–1000 depending on
  *   how often tokens might drift.
- * @property {6 | 7 | 8} [digits=6]
+ * @property {6 | 7 | 8 | 9 | 10} [digits=6]
  * @property {OtpAlgorithm} [algorithm='SHA1']
  */
 

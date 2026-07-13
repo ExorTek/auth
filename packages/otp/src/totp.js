@@ -10,7 +10,7 @@ const DEFAULT_PERIOD = 30;
 
 /**
  * @typedef {object} TotpOptions
- * @property {6 | 7 | 8} [digits=6]
+ * @property {6 | 7 | 8 | 9 | 10} [digits=6]
  * @property {OtpAlgorithm} [algorithm='SHA1']
  * @property {number} [period=30]        Seconds per code. RFC 6238 default is 30.
  * @property {number} [timestamp]        Override "now" in ms since epoch.
@@ -26,12 +26,13 @@ const DEFAULT_PERIOD = 30;
 /**
  * @typedef {object} ReplayGuard
  * @property {{
- *   get:    (key: string) => Promise<unknown>,
- *   set:    (key: string, value: unknown, ttlMs: number) => Promise<void>,
+ *   incr:   (key: string, ttlMs: number) => Promise<{ count: number }>,
  * }} store
  *   Any store shaped like the `@exortek/security` rate-limit stores —
- *   memory / Redis / custom all satisfy this duck type. Only `get` and
- *   `set` are used; no `incr` needed.
+ *   memory / Redis / custom all satisfy this duck type. The guard uses
+ *   the store's **atomic** `incr` (Redis `INCR`) as a compare-and-set so
+ *   two concurrent requests carrying the same code can't both pass — a
+ *   `get`-then-`set` pair would leave a TOCTOU window open.
  * @property {string} key
  *   Caller-provided namespace (typically the user id). We compose the
  *   real store key as `otp:used:<key>:<counter>` — the counter alone
@@ -40,7 +41,7 @@ const DEFAULT_PERIOD = 30;
 
 /**
  * @typedef {object} TotpVerifyOptions
- * @property {6 | 7 | 8} [digits=6]
+ * @property {6 | 7 | 8 | 9 | 10} [digits=6]
  * @property {OtpAlgorithm} [algorithm='SHA1']
  * @property {number} [period=30]
  * @property {number} [window=1]
@@ -103,11 +104,15 @@ export function totp(secret, options = {}) {
  *
  * @param {number} [period=30]
  * @param {number} [timestamp]     ms since epoch, default Date.now().
- * @returns {number}               Whole seconds in `[0, period)`.
+ * @param {number} [t0=0]          Epoch offset in seconds (RFC 6238 "T0").
+ *                                 Pass the same value used at enrollment so
+ *                                 the countdown lines up with `totp`.
+ * @returns {number}               Whole seconds in `(0, period]`.
  */
-export function remainingSeconds(period = DEFAULT_PERIOD, timestamp = Date.now()) {
+export function remainingSeconds(period = DEFAULT_PERIOD, timestamp = Date.now(), t0 = 0) {
   assertPeriod(period);
-  const secondsIntoPeriod = Math.floor(timestamp / 1000) % period;
+  assertT0(t0);
+  const secondsIntoPeriod = Math.floor(timestamp / 1000 - t0) % period;
   return period - secondsIntoPeriod;
 }
 
@@ -156,19 +161,23 @@ export async function verifyTotp(code, secret, options = {}) {
     return false;
   }
 
-  // Replay guard: record the specific matched counter with a TTL that
+  // Replay guard: mark the specific matched counter with a TTL that
   // covers the *remaining* window. A code accepted at T-1 can still be
   // replayed inside T+window until the window rolls off — we block that.
+  //
+  // Use the store's atomic `incr` as a compare-and-set: the first use
+  // creates the key (count === 1) and is allowed; any concurrent or later
+  // use sees count > 1 and is rejected. This closes the TOCTOU window a
+  // separate get-then-set would leave open under concurrency.
   if (options.replay) {
     const key = replayKey(options.replay.key, secret, matched);
-    const existing = await options.replay.store.get(key);
-    if (existing) {
-      return false;
-    }
     // TTL: (window + 1) periods forward from now — the code stays inside
     // the acceptance window that long, then naturally rolls off.
     const ttlMs = (window + 1) * period * 1000;
-    await options.replay.store.set(key, 1, ttlMs);
+    const { count } = await options.replay.store.incr(key, ttlMs);
+    if (count > 1) {
+      return false;
+    }
   }
 
   return true;

@@ -11,7 +11,7 @@ import { OtpError, ErrorCode } from './internal/errors.js';
  * @property {string} [issuer]
  *   Your app name. Shows above the account label in the app UI.
  * @property {'totp' | 'hotp'} [type='totp']
- * @property {6 | 7 | 8} [digits=6]
+ * @property {6 | 7 | 8 | 9 | 10} [digits=6]
  * @property {number} [period=30]                 TOTP only.
  * @property {number} [counter=0]                 HOTP only — starting counter.
  * @property {import('./hotp.js').OtpAlgorithm} [algorithm='SHA1']

@@ -68,10 +68,20 @@ export function generateSecret(options = {}) {
  * spaces stripped — matches how users paste), hex, and raw Buffers /
  * Uint8Arrays. Never trusts the caller — throws on malformed input.
  *
+ * **Auto-detection ambiguity.** When `encoding` is omitted, a string is
+ * probed as base32 first, then hex. Some strings are valid under BOTH
+ * alphabets (e.g. `'abcdef'` — only `a-f`), and auto-detect will read
+ * them as base32, producing the wrong key bytes for a caller who meant
+ * hex. If you store secrets hex-encoded, pass `encoding: 'hex'` (or
+ * `'base32'`) explicitly to remove the guesswork.
+ *
  * @param {string | Buffer | Uint8Array} secret
+ * @param {{ encoding?: 'base32' | 'hex' }} [options]
+ *   Force the input encoding instead of auto-detecting. Recommended
+ *   whenever the secret is not a base32 enrollment string.
  * @returns {Buffer}
  */
-export function decodeSecret(secret) {
+export function decodeSecret(secret, options = {}) {
   if (Buffer.isBuffer(secret)) {
     return secret;
   }
@@ -86,7 +96,25 @@ export function decodeSecret(secret) {
   // spaces every 4 chars (Google Authenticator's display format).
   const cleaned = secret.replace(/\s+/g, '');
 
-  // Base32 alphabet: A-Z2-7 (RFC 4648). Padding is optional.
+  const encoding = options.encoding;
+  if (encoding !== undefined && encoding !== 'base32' && encoding !== 'hex') {
+    throw new OtpError(
+      ErrorCode.INVALID_ARGUMENT,
+      `decodeSecret: encoding must be 'base32' or 'hex'; got ${JSON.stringify(encoding)}`,
+    );
+  }
+
+  // Explicit hex — no auto-detect, so hex secrets that also happen to be
+  // valid base32 are decoded correctly.
+  if (encoding === 'hex') {
+    if (!/^[0-9a-fA-F]+$/.test(cleaned) || cleaned.length % 2 !== 0) {
+      throw new OtpError(ErrorCode.INVALID_SECRET, 'secret is not valid hex (expected an even-length [0-9a-f] string)');
+    }
+    return Buffer.from(cleaned.toLowerCase(), 'hex');
+  }
+
+  // Explicit base32, or auto-detect (base32 first). Base32 alphabet:
+  // A-Z2-7 (RFC 4648). Padding is optional.
   if (/^[A-Za-z2-7]+=*$/.test(cleaned)) {
     try {
       return base32.decode(cleaned.toUpperCase());
@@ -95,6 +123,9 @@ export function decodeSecret(secret) {
         cause: err,
       });
     }
+  }
+  if (encoding === 'base32') {
+    throw new OtpError(ErrorCode.INVALID_SECRET, 'secret is not valid base32 — check for characters outside A-Z2-7');
   }
 
   // Hex fallback — sometimes people store the raw HMAC key hex-encoded.

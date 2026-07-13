@@ -3,21 +3,29 @@ import assert from 'node:assert/strict';
 import { totp, verifyTotp } from '../src/index.js';
 
 // A tiny in-memory store mimicking the @exortek/security store shape.
-// We only need `get` and `set` for the replay guard.
+// The replay guard uses the atomic `incr` (Redis INCR) as a
+// compare-and-set, so that's all we implement here.
 function makeStore() {
   const map = new Map();
+  function fresh(key) {
+    const v = map.get(key);
+    if (!v) return null;
+    if (v.expiresAt <= Date.now()) {
+      map.delete(key);
+      return null;
+    }
+    return v;
+  }
   return {
-    async get(key) {
-      const v = map.get(key);
-      if (!v) return null;
-      if (v.expiresAt <= Date.now()) {
-        map.delete(key);
-        return null;
+    async incr(key, ttlMs) {
+      const existing = fresh(key);
+      if (existing) {
+        existing.count += 1;
+        return { count: existing.count, expiresAt: existing.expiresAt };
       }
-      return v.value;
-    },
-    async set(key, value, ttlMs) {
-      map.set(key, { value, expiresAt: Date.now() + ttlMs });
+      const entry = { count: 1, expiresAt: Date.now() + ttlMs };
+      map.set(key, entry);
+      return { count: 1, expiresAt: entry.expiresAt };
     },
     _size: () => map.size,
   };

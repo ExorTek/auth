@@ -121,11 +121,12 @@ control the client.
 ## `remainingSeconds`
 
 ```ts
-remainingSeconds(period = 30, timestamp = Date.now()): number
+remainingSeconds(period = 30, timestamp = Date.now(), t0 = 0): number
 ```
 
 Whole seconds before the current TOTP code rolls over. Useful for the
-countdown ring most 2FA screens render.
+countdown ring most 2FA screens render. Pass the same `t0` you use with
+`totp` / `verifyTotp` so the countdown lines up with the code rollover.
 
 ```js
 const secs = remainingSeconds()   // 1..30 with default period
@@ -141,7 +142,9 @@ The `replay` option makes verify **single-use per counter per key**:
 
 ```js
 import { verifyTotp } from '@exortek/otp'
-// Any store shaped like { get, set } — the @exortek/security stores fit:
+// Any store exposing an atomic `incr(key, ttlMs)` — the @exortek/security
+// stores (memory / Redis / custom) all fit. `incr` is used as a
+// compare-and-set so two concurrent requests can't both accept the code:
 import { rateLimit } from '@exortek/security'
 
 const store = rateLimit.stores.memory()

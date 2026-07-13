@@ -23,7 +23,7 @@ const URI_SUPPORTED_ALGORITHMS = new Set(['SHA1', 'SHA256', 'SHA512']);
  *   is duplicated into the label per the Google Authenticator
  *   Key URI Format recommendation.
  * @property {ProvisioningType} [type='totp']
- * @property {6 | 7 | 8} [digits=6]
+ * @property {6 | 7 | 8 | 9 | 10} [digits=6]
  * @property {number} [period=30]                   TOTP only.
  * @property {number} [counter]                     HOTP only — required for hotp type.
  * @property {'SHA1' | 'SHA256' | 'SHA512'} [algorithm='SHA1']
