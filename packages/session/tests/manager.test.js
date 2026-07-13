@@ -15,9 +15,7 @@ test('createSessionManager: requires secret / ttl / idleTtl', () => {
 });
 
 test('createSessionManager: rejects idleTtl > ttl', () => {
-  assert.throws(() =>
-    createSessionManager({ secret: SECRET, ttl: '1h', idleTtl: '2h' }),
-  );
+  assert.throws(() => createSessionManager({ secret: SECRET, ttl: '1h', idleTtl: '2h' }));
 });
 
 test('issue → verify roundtrip', async () => {

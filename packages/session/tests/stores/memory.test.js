@@ -95,7 +95,10 @@ test('listByUser: only active + newest first', async () => {
   await store.put(revoked);
   await store.revoke('revoked');
   const list = await store.listByUser('u1');
-  assert.deepEqual(list.map(r => r.sid), ['new', 'old']);
+  assert.deepEqual(
+    list.map(r => r.sid),
+    ['new', 'old'],
+  );
   store._stop();
 });
 

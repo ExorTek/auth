@@ -26,7 +26,10 @@ export function createTrustedDeviceCookie(config) {
     throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'createTrustedDeviceCookie: config is required');
   }
   const secret = Array.isArray(config.secret) ? config.secret : [config.secret];
-  if (secret.length === 0 || secret.some(s => typeof s !== 'string' && !Buffer.isBuffer(s) && !(s instanceof Uint8Array))) {
+  if (
+    secret.length === 0 ||
+    secret.some(s => typeof s !== 'string' && !Buffer.isBuffer(s) && !(s instanceof Uint8Array))
+  ) {
     throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'createTrustedDeviceCookie: secret is required');
   }
   const ttlMs = parseDuration(config.ttl, 'ttl');
@@ -81,7 +84,7 @@ export function createTrustedDeviceCookie(config) {
         return false;
       }
       const cookieHeader =
-        typeof headers.get === 'function' ? headers.get('cookie') : headers.cookie ?? headers.Cookie;
+        typeof headers.get === 'function' ? headers.get('cookie') : (headers.cookie ?? headers.Cookie);
       if (!cookieHeader) {
         return false;
       }

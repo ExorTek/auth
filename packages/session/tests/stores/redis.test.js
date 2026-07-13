@@ -121,7 +121,10 @@ test('redisStore: listByUser returns non-revoked newest-first', async () => {
   await store.put(bad);
   await store.revoke('bad');
   const list = await store.listByUser('u1');
-  assert.deepEqual(list.map(r => r.sid), ['new', 'old']);
+  assert.deepEqual(
+    list.map(r => r.sid),
+    ['new', 'old'],
+  );
 });
 
 test('redisStore: countActive skips revoked', async () => {

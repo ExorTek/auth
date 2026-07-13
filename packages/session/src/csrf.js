@@ -26,7 +26,10 @@ export function deriveCsrfToken(sessionId, secret) {
     throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'deriveCsrfToken: sessionId is required');
   }
   if (typeof secret !== 'string' && !Buffer.isBuffer(secret) && !(secret instanceof Uint8Array)) {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'deriveCsrfToken: secret must be a string / Buffer / Uint8Array');
+    throw new SessionError(
+      ErrorCode.INVALID_ARGUMENT,
+      'deriveCsrfToken: secret must be a string / Buffer / Uint8Array',
+    );
   }
   const key = typeof secret === 'string' ? Buffer.from(secret, 'utf8') : Buffer.from(secret);
   return createHmac('sha256', key).update(NAMESPACE).update(sessionId).digest('base64url').slice(0, 32);

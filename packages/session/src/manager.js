@@ -167,7 +167,10 @@ export function createSessionManager(config) {
       );
     }
     if (userId !== null && typeof userId !== 'string') {
-      throw new SessionError(ErrorCode.INVALID_ARGUMENT, `issue: userId must be a string or null; got ${typeof userId}`);
+      throw new SessionError(
+        ErrorCode.INVALID_ARGUMENT,
+        `issue: userId must be a string or null; got ${typeof userId}`,
+      );
     }
     if (concurrentLimit !== undefined && userId !== null) {
       const active = await store.countActive(userId);
@@ -430,10 +433,7 @@ export function createSessionManager(config) {
   async function requireFreshAuth(req, options = {}) {
     const maxAgeSeconds = options.maxAgeSeconds;
     if (typeof maxAgeSeconds !== 'number' || !Number.isFinite(maxAgeSeconds) || maxAgeSeconds <= 0) {
-      throw new SessionError(
-        ErrorCode.INVALID_ARGUMENT,
-        'requireFreshAuth: maxAgeSeconds must be a positive number',
-      );
+      throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'requireFreshAuth: maxAgeSeconds must be a positive number');
     }
     const now = options.now ?? Date.now();
     const session = await verify(req, { now });
@@ -573,8 +573,7 @@ export function createSessionManager(config) {
     if (!headers) {
       return undefined;
     }
-    const cookieHeader =
-      typeof headers.get === 'function' ? headers.get('cookie') : headers.cookie ?? headers.Cookie;
+    const cookieHeader = typeof headers.get === 'function' ? headers.get('cookie') : (headers.cookie ?? headers.Cookie);
     if (!cookieHeader) {
       return undefined;
     }

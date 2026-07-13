@@ -27,8 +27,7 @@ yarn.lock
 !.changeset/config.json
 
 # Personal / local
-CLAUDE.md
-ARCHITECTURE.md
+**.md
 skills-lock.json
 .claude/
 .idea/

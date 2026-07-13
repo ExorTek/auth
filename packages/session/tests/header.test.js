@@ -29,19 +29,13 @@ test('returns undefined for empty token after prefix', () => {
 
 test('honours custom headerName + prefix', () => {
   assert.equal(
-    extractTokenFromHeader(
-      { 'x-app-token': 'app_abc' },
-      { headerName: 'X-App-Token', prefix: 'app_' },
-    ),
+    extractTokenFromHeader({ 'x-app-token': 'app_abc' }, { headerName: 'X-App-Token', prefix: 'app_' }),
     'abc',
   );
 });
 
 test('array-form headers pick first', () => {
-  assert.equal(
-    extractTokenFromHeader({ authorization: ['Bearer first', 'Bearer second'] }),
-    'first',
-  );
+  assert.equal(extractTokenFromHeader({ authorization: ['Bearer first', 'Bearer second'] }), 'first');
 });
 
 test('returns undefined for null / undefined input', () => {
