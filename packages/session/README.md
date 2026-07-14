@@ -5,7 +5,7 @@
 > cookies, and adapters for Fastify, Express, Hono, and Elysia. Built on `@exortek/crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/session.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/session)
-[![tests](https://img.shields.io/badge/tests-144%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-166%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/session.svg?color=339933)](https://nodejs.org)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![license](https://img.shields.io/npm/l/@exortek/session.svg?color=blue)](./LICENSE)
@@ -108,17 +108,24 @@ createSessionManager({
   },
 
   store?:      SessionStore,                            // default sessionStore.memory()
+  touchEvery?: string | number,                         // rolling-touch write frequency
+                                                        //   default: min('60s', idleTtl / 2)
 
   // opt-in features
   anonymous?:            boolean,                       // guest sessions
   concurrentLimit?:      number,                        // e.g. 3 → kicks oldest
   bindTo?:               Array<'ip' | 'ua'>,            // fingerprint binding
+  bindStrictness?:       'strict' | 'soft',             // strict (default): hard revoke on
+                                                        // mismatch. soft: fire onSuspicious
+                                                        // and let the request through (good
+                                                        // for mobile users on 5G ↔ wifi)
   impersonation?:        boolean,                       // enable impersonate() API
+  impersonationTtl?:     string | number,               // default '30m'
   deviceLabels?:         boolean,                       // auto-generated 'iPhone 14 · Chrome'
   events?: {                                            // audit trail
     onIssue, onVerify, onRotate, onRevoke, onDeny, onSuspicious,
   },
-  suspiciousActivity?:   boolean | { onDetected },      // IP change flagging
+  suspiciousActivity?:   boolean | { onDetected },      // IP + UA change flagging
 })
 ```
 
@@ -133,6 +140,8 @@ createSessionManager({
 - `revokeAllForUser(userId, { reason? })` — compromise scenario
 - `revokeAllExceptCurrent(req, { reason? })` — password-change UX
 - `listActive(userId)` — active sessions for a settings page
+- `upgrade(req, userId, { mergeClaims?, now? })` — attach a userId to an anonymous session,
+  revoke the guest record, mint an authenticated session with merged claims (guest-checkout flow)
 
 ### Sudo mode (step-up auth)
 
@@ -150,27 +159,50 @@ await sessions.markFresh(req);
 ### Impersonation (opt-in with audit trail)
 
 ```js
-const sessions = createSessionManager({ ..., impersonation: true });
-
-// Admin acts as user, session carries impersonatedBy: adminId
-const { cookie } = await sessions.impersonate(adminReq, targetUserId, {
-  reason: 'support ticket #4211',
+const sessions = createSessionManager({
+  ...,
+  impersonation:    true,
+  impersonationTtl: '15m',    // default '30m' — impersonation sessions run on a short TTL
 });
+
+// Admin acts as user, session carries impersonatedBy + impersonationReason
+const { cookie, session } = await sessions.impersonate(adminReq, targetUserId, {
+  reason: 'support ticket #4211',
+  ttl:    '5m',              // per-call override wins over impersonationTtl
+});
+// session.impersonatedBy === adminId
+// session.impersonationReason === 'support ticket #4211'
 ```
+
+An admin session that is itself impersonated cannot start a second layer — impersonation
+never nests, so audit trails stay flat.
 
 ### CSRF derivation
 
 ```js
-import { deriveCsrfToken, verifyCsrfToken } from '@exortek/session';
+import { deriveCsrfToken, verifyCsrfToken, maskCsrfToken, unmaskCsrfToken } from '@exortek/session';
 
 const csrfSecret = process.env.CSRF_SECRET;
-const csrf = deriveCsrfToken(session.id, csrfSecret);
-// Render into a meta tag or non-HttpOnly cookie
-// On mutating request:
-if (!verifyCsrfToken(req.body._csrf, session.id, csrfSecret)) {
+const raw = deriveCsrfToken(session.id, csrfSecret);   // deterministic, session-bound
+
+// Ship a fresh mask per render so response compression can't reveal the token
+// through a BREACH-class oracle.
+const masked = maskCsrfToken(raw);
+res.render('form', { csrf: masked });
+
+// On the mutating request the client echoes the masked value back; unmask
+// before verifying.
+const submitted = unmaskCsrfToken(req.body._csrf);
+if (!verifyCsrfToken(submitted, session.id, csrfSecret)) {
   return res.status(403).end();
 }
 ```
+
+`maskCsrfToken` XORs the raw token against a fresh random pad and returns
+`pad || (token ⊕ pad)`. Every render sends a different string; the pad travels
+alongside it so the server can recover the original. Skipping the mask is fine
+when responses are not compressed or the token never lands in the HTML body
+(SPA that reads it from a header, for example).
 
 ### Trusted device cookie (subpath)
 
@@ -337,17 +369,31 @@ Codes: `INVALID_ARGUMENT`, `MISSING_TOKEN`, `INVALID_TOKEN`, `EXPIRED`, `IDLE_TI
 - **Sealed cookie by default** — encrypted opaque claims, stateless verify hot-path
 - **Per-request cache** — 3 verify calls in one request → 1 decryption
 - **Multi-secret rotation** — cycle the encryption key without invalidating in-flight tokens
-- **Rolling touch** — idle TTL refreshes every request (with a 1-second write-amp guard)
-- **Fingerprint binding** — IP / UA hash into the cookie payload; mismatch → hard revoke
+- **Rolling touch with `touchEvery`** — idle TTL refreshes cost one store write per interval
+  (default 60s / half of idleTtl, whichever is smaller)
+- **Fingerprint binding** — IP / UA hash in the cookie payload;
+  `bindStrictness: 'strict'` (default) hard-revokes on mismatch, `'soft'` lets the request
+  through and fires `onSuspicious` (mobile 5G ↔ wifi friendly)
 - **Sudo mode** — `requireFreshAuth` + `markFresh` for sensitive actions
-- **Impersonation** — admin-as-user with `impersonatedBy` audit trail
-- **Concurrent limit** — 3 devices max, oldest kicked
-- **CSRF derivation** — deterministic session-bound synchroniser token
-- **Trusted-device cookie** — long-lived separate cookie for 2FA skip
+- **Impersonation** — admin-as-user with `impersonatedBy` + `impersonationReason` audit trail
+  and a short 30 min default TTL; nesting refused
+- **Concurrent limit** — 3 devices max, oldest kicked, limit-drop convergence via
+  `while (active >= limit)` eviction
+- **Anonymous → auth upgrade** — guest-cart claims survive the login via `sessions.upgrade`
+- **CSRF derivation** — deterministic session-bound synchroniser token +
+  per-render `maskCsrfToken` for BREACH resistance
+- **Trusted-device cookie** — long-lived separate cookie for 2FA skip; reserved payload
+  fields protected from `extraClaims` clobber
+- **Redis + tombstones** — revocation lives in its own key, immune to concurrent
+  rolling-touch writes overwriting it (the old lost-revoke class of bug)
 - **Redis pub/sub** — cross-worker revocation propagation
-- **Framework adapters** — Fastify, Express, Hono, Elysia
-- **144 unit tests** — token roundtrip, rotation, revoke variants, fresh-auth, fingerprint binding,
-  concurrent limit, impersonation, events, CSRF, trusted-device, adapter shape
+- **Framework adapters** — Fastify, Express (with cookie append), Hono, Elysia
+- **166 unit tests** — token roundtrip, rotation (incl. concurrent-rotate race),
+  concurrent-limit convergence, revoke variants, fresh-auth, fingerprint binding
+  (both strictness modes), impersonation (TTL, nest-refusal), events, CSRF (masking too),
+  trusted-device (claim-clobber regression), all four adapter shapes, and a live Redis
+  integration suite that covers the tombstone lost-revoke scenario end-to-end
+  (opt-in via `REDIS_URL`)
 
 ## Links
 
