@@ -23,17 +23,17 @@ Numbers reflect dependency order — a lower number never imports from a higher 
 
 | #  | Package                | What it does                                                                         |
 |:--:|------------------------|--------------------------------------------------------------------------------------|
-| 01 | `@exortek/crypto`      | crypto primitives — the foundation the rest builds on                                |
-| 02 | `@exortek/password`    | Argon2id / scrypt / bcrypt / PBKDF2, strength scoring, HIBP breach check, peppering  |
-| 03 | `@exortek/otp`         | TOTP / HOTP, backup codes, QR provisioning URI                                       |
-| 04 | `@exortek/challenge`   | e-mail / SMS one-time code storage + verification                                    |
-| 05 | `@exortek/jwk`         | JWK ↔ PEM ↔ DER converters, key rotation                                             |
-| 06 | `@exortek/jws`         | JOSE signed payloads (compact + JSON)                                                |
-| 07 | `@exortek/jwt`         | JWT sign / verify with algorithm allowlists, clock skew                              |
-| 08 | `@exortek/jwe`         | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                       |
-| 09 | `@exortek/jwks`        | JWKS URI fetching, caching, `kid` rotation                                           |
-| 10 | [`@exortek/session`](./packages/session) | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub |
-| 11 | `@exortek/security`    | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers |
+| 01 | [`@exortek/crypto`](./packages/crypto)     | crypto primitives — the foundation the rest builds on                                |
+| 02 | [`@exortek/password`](./packages/password) | Argon2id / scrypt / bcrypt / PBKDF2, strength scoring, HIBP breach check, peppering  |
+| 03 | [`@exortek/otp`](./packages/otp)           | TOTP / HOTP, backup codes, QR provisioning URI                                       |
+| 04 | `@exortek/challenge`                        | e-mail / SMS one-time code storage + verification                                    |
+| 05 | `@exortek/jwk`                              | JWK ↔ PEM ↔ DER converters, key rotation                                             |
+| 06 | `@exortek/jws`                              | JOSE signed payloads (compact + JSON)                                                |
+| 07 | `@exortek/jwt`                              | JWT sign / verify with algorithm allowlists, clock skew                              |
+| 08 | `@exortek/jwe`                              | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                       |
+| 09 | `@exortek/jwks`                             | JWKS URI fetching, caching, `kid` rotation                                           |
+| 10 | [`@exortek/session`](./packages/session)   | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub        |
+| 11 | [`@exortek/security`](./packages/security) | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers |
 | 12 | `@exortek/device`      | device fingerprinting, trusted-device tokens                                         |
 | 13 | `@exortek/apikey`      | prefixed API keys (`sk_live_...`), rate-limited by default                           |
 | 14 | `@exortek/magic-link`  | passwordless email / SMS link tokens                                                 |
@@ -48,8 +48,14 @@ Numbers reflect dependency order — a lower number never imports from a higher 
 
 ## Install
 
+Every published package is installable on its own:
+
 ```bash
 npm install @exortek/crypto
+npm install @exortek/security
+npm install @exortek/otp
+npm install @exortek/password
+npm install @exortek/session
 ```
 
 Node.js **22 or newer**.
