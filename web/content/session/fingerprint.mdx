@@ -1,0 +1,156 @@
+---
+title: 'session/fingerprint — ip / ua binding'
+sidebarTitle: fingerprint
+---
+
+import { Callout } from 'nextra/components';
+
+# `fingerprint`
+
+Bind a session to the IP and/or User-Agent it was issued from — a
+mismatch on subsequent verify means the cookie is being sent from
+somewhere it shouldn't be. Opt-in via `bindTo`.
+
+```js
+const sessions = createSessionManager({
+  secret, ttl: '7d', idleTtl: '30m',
+  bindTo:          ['ip', 'ua'],
+  bindStrictness:  'strict',   // 'strict' (default) | 'soft'
+});
+```
+
+## What the fingerprint contains
+
+A SHA-256 hash of the pieces you named, in a canonical order. The
+hash is stored inside the sealed cookie payload as `fp`, so it
+travels with every request but is opaque to the client.
+
+- `bindTo: ['ip']` — `ip:<remoteAddress>`
+- `bindTo: ['ua']` — `ua:<user-agent header>`
+- `bindTo: ['ip', 'ua']` — both concatenated in canonical order
+  (the array position doesn't matter — flipping `['ua', 'ip']`
+  produces the same hash)
+
+## `bindStrictness`
+
+The tradeoff: how strong an attack signal is a fingerprint mismatch,
+vs how much legitimate mobile-user friction does a hard revoke
+create?
+
+### `'strict'` (default)
+
+Fingerprint mismatch → **hard revoke** + `onDeny` fires with
+`fingerprint-mismatch`. The session is dead; the user has to sign
+back in.
+
+Right for:
+
+- High-value corpora (financial, healthcare)
+- Admin sessions
+- API endpoints backing sensitive operations
+
+Wrong for:
+
+- Consumer mobile apps where users move between wifi and 5G
+  mid-session — the IP changes constantly, every network flip is a
+  logout
+
+### `'soft'`
+
+Fingerprint mismatch → session **stays alive**, `onSuspicious` fires
+with `reason: 'fingerprint-mismatch'`. The application can react
+(email the user, force a step-up ceremony, add a UI banner) without
+killing the request in flight.
+
+```js
+const sessions = createSessionManager({
+  ...,
+  bindTo:         ['ip'],
+  bindStrictness: 'soft',
+  suspiciousActivity: {
+    onDetected: async ({ userId, sessionId, reason, previous, current }) => {
+      await notifyUser(userId, `Your session was used from a new IP (${current.ip}). If this wasn't you, sign out other devices at /settings/security.`);
+    },
+  },
+});
+```
+
+## What each binding is worth
+
+### `ip`
+
+Captures the peer address `req.ip` (Fastify/Express) or the
+runtime-resolved equivalent (Hono/Elysia). Trust of `req.ip` depends
+on your framework's `trustProxy` setting — see [middleware](/session/middleware)
+for the runtime-specific caveats.
+
+- **Strong** against a stolen cookie replayed from a different
+  network egress.
+- **Weak** against an attacker on the same NAT / same corporate VPN.
+- **Mobile-hostile** in `strict` mode — network switches invalidate.
+
+### `ua`
+
+Captures the `User-Agent` request header, capped at 512 bytes.
+
+- **Strong** against a cookie replayed from a different browser /
+  OS. UA fingerprints have moderate entropy.
+- **Weak** against a `curl -H "User-Agent: …"` copy. Any client
+  under attacker control can forge the header.
+- **Version churn** is a footgun — the same user on Chrome 127 →
+  128 gets a new UA and (in strict mode) hard-revokes their session
+  on the browser's next auto-update. Combine with `bindStrictness:
+  'soft'` if UA is in the list.
+
+## Adapter-specific IP resolution
+
+- **Fastify** — honours `req.ip`, which itself honours Fastify's
+  `trustProxy` setting. Configure once at the Fastify level; the
+  session adapter inherits.
+- **Express** — honours `req.ip`, which itself honours the app's
+  `'trust proxy'` setting. Same story.
+- **Hono** — reaches into `c.env.incoming?.socket?.remoteAddress`
+  (Node adapter). Edge runtimes without an `incoming` object fall
+  back to UA-only.
+- **Elysia** — calls `context.server?.requestIP(context.request)`.
+
+## Fingerprint change on rotate
+
+`rotate()` recomputes the fingerprint from the current request, so a
+legitimate rotation from a new IP (say, immediately after a step-up
+auth on a new network) produces a new cookie whose `fp` matches the
+new environment. The old cookie's `fp` remains bound to the old IP —
+it wouldn't verify anywhere else even if someone replayed it.
+
+## Suspicious activity detection
+
+Even without `bindTo`, if `suspiciousActivity: true` is set, the
+manager compares stored `ip` / `ua` on the record to the current
+request on every verify and rotate, firing `onDetected` on drift.
+This is **advisory only** — no revoke, no denial. Use it to build
+"new login from unfamiliar location" emails without disrupting the
+user's flow.
+
+```js
+const sessions = createSessionManager({
+  ...,
+  // No bindTo — just detection
+  suspiciousActivity: {
+    onDetected: async ({ userId, reason, previous, current }) => {
+      analytics.track('session.drift', { userId, reason, from: previous, to: current });
+    },
+  },
+});
+```
+
+<Callout type="info">
+  Suspicious-activity handlers that throw are swallowed silently by
+  design — a telemetry mishap must never fail a login. Log inside
+  the handler if you need to see failures.
+</Callout>
+
+## Compliance
+
+Fingerprint binding contributes to OWASP ASVS **§V3.5** (token
+binding) and NIST SP 800-63B §7.1.2 (session binding to context) —
+see the [compliance mapping](/compliance).

@@ -1,0 +1,167 @@
+---
+title: 'session/csrf — session-bound tokens'
+sidebarTitle: csrf
+---
+
+import { Callout } from 'nextra/components';
+
+# `csrf`
+
+Cross-Site Request Forgery protection tied to the current session.
+The token is derived deterministically from the session ID + a server
+secret, so:
+
+- Every user gets a unique CSRF value.
+- The value survives across requests without any server-side state.
+- Two different users' tokens cannot verify against each other's
+  sessions.
+
+## Primitives
+
+```js
+import {
+  deriveCsrfToken,
+  verifyCsrfToken,
+  maskCsrfToken,
+  unmaskCsrfToken,
+} from '@exortek/session';
+```
+
+### `deriveCsrfToken(sessionId, secret)`
+
+Returns a 32-character base64url string:
+`HMAC-SHA-256(secret, "session-csrf" || sessionId)` truncated to 24
+bytes. Deterministic — the same session id + secret always produces
+the same token.
+
+### `verifyCsrfToken(candidate, sessionId, secret)`
+
+Timing-safe compare. Returns `false` on any mismatch —
+non-string candidate, wrong length, wrong value — never throws.
+
+### `maskCsrfToken(rawToken)` / `unmaskCsrfToken(maskedToken)`
+
+Per-render one-time pad. See below.
+
+## Basic flow (Express)
+
+```js
+import { deriveCsrfToken, verifyCsrfToken } from '@exortek/session';
+
+const CSRF_SECRET = process.env.CSRF_SECRET;
+
+// On page render — hand a token to the client
+app.get('/settings', requireAuth, (req, res) => {
+  const csrf = deriveCsrfToken(req.session.id, CSRF_SECRET);
+  res.render('settings', { csrf });
+});
+
+// On mutating request — client echoes the token back
+app.post('/settings', requireAuth, (req, res) => {
+  if (!verifyCsrfToken(req.body._csrf, req.session.id, CSRF_SECRET)) {
+    return res.sendStatus(403);
+  }
+  // ...safe from here
+});
+```
+
+The client can carry the token in:
+
+- A hidden `<input name="_csrf" value="...">` inside a form
+- A `<meta name="csrf" content="...">` for JS to read
+- A non-HttpOnly cookie for JS to read and echo in a header
+
+<Callout type="warning">
+  **The CSRF cookie must NOT be HttpOnly.** The point of double-submit
+  is that JS reads the value from the cookie and echoes it in a header
+  — an HttpOnly cookie defeats that. Use HttpOnly on the *session*
+  cookie only. See `@exortek/security/csrf` for the cookie-based
+  double-submit pattern in full.
+</Callout>
+
+## BREACH resistance — mask before rendering
+
+`deriveCsrfToken` returns the **same string** for a given session +
+secret. If your app serves compressed HTML with the CSRF value in
+the response body, a BREACH-class attacker who can influence a
+reflected part of that response (via a URL parameter, say) can
+recover the token character by character through response-length
+oracles.
+
+`maskCsrfToken(raw)` prevents this by XORing the raw token against a
+freshly-generated random pad and shipping `pad || (token ⊕ pad)`.
+Every render produces a different string; the pad travels alongside
+the ciphered token so the server can recover the original with
+`unmaskCsrfToken`.
+
+```js
+// On render — mask fresh every time
+const raw = deriveCsrfToken(session.id, CSRF_SECRET);
+const masked = maskCsrfToken(raw);
+res.render('form', { csrf: masked });
+
+// On mutating request — unmask, then verify
+const submitted = unmaskCsrfToken(req.body._csrf);
+if (!verifyCsrfToken(submitted, session.id, CSRF_SECRET)) {
+  return res.sendStatus(403);
+}
+```
+
+The mask is purely a rendering concern. Skip it when:
+
+- Response compression is disabled at your edge / server.
+- The token lives in a non-HTML surface (an HTTP header, a JSON API
+  response the browser reads via `fetch` rather than rendering
+  server-side).
+- Your framework already applies its own random per-render nonces
+  around the token.
+
+## What secret to use
+
+The CSRF secret should **not be the same** as your session encryption
+secret. Reason: if the session secret ever leaks, a CSRF valid
+against every user is trivially derivable. Keep them independent, and
+rotate independently.
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+Store in your secret manager / env, load once at boot.
+
+## What happens on session rotate
+
+Because the CSRF token is derived from `session.id`, calling
+`sessions.rotate(req)` produces a new session id and therefore a new
+CSRF token. Existing forms rendered against the pre-rotate session
+will fail their CSRF check on submit.
+
+Solutions:
+
+- After `rotate`, re-render the form (server-side) so the new CSRF
+  ships in the fresh HTML.
+- Or store the CSRF in a cookie that the middleware refreshes on
+  every request, so the browser always has the current token.
+
+## Why not use `@exortek/security/csrf`?
+
+Two implementations, both correct, different shapes:
+
+- **`session.csrf`** — this page. Token derives from `session.id +
+  secret`. Zero server state, one-line to generate.
+- **`security.csrf`** — the double-submit-cookie flow in the
+  security package. Independent of session — issues its own opaque
+  token, stores in cookie, verifies on submit. Works even without a
+  session (guest form submissions).
+
+Pick session's when your app already has a session and you want a
+CSRF token per user with no extra state. Pick security's when you
+need a first-class double-submit implementation with cookie
+management built in, or when your endpoints don't have a session
+attached.
+
+## Compliance
+
+Session-bound CSRF derivation covers OWASP ASVS **§V4.2** (CSRF
+defence) and the OWASP CSRF Prevention Cheat Sheet's
+"Synchronizer Token Pattern." See the [compliance mapping](/compliance).
