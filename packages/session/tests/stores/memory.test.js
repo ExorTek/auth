@@ -137,3 +137,38 @@ test('LRU eviction when maxSessions hit', async () => {
   assert.ok(await store.get('d'));
   store._stop();
 });
+
+test('eviction prefers expired garbage, then anonymous, over authenticated sessions', async () => {
+  const store = memoryStore({ maxSessions: 3, sweepMs: 60_000 });
+  const now = Date.now();
+  // Oldest = authenticated; middle = expired; newest = anonymous.
+  await store.put(makeRecord({ sid: 'auth', uid: 'u1', lastSeenAt: now - 3000 }));
+  await store.put(makeRecord({ sid: 'dead', uid: 'u2', lastSeenAt: now - 2000, expiresAt: now - 1 }));
+  await store.put(makeRecord({ sid: 'anon', uid: null, isAnonymous: true, lastSeenAt: now - 1000 }));
+
+  // 4th put: expired 'dead' should be swept — both live sessions survive.
+  await store.put(makeRecord({ sid: 'new1', uid: 'u3' }));
+  assert.equal(await store.get('dead'), null);
+  assert.ok(await store.get('auth'));
+  assert.ok(await store.get('anon'));
+
+  // 5th put: no garbage left — the anonymous session goes, NOT the
+  // older authenticated one.
+  await store.put(makeRecord({ sid: 'new2', uid: 'u4' }));
+  assert.equal(await store.get('anon'), null);
+  assert.ok(await store.get('auth'));
+  store._stop();
+});
+
+test('update(lastSeenAt) refreshes LRU position', async () => {
+  const store = memoryStore({ maxSessions: 2, sweepMs: 60_000 });
+  const now = Date.now();
+  await store.put(makeRecord({ sid: 'a', uid: null, isAnonymous: true, lastSeenAt: now - 2000 }));
+  await store.put(makeRecord({ sid: 'b', uid: null, isAnonymous: true, lastSeenAt: now - 1000 }));
+  // Touch 'a' — it becomes most-recently-seen, so 'b' is now the victim.
+  await store.update('a', { lastSeenAt: now });
+  await store.put(makeRecord({ sid: 'c', uid: null, isAnonymous: true }));
+  assert.ok(await store.get('a'));
+  assert.equal(await store.get('b'), null);
+  store._stop();
+});

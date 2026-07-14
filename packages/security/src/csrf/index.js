@@ -4,11 +4,15 @@
  * Recommended pattern: **signed double-submit cookie + custom header**.
  *   1. Server issues `token = generate(secret)` — an unpredictable random
  *      identifier plus an HMAC binding it to the server's secret.
- *   2. Store it in a `__Host-` prefixed cookie (HttpOnly, Secure, SameSite=Strict).
+ *   2. Store it in a `__Host-` prefixed cookie (Secure, SameSite=Strict).
+ *      NOT HttpOnly if the client echoes it from JavaScript (step 3) —
+ *      client-side JS cannot read an HttpOnly cookie. Use HttpOnly only
+ *      when the server template-injects the token into forms/meta tags
+ *      itself.
  *   3. On every write request (POST/PUT/PATCH/DELETE) the client echoes the
  *      same value in a custom header (or a template-injected form field).
  *   4. `verify(fromCookie, fromHeader, secret)` checks equality *and* the
- *      HMAC — so a leaked cookie without knowledge of the secret is useless.
+ *      HMAC — so a planted cookie without knowledge of the secret is useless.
  *
  * `generateUnsigned` / `verifyUnsigned` exist for legacy setups where the
  * server has no signing secret. Prefer `generate` — the unsigned variant

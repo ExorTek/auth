@@ -30,6 +30,14 @@ export function sessionPlugin(configOrManager) {
   const plugin = async elysiaApp => {
     return elysiaApp.derive(async context => {
       const request = { headers: context.request.headers };
+      // Surface the client IP for fingerprint binding (`bindTo: ['ip']`)
+      // and suspicious-activity detection. Bun's server exposes
+      // `requestIP(request)`; when unavailable, ip-binding silently
+      // degrades to ua-only.
+      const ip = context.server?.requestIP?.(context.request)?.address;
+      if (ip) {
+        request.ip = ip;
+      }
       const session = await sessions.verify(request);
       return {
         session,

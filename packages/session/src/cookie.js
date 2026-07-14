@@ -119,6 +119,21 @@ export function serialiseCookie(name, value, options = {}) {
       `serialiseCookie: cookie name '${name}' uses the __Secure- prefix — Secure is mandatory`,
     );
   }
+  // Attribute values are emitted verbatim — a `;`, comma, or control
+  // char inside them would splice extra attributes (or a second cookie)
+  // into the header. Config-sourced, so reject loudly at boot.
+  if (options.domain !== undefined && !/^[a-zA-Z0-9.-]+$/.test(options.domain)) {
+    throw new SessionError(
+      ErrorCode.INVALID_ARGUMENT,
+      `serialiseCookie: domain contains characters not allowed in a cookie attribute; got ${JSON.stringify(options.domain)}`,
+    );
+  }
+  if (options.path !== undefined && /[;,\s\x00-\x1f\x7f]/.test(options.path)) {
+    throw new SessionError(
+      ErrorCode.INVALID_ARGUMENT,
+      `serialiseCookie: path contains characters not allowed in a cookie attribute; got ${JSON.stringify(options.path)}`,
+    );
+  }
   const parts = [`${name}=${encodeURIComponent(value)}`];
   if (options.domain) {
     parts.push(`Domain=${options.domain}`);

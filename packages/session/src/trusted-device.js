@@ -42,6 +42,9 @@ export function createTrustedDeviceCookie(config) {
      * Mint a trusted-device cookie for a user. Call this at 2FA completion
      * when the user ticked "remember me on this device".
      *
+     * `extraClaims` keys named `uid`, `iat`, or `exp` are ignored — the
+     * reserved fields always win.
+     *
      * @param {string} userId
      * @param {{ now?: number, extraClaims?: object }} [options]
      * @returns {string}   Set-Cookie header value.
@@ -51,11 +54,15 @@ export function createTrustedDeviceCookie(config) {
         throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'trustedDevice.issue: userId is required');
       }
       const now = options.now ?? Date.now();
+      // Reserved fields are written AFTER the extraClaims spread so a
+      // caller-supplied (possibly user-influenced) claims object can
+      // never clobber uid/iat/exp — extraClaims.uid overriding the
+      // userId argument would let one user's cookie verify as another's.
       const payload = {
+        ...(options.extraClaims ?? {}),
         uid: userId,
         iat: now,
         exp: now + ttlMs,
-        ...(options.extraClaims ?? {}),
       };
       const token = seal(payload, secret[0], { ttl: Math.max(1, Math.ceil(ttlMs / 1000)), now });
       return serialiseCookie(cookieName, token, {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveCsrfToken, verifyCsrfToken } from '../src/csrf.js';
+import { deriveCsrfToken, verifyCsrfToken, maskCsrfToken, unmaskCsrfToken } from '../src/csrf.js';
 import { SessionError, ErrorCode } from '../src/errors.js';
 
 const SECRET = 'thirty-two-byte-server-secret-for-csrf';
@@ -54,4 +54,21 @@ test('deriveCsrfToken: rejects empty sessionId', () => {
 
 test('deriveCsrfToken: rejects bad secret', () => {
   assert.throws(() => deriveCsrfToken('sid', null));
+});
+
+test('mask/unmask: round-trips and never repeats ciphertext (BREACH)', () => {
+  const token = deriveCsrfToken('sid-1', SECRET);
+  const m1 = maskCsrfToken(token);
+  const m2 = maskCsrfToken(token);
+  assert.notEqual(m1, m2, 'each mask must use a fresh pad');
+  assert.equal(unmaskCsrfToken(m1), token);
+  assert.equal(unmaskCsrfToken(m2), token);
+  assert.equal(verifyCsrfToken(unmaskCsrfToken(m1), 'sid-1', SECRET), true);
+});
+
+test('unmask: returns null for malformed input, never throws', () => {
+  assert.equal(unmaskCsrfToken(null), null);
+  assert.equal(unmaskCsrfToken(''), null);
+  assert.equal(unmaskCsrfToken('x'), null); // odd byte count after decode
+  assert.equal(verifyCsrfToken(unmaskCsrfToken('x'), 'sid-1', SECRET), false);
 });

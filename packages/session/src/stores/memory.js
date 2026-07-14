@@ -49,8 +49,11 @@ import { SessionError, ErrorCode } from '../errors.js';
  * @typedef {object} MemoryStoreOptions
  * @property {number} [maxSessions=100000]
  *   Absolute cap on session count. Protects against a leaky app slowly
- *   filling process memory; when hit, the oldest session (by
- *   `lastSeenAt`) is evicted to make room.
+ *   filling process memory. When hit, expired/revoked entries are swept
+ *   first; if still full, the least-recently-seen ANONYMOUS session is
+ *   evicted before any authenticated one — so an anonymous-session
+ *   flood can't force-logout real users. With `anonymous: true`, still
+ *   pair this store with an IP rate limit on session creation.
  * @property {number} [sweepMs=60000]
  *   How often the store scans for expired entries and drops them.
  *   Deferred cleanup is fine — expired records never verify, and
@@ -101,26 +104,43 @@ export function memoryStore(options = {}) {
     timer.unref();
   }
 
+  function evict(sid) {
+    const victim = map.get(sid);
+    if (victim) {
+      removeIndex(victim);
+    }
+    map.delete(sid);
+  }
+
   function ensureRoom() {
     if (map.size < maxSessions) {
       return;
     }
-    // Evict the least-recently-seen entry — deterministic, works even
-    // when every remaining record is still within its TTL.
-    let victimSid = null;
-    let victimSeen = Infinity;
+    // Reclaim dead entries first — an authenticated session must never
+    // be evicted while expired/revoked garbage is still occupying slots.
+    sweep();
+    if (map.size < maxSessions) {
+      return;
+    }
+    // The map is kept in least-recently-seen order (update() re-inserts
+    // on touch), so iteration order IS the LRU order. Prefer the oldest
+    // ANONYMOUS session: with `anonymous: true` an attacker can mint
+    // unlimited cookie-less sessions, and pure-LRU eviction would let
+    // that flood push real users' authenticated sessions out (a mass
+    // forced-logout DoS). Only when no anonymous session exists does
+    // the oldest authenticated one go.
+    let fallback = null;
     for (const [sid, rec] of map) {
-      if (rec.lastSeenAt < victimSeen) {
-        victimSeen = rec.lastSeenAt;
-        victimSid = sid;
+      if (fallback === null) {
+        fallback = sid;
+      }
+      if (rec.isAnonymous) {
+        evict(sid);
+        return;
       }
     }
-    if (victimSid) {
-      const victim = map.get(victimSid);
-      if (victim) {
-        removeIndex(victim);
-      }
-      map.delete(victimSid);
+    if (fallback !== null) {
+      evict(fallback);
     }
   }
 
@@ -183,6 +203,11 @@ export function memoryStore(options = {}) {
       if (patch.uid !== undefined && patch.uid !== existing.uid) {
         removeIndex(existing);
         addIndex(next);
+      }
+      // Delete-then-set keeps Map iteration order = LRU order, which
+      // makes ensureRoom's eviction scan O(1) in the common case.
+      if (patch.lastSeenAt !== undefined) {
+        map.delete(sid);
       }
       map.set(sid, next);
       return next;

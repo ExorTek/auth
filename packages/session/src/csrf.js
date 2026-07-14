@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
 import { SessionError, ErrorCode } from './errors.js';
 
 // CSRF token derivation from a session ID + a server secret. The token
@@ -9,6 +9,13 @@ import { SessionError, ErrorCode } from './errors.js';
 // This is the standard "synchroniser token" pattern hardened by binding
 // the token to the session it belongs to, so an attacker who steals a
 // CSRF value from one user cannot use it against another.
+//
+// BREACH note: the derived token is constant for the session's
+// lifetime. If you embed it in HTML served with response compression,
+// a BREACH-class attacker can recover it byte-by-byte. Wrap it with
+// {@link maskCsrfToken} before rendering — each response then carries
+// a different ciphertext of the same underlying token — and call
+// {@link unmaskCsrfToken} before {@link verifyCsrfToken}.
 
 const NAMESPACE = Buffer.from('exortek/session/csrf/v1', 'utf8');
 
@@ -59,4 +66,55 @@ export function verifyCsrfToken(candidate, sessionId, secret) {
     return false;
   }
   return timingSafeEqual(Buffer.from(expected, 'utf8'), Buffer.from(candidate, 'utf8'));
+}
+
+/**
+ * One-time-pad mask a CSRF token for embedding in compressed HTML
+ * (BREACH mitigation, per OWASP). Output is `base64url(pad ‖ pad⊕token)`
+ * — a fresh random pad per call, so two renders of the same token never
+ * produce the same bytes.
+ *
+ * @param {string} token    Output of {@link deriveCsrfToken}.
+ * @returns {string}
+ */
+export function maskCsrfToken(token) {
+  if (typeof token !== 'string' || token.length === 0) {
+    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'maskCsrfToken: token is required');
+  }
+  const t = Buffer.from(token, 'utf8');
+  const pad = randomBytes(t.length);
+  const masked = Buffer.alloc(t.length);
+  for (let i = 0; i < t.length; i++) {
+    masked[i] = t[i] ^ pad[i];
+  }
+  return Buffer.concat([pad, masked]).toString('base64url');
+}
+
+/**
+ * Reverse {@link maskCsrfToken}. Returns the underlying token, or
+ * `null` for malformed input — never throws for user-supplied values.
+ * Feed the result into {@link verifyCsrfToken}.
+ *
+ * @param {unknown} masked
+ * @returns {string | null}
+ */
+export function unmaskCsrfToken(masked) {
+  if (typeof masked !== 'string' || masked.length === 0) {
+    return null;
+  }
+  let bytes;
+  try {
+    bytes = Buffer.from(masked, 'base64url');
+  } catch {
+    return null;
+  }
+  if (bytes.length === 0 || bytes.length % 2 !== 0) {
+    return null;
+  }
+  const half = bytes.length / 2;
+  const out = Buffer.alloc(half);
+  for (let i = 0; i < half; i++) {
+    out[i] = bytes[i] ^ bytes[half + i];
+  }
+  return out.toString('utf8');
 }

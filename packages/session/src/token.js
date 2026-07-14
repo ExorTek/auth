@@ -4,13 +4,15 @@ import { CryptoError, ErrorCode as CryptoErrorCode } from '@exortek/crypto';
 import { SessionError, ErrorCode } from './errors.js';
 
 /**
+ * The sealed cookie carries only what `verify()` reads back — the sid
+ * is the store lookup key; everything else about the session (userId,
+ * claims, freshAt, …) lives server-side in the {@link SessionRecord}
+ * so it can never go stale inside an already-issued cookie.
+ *
  * @typedef {object} SessionTokenPayload
  * @property {string} sid           Server-side session ID (opaque, from CSPRNG).
- * @property {string | null} uid    User ID (or `null` for anonymous sessions).
- * @property {object} claims        Free-form claims — roles, tenant, etc.
  * @property {number} iat           Issued-at (ms epoch).
  * @property {number} exp           Absolute expiry (ms epoch).
- * @property {number} [freshAt]     Last fresh-auth timestamp (sudo mode).
  * @property {string} [fp]          Fingerprint hash (IP + UA), when `bindTo` is enabled.
  * @property {string} [imp]         Admin user ID that started the impersonation.
  */

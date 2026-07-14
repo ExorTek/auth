@@ -3,8 +3,7 @@ import { memoryStore } from './stores/memory.js';
 import { SessionError, ErrorCode } from './errors.js';
 import { generateSessionId, encodeToken, decodeToken } from './token.js';
 import { parseCookies, serialiseCookie, serialiseDeleteCookie } from './cookie.js';
-import { extractTokenFromHeader } from './header.js';
-import { deriveCsrfToken, verifyCsrfToken } from './csrf.js';
+import { deriveCsrfToken, verifyCsrfToken, maskCsrfToken, unmaskCsrfToken } from './csrf.js';
 import { computeFingerprint, readIp, readUserAgent } from './fingerprint.js';
 import { deriveDeviceLabel } from './device-label.js';
 import { createTrustedDeviceCookie } from './trusted-device.js';
@@ -18,7 +17,6 @@ import { createTrustedDeviceCookie } from './trusted-device.js';
  * @typedef {import('./stores/memory.js').SessionStore} SessionStore
  * @typedef {import('./stores/memory.js').SessionRecord} SessionRecord
  * @typedef {import('./cookie.js').CookieOptions} CookieOptions
- * @typedef {import('./header.js').HeaderTokenConfig} HeaderTokenConfig
  * @typedef {import('./token.js').SessionTokenPayload} SessionTokenPayload
  */
 
@@ -38,9 +36,10 @@ export {
   parseCookies,
   serialiseCookie,
   serialiseDeleteCookie,
-  extractTokenFromHeader,
   deriveCsrfToken,
   verifyCsrfToken,
+  maskCsrfToken,
+  unmaskCsrfToken,
   computeFingerprint,
   deriveDeviceLabel,
   readIp,

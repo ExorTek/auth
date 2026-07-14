@@ -53,3 +53,14 @@ test('secret rotation: cookie minted under OLD verifies under [NEW, OLD]', () =>
   const req = mkReq(`__Host-td=${cookieVal}`);
   assert.equal(rotated.verify(req, 'u1'), true);
 });
+
+test('extraClaims cannot clobber the reserved uid/iat/exp fields', () => {
+  const td = createTrustedDeviceCookie({ secret: SECRET, ttl: '30d' });
+  const setCookie = td.issue('u1', {
+    extraClaims: { uid: 'attacker', exp: Date.now() + 10 * 365 * 86_400_000, note: 'kept' },
+  });
+  const cookieVal = decodeURIComponent(setCookie.match(/__Host-td=([^;]+)/)[1]);
+  // Verifies for the REAL user, not the smuggled one.
+  assert.equal(td.verify(mkReq(`__Host-td=${encodeURIComponent(cookieVal)}`), 'u1'), true);
+  assert.equal(td.verify(mkReq(`__Host-td=${encodeURIComponent(cookieVal)}`), 'attacker'), false);
+});

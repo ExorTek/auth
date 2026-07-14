@@ -116,3 +116,14 @@ test('serialiseDeleteCookie: emits Max-Age=0 + past Expires', () => {
   assert.match(s, /Max-Age=0/);
   assert.match(s, /Expires=Thu, 01 Jan 1970/);
 });
+
+test('serialiseCookie: rejects attribute injection via path/domain', () => {
+  assert.throws(
+    () => serialiseCookie('sid', 'v', { path: '/; Domain=evil.com' }),
+    err => err instanceof SessionError && err.code === ErrorCode.INVALID_ARGUMENT,
+  );
+  assert.throws(
+    () => serialiseCookie('sid', 'v', { domain: 'good.com; Secure', path: '/' }),
+    err => err instanceof SessionError && err.code === ErrorCode.INVALID_ARGUMENT,
+  );
+});

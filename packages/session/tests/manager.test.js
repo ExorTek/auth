@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSessionManager, SessionError, ErrorCode } from '../src/index.js';
+import { createSessionManager, ErrorCode } from '../src/index.js';
 
 const SECRET = 'thirty-two-byte-secret-for-session-tests';
 
@@ -132,7 +132,7 @@ test('revokeAllForUser kills every session', async () => {
 test('revokeAllExceptCurrent keeps current session alive', async () => {
   const sessions = createSessionManager({ secret: SECRET, ttl: '7d', idleTtl: '30m' });
   const a = await sessions.issue({ userId: 'u1' });
-  const b = await sessions.issue({ userId: 'u1' });
+  await sessions.issue({ userId: 'u1' });
   await sessions.issue({ userId: 'u1' });
   const currentReq = mkReq(`__Host-sid=${encodeURIComponent(a.token)}`);
   const killed = await sessions.revokeAllExceptCurrent(currentReq);
@@ -208,25 +208,35 @@ test('secret rotation: token minted under OLD verifies under [NEW, OLD]', async 
   assert.equal(verified.id, session.id);
 });
 
-test('Bearer header takes precedence when headerToken configured', async () => {
+test('bad secret shape rejected', () => {
+  assert.throws(() => createSessionManager({ secret: 42, ttl: '7d', idleTtl: '30m' }));
+  assert.throws(() => createSessionManager({ secret: [], ttl: '7d', idleTtl: '30m' }));
+});
+
+test('touchEvery: rejects a value >= idleTtl', () => {
+  assert.throws(
+    () => createSessionManager({ secret: SECRET, ttl: '7d', idleTtl: '30m', touchEvery: '30m' }),
+    err => err.code === ErrorCode.INVALID_ARGUMENT,
+  );
+});
+
+test('touchEvery: lastSeenAt is only persisted after the sampling interval', async () => {
   const sessions = createSessionManager({
     secret: SECRET,
     ttl: '7d',
     idleTtl: '30m',
-    headerToken: {},
+    touchEvery: '60s',
   });
-  const { token } = await sessions.issue({ userId: 'u1' });
-  const req = {
-    headers: {
-      authorization: `Bearer ${token}`,
-    },
-  };
-  const verified = await sessions.verify(req);
-  assert.ok(verified);
-  sessions.store._stop();
-});
+  const t0 = Date.now();
+  const { token, session } = await sessions.issue({ userId: 'u1', now: t0 });
+  const req = c => ({ headers: { cookie: `__Host-sid=${encodeURIComponent(c)}` } });
 
-test('bad secret shape rejected', () => {
-  assert.throws(() => createSessionManager({ secret: 42, ttl: '7d', idleTtl: '30m' }));
-  assert.throws(() => createSessionManager({ secret: [], ttl: '7d', idleTtl: '30m' }));
+  // Inside the interval — no store write.
+  await sessions.verify(req(token), { now: t0 + 30_000 });
+  assert.equal((await sessions.store.get(session.id)).lastSeenAt, t0);
+
+  // Past the interval — lastSeenAt persists.
+  await sessions.verify(req(token), { now: t0 + 61_000 });
+  assert.equal((await sessions.store.get(session.id)).lastSeenAt, t0 + 61_000);
+  sessions.store._stop();
 });

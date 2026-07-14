@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSessionManager, SessionError, ErrorCode } from '../src/index.js';
+import { createSessionManager } from '../src/index.js';
 
 const SECRET = 'thirty-two-byte-secret-for-session-tests';
 const mkReq = c => ({ headers: c ? { cookie: c } : {} });

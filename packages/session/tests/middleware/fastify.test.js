@@ -44,7 +44,10 @@ test('fastify plugin: decorates request + reply and populates session', async ()
   const replyHeaders = {};
   const reply = {
     header(name, value) {
-      replyHeaders[name] = value;
+      replyHeaders[name.toLowerCase()] = value;
+    },
+    getHeader(name) {
+      return replyHeaders[name.toLowerCase()];
     },
   };
   await fastify.__invoke(request, reply);
@@ -53,7 +56,35 @@ test('fastify plugin: decorates request + reply and populates session', async ()
   assert.equal(typeof reply.setSessionCookie, 'function');
 
   reply.setSessionCookie('__Host-sid=fresh; Path=/; Secure');
-  assert.equal(replyHeaders['Set-Cookie'], '__Host-sid=fresh; Path=/; Secure');
+  assert.equal(replyHeaders['set-cookie'], '__Host-sid=fresh; Path=/; Secure');
+  manager.store._stop();
+});
+
+test('fastify plugin: setSessionCookie appends to existing Set-Cookie values', async () => {
+  const { manager, plugin } = sessionPlugin({
+    secret: SECRET,
+    ttl: '7d',
+    idleTtl: '30m',
+    anonymous: true,
+  });
+  const fastify = mkFastify();
+  await plugin(fastify);
+
+  const replyHeaders = {};
+  const reply = {
+    header(name, value) {
+      replyHeaders[name.toLowerCase()] = value;
+    },
+    getHeader(name) {
+      return replyHeaders[name.toLowerCase()];
+    },
+  };
+  await fastify.__invoke({ headers: {} }, reply);
+
+  // A route sets an unrelated cookie first — ours must not clobber it.
+  reply.header('Set-Cookie', 'csrf=abc; Path=/; Secure');
+  reply.setSessionCookie('__Host-sid=fresh; Path=/; Secure');
+  assert.deepEqual(replyHeaders['set-cookie'], ['csrf=abc; Path=/; Secure', '__Host-sid=fresh; Path=/; Secure']);
   manager.store._stop();
 });
 

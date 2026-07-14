@@ -28,6 +28,16 @@ export function sessionMiddleware(configOrManager) {
     // request cache on the context so a nested call to verify from a
     // route handler still hits the cache.
     const request = { headers: c.req.raw.headers };
+    // Surface the client IP so fingerprint binding (`bindTo: ['ip']`)
+    // and suspicious-activity detection work. On the Node adapter
+    // (@hono/node-server) the raw IncomingMessage rides on `c.env
+    // .incoming`; without it (Bun/Deno/Workers) the IP is not
+    // derivable here and ip-binding silently degrades to ua-only —
+    // pass a manager with `bindTo: ['ua']` on those runtimes.
+    const socket = c.env?.incoming?.socket;
+    if (socket) {
+      request.socket = socket;
+    }
     const session = await sessions.verify(request);
     c.set('session', session);
     c.set('sessions', sessions);

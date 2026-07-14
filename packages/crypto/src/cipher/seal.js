@@ -281,13 +281,40 @@ function _describe(v) {
   return typeof v === 'object' ? (v.constructor?.name ?? 'object') : typeof v;
 }
 
+// HKDF result cache. seal/unseal run on the hot path (every session
+// verify), and the secret → key derivation is fully deterministic, so
+// re-deriving per call is pure waste. Only STRING secrets are cached:
+// strings are immutable, whereas a Buffer's contents can be mutated
+// (e.g. zeroized) after the fact, which would make an identity-keyed
+// cache silently serve a key for material that no longer exists.
+const KEY_CACHE_MAX = 8;
+/** @type {Map<string, Buffer>} */
+const _keyCache = new Map();
+
 function _deriveKey(secret) {
-  return hkdf(toBuffer(secret, 'secret'), {
+  const cacheable = typeof secret === 'string';
+  if (cacheable) {
+    const hit = _keyCache.get(secret);
+    if (hit) {
+      return hit;
+    }
+  }
+  const key = hkdf(toBuffer(secret, 'secret'), {
     salt: Buffer.of(VERSION),
     info: HKDF_INFO,
     length: 32,
     hash: 'sha256',
   });
+  if (cacheable) {
+    if (_keyCache.size >= KEY_CACHE_MAX) {
+      // Drop the oldest entry — realistic deployments hold 1-3 secrets
+      // (current + rotation tail), so eviction is a safety valve, not a
+      // steady-state path.
+      _keyCache.delete(_keyCache.keys().next().value);
+    }
+    _keyCache.set(secret, key);
+  }
+  return key;
 }
 
 function _parseTtl(ttl) {

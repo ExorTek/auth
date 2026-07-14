@@ -3,7 +3,6 @@ import { generateSessionId, encodeToken, decodeToken } from './token.js';
 import { memoryStore } from './stores/memory.js';
 import { parseDuration } from './internal/duration.js';
 import { parseCookies, serialiseCookie, serialiseDeleteCookie } from './cookie.js';
-import { extractTokenFromHeader } from './header.js';
 import { computeFingerprint, readIp, readUserAgent } from './fingerprint.js';
 import { deriveDeviceLabel } from './device-label.js';
 import { createKeyMutex } from './internal/mutex.js';
@@ -13,7 +12,6 @@ import { createKeyMutex } from './internal/mutex.js';
  * @typedef {import('./stores/memory.js').SessionStore} SessionStore
  * @typedef {import('./stores/memory.js').SessionRecord} SessionRecord
  * @typedef {import('./cookie.js').CookieOptions} CookieOptions
- * @typedef {import('./header.js').HeaderTokenConfig} HeaderTokenConfig
  */
 
 /**
@@ -33,8 +31,15 @@ import { createKeyMutex } from './internal/mutex.js';
  * @property {string | number} idleTtl
  * @property {CookieOptions & { name?: string }} [cookie]
  * @property {SessionStore} [store]
- * @property {HeaderTokenConfig} [headerToken]
  * @property {boolean} [anonymous=false]
+ * @property {string | number} [touchEvery]                 How often `verify` persists a
+ *                                                          rolling `lastSeenAt` update to the
+ *                                                          store. Defaults to 60s (or half the
+ *                                                          idleTtl, whichever is smaller).
+ *                                                          Larger values cut store write
+ *                                                          traffic; the idle-timeout check
+ *                                                          only ever errs by at most this
+ *                                                          much. Must be shorter than idleTtl.
  * @property {number} [concurrentLimit]
  * @property {ReadonlyArray<'ip' | 'ua'>} [bindTo]         Fingerprint binding.
  * @property {'strict' | 'soft'} [bindStrictness='strict'] Behaviour on fingerprint mismatch.
@@ -92,6 +97,17 @@ import { createKeyMutex } from './internal/mutex.js';
  * @property {Session} session
  */
 
+/**
+ * Create a session manager — the package's main entrypoint. Issues
+ * sealed cookie/bearer tokens backed by a server-side store, and
+ * exposes the verify / rotate / revoke lifecycle around them.
+ *
+ * The returned object's type is inferred — consumers get the full
+ * method surface in the generated `.d.ts` without a hand-maintained
+ * typedef drifting out of sync.
+ *
+ * @param {SessionManagerConfig} config
+ */
 export function createSessionManager(config) {
   if (!config || typeof config !== 'object') {
     throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'createSessionManager: config is required');
@@ -109,8 +125,21 @@ export function createSessionManager(config) {
   const cookieOptions = { ...config.cookie };
   delete cookieOptions.name;
   const store = config.store ?? memoryStore();
-  const headerToken = config.headerToken;
   const anonymousAllowed = config.anonymous === true;
+  // Rolling-touch sampling: writing lastSeenAt on every request is one
+  // store write per request for information the idle-TTL check only
+  // needs at `touchEvery` granularity. Default: 60s, clamped to half
+  // the idleTtl so short idle windows still get enough resolution.
+  const touchEveryMs =
+    config.touchEvery !== undefined
+      ? parseDuration(config.touchEvery, 'touchEvery')
+      : Math.min(60_000, Math.max(1, Math.floor(idleTtlMs / 2)));
+  if (touchEveryMs >= idleTtlMs) {
+    throw new SessionError(
+      ErrorCode.INVALID_ARGUMENT,
+      `createSessionManager: touchEvery (${touchEveryMs}ms) must be shorter than idleTtl (${idleTtlMs}ms) — otherwise active sessions idle out between touches`,
+    );
+  }
   const concurrentLimit = config.concurrentLimit;
   const bindTo = Array.isArray(config.bindTo) ? Object.freeze([...config.bindTo]) : null;
   const bindStrictness = config.bindStrictness ?? 'strict';
@@ -192,6 +221,13 @@ export function createSessionManager(config) {
     return out;
   }
 
+  /**
+   * Mint a new session: writes the server-side record and returns the
+   * sealed token plus a ready-to-send Set-Cookie value.
+   *
+   * @param {IssueOptions} [options]
+   * @returns {Promise<IssueResult>}
+   */
   async function issue(options = {}) {
     const now = options.now ?? Date.now();
     const userId = options.userId ?? null;
@@ -220,14 +256,20 @@ export function createSessionManager(config) {
 
   async function issueLocked(options, now, userId) {
     if (concurrentLimit !== undefined && userId !== null) {
-      const active = await store.countActive(userId);
-      if (active >= concurrentLimit) {
+      // Evict until we're strictly below the limit — the store may
+      // already be OVER it (limit lowered between deploys, or a
+      // multi-worker race slipped extras in), and a single eviction
+      // would leave it there forever.
+      let active = await store.countActive(userId);
+      while (active >= concurrentLimit) {
         const list = await store.listByUser(userId);
         const oldest = list[list.length - 1];
-        if (oldest) {
-          await store.revoke(oldest.sid, 'concurrent-limit');
-          await fire(events.onRevoke, oldest.sid, 'concurrent-limit');
+        if (!oldest) {
+          break;
         }
+        await store.revoke(oldest.sid, 'concurrent-limit');
+        await fire(events.onRevoke, oldest.sid, 'concurrent-limit');
+        active -= 1;
       }
     }
     const durationMs = options.rememberMe ? ttlMs * 2 : ttlMs;
@@ -270,10 +312,13 @@ export function createSessionManager(config) {
     }
     await store.put(record);
 
+    // Token diet: the sealed cookie carries only what verify() actually
+    // reads — sid (store lookup key), iat/exp (transport-level expiry)
+    // and fp (fingerprint binding). uid/claims live server-side in the
+    // record; duplicating them here would bloat the cookie toward the
+    // 4 KB limit and go stale the moment store.update() changes them.
     const payload = {
       sid: record.sid,
-      uid: record.uid,
-      claims: record.claims,
       iat: record.issuedAt,
       exp: record.expiresAt,
     };
@@ -290,6 +335,16 @@ export function createSessionManager(config) {
     };
   }
 
+  /**
+   * Authenticate a request. Returns the live `Session` or `null` —
+   * never throws for bad/expired/missing tokens (those surface through
+   * the `onDeny` event instead). The result is cached on the request
+   * object, so repeated calls within one request hit the store once.
+   *
+   * @param {any} req                     Framework request (needs `.headers`).
+   * @param {{ now?: number }} [options]
+   * @returns {Promise<Session | null>}
+   */
   async function verify(req, options = {}) {
     if (!req) {
       return null;
@@ -312,8 +367,7 @@ export function createSessionManager(config) {
       // All onDeny reasons are lowercase kebab — normalize the crypto/
       // session error codes (SCREAMING_SNAKE) into that shape so
       // consumers see a single vocabulary.
-      const denyReason =
-        err?.code === 'EXPIRED' ? 'expired' : err?.code === 'INVALID_TOKEN' ? 'invalid-token' : 'invalid-token';
+      const denyReason = err?.code === 'EXPIRED' ? 'expired' : 'invalid-token';
       await fire(events.onDeny, denyReason, req);
       return null;
     }
@@ -370,8 +424,8 @@ export function createSessionManager(config) {
     if (suspiciousActivity && record.uid) {
       await detectSuspicious(req, record);
     }
-    // Rolling touch.
-    if (now - record.lastSeenAt > 1000) {
+    // Rolling touch — sampled at touchEvery to bound store write traffic.
+    if (now - record.lastSeenAt > touchEveryMs) {
       await store.update(payload.sid, { lastSeenAt: now });
       record.lastSeenAt = now;
     }
@@ -381,6 +435,13 @@ export function createSessionManager(config) {
     return session;
   }
 
+  /**
+   * Manually refresh a session's `lastSeenAt` (the idle-TTL clock).
+   *
+   * @param {string} sessionId
+   * @param {{ now?: number }} [options]
+   * @returns {Promise<boolean>}   `false` when the sid isn't in the store.
+   */
   async function touch(sessionId, options = {}) {
     if (typeof sessionId !== 'string' || sessionId.length === 0) {
       throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'touch: sessionId is required');
@@ -466,8 +527,6 @@ export function createSessionManager(config) {
 
     const payload = {
       sid: next.sid,
-      uid: next.uid,
-      claims: next.claims,
       iat: next.issuedAt,
       exp: next.expiresAt,
     };
@@ -494,6 +553,14 @@ export function createSessionManager(config) {
     };
   }
 
+  /**
+   * Record a fresh re-authentication ("sudo mode") on the current
+   * session — pair with {@link requireFreshAuth} on sensitive routes.
+   *
+   * @param {any} req
+   * @param {{ now?: number }} [options]
+   * @returns {Promise<{ freshAt: number }>}
+   */
   async function markFresh(req, options = {}) {
     const now = options.now ?? Date.now();
     const session = await verify(req, { now });
@@ -508,6 +575,15 @@ export function createSessionManager(config) {
     return { freshAt: now };
   }
 
+  /**
+   * Check that the session re-authenticated within the last
+   * `maxAgeSeconds`. Returns `false` for missing sessions, sessions
+   * that never called {@link markFresh}, and stale fresh-auth stamps.
+   *
+   * @param {any} req
+   * @param {{ maxAgeSeconds: number, now?: number }} options
+   * @returns {Promise<boolean>}
+   */
   async function requireFreshAuth(req, options = {}) {
     const maxAgeSeconds = options.maxAgeSeconds;
     if (typeof maxAgeSeconds !== 'number' || !Number.isFinite(maxAgeSeconds) || maxAgeSeconds <= 0) {
@@ -524,6 +600,17 @@ export function createSessionManager(config) {
     return now - session.freshAt <= maxAgeSeconds * 1000;
   }
 
+  /**
+   * Mint a short-lived session for `targetUserId` on behalf of the
+   * admin authenticated on `adminReq`. Requires `impersonation: true`
+   * in the manager config; chaining (impersonating from an already-
+   * impersonated session) is refused to keep the audit trail honest.
+   *
+   * @param {any} adminReq
+   * @param {string} targetUserId
+   * @param {{ ttl?: string | number, claims?: object, reason?: string, now?: number }} [options]
+   * @returns {Promise<IssueResult>}
+   */
   async function impersonate(adminReq, targetUserId, options = {}) {
     if (!impersonationEnabled) {
       throw new SessionError(
@@ -537,6 +624,15 @@ export function createSessionManager(config) {
     const adminSession = await verify(adminReq);
     if (!adminSession || !adminSession.userId) {
       throw new SessionError(ErrorCode.INVALID_TOKEN, 'impersonate: admin session is not valid');
+    }
+    // No chaining: an impersonation session may not start another one.
+    // The second hop would record the *borrowed* identity as
+    // `impersonatedBy`, erasing the real admin from the audit trail.
+    if (adminSession.impersonatedBy !== undefined) {
+      throw new SessionError(
+        ErrorCode.INVALID_ARGUMENT,
+        'impersonate: the current session is itself an impersonation — chaining is not allowed; act from the real admin session',
+      );
     }
     const now = options.now ?? Date.now();
     // Impersonation runs against its own (shorter) TTL — the regular
@@ -565,8 +661,6 @@ export function createSessionManager(config) {
     await store.put(record);
     const payload = {
       sid: record.sid,
-      uid: record.uid,
-      claims: record.claims,
       iat: record.issuedAt,
       exp: record.expiresAt,
       imp: adminSession.userId,
@@ -581,6 +675,14 @@ export function createSessionManager(config) {
     };
   }
 
+  /**
+   * Log out the session on `req`. Always returns a delete-cookie so
+   * the caller can clear the browser even when no valid token came in.
+   *
+   * @param {any} req
+   * @param {{ reason?: string, now?: number }} [options]
+   * @returns {Promise<{ cookie: string, revoked: boolean }>}
+   */
   async function revoke(req, options = {}) {
     const now = options.now ?? Date.now();
     const token = extractToken(req);
@@ -604,6 +706,13 @@ export function createSessionManager(config) {
     return { cookie: deleteCookie(), revoked };
   }
 
+  /**
+   * Revoke a single session by ID — the "log out that device" button.
+   *
+   * @param {string} sessionId
+   * @param {{ reason?: string }} [options]
+   * @returns {Promise<boolean>}
+   */
   async function revokeById(sessionId, options = {}) {
     if (typeof sessionId !== 'string' || sessionId.length === 0) {
       throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'revokeById: sessionId is required');
@@ -615,6 +724,14 @@ export function createSessionManager(config) {
     return revoked;
   }
 
+  /**
+   * Revoke every session for a user — password change, account
+   * compromise, offboarding.
+   *
+   * @param {string} userId
+   * @param {{ reason?: string }} [options]
+   * @returns {Promise<number>}    Count revoked.
+   */
   async function revokeAllForUser(userId, options = {}) {
     if (typeof userId !== 'string' || userId.length === 0) {
       throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'revokeAllForUser: userId is required');
@@ -626,6 +743,14 @@ export function createSessionManager(config) {
     return count;
   }
 
+  /**
+   * "Log out everywhere else" — revoke the user's other sessions,
+   * keeping the one authenticated on `req`.
+   *
+   * @param {any} req
+   * @param {{ reason?: string, now?: number }} [options]
+   * @returns {Promise<number>}    Count revoked.
+   */
   async function revokeAllExceptCurrent(req, options = {}) {
     const session = await verify(req, { now: options.now });
     if (!session || !session.userId) {
@@ -638,6 +763,13 @@ export function createSessionManager(config) {
     return count;
   }
 
+  /**
+   * All live sessions for a user, newest-seen first — the data behind
+   * a "your devices" settings page.
+   *
+   * @param {string} userId
+   * @returns {Promise<Session[]>}
+   */
   async function listActive(userId) {
     if (typeof userId !== 'string' || userId.length === 0) {
       throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'listActive: userId is required');
@@ -680,13 +812,18 @@ export function createSessionManager(config) {
       options.mergeClaims && typeof options.mergeClaims === 'object'
         ? { ...anon.claims, ...options.mergeClaims }
         : anon.claims;
-    // Revoke the anonymous record and mint an authenticated session.
+    // Mint the authenticated session FIRST, revoke the anonymous record
+    // only once that succeeded — the reverse order would leave the user
+    // with no session at all (and a lost cart) if issue() throws on a
+    // store hiccup.
+    const result = await issue({ userId, claims: merged, req, now: options.now });
     await store.revoke(anon.id, 'upgraded');
     await fire(events.onRevoke, anon.id, 'upgraded');
     if (req && typeof req === 'object') {
-      delete req.__exortekSession;
+      // Bust the per-request cache — it still holds the anonymous session.
+      req.__exortekSession = result.session;
     }
-    return issue({ userId, claims: merged, req, now: options.now });
+    return result;
   }
 
   // Compare current request context against the stored record and fire
@@ -720,12 +857,6 @@ export function createSessionManager(config) {
 
   function extractToken(req) {
     const headers = req?.headers;
-    if (headerToken && headers) {
-      const fromHeader = extractTokenFromHeader(headers, headerToken);
-      if (fromHeader) {
-        return fromHeader;
-      }
-    }
     if (!headers) {
       return undefined;
     }

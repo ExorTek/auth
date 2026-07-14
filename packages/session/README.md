@@ -119,10 +119,6 @@ createSessionManager({
     onIssue, onVerify, onRotate, onRevoke, onDeny, onSuspicious,
   },
   suspiciousActivity?:   boolean | { onDetected },      // IP change flagging
-  headerToken?: {                                       // Bearer header extraction
-    headerName?: 'Authorization',
-    prefix?:     'Bearer ',
-  },
 })
 ```
 

@@ -58,3 +58,19 @@ test('impersonate: rejects missing targetUserId', async () => {
   await assert.rejects(sessions.impersonate(adminReq, ''));
   sessions.store._stop();
 });
+
+test('impersonation cannot be chained from an impersonated session', async () => {
+  const sessions = createSessionManager({
+    secret: SECRET,
+    ttl: '7d',
+    idleTtl: '30m',
+    impersonation: true,
+  });
+  const admin = await sessions.issue({ userId: 'admin' });
+  const first = await sessions.impersonate(mkReq(`__Host-sid=${encodeURIComponent(admin.token)}`), 'victim');
+  await assert.rejects(
+    sessions.impersonate(mkReq(`__Host-sid=${encodeURIComponent(first.token)}`), 'other-user'),
+    err => err instanceof SessionError && err.code === ErrorCode.INVALID_ARGUMENT,
+  );
+  sessions.store._stop();
+});

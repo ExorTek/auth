@@ -119,6 +119,14 @@ async function ensureDecoy() {
  * can no longer walk a wordlist of emails and grade "exists" vs
  * "doesn't exist" by response latency.
  *
+ * **Caveat:** the decoy is an scrypt hash at this package's default
+ * parameters. If your stored hashes use a different algorithm or much
+ * heavier parameters (e.g. tuned argon2id), the decoy path's timing
+ * will differ from the real-verify path and a careful attacker can
+ * still distinguish them. In that case pre-hash a decoy with YOUR
+ * production parameters and call `verify(input, myDecoyHash)` on the
+ * missing-user path instead.
+ *
  * @example
  * const user = await db.users.findByEmail(input.email)
  * const ok = await password.constantTimeVerify(input.password, user?.pw_hash)

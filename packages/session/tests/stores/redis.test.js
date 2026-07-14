@@ -156,7 +156,7 @@ test('redisStore: works with node-redis camelCase methods', async () => {
     async get(key) {
       return kv.get(key) ?? null;
     },
-    async set(key, value, opts) {
+    async set(key, value, _opts) {
       kv.set(key, value);
       return 'OK';
     },
@@ -191,4 +191,61 @@ test('redisStore: works with node-redis camelCase methods', async () => {
 test('redisStore: rejects a client that is missing get/set/del', () => {
   assert.throws(() => redisStore({}));
   assert.throws(() => redisStore({ get: async () => null }));
+});
+
+test('redisStore: a concurrent update cannot resurrect a revoked session (tombstone)', async () => {
+  const client = fakeIoredis();
+  const store = redisStore(client);
+  await store.put(makeRecord({ sid: 'a' }));
+
+  // Simulate the lost-update race: worker A reads the record (pre-revoke
+  // copy), worker B revokes, worker A writes its patch back. Under the
+  // old field-based revocation this un-revoked the session.
+  const staleCopy = await store.get('a'); // worker A's read
+  await store.revoke('a', 'stolen'); // worker B revokes
+  // Worker A's touch lands last, carrying revoked: false.
+  await client.set(`sess:a`, JSON.stringify({ ...staleCopy, lastSeenAt: Date.now() }), 'PX', 60_000);
+
+  const got = await store.get('a');
+  assert.equal(got.revoked, true, 'tombstone must keep the session revoked');
+  assert.equal(got.revokedReason, 'stolen');
+});
+
+test('redisStore: update() does not clear a tombstoned revocation', async () => {
+  const store = redisStore(fakeIoredis());
+  await store.put(makeRecord({ sid: 'a' }));
+  await store.revoke('a', 'logout');
+  await store.update('a', { lastSeenAt: Date.now() });
+  const got = await store.get('a');
+  assert.equal(got.revoked, true);
+});
+
+test('redisStore: tombstoned sessions stay out of listByUser/countActive', async () => {
+  const store = redisStore(fakeIoredis());
+  await store.put(makeRecord({ sid: 'a', uid: 'u1' }));
+  await store.put(makeRecord({ sid: 'b', uid: 'u1' }));
+  await store.revoke('a');
+  assert.deepEqual(
+    (await store.listByUser('u1')).map(r => r.sid),
+    ['b'],
+  );
+  assert.equal(await store.countActive('u1'), 1);
+});
+
+test('redisStore: works with an MGET-capable client', async () => {
+  const base = fakeIoredis();
+  let mgetCalls = 0;
+  const client = {
+    ...base,
+    async mget(...keys) {
+      mgetCalls++;
+      return Promise.all(keys.map(k => base.get(k)));
+    },
+  };
+  const store = redisStore(client);
+  await store.put(makeRecord({ sid: 'a', uid: 'u1' }));
+  await store.put(makeRecord({ sid: 'b', uid: 'u1' }));
+  const list = await store.listByUser('u1');
+  assert.equal(list.length, 2);
+  assert.ok(mgetCalls > 0, 'listByUser should batch reads through MGET');
 });
