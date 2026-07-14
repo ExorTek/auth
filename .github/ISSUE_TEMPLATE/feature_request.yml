@@ -20,6 +20,9 @@ body:
       options:
         - '@exortek/crypto'
         - '@exortek/security'
+        - '@exortek/otp'
+        - '@exortek/password'
+        - '@exortek/session'
         - 'A new package (please describe below)'
         - 'Repo tooling / docs site'
     validations:
