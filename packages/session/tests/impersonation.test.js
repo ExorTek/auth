@@ -23,7 +23,7 @@ test('impersonate: admin becomes target, audit trail carried', async () => {
   const imp = await sessions.impersonate(adminReq, 'target-user', { reason: 'support #4211' });
   assert.equal(imp.session.userId, 'target-user');
   assert.equal(imp.session.impersonatedBy, 'admin');
-  assert.equal(imp.session.claims.__impersonationReason, 'support #4211');
+  assert.equal(imp.session.impersonationReason, 'support #4211');
 
   // Verify the impersonation session on a separate request
   const impReq = mkReq(`__Host-sid=${encodeURIComponent(imp.token)}`);

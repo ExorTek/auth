@@ -6,6 +6,7 @@ import { parseCookies, serialiseCookie, serialiseDeleteCookie } from './cookie.j
 import { extractTokenFromHeader } from './header.js';
 import { computeFingerprint, readIp, readUserAgent } from './fingerprint.js';
 import { deriveDeviceLabel } from './device-label.js';
+import { createKeyMutex } from './internal/mutex.js';
 
 /**
  * @typedef {import('./token.js').SessionTokenPayload} SessionTokenPayload
@@ -36,7 +37,21 @@ import { deriveDeviceLabel } from './device-label.js';
  * @property {boolean} [anonymous=false]
  * @property {number} [concurrentLimit]
  * @property {ReadonlyArray<'ip' | 'ua'>} [bindTo]         Fingerprint binding.
+ * @property {'strict' | 'soft'} [bindStrictness='strict'] Behaviour on fingerprint mismatch.
+ *                                                        `strict` (default) — hard revoke,
+ *                                                        verify returns null.
+ *                                                        `soft` — fire `onSuspicious` with
+ *                                                        `reason: 'fingerprint-mismatch'` but
+ *                                                        let the request through. Useful for
+ *                                                        mobile users who move between wifi
+ *                                                        and 5G.
  * @property {boolean} [impersonation=false]               Enable impersonate() API.
+ * @property {string | number} [impersonationTtl='30m']     Absolute lifetime of an
+ *                                                          impersonation session. Defaults to
+ *                                                          30 minutes — impersonation is a
+ *                                                          high-risk mode; the tight window
+ *                                                          matches AWS / GCP admin console
+ *                                                          patterns and cuts audit surface.
  * @property {boolean} [deviceLabels=false]                Auto-generate device labels from UA.
  * @property {SessionEvents} [events]                      Audit trail callbacks.
  * @property {boolean | { onDetected?: SessionEvents['onSuspicious'] }} [suspiciousActivity]
@@ -66,6 +81,7 @@ import { deriveDeviceLabel } from './device-label.js';
  * @property {string} [ip]
  * @property {string} [ua]
  * @property {string} [impersonatedBy]
+ * @property {string} [impersonationReason]
  * @property {boolean} isAnonymous
  */
 
@@ -97,10 +113,26 @@ export function createSessionManager(config) {
   const anonymousAllowed = config.anonymous === true;
   const concurrentLimit = config.concurrentLimit;
   const bindTo = Array.isArray(config.bindTo) ? Object.freeze([...config.bindTo]) : null;
+  const bindStrictness = config.bindStrictness ?? 'strict';
+  if (bindStrictness !== 'strict' && bindStrictness !== 'soft') {
+    throw new SessionError(
+      ErrorCode.INVALID_ARGUMENT,
+      `createSessionManager: bindStrictness must be 'strict' | 'soft'; got '${bindStrictness}'`,
+    );
+  }
   const impersonationEnabled = config.impersonation === true;
+  const impersonationTtlMs = impersonationEnabled
+    ? parseDuration(config.impersonationTtl ?? '30m', 'impersonationTtl')
+    : 0;
   const deviceLabelsAuto = config.deviceLabels === true;
   const events = config.events ?? {};
   const suspiciousActivity = normaliseSuspicious(config.suspiciousActivity, events);
+  // Per-key mutex used to serialise the concurrent-limit check and the
+  // rotate flow — both are read-modify-write cycles on a shared record
+  // that would otherwise be prone to `active === limit` and
+  // "same-token rotated twice" races. Only meaningful for the memory
+  // store; distributed stores need their own atomic primitives.
+  const mutex = createKeyMutex();
 
   if (bindTo) {
     for (const b of bindTo) {
@@ -154,6 +186,9 @@ export function createSessionManager(config) {
     if (record.impersonatedBy !== undefined) {
       out.impersonatedBy = record.impersonatedBy;
     }
+    if (record.impersonationReason !== undefined) {
+      out.impersonationReason = record.impersonationReason;
+    }
     return out;
   }
 
@@ -172,6 +207,18 @@ export function createSessionManager(config) {
         `issue: userId must be a string or null; got ${typeof userId}`,
       );
     }
+    // When the concurrent limit is enabled, the entire count →
+    // evict-oldest → put sequence must run under a per-user mutex.
+    // Wrapping only the check would still leave a race where two
+    // parallel issues both see `active < limit` and both put — leaving
+    // us at limit+1.
+    if (concurrentLimit !== undefined && userId !== null) {
+      return mutex.withLock(`limit:${userId}`, () => issueLocked(options, now, userId));
+    }
+    return issueLocked(options, now, userId);
+  }
+
+  async function issueLocked(options, now, userId) {
     if (concurrentLimit !== undefined && userId !== null) {
       const active = await store.countActive(userId);
       if (active >= concurrentLimit) {
@@ -262,7 +309,12 @@ export function createSessionManager(config) {
       payload = decodeToken(token, secret, { now });
     } catch (err) {
       req.__exortekSession = null;
-      await fire(events.onDeny, err?.code ?? 'invalid-token', req);
+      // All onDeny reasons are lowercase kebab — normalize the crypto/
+      // session error codes (SCREAMING_SNAKE) into that shape so
+      // consumers see a single vocabulary.
+      const denyReason =
+        err?.code === 'EXPIRED' ? 'expired' : err?.code === 'INVALID_TOKEN' ? 'invalid-token' : 'invalid-token';
+      await fire(events.onDeny, denyReason, req);
       return null;
     }
     const record = await store.get(payload.sid);
@@ -292,25 +344,31 @@ export function createSessionManager(config) {
     if (bindTo && payload.fp) {
       const current = computeFingerprint(req, bindTo);
       if (current !== payload.fp) {
-        await store.revoke(payload.sid, 'fingerprint-mismatch');
-        req.__exortekSession = null;
-        await fire(events.onDeny, 'fingerprint-mismatch', req);
-        await fire(events.onRevoke, payload.sid, 'fingerprint-mismatch');
-        return null;
+        if (bindStrictness === 'soft') {
+          // Soft mode: don't kill the session, but always emit a
+          // suspicious-activity signal so the app can react (email the
+          // user, force re-auth, whatever). Verify proceeds.
+          if (suspiciousActivity) {
+            await fire(suspiciousActivity.onDetected, {
+              userId: record.uid,
+              sessionId: record.sid,
+              reason: 'fingerprint-mismatch',
+              previous: { fp: payload.fp },
+              current: { fp: current ?? null },
+            });
+          }
+        } else {
+          await store.revoke(payload.sid, 'fingerprint-mismatch');
+          req.__exortekSession = null;
+          await fire(events.onDeny, 'fingerprint-mismatch', req);
+          await fire(events.onRevoke, payload.sid, 'fingerprint-mismatch');
+          return null;
+        }
       }
     }
     // Suspicious-activity: soft signal, doesn't revoke — flags for the app.
     if (suspiciousActivity && record.uid) {
-      const currentIp = readIp(req);
-      if (currentIp && record.ip && currentIp !== record.ip) {
-        await fire(suspiciousActivity.onDetected, {
-          userId: record.uid,
-          sessionId: record.sid,
-          reason: 'ip-change',
-          previous: { ip: record.ip },
-          current: { ip: currentIp },
-        });
-      }
+      await detectSuspicious(req, record);
     }
     // Rolling touch.
     if (now - record.lastSeenAt > 1000) {
@@ -343,9 +401,26 @@ export function createSessionManager(config) {
     if (!current) {
       throw new SessionError(ErrorCode.INVALID_TOKEN, 'rotate: no valid session to rotate');
     }
+    return mutex.withLock(`rotate:${current.id}`, () => rotateLocked(req, current, options, now));
+  }
+
+  async function rotateLocked(req, current, options, now) {
+    // Re-fetch under the lock — a parallel rotate may have already
+    // consumed the session between our verify above and the lock
+    // grant. When it did, the store has the session marked revoked
+    // and we short-circuit rather than mint a duplicate.
     const oldRecord = await store.get(current.id);
-    if (!oldRecord) {
-      throw new SessionError(ErrorCode.SESSION_NOT_FOUND, 'rotate: session record has already disappeared');
+    if (!oldRecord || oldRecord.revoked) {
+      throw new SessionError(
+        ErrorCode.SESSION_NOT_FOUND,
+        'rotate: session was rotated or revoked by a concurrent request',
+      );
+    }
+    // Fire suspicious-activity for context drift during rotate too — a
+    // privilege-escalation flow initiated from a new IP is exactly the
+    // shape of activity that deserves an alert.
+    if (suspiciousActivity && oldRecord.uid) {
+      await detectSuspicious(req, oldRecord);
     }
     // Kill the old record atomically before issuing the new one — a
     // concurrent verify against the old token now returns null.
@@ -383,6 +458,9 @@ export function createSessionManager(config) {
     }
     if (oldRecord.impersonatedBy !== undefined) {
       next.impersonatedBy = oldRecord.impersonatedBy;
+    }
+    if (oldRecord.impersonationReason !== undefined) {
+      next.impersonationReason = oldRecord.impersonationReason;
     }
     await store.put(next);
 
@@ -461,7 +539,11 @@ export function createSessionManager(config) {
       throw new SessionError(ErrorCode.INVALID_TOKEN, 'impersonate: admin session is not valid');
     }
     const now = options.now ?? Date.now();
-    const durationMs = ttlMs;
+    // Impersonation runs against its own (shorter) TTL — the regular
+    // ttlMs would keep an admin's borrowed identity alive for the full
+    // session window (7 days by default). Callers can override at the
+    // config layer OR per-call via `options.ttl`.
+    const durationMs = options.ttl ? parseDuration(options.ttl, 'impersonate.ttl') : impersonationTtlMs;
     const expiresAt = now + durationMs;
     /** @type {SessionRecord} */
     const record = {
@@ -476,7 +558,9 @@ export function createSessionManager(config) {
       impersonatedBy: adminSession.userId,
     };
     if (options.reason) {
-      record.claims = { ...record.claims, __impersonationReason: options.reason };
+      // Store the audit-trail reason as its own field, not smuggled
+      // through the claims object.
+      record.impersonationReason = String(options.reason);
     }
     await store.put(record);
     const payload = {
@@ -562,6 +646,78 @@ export function createSessionManager(config) {
     return records.map(projectSession);
   }
 
+  /**
+   * Attach a userId to the currently-anonymous session on `req`.
+   *
+   *   const cart = anon.session.claims.cart
+   *   await sessions.upgrade(req, userId, { mergeClaims: { cart } })
+   *
+   * The old anonymous record is revoked, a fresh session is issued
+   * with the merged claims, and a new cookie is returned. Typical use
+   * case is a guest checkout where the shopping cart lives on the
+   * anonymous session and should survive the login.
+   *
+   * @param {any} req
+   * @param {string} userId
+   * @param {{ mergeClaims?: object, now?: number }} [options]
+   * @returns {Promise<import('./manager.js').IssueResult>}
+   */
+  async function upgrade(req, userId, options = {}) {
+    if (typeof userId !== 'string' || userId.length === 0) {
+      throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'upgrade: userId is required');
+    }
+    const anon = await verify(req, { now: options.now });
+    if (!anon) {
+      throw new SessionError(ErrorCode.INVALID_TOKEN, 'upgrade: no valid session on the request');
+    }
+    if (!anon.isAnonymous) {
+      throw new SessionError(
+        ErrorCode.INVALID_ARGUMENT,
+        'upgrade: session is already authenticated — call rotate() or issue() instead',
+      );
+    }
+    const merged =
+      options.mergeClaims && typeof options.mergeClaims === 'object'
+        ? { ...anon.claims, ...options.mergeClaims }
+        : anon.claims;
+    // Revoke the anonymous record and mint an authenticated session.
+    await store.revoke(anon.id, 'upgraded');
+    await fire(events.onRevoke, anon.id, 'upgraded');
+    if (req && typeof req === 'object') {
+      delete req.__exortekSession;
+    }
+    return issue({ userId, claims: merged, req, now: options.now });
+  }
+
+  // Compare current request context against the stored record and fire
+  // `onDetected` for any drift. Called from both `verify` and `rotate`
+  // so a state change during a privilege-escalation flow is caught too.
+  async function detectSuspicious(req, record) {
+    if (!suspiciousActivity || !record?.uid) {
+      return;
+    }
+    const currentIp = readIp(req);
+    if (currentIp && record.ip && currentIp !== record.ip) {
+      await fire(suspiciousActivity.onDetected, {
+        userId: record.uid,
+        sessionId: record.sid,
+        reason: 'ip-change',
+        previous: { ip: record.ip },
+        current: { ip: currentIp },
+      });
+    }
+    const currentUa = readUserAgent(req);
+    if (currentUa && record.ua && currentUa !== record.ua) {
+      await fire(suspiciousActivity.onDetected, {
+        userId: record.uid,
+        sessionId: record.sid,
+        reason: 'ua-change',
+        previous: { ua: record.ua },
+        current: { ua: currentUa },
+      });
+    }
+  }
+
   function extractToken(req) {
     const headers = req?.headers;
     if (headerToken && headers) {
@@ -594,6 +750,7 @@ export function createSessionManager(config) {
     revokeAllForUser,
     revokeAllExceptCurrent,
     listActive,
+    upgrade,
     get cookieName() {
       return cookieName;
     },

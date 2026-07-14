@@ -31,13 +31,13 @@ export function sessionPlugin(configOrManager) {
       reply.setSessionCookie = value => {
         reply.header('Set-Cookie', value);
       };
-      reply.clearSessionCookie = () => {
-        // revoke() returns a delete-cookie string synchronously via the
-        // helper — but the async revoke also runs the store revoke. We
-        // fire the async work but return immediately.
-        sessions.revoke(request).then(result => {
-          reply.header('Set-Cookie', result.cookie);
-        });
+      // Returns the promise so callers can `await reply.clearSessionCookie()`
+      // before `reply.send()`. Fire-and-forget would race the response
+      // and drop the delete-cookie header on the floor.
+      reply.clearSessionCookie = async () => {
+        const result = await sessions.revoke(request);
+        reply.header('Set-Cookie', result.cookie);
+        return result;
       };
     });
   };
