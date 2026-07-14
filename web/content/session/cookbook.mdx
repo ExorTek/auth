@@ -1,0 +1,247 @@
+---
+title: 'session/cookbook — real flows'
+sidebarTitle: cookbook
+---
+
+import { Callout } from 'nextra/components';
+
+# `cookbook`
+
+Fully-worked recipes — copy, tweak, ship.
+
+## Login + logout (Express)
+
+```js
+import { sessionMiddleware } from '@exortek/session/express';
+import { password } from '@exortek/password';
+
+const { manager: sessions, middleware } = sessionMiddleware({
+  secret: process.env.SESSION_SECRET,
+  ttl: '7d',
+  idleTtl: '30m',
+});
+app.use(middleware);
+
+app.post('/auth/login', async (req, res) => {
+  const user = await db.users.findByEmail(req.body.email);
+  const ok = await password.constantTimeVerify(req.body.password, user?.pw_hash);
+  if (!ok) return res.status(401).json({ error: 'invalid_credentials' });
+
+  const { cookie } = await sessions.issue({
+    userId: user.id,
+    claims: { roles: user.roles },
+  });
+  res.setSessionCookie(cookie);
+  res.json({ ok: true });
+});
+
+app.post('/auth/logout', async (req, res) => {
+  await res.clearSessionCookie();
+  res.json({ ok: true });
+});
+```
+
+## Password change: keep this device, sign out everywhere else
+
+```js
+app.post('/auth/password', async (req, res) => {
+  if (!req.session) return res.sendStatus(401);
+  const user = await db.users.findById(req.session.userId);
+
+  const ok = await password.verify(req.body.currentPassword, user.pw_hash);
+  if (!ok) return res.status(401).json({ error: 'wrong_password' });
+
+  const newHash = await password.scrypt.hash(req.body.newPassword);
+  await db.users.update(user.id, { pw_hash: newHash });
+
+  // Kill every other session, keep the one that issued this request
+  await sessions.revokeAllExceptCurrent(req, { reason: 'password-change' });
+
+  res.json({ ok: true, message: 'Signed out on every other device' });
+});
+```
+
+## Sudo mode — sensitive endpoint
+
+```js
+async function requireSudo(req, res, next) {
+  if (!(await req.sessions.requireFreshAuth(req, { maxAgeSeconds: 300 }))) {
+    return res.status(401).json({ error: 'sudo_required', reauth: '/reauth' });
+  }
+  next();
+}
+
+// The re-auth handler stamps the session as fresh
+app.post('/reauth', async (req, res) => {
+  const user = await db.users.findById(req.session.userId);
+  const ok = await password.verify(req.body.password, user.pw_hash);
+  if (!ok) return res.sendStatus(401);
+  await req.sessions.markFresh(req);
+  res.json({ ok: true });
+});
+
+// Any endpoint that needs step-up
+app.delete('/api/keys/:id', requireSudo, async (req, res) => {
+  await db.apiKeys.destroy(req.params.id);
+  res.json({ ok: true });
+});
+```
+
+## Guest-cart checkout — anonymous → authenticated upgrade
+
+```js
+const sessions = createSessionManager({
+  secret, ttl: '30d', idleTtl: '24h',
+  anonymous: true,
+});
+
+// Guest browses, adds items
+app.post('/cart/add', async (req, res) => {
+  let s = await sessions.verify(req);
+  if (!s) {
+    const anon = await sessions.issue({ userId: null, claims: { cart: [] } });
+    res.setHeader('Set-Cookie', anon.cookie);
+    s = anon.session;
+  }
+  const cart = [...(s.claims.cart ?? []), req.body.sku];
+  // ...persist cart to session claims via a fresh rotate() or your own store
+});
+
+// User signs up / logs in — cart claims survive the transition
+app.post('/auth/signup', async (req, res) => {
+  const user = await db.users.create(req.body);
+  const upgraded = await sessions.upgrade(req, user.id, {
+    mergeClaims: { roles: ['user'] },   // preserves cart[] automatically
+  });
+  res.setHeader('Set-Cookie', upgraded.cookie);
+  res.redirect('/checkout');
+});
+```
+
+## 2FA + trusted device (skip TOTP for 30 days)
+
+```js
+import { createTrustedDeviceCookie } from '@exortek/session/trusted-device';
+import { totp, backupCodes } from '@exortek/otp';
+
+const trusted = createTrustedDeviceCookie({
+  secret: process.env.TD_SECRET,
+  ttl: '30d',
+});
+
+app.post('/auth/login', async (req, res) => {
+  const user = await db.users.findByEmail(req.body.email);
+  const ok = await password.constantTimeVerify(req.body.password, user?.pw_hash);
+  if (!ok) return res.status(401).end();
+
+  // Trusted-device cookie present + valid → skip TOTP
+  if (user.totpSecret && !trusted.verify(req, user.id)) {
+    // Hand off to a dedicated /auth/totp handler; store a
+    // pending-auth cookie or a signed token here.
+    return res.json({ next: 'totp' });
+  }
+
+  const { cookie } = await sessions.issue({ userId: user.id });
+  res.setHeader('Set-Cookie', cookie);
+  res.json({ ok: true });
+});
+
+app.post('/auth/totp', async (req, res) => {
+  const user = await db.users.findById(req.body.userId);
+  const ok = await verifyTotp(req.body.code, user.totpSecret);
+  if (!ok) return res.status(401).end();
+
+  const { cookie } = await sessions.issue({ userId: user.id });
+  const setCookies = [cookie];
+  if (req.body.rememberDevice) setCookies.push(trusted.issue(user.id));
+  res.setHeader('Set-Cookie', setCookies);
+  res.json({ ok: true });
+});
+```
+
+## Admin impersonation with audit trail
+
+```js
+const sessions = createSessionManager({
+  secret, ttl: '7d', idleTtl: '30m',
+  impersonation: true,
+  impersonationTtl: '15m',                 // short window on purpose
+  events: {
+    onIssue: session => {
+      if (session.impersonatedBy) {
+        audit.log('impersonation.start', {
+          admin:  session.impersonatedBy,
+          target: session.userId,
+          reason: session.impersonationReason,
+        });
+      }
+    },
+    onRevoke: (sid, reason) => {
+      audit.log('impersonation.end', { sid, reason });
+    },
+  },
+});
+
+app.post('/admin/impersonate/:userId', async (req, res) => {
+  if (!req.session?.claims.roles?.includes('admin')) return res.sendStatus(403);
+
+  const { cookie } = await sessions.impersonate(req, req.params.userId, {
+    reason: req.body.reason ?? 'admin-initiated',
+  });
+  res.setHeader('Set-Cookie', cookie);
+  res.json({ ok: true });
+});
+```
+
+## Silent secret rotation
+
+Every request keeps working while a new secret rolls out.
+
+```js
+const sessions = createSessionManager({
+  secret: [
+    process.env.SESSION_SECRET_NEW,   // newest — used to issue + first for verify
+    process.env.SESSION_SECRET_OLD,   // still verified until every legacy token has died
+  ],
+  ttl: '7d',
+  idleTtl: '30m',
+});
+```
+
+Once every issued token has expired (i.e. the OLD deploy window closed
++ TTL), drop the old entry on the next deploy. No user is signed out.
+
+## Multi-worker deployment with Redis pub/sub
+
+```js
+import { redisStore } from '@exortek/session/stores/redis';
+import Redis from 'ioredis';
+
+const redis = new Redis(process.env.REDIS_URL);
+const sessions = createSessionManager({
+  secret, ttl: '7d', idleTtl: '30m',
+  store: redisStore(redis, {
+    keyPrefix: 'app:sess:',
+    publishRevocations: true,        // fires on every revoke
+    channel: 'app:sess:events',
+  }),
+});
+
+// On worker start — invalidate the per-request cache for every worker
+// as revocations happen, so a session killed on worker A can't verify
+// on worker B before Redis TTL settles.
+const listener = new Redis(process.env.REDIS_URL);
+await listener.subscribe('app:sess:events');
+listener.on('message', (_channel, message) => {
+  const event = JSON.parse(message);
+  if (event.type === 'revoke') {
+    // Your own in-memory cache invalidation, if any.
+  }
+});
+```
+
+<Callout type="info">
+  See the [config page](/session/config) for every knob these recipes
+  touch, and the [package README](https://github.com/ExorTek/auth/tree/master/packages/session)
+  for the full API + error codes.
+</Callout>

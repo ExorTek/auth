@@ -1,0 +1,125 @@
+---
+title: 'session/config — every option'
+sidebarTitle: config
+---
+
+import { Callout } from 'nextra/components';
+
+# `config`
+
+`createSessionManager(config)` accepts one options object. Only three
+fields are required — everything else is opt-in, defaults to off, and
+adds no cost when unused.
+
+## Required
+
+```ts
+{
+  secret:  string | Buffer | Uint8Array | Array<string | Buffer | Uint8Array>,
+  ttl:     string | number,   // absolute lifetime, e.g. '7d' or 604800 seconds
+  idleTtl: string | number,   // rolling window, e.g. '30m' or 1800 seconds
+}
+```
+
+- **`secret`** — the AES-256-GCM key material for the sealed cookie.
+  Anything with ≥ 16 bytes of entropy is fine; short passphrases
+  weaken it. Pass an array `[newest, …older]` to rotate: new hashes
+  use the first entry, verify walks the list.
+- **`ttl`** — absolute maximum session lifetime. A session that started
+  N ms ago dies regardless of activity when N > ttl.
+- **`idleTtl`** — rolling idle window. Every `verify(req)` refreshes
+  the record's `lastSeenAt`, so a session that keeps getting used
+  stays alive up to `ttl`.
+
+`idleTtl` must be ≤ `ttl`, or the constructor refuses to build.
+
+## Cookie
+
+```ts
+cookie?: {
+  name?:     '__Host-sid',                            // default
+  domain?:   string,
+  path?:     '/',                                     // default
+  sameSite?: 'lax' | 'strict' | 'none',               // default 'lax'
+  secure?:   boolean,                                 // default true
+  httpOnly?: boolean,                                 // default true
+}
+```
+
+The `__Host-` prefix enforces three attributes at boot: `secure: true`,
+no `domain`, `path: '/'`. Combining `__Host-` with any of those set
+differently is a boot-time error, on purpose — quiet cookie-scope
+mistakes are how session-adjacent CVEs get filed.
+
+## Store
+
+```ts
+store?: SessionStore   // default sessionStore.memory()
+```
+
+Any object matching the `SessionStore` interface (see
+[`packages/session/src/stores/memory.js`](https://github.com/ExorTek/auth/blob/master/packages/session/src/stores/memory.js)):
+`get`, `put`, `update`, `revoke`, `revokeAllForUser`,
+`revokeAllExcept`, `listByUser`, `countActive`. Ships with:
+
+- `sessionStore.memory()` — in-process, LRU-evicting, single-worker
+- `redisStore(client, { keyPrefix, publishRevocations, channel })` —
+  imported from `@exortek/session/stores/redis`
+
+## Rolling touch
+
+```ts
+touchEvery?: string | number   // default: min('60s', idleTtl / 2)
+```
+
+`verify(req)` refreshes `lastSeenAt` on every call, but persisting that
+to the store on every request under a hot API load can amplify write
+traffic 60-fold. `touchEvery` sets a lower bound between successful
+store-writes — the idle-timeout check only ever errs by up to that
+much.
+
+## Opt-in features
+
+Every one of these is off by default; each has zero cost when unused.
+
+```ts
+anonymous?:          boolean,             // guest sessions with userId: null
+concurrentLimit?:    number,              // e.g. 3 → oldest kicked
+bindTo?:             Array<'ip' | 'ua'>,  // fingerprint binding
+bindStrictness?:     'strict' | 'soft',   // default 'strict'
+impersonation?:      boolean,             // enable impersonate() API
+impersonationTtl?:   string | number,     // default '30m'
+deviceLabels?:       boolean,             // auto 'iPhone 14 · Chrome'
+events?: {
+  onIssue, onVerify, onRotate, onRevoke, onDeny, onSuspicious,
+},
+suspiciousActivity?: boolean | { onDetected },
+```
+
+### `bindStrictness`
+
+- **`'strict'`** (default) — fingerprint mismatch hard-revokes the session.
+- **`'soft'`** — mismatch fires `onSuspicious` and lets the request
+  through. Mobile users switching between wifi and 5G change IP mid-flow;
+  this mode keeps them logged in while still surfacing the anomaly.
+
+### `impersonation` + `impersonationTtl`
+
+Impersonation sessions carry `impersonatedBy` on the record and default
+to a short **30-minute TTL** regardless of the manager's global `ttl`.
+Override per-call with `impersonate(req, uid, { ttl: '5m' })`. Nested
+impersonation is refused — an admin session that is itself
+impersonated cannot start a second layer.
+
+### `events`
+
+Every lifecycle callback is invoked with structured payloads (see the
+[SessionEvents typedef](https://github.com/ExorTek/auth/blob/master/packages/session/src/manager.js)).
+Handlers that throw are silently swallowed — telemetry mishaps must
+never fail a login.
+
+<Callout type="info">
+  See the [package README](https://github.com/ExorTek/auth/tree/master/packages/session)
+  for full method signatures and error-code branching. Cookbook-style
+  recipes live at [/session/cookbook](/session/cookbook).
+</Callout>
