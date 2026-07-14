@@ -1,0 +1,140 @@
+---
+title: 'session/install — peer setup'
+sidebarTitle: install
+---
+
+import { Callout } from 'nextra/components';
+
+# `install`
+
+The base package works on Node 22+ with `@exortek/crypto` as its only
+runtime dependency (auto-installed). Every other capability — Redis
+store, framework adapters — is an **optional peer** you install only
+if you use it.
+
+## Base install
+
+```bash
+npm  install @exortek/session
+yarn add     @exortek/session
+pnpm add     @exortek/session
+```
+
+That's enough for:
+
+- Sealed cookie session issue / verify / rotate / revoke
+- Rolling idle TTL + absolute TTL
+- Multi-secret rotation
+- In-process memory store (single worker)
+- CSRF token derivation (`deriveCsrfToken` + masking helpers)
+- Trusted-device cookie subpath
+- Sudo mode, impersonation, concurrent limits, fingerprint binding,
+  device labels, session events — all opt-in via config flags
+
+## Redis store — multi-worker deployments
+
+Pick one Redis client. The store detects camelCase (`node-redis@4+`)
+and snake_case (`ioredis`) method names automatically.
+
+```bash
+yarn add ioredis
+# or
+yarn add redis
+```
+
+```js
+import { redisStore } from '@exortek/session/stores/redis';
+import Redis from 'ioredis';
+
+const client = new Redis(process.env.REDIS_URL);
+const store = redisStore(client, {
+  keyPrefix: 'sess:',                    // default 'sess:'
+  publishRevocations: true,              // pub/sub distributed revocation
+  channel: 'sess:events',                // default '<keyPrefix>events'
+});
+
+const sessions = createSessionManager({ ..., store });
+```
+
+<Callout type="info">
+  **Live-Redis integration tests** live at
+  `packages/session/tests/stores/redis.integration.test.js`. Set
+  `REDIS_URL=redis://localhost:6379` and re-run the session suite to
+  exercise the tombstone lost-revoke path against a real Redis 8.4:
+
+  ```bash
+  docker run --rm -d -p 6379:6379 redis:8.4-alpine
+  REDIS_URL=redis://localhost:6379 yarn workspace @exortek/session test
+  ```
+</Callout>
+
+## Framework adapters
+
+Each adapter's peer is only pulled in when you `import` its subpath.
+
+### Fastify
+
+```bash
+yarn add fastify
+```
+
+```js
+import { sessionPlugin } from '@exortek/session/fastify';
+const { plugin } = sessionPlugin(config);
+await app.register(plugin);
+```
+
+### Express
+
+```bash
+yarn add express
+```
+
+```js
+import { sessionMiddleware } from '@exortek/session/express';
+const { middleware } = sessionMiddleware(config);
+app.use(middleware);
+```
+
+### Hono
+
+```bash
+yarn add hono
+```
+
+```js
+import { sessionMiddleware } from '@exortek/session/hono';
+const { middleware } = sessionMiddleware(config);
+app.use('*', middleware);
+```
+
+### Elysia
+
+```bash
+yarn add elysia
+```
+
+```js
+import { sessionPlugin } from '@exortek/session/elysia';
+const { plugin } = sessionPlugin(config);
+new Elysia().use(plugin);
+```
+
+## Requirements
+
+- **Node.js 22 or newer** — session uses `crypto.hkdfSync`, `crypto.timingSafeEqual`, WHATWG `Headers`, and stable
+  `Buffer.subarray`.
+- **`@exortek/crypto`** is a runtime dependency (auto-installed).
+- `argon2` / `bcryptjs` are NOT required — those belong to
+  `@exortek/password`. Session's secret is a raw string / Buffer, not
+  a password.
+
+## What if a peer isn't installed?
+
+The umbrella `@exortek/session` never touches Redis or a framework at
+module-load time — subpaths are lazy. The first call into a subpath
+whose peer is missing throws a helpful error message that names the
+exact `yarn add` you need.
+
+That means `import { createSessionManager }` and `sessionStore.memory()`
+work on any Node 22+ environment with zero manual peer setup.

@@ -1,5 +1,16 @@
 export default {
   index: 'Overview',
+  install: 'install — peer setup',
   config: 'config — every option',
+  middleware: 'middleware — framework adapters',
+  stores: 'stores — memory, Redis, custom',
+  rotation: 'rotation — secret + session',
+  revocation: 'revocation — logout, admin kill, force-out',
+  'sudo-mode': 'sudo mode — step-up authentication',
+  impersonation: 'impersonation — admin-as-user',
+  fingerprint: 'fingerprint — ip / ua binding',
+  csrf: 'csrf — session-bound tokens',
+  'trusted-device': 'trusted device — 2FA skip cookie',
   cookbook: 'cookbook — real flows',
+  errors: 'errors — SessionError',
 };

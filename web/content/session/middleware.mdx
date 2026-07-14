@@ -1,0 +1,205 @@
+---
+title: 'session/middleware — framework adapters'
+sidebarTitle: middleware
+---
+
+import { Callout } from 'nextra/components';
+
+# `middleware`
+
+Four adapters, one shape. Each one:
+
+1. Registers a `preHandler` / middleware / `derive` hook that runs
+   `verify(req)` once per request.
+2. Exposes the manager as `req.sessions` (or `c.get('sessions')`) so
+   route handlers can call `rotate`, `impersonate`, `revokeAllForUser`,
+   etc.
+3. Populates `req.session` (or `c.get('session')`) with the projected
+   `Session` object, or `null` if unauthenticated.
+
+The framework peers (`fastify`, `express`, `hono`, `elysia`) are
+optional — each lives on its own subpath so importing one adapter
+never pulls the other three.
+
+## Fastify
+
+```js
+import Fastify from 'fastify';
+import { sessionPlugin } from '@exortek/session/fastify';
+
+const app = Fastify();
+const { plugin, manager: sessions } = sessionPlugin({
+  secret: process.env.SESSION_SECRET,
+  ttl: '7d',
+  idleTtl: '30m',
+});
+await app.register(plugin);
+
+app.get('/me', async (request, reply) => {
+  if (!request.session) {
+    return reply.code(401).send({ error: 'unauthenticated' });
+  }
+  return request.session;
+});
+
+app.post('/login', async (request, reply) => {
+  // ...verify credentials...
+  const { cookie } = await sessions.issue({
+    userId: user.id,
+    claims: { roles: user.roles },
+  });
+  reply.setSessionCookie(cookie);   // appends, does not clobber
+  return { ok: true };
+});
+
+app.post('/logout', async (request, reply) => {
+  await reply.clearSessionCookie();  // async — await it before reply.send
+  return { ok: true };
+});
+```
+
+<Callout type="info">
+  **`reply.clearSessionCookie` is `async` on purpose.** It performs the
+  server-side revoke before it writes the `Set-Cookie` delete header,
+  so `await` it — a fire-and-forget call would race the response and
+  drop the header.
+</Callout>
+
+### `reply.setSessionCookie` — no clobber
+
+Fastify's `reply.header('Set-Cookie', …)` **replaces** the header. If a
+route already set a CSRF cookie, a naive session-cookie install would
+lose it. `reply.setSessionCookie` handles the append for you — it
+collects existing `Set-Cookie` values into an array and adds the new
+one.
+
+## Express
+
+```js
+import express from 'express';
+import { sessionMiddleware } from '@exortek/session/express';
+
+const app = express();
+const { middleware, manager: sessions } = sessionMiddleware({
+  secret: process.env.SESSION_SECRET,
+  ttl: '7d',
+  idleTtl: '30m',
+});
+app.use(middleware);
+
+app.get('/me', (req, res) => {
+  if (!req.session) return res.sendStatus(401);
+  res.json(req.session);
+});
+
+app.post('/login', async (req, res) => {
+  // ...verify credentials...
+  const { cookie } = await sessions.issue({ userId: user.id });
+  res.setSessionCookie(cookie);
+  res.json({ ok: true });
+});
+
+app.post('/logout', async (req, res) => {
+  await res.clearSessionCookie();
+  res.json({ ok: true });
+});
+```
+
+Same `setSessionCookie` / `clearSessionCookie` convenience methods as
+Fastify — cookie values accumulate rather than replace.
+
+## Hono
+
+Hono runs on **Node, Bun, Cloudflare Workers, Deno, and Vercel Edge**.
+This adapter uses only `node:crypto` (via `@exortek/crypto`) which
+means edge runtimes without Node's crypto module are not yet
+supported.
+
+```js
+import { Hono } from 'hono';
+import { sessionMiddleware } from '@exortek/session/hono';
+
+const app = new Hono();
+const { middleware, manager: sessions } = sessionMiddleware({
+  secret: process.env.SESSION_SECRET,
+  ttl: '7d',
+  idleTtl: '30m',
+});
+app.use('*', middleware);
+
+app.get('/me', c => {
+  const session = c.get('session');
+  return session ? c.json(session) : c.text('unauthorized', 401);
+});
+
+app.post('/login', async c => {
+  // ...verify credentials...
+  const { cookie } = await sessions.issue({ userId: user.id });
+  c.header('Set-Cookie', cookie);
+  return c.json({ ok: true });
+});
+```
+
+### IP passthrough
+
+Hono's `c.req.raw` is a WHATWG `Request` with no `req.ip`. When you
+enable `bindTo: ['ip']` or `suspiciousActivity`, the adapter reaches
+into `c.env.incoming?.socket?.remoteAddress` to surface the peer IP
+from the underlying Node socket. If the runtime doesn't expose an
+`incoming` object (edge platforms), IP-based checks silently fall
+back to UA-only.
+
+## Elysia
+
+```js
+import { Elysia } from 'elysia';
+import { sessionPlugin } from '@exortek/session/elysia';
+
+const { plugin, manager: sessions } = sessionPlugin({
+  secret: process.env.SESSION_SECRET,
+  ttl: '7d',
+  idleTtl: '30m',
+});
+
+const app = new Elysia()
+  .use(plugin)
+  .get('/me', ({ session }) => session ?? { user: null })
+  .post('/login', async ({ set, body }) => {
+    // ...verify credentials...
+    const { cookie } = await sessions.issue({ userId: user.id });
+    set.headers['Set-Cookie'] = cookie;
+    return { ok: true };
+  });
+```
+
+### IP passthrough
+
+The plugin calls `context.server?.requestIP(context.request)` to
+resolve the peer IP — Elysia's own way of exposing it. Fingerprint
+binding on Elysia is therefore reliable in the same way as
+Fastify / Express.
+
+## Passing a pre-built manager
+
+Every adapter accepts either a config object OR an already-constructed
+manager. The manager form is useful when several adapters share the
+same manager, or when your test suite wants to inject a store:
+
+```js
+import { createSessionManager } from '@exortek/session';
+import { sessionMiddleware as expressAdapter } from '@exortek/session/express';
+import { sessionMiddleware as honoAdapter } from '@exortek/session/hono';
+
+const sessions = createSessionManager({ secret, ttl: '7d', idleTtl: '30m' });
+
+// Same manager, same store — both stacks see the same sessions
+expressApp.use(expressAdapter(sessions).middleware);
+honoApp.use('*', honoAdapter(sessions).middleware);
+```
+
+## Compliance impact
+
+All four adapters install the `__Host-sid` cookie with `Secure`,
+`HttpOnly`, and `SameSite=Lax` by default — the flags OWASP ASVS
+§V3.4 asks for. See the [compliance page](/compliance) for the row-by-row
+map.
