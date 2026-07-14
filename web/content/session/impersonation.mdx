@@ -1,0 +1,152 @@
+---
+title: 'session/impersonation — admin-as-user'
+sidebarTitle: impersonation
+---
+
+import { Callout } from 'nextra/components';
+
+# `impersonation`
+
+Support engineers, admins and QA people occasionally need to see the
+app **as another user** — to reproduce a bug, check a permission
+issue, verify a support-ticket claim. Impersonation is that flow,
+audit-trailed so the identity of the real actor is never lost.
+
+Opt-in — pass `impersonation: true` to `createSessionManager` to
+enable the `impersonate()` method.
+
+```js
+const sessions = createSessionManager({
+  secret, ttl: '7d', idleTtl: '30m',
+  impersonation:    true,
+  impersonationTtl: '30m',    // default
+});
+```
+
+## `impersonate(adminReq, targetUserId, { reason?, ttl?, claims?, now? })`
+
+Mint a fresh session as `targetUserId`, but tagged with the admin's
+identity so audit trails can attribute every action.
+
+```js
+app.post('/admin/impersonate/:userId', requireAdmin, async (req, res) => {
+  const { cookie, session } = await sessions.impersonate(req, req.params.userId, {
+    reason: req.body.reason ?? 'support',
+  });
+  // The admin's browser is now signed in AS the target user
+  res.setHeader('Set-Cookie', cookie);
+  res.json({ ok: true, impersonatedBy: session.impersonatedBy });
+});
+```
+
+Returned `Session` shape includes:
+
+- `userId` — the **target** user
+- `impersonatedBy` — the admin's real userId (from `adminReq.session`)
+- `impersonationReason` — the string you passed
+- `expiresAt` — capped by `impersonationTtl` (default 30m)
+
+## TTL
+
+Two knobs, per-call wins:
+
+1. **`impersonationTtl` on the manager config** — the default TTL for
+   every impersonate call. **30 minutes by default** because
+   impersonation is a high-risk mode; a stolen admin cookie should
+   not be able to keep the borrowed identity alive for a full 7-day
+   session window.
+2. **`options.ttl` on the impersonate call** — override for this
+   specific ceremony. Common patterns: `'5m'` for a quick debug,
+   `'15m'` for a longer investigation.
+
+```js
+sessions.impersonate(adminReq, userId, { ttl: '5m' });
+```
+
+The regular session `ttl` never applies to impersonation sessions.
+
+## No nesting
+
+Impersonation refuses to nest. An admin session that itself is
+already impersonated (i.e. `session.impersonatedBy` is set) cannot
+call `impersonate` — the manager throws
+`SessionError { code: INVALID_TOKEN }`.
+
+Why: nested impersonation muddies audit trails ("who really did
+this?"). The one-level rule keeps `impersonatedBy` pointing at a
+real accountable identity.
+
+## Audit trail
+
+Wire events to your audit log:
+
+```js
+const sessions = createSessionManager({
+  ...,
+  impersonation: true,
+  events: {
+    onIssue: session => {
+      if (session.impersonatedBy) {
+        audit.log('impersonation.start', {
+          admin:  session.impersonatedBy,
+          target: session.userId,
+          reason: session.impersonationReason,
+          sid:    session.id,
+          at:     session.issuedAt,
+        });
+      }
+    },
+    onRevoke: (sid, reason) => {
+      // Every revoke fires this — filter for impersonation sids in your
+      // audit sink if you keep a separate trail.
+      audit.log('session.revoke', { sid, reason });
+    },
+  },
+});
+```
+
+## Ending the ceremony
+
+Impersonation sessions are ordinary sessions with `impersonatedBy`
+set — end them the same way you end any other session:
+
+- `sessions.revoke(req)` — the admin's browser hits an "end
+  impersonation" button that logs them out of the target identity.
+- Passive TTL — after `impersonationTtl` the session dies naturally.
+- `sessions.revokeAllForUser(targetUserId)` — includes the
+  impersonation session because it belongs to the target user in the
+  store's index.
+
+<Callout type="warning">
+  **The admin does not automatically get their own session back on
+  end-of-impersonation.** The Set-Cookie from `impersonate()` replaced
+  the admin's cookie in their browser. If you want a "return to admin"
+  flow, the app has to remember the admin's identity (server-side
+  session state, or an out-of-band token) and re-issue a fresh admin
+  session on end.
+
+  Common pattern: a signed URL sent to the admin's email at the moment
+  of impersonate, or a second cookie you set with the admin's original
+  sid before overwriting it with the impersonation cookie.
+</Callout>
+
+## Detecting impersonation in handlers
+
+The projected `Session` on `req.session` carries the flag:
+
+```js
+app.get('/api/whatever', (req, res) => {
+  if (req.session?.impersonatedBy) {
+    // Optionally hide destructive actions, or add a UI badge
+    logger.info({ actor: req.session.impersonatedBy, as: req.session.userId }, 'impersonated action');
+  }
+  // ...normal flow
+});
+```
+
+## Compliance
+
+Audit-trailed impersonation covers PCI-DSS **§10.2.5** (audit of
+individual accesses to cardholder data) and SOC 2 **CC7.2** (system
+operations logs). See the [compliance mapping](/compliance) for the
+row-by-row map.

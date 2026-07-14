@@ -1,0 +1,137 @@
+---
+title: 'session/sudo mode — step-up authentication'
+sidebarTitle: sudo mode
+---
+
+import { Callout } from 'nextra/components';
+
+# `sudo mode`
+
+Sensitive endpoints — change password, delete account, mint an API
+key, rotate a payment method — deserve a fresh authentication proof
+even from an already-signed-in user. GitHub calls this
+"sudo mode"; AWS calls it "step-up auth"; Google calls it
+"reauthentication." Same pattern.
+
+The session manager ships two primitives:
+
+- **`requireFreshAuth(req, { maxAgeSeconds })`** — has the user
+  re-authenticated in the last N seconds? Returns a boolean.
+- **`markFresh(req)`** — stamp the current session with a fresh
+  `freshAt` timestamp after a successful re-auth.
+
+## Basic flow
+
+```js
+// A middleware that protects a whole route group
+async function requireSudo(req, res, next) {
+  if (!(await req.sessions.requireFreshAuth(req, { maxAgeSeconds: 300 }))) {
+    return res.status(401).json({ error: 'sudo_required', reauth: '/reauth' });
+  }
+  next();
+}
+
+// Any handler that needs step-up
+app.delete('/api/api-keys/:id', requireSudo, async (req, res) => {
+  await db.apiKeys.destroy(req.params.id);
+  res.json({ ok: true });
+});
+
+// The re-auth handler
+app.post('/reauth', async (req, res) => {
+  const user = await db.users.findById(req.session.userId);
+  const ok = await password.verify(req.body.password, user.pw_hash);
+  if (!ok) return res.sendStatus(401);
+  await req.sessions.markFresh(req);
+  res.json({ ok: true });
+});
+```
+
+## `requireFreshAuth`
+
+```ts
+requireFreshAuth(req, { maxAgeSeconds: number, now?: number }): Promise<boolean>
+```
+
+- Loads the current session via `verify(req)` (respects the
+  per-request cache).
+- Returns `false` if no session, or if the session has no `freshAt`,
+  or if `Date.now() - freshAt > maxAgeSeconds * 1000`.
+- Returns `true` if the session has been re-authenticated within the
+  window.
+
+`maxAgeSeconds` is per-endpoint — a very sensitive endpoint (delete
+account) might want 60s, a less sensitive one (change username)
+might allow 15 minutes.
+
+## `markFresh`
+
+```ts
+markFresh(req, { now?: number }): Promise<{ freshAt: number }>
+```
+
+- Loads the current session.
+- Writes `freshAt: now` on the record via `store.update`.
+- Invalidates the per-request cache so a subsequent `verify(req)`
+  in the same request sees the updated `freshAt`.
+- Throws `SessionError { code: INVALID_TOKEN }` if the request has no
+  valid session.
+
+## What "re-authentication" means is up to you
+
+`markFresh` doesn't care what method proved the user's identity. The
+common patterns:
+
+- **Password re-prompt** — user types their current password again
+  (the recipe above).
+- **TOTP** — request a fresh 2FA code from `@exortek/otp`.
+- **WebAuthn touch** — biometric on a passkey (when `@exortek/passkey`
+  ships).
+- **Magic-link click** — send a one-shot email link that lands on a
+  callback which calls `markFresh`.
+
+Any of these works. The manager only records the moment of freshness;
+it does not judge how you obtained it.
+
+## Combined with rotation
+
+For high-security actions you might want **fresh auth AND session
+rotation** — a step-up ceremony that also mints a new session cookie:
+
+```js
+app.post('/reauth', async (req, res) => {
+  const user = await db.users.findById(req.session.userId);
+  const ok = await password.verify(req.body.password, user.pw_hash);
+  if (!ok) return res.sendStatus(401);
+
+  await req.sessions.markFresh(req);
+  const { cookie } = await req.sessions.rotate(req);
+  res.setHeader('Set-Cookie', cookie);
+  res.json({ ok: true });
+});
+```
+
+Any stale cookie captured before the re-auth ceremony is now useless.
+
+## Not the same as MFA gating
+
+Sudo mode enforces **freshness** on top of an already-authenticated
+session. It doesn't replace multi-factor authentication at initial
+login. Users who signed in with just a password still need to pass
+the sudo prompt; users who signed in with password + TOTP see the
+sudo prompt too. The primitive is orthogonal to the initial auth
+strength.
+
+## Compliance
+
+`requireFreshAuth` covers NIST SP 800-63B §5.2.10
+("Reauthentication requirements shall be applied to bindings between
+authenticators and identities") and OWASP ASVS §V2.10 — see the
+[compliance mapping](/compliance).
+
+<Callout type="info">
+  A dedicated **step-up authentication** row on the compliance page
+  will flip from 🟡 to ✅ once `@exortek/passkey` ships, since
+  step-up over WebAuthn is the strongest form of this ceremony
+  available today.
+</Callout>
