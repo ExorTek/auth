@@ -1,0 +1,154 @@
+---
+title: 'session/stores — memory, Redis, custom'
+sidebarTitle: stores
+---
+
+import { Callout } from 'nextra/components';
+
+# `stores`
+
+Every session record — sid, uid, claims, expiry, revocation state —
+lives in a store. The manager talks to the store through a small
+interface; ship one that matches your deployment shape.
+
+## Memory (default)
+
+```js
+import { sessionStore } from '@exortek/session';
+const store = sessionStore.memory({
+  maxSessions: 100_000,   // absolute cap; oldest by lastSeenAt is evicted
+  sweepMs:     60_000,    // periodic scan for expired records
+});
+```
+
+- Single-process only. Restart wipes everything.
+- Eviction policy prefers **expired/revoked**, then **anonymous**,
+  then the oldest authenticated record — so an anonymous-session flood
+  cannot log real users out.
+- LRU is enforced via `Map` insertion-order (delete-and-set on touch),
+  which keeps eviction O(1) instead of a full scan.
+
+Use for dev, integration tests, and single-node deploys where you
+accept the "sessions die on restart" trade.
+
+## Redis
+
+```js
+import { redisStore } from '@exortek/session/stores/redis';
+import Redis from 'ioredis';
+
+const client = new Redis(process.env.REDIS_URL);
+const store = redisStore(client, {
+  keyPrefix: 'sess:',                    // record + tombstone + user index
+  publishRevocations: true,              // pub/sub distributed revocation
+  channel: 'sess:events',                // default '<keyPrefix>events'
+});
+
+const sessions = createSessionManager({ ..., store });
+```
+
+Works out of the box with `ioredis` and `node-redis@4+`. The store
+auto-detects camelCase vs snake_case methods; you don't need to
+adapt your client.
+
+### Layout in Redis
+
+For a session `sid`:
+
+- **`sess:<sid>`** — JSON blob of the record, `PX` = record's absolute
+  TTL.
+- **`sess:rev:<sid>`** — tombstone key, present only when the session
+  is revoked. Also carries `PX` = remaining TTL, so it evaporates
+  naturally.
+- **`sess:u:<uid>`** — set of sids belonging to that user, EXPIRE
+  bound to the longest session TTL among its members. Kept for
+  `revokeAllForUser` / `listByUser` performance.
+
+### Tombstone revocation (the S1.1 fix)
+
+The obvious "read-modify-write" pattern — GET the record, mutate
+`revoked: true`, SET it back — has a race under concurrent load:
+
+1. Worker A: `verify(req)` reads the record, sees `revoked: false`.
+2. Worker B: admin runs `revokeById(sid)` — writes `revoked: true`.
+3. Worker A: still with the pre-revoke record in memory, writes the
+   rolling-touch `lastSeenAt` update back — **overwrites the revoke.**
+   The session is alive again.
+
+The Redis store closes this by keeping revocation in a **separate key**
+(`sess:rev:<sid>`) that no `update` call ever touches. Every `get` reads
+both keys in one `MGET`; if the tombstone is present, the record is
+returned marked as revoked regardless of what a concurrent update did.
+
+<Callout type="info">
+  This is verified end-to-end against a real Redis 8.4 in
+  `packages/session/tests/stores/redis.integration.test.js`. Run
+  `REDIS_URL=redis://localhost:6379 yarn workspace @exortek/session test`
+  to exercise it locally.
+</Callout>
+
+### Distributed revocation (pub/sub)
+
+`publishRevocations: true` publishes every revoke to the configured
+channel:
+
+```json
+{ "type": "revoke", "sid": "abc…", "reason": "logout", "at": 172… }
+```
+
+Other workers subscribe with a second Redis connection and invalidate
+their per-request caches — a session killed on worker A cannot verify
+on worker B during the window before the tombstone key's TTL settles.
+
+```js
+const listener = new Redis(process.env.REDIS_URL);
+await listener.subscribe('sess:events');
+listener.on('message', (_ch, payload) => {
+  const event = JSON.parse(payload);
+  if (event.type === 'revoke') {
+    myLocalCache.invalidate(event.sid);
+  }
+});
+```
+
+## Custom store
+
+Implement this interface — every method returns a Promise:
+
+```ts
+interface SessionStore {
+  get(sid):                            Promise<SessionRecord | null>
+  put(record):                         Promise<void>
+  update(sid, patch):                  Promise<SessionRecord | null>
+  revoke(sid, reason?):                Promise<boolean>
+  revokeAllForUser(uid, reason?):      Promise<number>
+  revokeAllExcept(uid, keepSid, r?):   Promise<number>
+  listByUser(uid):                     Promise<SessionRecord[]>
+  countActive(uid):                    Promise<number>
+}
+```
+
+The `SessionRecord` shape is the source of truth — see
+[`packages/session/src/stores/memory.js`](https://github.com/ExorTek/auth/blob/master/packages/session/src/stores/memory.js)
+for the JSDoc typedef. Everything the manager writes flows through
+this shape; nothing else is assumed.
+
+## Which one when
+
+| Deployment                        | Pick                                            |
+| --------------------------------- | ----------------------------------------------- |
+| Local dev, integration tests      | `sessionStore.memory()`                         |
+| Single-node prod, moderate traffic | `sessionStore.memory({ maxSessions: 100_000 })` |
+| Multi-worker, single region        | `redisStore(client)`                            |
+| Multi-worker, cross-worker revoke instant | `redisStore(client, { publishRevocations: true })` |
+| DynamoDB / Postgres / your database | Custom store — see interface above              |
+
+## Compliance
+
+Store choice shapes several ASVS V3 rows on the
+[compliance page](/compliance):
+
+- **V3.7 — server-side invalidation on logout** requires a store that
+  actually persists the revocation. All three flavours above do.
+- **V3.4/V3.5 — cookie attributes and `__Host-` prefix** are the
+  manager's responsibility, not the store's.
