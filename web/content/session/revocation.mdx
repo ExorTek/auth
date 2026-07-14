@@ -1,0 +1,141 @@
+---
+title: 'session/revocation — logout, admin kill, force-out'
+sidebarTitle: revocation
+---
+
+import { Callout } from 'nextra/components';
+
+# `revocation`
+
+Five ways to kill a session. Pick the one that matches the intent —
+each one emits `onRevoke` with a distinct `reason`, so your audit log
+can distinguish "user clicked Logout" from "admin nuked a suspect".
+
+## `revoke(req, { reason?, now? })`
+
+The everyday logout. Reads the session cookie from the request,
+revokes the underlying record, returns a delete-cookie header.
+
+```js
+app.post('/logout', async (req, res) => {
+  const { cookie, revoked } = await sessions.revoke(req, { reason: 'user-logout' });
+  res.setHeader('Set-Cookie', cookie);
+  res.json({ ok: true, hadSession: revoked });
+});
+```
+
+- **Idempotent** — calling `revoke` on a request that has no cookie or
+  an already-revoked session is a no-op; you still get the
+  delete-cookie so the client's stale cookie disappears.
+- **Events** — fires `onRevoke(sid, reason)` and clears `req.__exortekSession`
+  so a subsequent `verify` in the same request returns `null`.
+
+## `revokeById(sessionId, { reason? })`
+
+Admin path: "kill this specific device in user 42's sessions list."
+Takes a bare sid — no request needed.
+
+```js
+app.delete('/admin/sessions/:sid', requireAdmin, async (req, res) => {
+  const killed = await sessions.revokeById(req.params.sid, { reason: 'admin-kill' });
+  res.json({ ok: killed });
+});
+```
+
+Returns `true` if the sid existed in the store, `false` otherwise.
+
+## `revokeAllForUser(userId, { reason? })`
+
+Compromise flow — every session belonging to a user dies at once.
+Returns the count killed for audit logging.
+
+```js
+// User reports "my account was hacked"
+const count = await sessions.revokeAllForUser(user.id, { reason: 'user-reported-compromise' });
+logger.warn({ userId: user.id, count }, 'account compromise — all sessions killed');
+```
+
+Combine with a password rotation, mass token invalidation across
+your other systems, and an email to the user.
+
+## `revokeAllExceptCurrent(req, { reason? })`
+
+The "you've been signed out on every other device" UX after a
+password change. The current request's session survives; every other
+session for the same user dies.
+
+```js
+app.post('/auth/password', async (req, res) => {
+  // ...verify current password, hash new one, persist...
+  const count = await sessions.revokeAllExceptCurrent(req, { reason: 'password-change' });
+  res.json({ ok: true, otherDevicesSignedOut: count });
+});
+```
+
+Returns 0 if the request has no valid session or the user only had
+one session to begin with.
+
+## Passive revocation — TTL + idle
+
+Alongside the explicit calls above, sessions die naturally in two
+other ways:
+
+- **Absolute TTL** — the record's `expiresAt` (issued-at + `ttl`) is
+  in the past. Verify returns `null` without touching the store; the
+  record ages out on the next `sweep` (memory) or Redis TTL.
+- **Idle TTL** — `Date.now() - lastSeenAt > idleTtl`. The manager
+  writes a `revoked: 'idle-timeout'` record so the sid doesn't linger.
+
+Both of these fire `onDeny` on the manager's events — with `reason:
+'expired'` or `'idle-timeout'` respectively — but no `onRevoke`.
+
+## Distributed revocation (Redis pub/sub)
+
+Under multi-worker deployments, a `revoke` on worker A leaves the
+`req.__exortekSession` cache on worker B pointing at the pre-revoke
+session until that request completes. Between revoke and the
+tombstone key propagating, worker B could re-verify the same session
+as valid.
+
+Enable `publishRevocations: true` on the Redis store:
+
+```js
+const store = redisStore(client, {
+  publishRevocations: true,
+  channel: 'sess:events',
+});
+```
+
+Every revoke publishes:
+
+```json
+{ "type": "revoke", "sid": "<sid>", "reason": "<reason>", "at": 172… }
+```
+
+Other workers subscribe with a second Redis connection and invalidate
+their local caches — see [stores](/session/stores#distributed-revocation-pubsub).
+
+## Events
+
+| Method                       | `onRevoke` fires             | `onDeny` fires        |
+| ---------------------------- | ---------------------------- | --------------------- |
+| `revoke(req)`                | ✓ with request's reason      | on subsequent verify  |
+| `revokeById(sid)`            | ✓                            | when the sid next verifies |
+| `revokeAllForUser(uid)`      | ✓ once per killed session    | as above              |
+| `revokeAllExceptCurrent(req)`| ✓ once per killed session    | as above              |
+| Idle timeout (auto)          | —                            | ✓ `'idle-timeout'`    |
+| Absolute expiry (auto)       | —                            | ✓ `'expired'`         |
+| Fingerprint mismatch (strict)| ✓ `'fingerprint-mismatch'`   | ✓ same reason         |
+
+<Callout type="info">
+  A revoked cookie **cannot un-revoke itself**. Even if the client
+  keeps sending the sealed cookie, `verify` sees the store's
+  `revoked: true` (or the Redis tombstone) and returns `null` every
+  time. The cookie is dead until it ages out.
+</Callout>
+
+## Compliance
+
+Explicit revocation on logout covers OWASP ASVS **§V3.7**. Force-out
+across sessions on password change covers NIST SP 800-63B §5.2.6.
+Both are on the [compliance page](/compliance).

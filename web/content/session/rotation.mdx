@@ -1,0 +1,135 @@
+---
+title: 'session/rotation — secret + session'
+sidebarTitle: rotation
+---
+
+import { Callout } from 'nextra/components';
+
+# `rotation`
+
+Two independent kinds of rotation, sharing the word:
+
+1. **Secret rotation** — the encryption key on the cookie itself. Cycle
+   it without invalidating any in-flight session.
+2. **Session rotation** — mint a fresh session identifier while
+   preserving the underlying user + claims. Standard practice on
+   privilege escalation or on a schedule.
+
+## Secret rotation
+
+Pass an array `[newest, …older]` as the manager secret. New tokens are
+issued with `secret[0]`; verify walks the array so any older token
+authenticates as long as its corresponding key still lives in the
+list.
+
+```js
+const sessions = createSessionManager({
+  secret: [
+    process.env.SESSION_SECRET_NEW,
+    process.env.SESSION_SECRET_OLD,
+  ],
+  ttl:     '7d',
+  idleTtl: '30m',
+});
+```
+
+**Deploy sequence** for a key rotation:
+
+1. **Add the new key** to the top of the array while keeping the old
+   one in place. Deploy. Every in-flight cookie still verifies (with
+   the old key), every new issue uses the new one.
+2. **Wait one absolute-TTL window.** With `ttl: '7d'` that's a week —
+   after which every cookie in circulation was issued under the new
+   key.
+3. **Drop the old key** from the array. Deploy. Any leftover token
+   under the old key would fail from this point (unlikely at this
+   stage, but the security guarantee is what matters).
+
+No user is signed out at any step.
+
+### Under-the-hood detail
+
+Session's `token.js` delegates to `@exortek/crypto.unseal`, which
+accepts a `[newest, …older]` array natively — see the
+[seal / unseal reference](/crypto/cipher). The manager never even
+knows which secret authenticated; the rotation is transparent.
+
+<Callout type="warning">
+  **Do NOT re-encrypt in place.** A `rotate(req)` call mints a new
+  session, but the underlying record's ciphertext is not re-signed by
+  the new key — the new cookie is a fresh seal from the new key. If
+  you need every existing user rehashed onto the new key immediately,
+  invalidate the current session and force re-login. In practice, the
+  passive rotation (wait one TTL window) is what production shops do.
+</Callout>
+
+## Session rotation
+
+Mint a fresh session ID + cookie for the current user, atomically
+revoking the previous session. When to call it:
+
+- **Privilege escalation** — user just answered a 2FA prompt, or was
+  promoted from `user` to `admin` mid-session. Rotate to prevent an
+  old cookie captured pre-escalation from carrying the new powers.
+- **Suspicious activity** — IP changed and your policy says "kill the
+  old ID, mint a new one so the theoretical attacker with the stolen
+  cookie loses it."
+- **Cadence** — some shops rotate every N hours as defence in depth.
+
+```js
+// After successful step-up auth
+const { cookie, session } = await sessions.rotate(req, {
+  claims: { ...oldSession.claims, roles: [...oldSession.claims.roles, 'admin'] },
+});
+res.setHeader('Set-Cookie', cookie);
+```
+
+**Preserved across rotate:**
+
+- `userId`
+- `expiresAt` (absolute TTL — rotation cannot extend session lifetime)
+- `impersonatedBy` / `impersonationReason` if present
+- `ip`, `ua`, `deviceLabel`, `freshAt`
+
+**Overridable via options:**
+
+- `claims` — merge or replace as needed
+- `now` — inject clock for tests
+
+### Race handling
+
+Under load, two parallel requests carrying the same session cookie
+might both call `rotate` at the same instant. The manager holds a
+per-`sid` mutex around the rotate flow, so exactly one call wins:
+
+- **Winner:** revokes the old sid, mints a fresh session, returns the
+  new cookie.
+- **Loser:** re-reads the record under the lock, sees it already
+  revoked, throws `SessionError` with `code: SESSION_NOT_FOUND`.
+
+That means the client sees at most one live session after any burst of
+concurrent rotates. Callers should handle the `SESSION_NOT_FOUND`
+throw by fetching a fresh session from the winning request's cookie
+(if they came through the same client) or by asking the user to sign
+back in.
+
+### Rotation + concurrent limit
+
+If `concurrentLimit` is set, rotation does not count against the limit
+(the old sid is revoked in the same critical section as the new one is
+put). A user at limit-1 who calls rotate stays at the same count
+before and after.
+
+## Combining both
+
+Secret rotation and session rotation are orthogonal — you can run them
+independently. A cadence-driven session rotation running every 6 hours
+does nothing to the encryption key; a secret rotation deploy does not
+force any rotate.
+
+## Compliance
+
+Session rotation on privilege escalation covers the last bit of ASVS
+**V3.7** and NIST SP 800-63B §5.2.5 "session bindings must rotate on
+authenticator change." See the [compliance mapping](/compliance) for
+the full table.
