@@ -36,7 +36,7 @@ node --test 'tests/**/*.test.js'
 One prefix per branch, matching the intent of the change. Reviewers can filter their inbox by prefix.
 
 | Prefix      | Use for                                    | Example                              |
-| ----------- | ------------------------------------------ | ------------------------------------ |
+|-------------|--------------------------------------------|--------------------------------------|
 | `feat/`     | New user-visible functionality.            | `feat/otp-backup-codes`              |
 | `fix/`      | Bug fixes.                                 | `fix/base32-empty-input`             |
 | `refactor/` | Internal cleanup, no behaviour change.     | `refactor/centralize-encoding-check` |
@@ -59,8 +59,10 @@ We follow [Conventional Commits](https://www.conventionalcommits.org). One conce
 ```
 
 - **type** — `feat` · `fix` · `refactor` · `perf` · `docs` · `test` · `chore` · `build` · `ci`
-- **scope** — the package or subsystem, most-specific first: `crypto/hash`, `crypto/cipher`, `crypto/internal`, `jwt`,
-  `web`, or omit for repo-wide work.
+- **scope** — the package or subsystem, most-specific first:
+  `crypto/hash`, `crypto/cipher`, `crypto/internal`, `security/csrf`,
+  `security/middleware`, `otp`, `password/algorithms`, `session/stores`,
+  `session/middleware`, `web`, or omit for repo-wide work.
 
 Good examples pulled from the log:
 
