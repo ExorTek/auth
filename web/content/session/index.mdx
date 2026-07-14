@@ -62,20 +62,23 @@ res.setHeader('Set-Cookie', bye);
 
 ## Features (opt-in via config flags)
 
-- **`anonymous: true`** — guest sessions with `userId: null`
+- **`anonymous: true`** — guest sessions with `userId: null`; promote via `sessions.upgrade()`
 - **`concurrentLimit: 3`** — max sessions per user; oldest kicked
-- **`bindTo: ['ip', 'ua']`** — fingerprint binding; mismatch → hard revoke
-- **`impersonation: true`** — admin-as-user with `impersonatedBy` audit trail
+- **`bindTo: ['ip', 'ua']` + `bindStrictness: 'soft'`** — fingerprint binding with mobile-friendly mode
+- **`impersonation: true`** + **`impersonationTtl: '15m'`** — admin-as-user with a short TTL and full audit trail
 - **`deviceLabels: true`** — auto-generated `iPhone 14 · Chrome`
-- **`events: { onIssue, ... }`** — audit trail callbacks
-- **`suspiciousActivity: true`** — IP change flagging
-- **`store: redisStore(...)`** — Redis-backed session store + pub/sub
+- **`events: { onIssue, onVerify, onRotate, onRevoke, onDeny, onSuspicious }`** — audit callbacks
+- **`suspiciousActivity: true`** — IP + UA change flagging
+- **`touchEvery: '1m'`** — cut store write traffic on hot login endpoints
+- **`store: redisStore(...)`** — Redis session store with pub/sub distributed revocation
 
-## Full reference
+## Where to next
 
-See the [README on GitHub](https://github.com/ExorTek/auth/tree/master/packages/session) for the complete API, framework
-adapter examples, error codes, and compliance impact. Expanded per-topic
-documentation is on the way to this site.
+- [**config**](/session/config) — every option, every default, every knob
+- [**cookbook**](/session/cookbook) — login flow, password change, guest checkout,
+  2FA + trusted device, admin impersonation, silent secret rotation
+- [README on GitHub](https://github.com/ExorTek/auth/tree/master/packages/session) —
+  the complete API reference and error codes
 
 <Callout type="info">
   **Compliance impact** — enabling `@exortek/session` moves the following
