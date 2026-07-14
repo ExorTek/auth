@@ -1,0 +1,193 @@
+---
+title: 'session/trusted device — 2FA skip cookie'
+sidebarTitle: trusted device
+---
+
+import { Callout } from 'nextra/components';
+
+# `trusted device`
+
+A separate long-lived cookie that remembers "this browser has already
+done full 2FA for user X, don't prompt for TOTP again for 30 days."
+Ships as its own subpath so the primitive stays independent from the
+session manager — the two live at different scopes.
+
+```js
+import { createTrustedDeviceCookie } from '@exortek/session/trusted-device';
+
+const trusted = createTrustedDeviceCookie({
+  secret: process.env.TD_SECRET,
+  ttl:    '30d',
+  cookie: {
+    name:     '__Host-td',        // default
+    sameSite: 'lax',              // default
+    // domain, path, secure, httpOnly all customisable — see cookie section
+  },
+});
+```
+
+## Why not just extend the session TTL?
+
+Different scope, different lifetime, different threat model:
+
+| Aspect                | Session cookie                       | Trusted-device cookie                |
+| --------------------- | ------------------------------------ | ------------------------------------ |
+| Scope                 | One sign-in                          | This browser, across sign-ins        |
+| TTL                   | 7 days (typical)                     | 30-90 days                           |
+| What proves it        | Password + 2FA                       | Full 2FA ceremony completed          |
+| Killed by             | Logout, password change              | Explicit "forget this device" only   |
+| What it authorises    | Access to app                        | Skipping the TOTP prompt at sign-in  |
+
+The trusted-device cookie doesn't sign you in on its own — it only
+lets you skip the second factor **when you already have valid
+credentials.** A stolen trusted-device cookie without the user's
+password / passkey is useless.
+
+## Basic flow (with `@exortek/otp` + `@exortek/password`)
+
+```js
+import { createTrustedDeviceCookie } from '@exortek/session/trusted-device';
+import { verifyTotp } from '@exortek/otp';
+import { password } from '@exortek/password';
+
+const trusted = createTrustedDeviceCookie({
+  secret: process.env.TD_SECRET,
+  ttl:    '30d',
+});
+
+app.post('/auth/login', async (req, res) => {
+  const user = await db.users.findByEmail(req.body.email);
+  const ok = await password.constantTimeVerify(req.body.password, user?.pw_hash);
+  if (!ok) return res.status(401).end();
+
+  // Skip TOTP if the current browser is trusted for this user
+  if (user.totpSecret && !trusted.verify(req, user.id)) {
+    return res.json({ next: 'totp', userId: user.id });
+  }
+
+  // Full sign-in (with or without needing 2FA)
+  const { cookie } = await sessions.issue({ userId: user.id });
+  res.setHeader('Set-Cookie', cookie);
+  res.json({ ok: true });
+});
+
+// The 2FA prompt handler
+app.post('/auth/totp', async (req, res) => {
+  const user = await db.users.findById(req.body.userId);
+  const ok = await verifyTotp(req.body.code, user.totpSecret);
+  if (!ok) return res.status(401).end();
+
+  const setCookies = [];
+  const { cookie } = await sessions.issue({ userId: user.id });
+  setCookies.push(cookie);
+
+  // "Remember this device" checkbox
+  if (req.body.rememberDevice) {
+    setCookies.push(trusted.issue(user.id));
+  }
+  res.setHeader('Set-Cookie', setCookies);
+  res.json({ ok: true });
+});
+```
+
+## API
+
+### `trusted.issue(userId, { now?, extraClaims? })`
+
+Returns a full `Set-Cookie` value that installs the trusted-device
+cookie for `userId`.
+
+- **`extraClaims`** — free-form key/value pairs stored alongside
+  `uid` in the sealed payload. Reserved fields (`uid`, `iat`, `exp`)
+  cannot be overwritten by `extraClaims` — the manager writes them
+  *after* the spread on purpose so a user-supplied "device name" form
+  can't smuggle in a wrong `uid` and bypass 2FA for another account.
+
+### `trusted.verify(req, userId, { now? })`
+
+Boolean. Returns `true` when the incoming request carries a
+trusted-device cookie whose sealed payload's `uid === userId` and
+whose `exp` is in the future. Returns `false` for missing cookie,
+expired cookie, wrong user, malformed cookie — never throws.
+
+### `trusted.revoke()`
+
+Returns a delete-cookie header. Wire this into a "forget this
+device" flow:
+
+```js
+app.post('/auth/forget-device', requireAuth, (req, res) => {
+  res.setHeader('Set-Cookie', trusted.revoke());
+  res.json({ ok: true });
+});
+```
+
+## Secret rotation
+
+Pass an array `[newest, …older]` for the secret — same rotation
+model as the session cookie's `secret`. Cookies issued under the
+old key still verify while the old key remains in the array.
+
+```js
+const trusted = createTrustedDeviceCookie({
+  secret: [process.env.TD_SECRET_NEW, process.env.TD_SECRET_OLD],
+  ttl: '30d',
+});
+```
+
+Drop the old key from the array after one full `ttl` window (30
+days by default) — every legitimate cookie has died naturally by
+then.
+
+## Cookie shape
+
+Default cookie is `__Host-td` — the `__Host-` prefix enforces
+`secure: true`, no `domain`, `path: '/'`. Override the name to fit
+your other cookie namespacing:
+
+```js
+createTrustedDeviceCookie({
+  secret, ttl: '30d',
+  cookie: {
+    name:     'app_trusted_device',    // no __Host- prefix — customise freely
+    domain:   '.example.com',           // works because you dropped __Host-
+    sameSite: 'lax',
+    secure:   true,
+    httpOnly: true,
+  },
+});
+```
+
+## What the cookie carries
+
+Sealed via `@exortek/crypto.seal` — AES-256-GCM + expiry inside the
+AAD. Payload:
+
+```ts
+{
+  uid: string,          // the user id you trust
+  iat: number,          // issued-at (ms)
+  exp: number,          // absolute expiry (ms)
+  ...extraClaims,       // whatever you passed at issue
+}
+```
+
+Opaque to the client — the sealed cookie prints as a base64url
+blob. Never leak the secret; anyone with it can forge a
+trusted-device cookie for any uid.
+
+<Callout type="warning">
+  **Reserved-field guarantee** — even if a form field maps directly
+  into `extraClaims`, the `uid` / `iat` / `exp` written by `issue`
+  will not be overwritten. This closes a 2FA-bypass class of bug
+  where a "device nickname" field could otherwise be crafted to
+  swap the trusted user.
+</Callout>
+
+## Compliance
+
+Trusted-device cookie contributes to NIST SP 800-63B §5.2.11
+("Verifier compromise resistance… may retain a persistent identifier
+to reduce user friction for repeat authentications") when the
+underlying 2FA is strong (TOTP, passkey). See the
+[compliance mapping](/compliance).

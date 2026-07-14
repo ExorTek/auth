@@ -1,0 +1,152 @@
+---
+title: 'session/errors — SessionError'
+sidebarTitle: errors
+---
+
+# `errors`
+
+Every recoverable failure raised by `@exortek/session` is a
+`SessionError` carrying a stable machine-readable `code`. **Branch on
+`code`, never on the message text** — messages are free-form and
+change across versions.
+
+```js
+import { SessionError, ErrorCode } from '@exortek/session';
+
+try {
+  await sessions.rotate(req);
+} catch (err) {
+  if (err instanceof SessionError) {
+    if (err.code === ErrorCode.INVALID_TOKEN) return res.redirect('/login');
+    if (err.code === ErrorCode.SESSION_NOT_FOUND) return res.status(409).end();
+  }
+  throw err;
+}
+```
+
+## `SessionError`
+
+```ts
+class SessionError extends Error {
+  code:     string;             // one of ErrorCode
+  status:   number;             // HTTP status suggestion (see table)
+  message:  string;             // free-form
+  cause?:   unknown;            // upstream error when relevant
+  details?: object;             // structured extras (rare)
+}
+```
+
+## `ErrorCode`
+
+| Code                          | HTTP | Meaning                                                                                    |
+| ----------------------------- | ---- | ------------------------------------------------------------------------------------------ |
+| `INVALID_ARGUMENT`            | 400  | Bad function argument — malformed config, wrong type, out-of-range value.                  |
+| `MISSING_TOKEN`               | 401  | No cookie and no header token on the request.                                              |
+| `INVALID_TOKEN`               | 401  | Sealed cookie failed authentication — tampered bytes, wrong secret, or wrong shape.        |
+| `EXPIRED`                     | 401  | Absolute TTL passed. Verify returns null; this is thrown only from `decodeToken` directly. |
+| `IDLE_TIMEOUT`                | 401  | Idle window elapsed since `lastSeenAt`.                                                    |
+| `REVOKED`                     | 401  | Store returned `revoked: true` for the sid.                                                |
+| `SESSION_NOT_FOUND`           | 401  | Concurrent rotate or a store dropout — the sid has already gone.                           |
+| `TOKEN_ROTATION_REQUIRED`     | 401  | Reserved — future signalling for secret-rotation forced rehash.                            |
+| `FINGERPRINT_MISMATCH`        | 401  | `bindTo` was set to strict; ip / ua at verify time didn't match the record.                |
+| `SUSPICIOUS_ACTIVITY`         | 401  | Reserved — currently soft signal via `onSuspicious` rather than a throw.                   |
+| `CONCURRENT_LIMIT_EXCEEDED`   | 401  | Reserved — the manager evicts oldest instead of throwing in the normal flow.               |
+| `FRESH_AUTH_REQUIRED`         | 401  | Reserved — `requireFreshAuth` returns boolean, doesn't throw. Available for callers.       |
+| `IMPERSONATION_INVALID`       | 403  | Impersonation refused — most commonly nested impersonation attempt.                        |
+| `MISSING_PEER_DEP`            | 500  | An adapter subpath was imported but its peer (fastify, ioredis, etc.) isn't installed.     |
+
+## `status` field
+
+Each code carries a suggested HTTP status. Middleware can translate
+directly:
+
+```js
+app.use((err, req, res, next) => {
+  if (err instanceof SessionError) {
+    return res.status(err.status).json({
+      error: err.code,
+      message: err.message,
+    });
+  }
+  next(err);
+});
+```
+
+Override at throw time via the third options argument:
+
+```js
+throw new SessionError(ErrorCode.INVALID_TOKEN, 'nope', { status: 418 });
+```
+
+## When errors are thrown
+
+The manager tries hard to **return `null`** on a wrong-token verify
+so login handlers don't need a try/catch around the hot path. Real
+throws are reserved for **misconfiguration** or **impossible states**:
+
+- `createSessionManager({ … })` throws on invalid config
+  (INVALID_ARGUMENT). Boot-time.
+- `rotate(req)` throws when there's no session on `req`
+  (INVALID_TOKEN) or when a concurrent rotate has already consumed
+  the sid (SESSION_NOT_FOUND).
+- `markFresh(req)` throws when there's no session on `req`
+  (INVALID_TOKEN).
+- `impersonate(adminReq, targetUid)` throws when the admin session is
+  invalid, when the target uid is missing, or when the admin session
+  is itself an impersonation (IMPERSONATION_INVALID).
+- Subpath imports (`@exortek/session/stores/redis`,
+  `@exortek/session/fastify`, …) throw `MISSING_PEER_DEP` on the
+  first call into a peer that isn't installed. Actionable — the
+  message names the exact `yarn add` you need.
+
+**Never throws:**
+
+- `verify(req)` — returns `null` on any failure (expired, revoked,
+  malformed, missing). Fires `onDeny` with a `reason` string so the
+  app can distinguish.
+- `revoke(req)` — idempotent. Returns `{ cookie, revoked: false }`
+  when there was nothing to revoke.
+- `deriveCsrfToken` / `verifyCsrfToken` — never throws on
+  user-supplied input; returns false on any mismatch.
+- Trusted-device `verify(req, userId)` — returns boolean; never
+  throws.
+
+## Cause chain
+
+Errors carry a `cause` for upstream problems that triggered them:
+
+```js
+try {
+  await sessions.verify(req);
+} catch (err) {
+  if (err.code === ErrorCode.MISSING_PEER_DEP) {
+    console.error(err.cause);   // the raw ERR_MODULE_NOT_FOUND
+  }
+}
+```
+
+Log the cause chain internally; **never** render it to the user —
+it can carry filesystem paths and stack traces that help an
+attacker fingerprint your setup.
+
+## Event vs error
+
+Several failure modes emit **events** rather than throw:
+
+| Situation                        | Throw          | Event                                     |
+| -------------------------------- | -------------- | ----------------------------------------- |
+| Wrong password (upstream)        | No             | —                                         |
+| Malformed cookie                 | No             | `onDeny('invalid-token')`                 |
+| Expired token                    | No             | `onDeny('expired')`                       |
+| Idle timeout                     | No             | `onDeny('idle-timeout')` + `onRevoke`     |
+| Fingerprint mismatch (strict)    | No             | `onDeny('fingerprint-mismatch')` + `onRevoke` |
+| Fingerprint mismatch (soft)      | No             | `onSuspicious('fingerprint-mismatch')`    |
+| IP change (`suspiciousActivity`) | No             | `onSuspicious('ip-change')`               |
+| UA change (`suspiciousActivity`) | No             | `onSuspicious('ua-change')`               |
+| Concurrent-limit eviction        | No             | `onRevoke('concurrent-limit')`            |
+| Missing peer dep                 | ✓ MISSING_PEER_DEP | —                                     |
+| Bad config                       | ✓ INVALID_ARGUMENT | —                                     |
+| Impersonation nesting            | ✓ IMPERSONATION_INVALID | —                                |
+
+Wire events into your telemetry sink for a full picture of what the
+manager is doing.
