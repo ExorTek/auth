@@ -14,22 +14,22 @@
       "require": "./dist/index.cjs"
     },
     "./scrypt": {
-      "types": "./dist/scrypt.d.ts",
+      "types": "./dist/algorithms/scrypt.d.ts",
       "import": "./dist/scrypt.mjs",
       "require": "./dist/scrypt.cjs"
     },
     "./pbkdf2": {
-      "types": "./dist/pbkdf2.d.ts",
+      "types": "./dist/algorithms/pbkdf2.d.ts",
       "import": "./dist/pbkdf2.mjs",
       "require": "./dist/pbkdf2.cjs"
     },
     "./argon2": {
-      "types": "./dist/argon2.d.ts",
+      "types": "./dist/algorithms/argon2.d.ts",
       "import": "./dist/argon2.mjs",
       "require": "./dist/argon2.cjs"
     },
     "./bcrypt": {
-      "types": "./dist/bcrypt.d.ts",
+      "types": "./dist/algorithms/bcrypt.d.ts",
       "import": "./dist/bcrypt.mjs",
       "require": "./dist/bcrypt.cjs"
     },
@@ -61,13 +61,13 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json",
     "build:watch": "rollup -c rollup.config.js --watch",
     "build:types": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test 'tests/**/*.test.js'",
     "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "peerDependencies": {
     "argon2": ">=0.44.0",

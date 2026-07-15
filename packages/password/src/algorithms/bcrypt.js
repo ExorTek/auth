@@ -210,9 +210,4 @@ function assertRounds(rounds) {
       `bcrypt: rounds must be an integer in [4, 31]; got ${rounds}. OWASP 2024 minimum is 10; 12 is a modern default.`,
     );
   }
-  if (rounds < 10) {
-    // Not fatal — some tests deliberately use rounds=4 to stay fast —
-    // but log a warning-shaped hint via a "soft" error path is out of
-    // scope for a library. Users can add their own linter rule.
-  }
 }
