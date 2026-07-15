@@ -166,3 +166,29 @@ test('hotp: SHA224 + SHA384 supported', async () => {
   assert.equal(c224.length, 6);
   assert.equal(c384.length, 6);
 });
+
+// Regression: verifyTotp must accept the full documented window range
+// [0, 10]. Previously any window > 5 threw "HOTP window must be an integer
+// in [0, 10]" because the symmetric skew window (2×window) was routed
+// through verifyHotp's forward-window guard.
+test('verifyTotp: window 6..10 verify instead of throwing', async () => {
+  const t = 1_600_000_000_000;
+  const code = totp(SHA1_SECRET, { timestamp: t });
+  for (const window of [6, 7, 8, 9, 10]) {
+    assert.equal(
+      await verifyTotp(code, SHA1_SECRET, { timestamp: t, window }),
+      true,
+      `window=${window} should verify the current code`,
+    );
+  }
+});
+
+test('verifyTotp: wide window accepts skewed codes within tolerance only', async () => {
+  const t = 1_600_000_000_000;
+  const period = 30;
+  // A code from 6 periods in the future.
+  const future = totp(SHA1_SECRET, { timestamp: t + 6 * period * 1000 });
+  assert.equal(await verifyTotp(future, SHA1_SECRET, { timestamp: t, window: 6 }), true);
+  // Just outside the window must still be rejected.
+  assert.equal(await verifyTotp(future, SHA1_SECRET, { timestamp: t, window: 5 }), false);
+});

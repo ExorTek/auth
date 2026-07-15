@@ -82,6 +82,15 @@ function counterToBuffer(counter) {
   return buf;
 }
 
+// HMAC + truncate over an ALREADY-DECODED key Buffer. The hot inner core
+// shared by hotp / verify / resync loops — callers validate digits /
+// algorithm / counter once and decode the secret once, so a 500-counter
+// resync scan doesn't re-run base32 decoding 500 times.
+function _hotpFromKey(key, counter, digits, algorithm) {
+  const mac = createHmac(algorithm.toLowerCase(), key).update(counterToBuffer(counter)).digest();
+  return truncate(mac, digits);
+}
+
 /**
  * RFC 4226 HOTP — HMAC-based one-time password.
  *
@@ -97,9 +106,7 @@ export function hotp(secret, counter, options = {}) {
   assertAlgorithm(algorithm);
   assertCounter(counter);
 
-  const key = decodeSecret(secret);
-  const mac = createHmac(algorithm.toLowerCase(), key).update(counterToBuffer(counter)).digest();
-  return truncate(mac, digits);
+  return _hotpFromKey(decodeSecret(secret), counter, digits, algorithm);
 }
 
 /**
@@ -133,18 +140,46 @@ export function verifyHotp(code, secret, counter, options = {}) {
     throw new OtpError(ErrorCode.INVALID_ARGUMENT, `HOTP window must be an integer in [0, 10]; got ${window}`);
   }
 
+  return _verifyHotpForward(code, secret, counter, window, digits, algorithm);
+}
+
+/**
+ * Shared forward-scan core for {@link verifyHotp} and {@link verifyTotp}.
+ *
+ * Validates the code shape, then timing-safely scans the counters
+ * `[start, start + span]`. Deliberately has **no `span` upper bound** —
+ * `verifyHotp` applies its own `[0, 10]` window guard before calling in,
+ * while `verifyTotp` legitimately needs a span of up to `2 × window`
+ * (its symmetric skew window mapped onto a forward-only HOTP scan). The
+ * two concepts were previously coupled, which made any TOTP `window > 5`
+ * throw `HOTP window must be an integer in [0, 10]`.
+ *
+ * @private
+ * @param {string} code
+ * @param {string | Buffer | Uint8Array} secret
+ * @param {number} start        First counter to try (non-negative).
+ * @param {number} span         How many counters past `start` to also try.
+ * @param {6 | 7 | 8 | 9 | 10} digits
+ * @param {OtpAlgorithm} algorithm
+ * @returns {number | null}     Matched counter, or `null`.
+ */
+export function _verifyHotpForward(code, secret, start, span, digits, algorithm) {
+  assertDigits(digits);
+  assertAlgorithm(algorithm);
   // Reject obviously wrong shapes upfront — but do NOT skip the loop
   // when the shape matches so timing doesn't leak "known length".
-  if (code.length !== digits || !/^\d+$/.test(code)) {
+  if (typeof code !== 'string' || code.length !== digits || !/^\d+$/.test(code)) {
     return null;
   }
-
+  // Decode once, outside the loop — base32 decoding per candidate would be
+  // pure waste on a wide window.
+  const key = decodeSecret(secret);
   const target = Buffer.from(code, 'utf8');
   let matched = null;
-  for (let i = 0; i <= window; i++) {
-    const candidate = Buffer.from(hotp(secret, counter + i, { digits, algorithm }), 'utf8');
+  for (let i = 0; i <= span; i++) {
+    const candidate = Buffer.from(_hotpFromKey(key, start + i, digits, algorithm), 'utf8');
     if (timingSafeEqual(target, candidate) && matched === null) {
-      matched = counter + i;
+      matched = start + i;
     }
   }
   return matched;
@@ -210,15 +245,17 @@ export function resynchronize(secret, codes, options = {}) {
   }
 
   // Scan forward looking for a counter N where hotp(N) === code1 AND
-  // hotp(N+1) === code2. This is O(maxLookAhead) HMACs, cheap.
+  // hotp(N+1) === code2. This is O(maxLookAhead) HMACs, cheap. Decode the
+  // secret once — not per candidate counter.
+  const key = decodeSecret(secret);
   const t1 = Buffer.from(code1, 'utf8');
   const t2 = Buffer.from(code2, 'utf8');
   for (let i = 0; i <= maxLookAhead; i++) {
-    const c1 = Buffer.from(hotp(secret, startCounter + i, { digits, algorithm }), 'utf8');
+    const c1 = Buffer.from(_hotpFromKey(key, startCounter + i, digits, algorithm), 'utf8');
     if (c1.length !== t1.length || !timingSafeEqual(t1, c1)) {
       continue;
     }
-    const c2 = Buffer.from(hotp(secret, startCounter + i + 1, { digits, algorithm }), 'utf8');
+    const c2 = Buffer.from(_hotpFromKey(key, startCounter + i + 1, digits, algorithm), 'utf8');
     if (c2.length === t2.length && timingSafeEqual(t2, c2)) {
       return startCounter + i + 2;
     }

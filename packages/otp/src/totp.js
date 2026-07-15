@@ -1,4 +1,4 @@
-import { hotp, verifyHotp } from './hotp.js';
+import { hotp, _verifyHotpForward } from './hotp.js';
 import { OtpError, ErrorCode } from './internal/errors.js';
 import { createHash } from 'node:crypto';
 
@@ -146,17 +146,13 @@ export async function verifyTotp(code, secret, options = {}) {
   }
 
   const center = counterForTimestamp(timestamp, period, t0);
-  const start = center - window;
+  const start = Math.max(0, center - window);
   const end = center + window;
 
-  // Reuse verifyHotp's loop, but symmetric around the current counter.
-  // We pass `window * 2` as its forward-only window and start at the
-  // earliest candidate.
-  const matched = verifyHotp(code, secret, Math.max(0, start), {
-    digits,
-    algorithm,
-    window: end - Math.max(0, start),
-  });
+  // Symmetric skew window mapped onto a forward-only HOTP scan: try every
+  // counter in [start, end]. Uses the shared core directly (not verifyHotp)
+  // so the span — up to 2×window — isn't rejected by HOTP's [0, 10] guard.
+  const matched = _verifyHotpForward(code, secret, start, end - start, digits, algorithm);
   if (matched === null) {
     return false;
   }
