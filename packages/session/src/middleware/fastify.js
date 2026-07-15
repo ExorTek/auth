@@ -5,7 +5,7 @@ import { createSessionManager } from '../manager.js';
  *
  *   1. `request.session` is populated on every request (or `null` if
  *      unauthenticated).
- *   2. `reply.setSession(sessionOrToken)` and `reply.clearSession()`
+ *   2. `reply.setSessionCookie(token)` and `reply.clearSessionCookie()`
  *      convenience methods are added to the reply, wiring the
  *      `Set-Cookie` header automatically.
  *   3. `request.sessions` exposes the manager for handlers that need

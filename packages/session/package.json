@@ -24,22 +24,22 @@
       "require": "./dist/trusted-device.cjs"
     },
     "./fastify": {
-      "types": "./dist/fastify.d.ts",
+      "types": "./dist/middleware/fastify.d.ts",
       "import": "./dist/fastify.mjs",
       "require": "./dist/fastify.cjs"
     },
     "./express": {
-      "types": "./dist/express.d.ts",
+      "types": "./dist/middleware/express.d.ts",
       "import": "./dist/express.mjs",
       "require": "./dist/express.cjs"
     },
     "./hono": {
-      "types": "./dist/hono.d.ts",
+      "types": "./dist/middleware/hono.d.ts",
       "import": "./dist/hono.mjs",
       "require": "./dist/hono.cjs"
     },
     "./elysia": {
-      "types": "./dist/elysia.d.ts",
+      "types": "./dist/middleware/elysia.d.ts",
       "import": "./dist/elysia.mjs",
       "require": "./dist/elysia.cjs"
     },
@@ -51,13 +51,13 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json",
     "build:watch": "rollup -c rollup.config.js --watch",
     "build:types": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test 'tests/**/*.test.js'",
     "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
     "@exortek/crypto": "workspace:^"
