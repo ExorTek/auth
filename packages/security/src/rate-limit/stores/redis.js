@@ -31,6 +31,45 @@ end
 return { tonumber(current), ttl }
 `.trim();
 
+// Exists-guarded DECR: a rollback must never create the key (a plain DECR
+// on a missing key would mint a TTL-less `-1` that leaks forever) and
+// never take the counter negative.
+const DECR_SCRIPT = `
+local key = KEYS[1]
+if redis.call('EXISTS', key) == 0 then
+  return 0
+end
+local count = redis.call('DECR', key)
+if count < 0 then
+  redis.call('SET', key, '0', 'KEEPTTL')
+  return 0
+end
+return count
+`.trim();
+
+// Compare-and-set for the bucket algorithms' opaque state strings. The
+// sentinel below means "key must not exist" — bucket state is always
+// '<int>|<int>', so it can never collide with a real value.
+const CAS_ABSENT = '__absent__';
+const CAS_SCRIPT = `
+local key = KEYS[1]
+local expected = ARGV[1]
+local value = ARGV[2]
+local ttl = tonumber(ARGV[3])
+local current = redis.call('GET', key)
+if expected == '${CAS_ABSENT}' then
+  if current then
+    return 0
+  end
+else
+  if not current or current ~= expected then
+    return 0
+  end
+end
+redis.call('SET', key, value, 'PX', ttl)
+return 1
+`.trim();
+
 /**
  * Redis-compatible store. Works with any client that exposes:
  *   - `eval(script, numkeys, ...args)`  → number | string
@@ -91,6 +130,12 @@ export function redisStore(client, options = {}) {
     if (typeof client.exortekRlRead !== 'function') {
       client.defineCommand('exortekRlRead', { numberOfKeys: 1, lua: READ_SCRIPT });
     }
+    if (typeof client.exortekRlDecr !== 'function') {
+      client.defineCommand('exortekRlDecr', { numberOfKeys: 1, lua: DECR_SCRIPT });
+    }
+    if (typeof client.exortekRlCas !== 'function') {
+      client.defineCommand('exortekRlCas', { numberOfKeys: 1, lua: CAS_SCRIPT });
+    }
   }
 
   async function runIncr(fullKey, ttlMs) {
@@ -114,6 +159,26 @@ export function redisStore(client, options = {}) {
       return client.eval(READ_SCRIPT, 1, fullKey);
     }
     return client.eval(READ_SCRIPT, { keys: [fullKey], arguments: [] });
+  }
+
+  async function runDecr(fullKey) {
+    if (useDefined) {
+      return client.exortekRlDecr(fullKey);
+    }
+    if (client.eval.length >= 2 && !client.sendCommand) {
+      return client.eval(DECR_SCRIPT, 1, fullKey);
+    }
+    return client.eval(DECR_SCRIPT, { keys: [fullKey], arguments: [] });
+  }
+
+  async function runCas(fullKey, expected, value, ttlMs) {
+    if (useDefined) {
+      return client.exortekRlCas(fullKey, expected, value, ttlMs);
+    }
+    if (client.eval.length >= 2 && !client.sendCommand) {
+      return client.eval(CAS_SCRIPT, 1, fullKey, expected, value, ttlMs);
+    }
+    return client.eval(CAS_SCRIPT, { keys: [fullKey], arguments: [expected, String(value), String(ttlMs)] });
   }
 
   function parsePair(raw) {
@@ -148,6 +213,15 @@ export function redisStore(client, options = {}) {
       // node-redis v4 accepts positional 'PX', ttl on its `set` command;
       // ioredis and Upstash do too.
       await client.set(k(key), String(count), 'PX', ttlMs);
+    },
+
+    async decr(key) {
+      await runDecr(k(key));
+    },
+
+    async compareAndSet(key, expected, value, ttlMs) {
+      const raw = await runCas(k(key), expected === null ? CAS_ABSENT : String(expected), String(value), ttlMs);
+      return Number(raw) === 1;
     },
 
     async delete(key) {

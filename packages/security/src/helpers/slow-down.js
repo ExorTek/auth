@@ -1,4 +1,5 @@
 import { SecurityError, ErrorCode } from '../internal/errors.js';
+import { parseDuration } from '../rate-limit/duration.js';
 
 /**
  * @typedef {object} SlowDownConfig
@@ -57,7 +58,7 @@ export function slowDown(config) {
     );
   }
 
-  const windowMs = parseWindow(config.window);
+  const windowMs = parseDuration(config.window, 'slowDown.window');
   const maxDelayMs = config.maxDelayMs ?? 20_000;
   const growth = config.growth ?? 'linear';
 
@@ -90,27 +91,6 @@ export function slowDown(config) {
       };
     },
   };
-}
-
-function parseWindow(input) {
-  if (typeof input === 'number') {
-    if (!Number.isInteger(input) || input <= 0) {
-      throw new SecurityError(
-        ErrorCode.INVALID_ARGUMENT,
-        `slowDown.window must be a positive integer ms; got ${input}`,
-      );
-    }
-    return input;
-  }
-  if (typeof input !== 'string') {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'slowDown.window must be a duration string or ms number');
-  }
-  const m = /^\s*(\d+(?:\.\d+)?)\s*(ms|s|m|h|d)\s*$/i.exec(input);
-  if (!m) {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `slowDown.window invalid: '${input}'`);
-  }
-  const units = { ms: 1, s: 1000, m: 60000, h: 3600000, d: 86400000 };
-  return Math.round(Number(m[1]) * units[m[2].toLowerCase()]);
 }
 
 function sleep(ms) {

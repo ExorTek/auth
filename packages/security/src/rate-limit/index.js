@@ -34,6 +34,17 @@ import { withBan } from './with-ban.js';
  *   Overwrite (or create) the key with an explicit count and TTL.
  * @property {(key: string) => Promise<void>} delete
  * @property {(key: string) => Promise<void>} reset
+ * @property {(key: string) => Promise<void>} [decr]
+ *   Optional: atomically decrement an existing key (no-op when absent;
+ *   never creates the key). `sliding` uses this to roll back its
+ *   tentative increment on rejection without racing concurrent `incr`s —
+ *   stores that omit it fall back to a read-modify-write rollback.
+ * @property {(key: string, expected: string | null, value: string | number, ttlMs: number) => Promise<boolean>} [compareAndSet]
+ *   Optional: atomically write `value` only if the key's current stored
+ *   count equals `expected` (`null` = key must not exist). Returns
+ *   `true` when the write happened. `tokenBucket` / `leakyBucket` use
+ *   this as a CAS so concurrent requests can't double-spend a token —
+ *   stores that omit it fall back to last-writer-wins `set`.
  */
 
 /**

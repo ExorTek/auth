@@ -47,8 +47,14 @@ export function sliding(config) {
 
       if (interpolated > limit) {
         // Roll back the tentative increment so future checks report the
-        // correct remaining count.
-        await store.set(currentKey, current.count - 1, Math.max(1, current.expiresAt - now));
+        // correct remaining count. Prefer the store's atomic `decr` — the
+        // read-modify-write `set` fallback can race a concurrent `incr`
+        // and overwrite it, silently under-counting the window.
+        if (typeof store.decr === 'function') {
+          await store.decr(currentKey);
+        } else {
+          await store.set(currentKey, current.count - 1, Math.max(1, current.expiresAt - now));
+        }
         return {
           allowed: false,
           remaining: 0,

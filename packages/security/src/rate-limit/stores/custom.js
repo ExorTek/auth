@@ -13,6 +13,12 @@ import { SecurityError, ErrorCode } from '../../internal/errors.js';
  *
  * Optional:
  *   - `reset(key)`                → void (defaults to `delete`)
+ *   - `decr(key)`                 → void — atomic decrement of an existing
+ *     key. When provided, `sliding` uses it for race-free rollback of a
+ *     rejected request's tentative increment.
+ *   - `compareAndSet(key, expected, value, ttlMs)` → boolean — atomic CAS
+ *     (`expected: null` = key must not exist). When provided,
+ *     `tokenBucket` / `leakyBucket` become race-free under concurrency.
  *
  * Atomicity guarantee: `incr` must be atomic across concurrent callers. On
  * Redis, wrap `INCR + EXPIRE` in a Lua script or MULTI/EXEC. On Mongo, use
@@ -40,7 +46,7 @@ export function customStore(impl) {
     }
   }
 
-  return {
+  const store = {
     get: key => Promise.resolve(impl.get(key)),
     read: key => Promise.resolve(typeof impl.read === 'function' ? impl.read(key) : impl.get(key)),
     incr: (key, ttlMs) => Promise.resolve(impl.incr(key, ttlMs)),
@@ -48,4 +54,15 @@ export function customStore(impl) {
     delete: key => Promise.resolve(impl.delete(key)),
     reset: key => Promise.resolve(typeof impl.reset === 'function' ? impl.reset(key) : impl.delete(key)),
   };
+  // Pass the atomic extras through ONLY when the impl provides them — the
+  // algorithms feature-detect and fall back otherwise. Wrapping a missing
+  // method in a stub would advertise atomicity the backend can't deliver.
+  if (typeof impl.decr === 'function') {
+    store.decr = key => Promise.resolve(impl.decr(key));
+  }
+  if (typeof impl.compareAndSet === 'function') {
+    store.compareAndSet = (key, expected, value, ttlMs) =>
+      Promise.resolve(impl.compareAndSet(key, expected, value, ttlMs)).then(Boolean);
+  }
+  return store;
 }

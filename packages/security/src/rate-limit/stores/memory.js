@@ -151,6 +151,39 @@ export function memoryStore(options = {}) {
       map.set(key, { count, expiresAt });
     },
 
+    // Atomic decrement of an existing key — used by `sliding` to roll back
+    // its tentative increment on rejection. Never creates the key, never
+    // drops the count below zero, and (unlike incr) does NOT refresh the
+    // LRU position: a rollback isn't fresh activity. Single-threaded JS
+    // makes the read-modify-write here atomic by construction.
+    async decr(key) {
+      const entry = peekFresh(key);
+      if (entry && typeof entry.count === 'number' && entry.count > 0) {
+        entry.count -= 1;
+      }
+    },
+
+    // Compare-and-set for the bucket algorithms' opaque state strings.
+    // `expected === null` means "key must not exist". Counts are compared
+    // as strings so numeric and string state round-trip identically.
+    // Atomic by construction (no await between read and write).
+    async compareAndSet(key, expected, value, ttlMs) {
+      scheduleSweeper();
+      const entry = peekFresh(key);
+      const current = entry ? String(entry.count) : null;
+      if (current !== (expected === null ? null : String(expected))) {
+        return false;
+      }
+      if (entry) {
+        // Same LRU refresh rule as incr — a successful write is activity.
+        map.delete(key);
+      } else {
+        evictIfFull();
+      }
+      map.set(key, { count: value, expiresAt: now() + ttlMs });
+      return true;
+    },
+
     async delete(key) {
       map.delete(key);
     },

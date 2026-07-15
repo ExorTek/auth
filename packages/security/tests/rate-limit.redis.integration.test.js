@@ -135,4 +135,35 @@ if (!REDIS_URL) {
       assert.equal(counts[i], i + 1);
     }
   });
+
+  test('redis: decr rolls back an existing key, never creates, never goes negative', async () => {
+    const store = rateLimit.stores.redis(client, { prefix: `${runNs}decr:` });
+    await store.incr('k', 5000);
+    await store.incr('k', 5000);
+    await store.decr('k');
+    assert.equal((await store.get('k')).count, 1);
+    await store.decr('k');
+    await store.decr('k'); // clamp at 0
+    // count 0 reads back as null through get() (count <= 0 filter) — assert raw
+    const raw = await client.get(`${runNs}decr:k`);
+    assert.equal(raw, '0');
+    await store.decr('missing');
+    assert.equal(await client.exists(`${runNs}decr:missing`), 0);
+  });
+
+  test('redis: compareAndSet is a real CAS', async () => {
+    const store = rateLimit.stores.redis(client, { prefix: `${runNs}cas:` });
+    assert.equal(await store.compareAndSet('k', null, '5000|1', 5000), true);
+    assert.equal(await store.compareAndSet('k', null, '4000|2', 5000), false);
+    assert.equal(await store.compareAndSet('k', '5000|1', '4000|2', 5000), true);
+    assert.equal(await store.compareAndSet('k', '5000|1', '3000|3', 5000), false);
+    assert.equal(await client.get(`${runNs}cas:k`), '4000|2');
+  });
+
+  test('redis: tokenBucket concurrent burst never overspends capacity', async () => {
+    const store = rateLimit.stores.redis(client, { prefix: `${runNs}tb:` });
+    const limiter = rateLimit.tokenBucket({ capacity: 5, refillRate: 0.001, store });
+    const results = await Promise.all(Array.from({ length: 25 }, () => limiter.check({ key: 'u' })));
+    assert.equal(results.filter(r => r.allowed).length, 5);
+  });
 }

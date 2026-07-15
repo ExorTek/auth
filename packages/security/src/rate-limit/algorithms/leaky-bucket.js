@@ -14,6 +14,10 @@ import { assertBucketOptions, assertKey } from '../options.js';
  * For user-facing endpoints, prefer `sliding` or `tokenBucket`.
  *
  * State encoding matches token-bucket: `"<level*1000>|<updatedAt>"`.
+ * Writes go through the store's optional atomic `compareAndSet` when
+ * available (bundled memory + Redis stores both provide it) so
+ * concurrent requests can't race the level; stores without it fall
+ * back to last-writer-wins `set`.
  *
  * @param {import('../index.js').BucketLimiterConfig} config
  * @returns {import('../index.js').Limiter}
@@ -25,55 +29,74 @@ export function leakyBucket(config) {
   const store = config.store;
   const ttlMs = Math.max(60_000, Math.ceil((capacity / leakRate) * 1000 * 4));
 
+  const hasCas = typeof store.compareAndSet === 'function';
+  // Same optimistic-concurrency loop as token-bucket — see that module for
+  // the progress / fail-closed rationale.
+  const MAX_ATTEMPTS = 32;
+
   return {
     async check(input) {
       assertKey(input);
       const { key } = input;
       const storeKey = `lb:${key}`;
-      const now = Date.now();
 
-      const raw = await store.get(storeKey);
-      let level = 0;
-      let updatedAt = now;
-      if (raw && raw.count !== null && raw.count !== undefined) {
-        const parsed = decodeState(raw.count);
-        if (parsed) {
-          level = parsed.level;
-          updatedAt = parsed.updatedAt;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        const now = Date.now();
+        const raw = await store.get(storeKey);
+        const rawState = raw && raw.count !== null && raw.count !== undefined ? String(raw.count) : null;
+        let level = 0;
+        let updatedAt = now;
+        if (rawState !== null) {
+          const parsed = decodeState(rawState);
+          if (parsed) {
+            level = parsed.level;
+            updatedAt = parsed.updatedAt;
+          }
         }
+
+        const elapsedSec = Math.max(0, (now - updatedAt) / 1000);
+        level = Math.max(0, level - elapsedSec * leakRate);
+
+        let nextState;
+        let result;
+        if (level + 1 > capacity) {
+          const overflow = level + 1 - capacity;
+          const retryAfter = Math.max(1, Math.ceil(overflow / leakRate));
+          nextState = encodeState(level, now);
+          result = {
+            allowed: false,
+            remaining: 0,
+            reset: new Date(now + retryAfter * 1000),
+            retryAfter,
+          };
+        } else {
+          level += 1;
+          nextState = encodeState(level, now);
+          const secondsUntilEmpty = level / leakRate;
+          result = {
+            allowed: true,
+            remaining: Math.floor(capacity - level),
+            reset: new Date(now + secondsUntilEmpty * 1000),
+            retryAfter: null,
+          };
+        }
+
+        if (hasCas) {
+          const wrote = await store.compareAndSet(storeKey, rawState, nextState, ttlMs);
+          if (!wrote) {
+            continue; // lost the race — recompute on the fresh state
+          }
+        } else {
+          await store.set(storeKey, nextState, ttlMs);
+        }
+        return result;
       }
 
-      const elapsedSec = Math.max(0, (now - updatedAt) / 1000);
-      level = Math.max(0, level - elapsedSec * leakRate);
-
-      if (level + 1 > capacity) {
-        const overflow = level + 1 - capacity;
-        const retryAfter = Math.max(1, Math.ceil(overflow / leakRate));
-        await persist(store, storeKey, level, now, ttlMs);
-        return {
-          allowed: false,
-          remaining: 0,
-          reset: new Date(now + retryAfter * 1000),
-          retryAfter,
-        };
-      }
-
-      level += 1;
-      await persist(store, storeKey, level, now, ttlMs);
-
-      const secondsUntilEmpty = level / leakRate;
-      return {
-        allowed: true,
-        remaining: Math.floor(capacity - level),
-        reset: new Date(now + secondsUntilEmpty * 1000),
-        retryAfter: null,
-      };
+      // CAS never succeeded across every attempt — only reachable with a
+      // store whose compareAndSet is broken. Deny without writing state.
+      return { allowed: false, remaining: 0, reset: new Date(Date.now() + 1000), retryAfter: 1 };
     },
   };
-}
-
-async function persist(store, key, level, updatedAt, ttlMs) {
-  await store.set(key, encodeState(level, updatedAt), ttlMs);
 }
 
 function encodeState(level, updatedAt) {

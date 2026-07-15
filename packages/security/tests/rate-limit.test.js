@@ -607,3 +607,82 @@ test('withBan: concurrent denials past threshold all land in the ban window (no 
   assert.equal(followUp.allowed, false);
   assert.ok(followUp.retryAfter >= 500, 'a subsequent request should hit the ban window');
 });
+
+// ---------------------------------------------------------------------------
+// Atomic store extras: decr + compareAndSet
+// ---------------------------------------------------------------------------
+
+test('memoryStore.decr: decrements an existing key, never below zero, never creates', async () => {
+  const store = rateLimit.stores.memory();
+  await store.incr('k', 60_000);
+  await store.incr('k', 60_000);
+  await store.decr('k');
+  assert.equal((await store.get('k')).count, 1);
+  await store.decr('k');
+  await store.decr('k'); // already 0 — must clamp, not go negative
+  assert.equal((await store.get('k')).count, 0);
+  await store.decr('missing'); // must not create the key
+  assert.equal(await store.get('missing'), null);
+  store._stop();
+});
+
+test('memoryStore.compareAndSet: CAS semantics', async () => {
+  const store = rateLimit.stores.memory();
+  // expected null = key must not exist
+  assert.equal(await store.compareAndSet('k', null, 'a|1', 60_000), true);
+  assert.equal(await store.compareAndSet('k', null, 'b|2', 60_000), false);
+  // matching expected wins, stale expected loses
+  assert.equal(await store.compareAndSet('k', 'a|1', 'b|2', 60_000), true);
+  assert.equal(await store.compareAndSet('k', 'a|1', 'c|3', 60_000), false);
+  assert.equal((await store.get('k')).count, 'b|2');
+  store._stop();
+});
+
+test('sliding: rejected requests roll back via decr without racing concurrent incrs', async () => {
+  const store = rateLimit.stores.memory();
+  const limiter = rateLimit.sliding({ requests: 3, window: '1m', store });
+  // Burst well past the limit concurrently. With the old set()-based
+  // rollback, interleaved rollbacks could clobber concurrent increments
+  // and drive the counter DOWN, letting later requests through.
+  const results = await Promise.all(Array.from({ length: 20 }, () => limiter.check({ key: 'u' })));
+  const allowed = results.filter(r => r.allowed).length;
+  assert.equal(allowed, 3);
+  // And the counter must not have been rolled back below the allowed count.
+  const after = await limiter.check({ key: 'u' });
+  assert.equal(after.allowed, false);
+  store._stop();
+});
+
+test('tokenBucket: concurrent burst can never overspend capacity (CAS)', async () => {
+  const store = rateLimit.stores.memory();
+  const limiter = rateLimit.tokenBucket({ capacity: 5, refillRate: 0.001, store });
+  const results = await Promise.all(Array.from({ length: 25 }, () => limiter.check({ key: 'u' })));
+  const allowed = results.filter(r => r.allowed).length;
+  assert.equal(allowed, 5);
+  store._stop();
+});
+
+test('leakyBucket: concurrent burst can never exceed capacity (CAS)', async () => {
+  const store = rateLimit.stores.memory();
+  const limiter = rateLimit.leakyBucket({ capacity: 5, leakRate: 0.001, store });
+  const results = await Promise.all(Array.from({ length: 25 }, () => limiter.check({ key: 'u' })));
+  const allowed = results.filter(r => r.allowed).length;
+  assert.equal(allowed, 5);
+  store._stop();
+});
+
+test('tokenBucket: still works on stores without compareAndSet (fallback path)', async () => {
+  const base = rateLimit.stores.memory();
+  // A custom store exposing only the required surface — no decr, no CAS.
+  const store = rateLimit.stores.custom({
+    get: k => base.get(k),
+    incr: (k, t) => base.incr(k, t),
+    set: (k, c, t) => base.set(k, c, t),
+    delete: k => base.delete(k),
+  });
+  const limiter = rateLimit.tokenBucket({ capacity: 2, refillRate: 0.001, store });
+  assert.equal((await limiter.check({ key: 'u' })).allowed, true);
+  assert.equal((await limiter.check({ key: 'u' })).allowed, true);
+  assert.equal((await limiter.check({ key: 'u' })).allowed, false);
+  base._stop();
+});

@@ -65,13 +65,13 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json",
     "build:watch": "rollup -c rollup.config.js --watch",
     "build:types": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test 'tests/**/*.test.js'",
     "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "keywords": [
     "backend",

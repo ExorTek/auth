@@ -194,6 +194,17 @@ export function securityMiddleware(options = {}) {
   const headersEntries = cfg.responseHeaders ? Object.entries(cfg.responseHeaders) : null;
 
   return async function security(c, next) {
+    // Stamp static security headers FIRST so they ride on terminal
+    // rejection responses too (a 429 / 403 from rate-limit or csrf must
+    // still carry CSP / HSTS). Matches the Express and Elysia adapters,
+    // which also apply headers to every response, not just passed-through
+    // ones. Hono applies context headers set via c.header() onto responses
+    // built by c.json()/c.body().
+    if (headersEntries) {
+      for (const [k, v] of headersEntries) {
+        c.header(k, v);
+      }
+    }
     if (cfg.corsCheck) {
       const terminal = await runCors(cfg.corsCheck, c, headersEntries);
       if (terminal) {
@@ -210,11 +221,6 @@ export function securityMiddleware(options = {}) {
       const terminal = await runCsrf(cfg.csrf, c);
       if (terminal) {
         return terminal;
-      }
-    }
-    if (headersEntries) {
-      for (const [k, v] of headersEntries) {
-        c.header(k, v);
       }
     }
     await next();
