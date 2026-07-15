@@ -46,7 +46,7 @@ redirects, and a set of sharp-edged helpers — plus adapter modules that reduce
   into `allowedSchemes`. X-Frame-Options `ALLOW-FROM` is rejected — modern browsers ignore it.
 - **True LRU memory store.** A hot key can never evict itself under cap pressure (a subtle rate-limit bypass in most
   in-process implementations).
-- **Tests:** 223 currently passing, plus 10 gated on a live Redis instance for the Redis store.
+- **Tests:** 241 currently passing, plus 10 gated on a live Redis instance for the Redis store.
 
 <Callout type="warning">
   **`@exortek/security` gives you the primitives and the wiring; it doesn't turn off your brain.** CSRF still requires a

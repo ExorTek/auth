@@ -3,17 +3,15 @@
 > Framework-agnostic defensive HTTP layer for Node.js 22+ — built on `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/security.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/security)
-[![tests](https://img.shields.io/badge/tests-240%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-241%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/security.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/security)](https://packagephobia.com/result?p=@exortek/security)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![license](https://img.shields.io/npm/l/@exortek/security.svg?color=blue)](./LICENSE)
 
 CSRF, rate limiting, helmet-style headers, CORS, safe redirects, and 17 focused defensive helpers — one install replaces
-`helmet` + `csrf-csrf`
-
-- `express-rate-limit` + `express-slow-down` + `cors` + `hpp` + `express-mongo-sanitize`. Adapters for **Fastify**,
-  **Express**, **Hono**, **Elysia**.
+`helmet` + `csrf-csrf` + `express-rate-limit` + `express-slow-down` + `cors` + `hpp` + `express-mongo-sanitize`. Adapters
+for **Fastify**, **Express**, **Hono**, and **Elysia**.
 
 📖 **Docs:** [**auth.memet.dev/security**](https://auth.memet.dev/security)
 

@@ -110,12 +110,15 @@ const limiter = rateLimit.tokenBucket({
 });
 ```
 
-<Callout type="info">
+<Callout type="warning">
   Bucket state is a compact string per key (`"<tokens*1000>|<updatedAt>"`),
-  so any store that treats `count` as an opaque scalar works. Two
-  concurrent requests on the same key can race in memory / custom
-  stores — good enough for typical workloads. If you need cluster-wide
-  atomicity, use the Redis store with a Lua overlay in front of it.
+  read and written with a non-atomic `get` + `set` pair. Two concurrent
+  requests on the same key can therefore race — **including on the Redis
+  store**, whose bundled Lua script only makes `incr` / `read` atomic, not
+  the bucket read-modify-write. This is fine for typical single-key
+  workloads, but it is **not** a hard cluster-wide cap. If you need a
+  strict limit under concurrency, use `sliding` or `fixed` — they count
+  through the store's atomic `incr`.
 </Callout>
 
 ## `leakyBucket`
