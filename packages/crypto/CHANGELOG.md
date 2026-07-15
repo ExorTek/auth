@@ -1,5 +1,13 @@
 # @exortek/crypto
 
+## 1.0.6
+
+### Patch Changes
+
+- eaf7921: Build hygiene: `build` and `clean` scripts now remove `dist/` **and** `tsconfig.tsbuildinfo` before every
+  build. Without the pre-clean, `tsc --incremental` could skip regenerating type declarations for removed/renamed source
+  files, leaving stale `.d.ts` artifacts inside `dist/` — which `files: ["dist"]` would then ship in the tarball.
+
 ## 1.0.5
 
 ### Patch Changes
