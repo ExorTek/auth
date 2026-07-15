@@ -22,7 +22,7 @@ Node's `crypto` module is powerful but full of foot-guns — nonce reuse, wrong 
 incompatible signature encodings, inconsistent option shapes. Every auth-adjacent codebase re-implements the same 30
 helpers on top of it, badly. `@exortek/crypto` ships them once, correctly:
 
-- **Ergonomic by default.** `random.pin(6)` never returns `'000000'`. `hash.hmac(data, secret)` is timing-safe by
+- **Ergonomic by default.** `random.pin(6)` never returns `'000000'`. `hmac(data, secret)` is timing-safe by
   construction. `cipher.seal(payload, secret, { ttl: '1h' })` mints a tamper-proof token you can put in a URL.
 - **Framework-agnostic.** No Express, Fastify, Hono or Elysia coupling.
 - **Zero deps.** `node:crypto` is the only runtime input. `dist` is a few kilobytes per subpath.
@@ -42,13 +42,16 @@ Requires **Node.js 22 or newer**.
 ## Quick start
 
 ```js
-import { random, hash, cipher, sign } from '@exortek/crypto';
+// `random` and `cipher` are namespace objects; the hash and signature
+// primitives are named exports (there is no `hash` / `sign` namespace —
+// those names belong to the `hash()` and `sign()` functions themselves).
+import { random, cipher, verifyHmac, generateSignKeyPair, sign, thumbprint } from '@exortek/crypto';
 
 // A 6-digit OTP that will never render '000000'
 const otp = random.pin(6);
 
 // A webhook signature you can safely compare in a handler
-const ok = hash.verifyHmac(body, req.headers['x-signature'], WEBHOOK_SECRET);
+const ok = verifyHmac(body, req.headers['x-signature'], WEBHOOK_SECRET);
 
 // A cookie-safe encrypted, authenticated string
 const key = await cipher.generateKey();
@@ -60,9 +63,9 @@ const ticket = cipher.seal({ userId: 42, purpose: 'pw-reset' }, RESET_SECRET, {
 });
 
 // A JOSE-standard signature with the JWK thumbprint as `kid`
-const kp = await sign.generateSignKeyPair('es256');
-const sig = sign.sign('claim=1', kp.privateKey, { algo: 'es256' });
-const kid = sign.thumbprint(kp.publicKey);
+const kp = await generateSignKeyPair('es256');
+const sig = sign('claim=1', kp.privateKey, { algo: 'es256' });
+const kid = thumbprint(kp.publicKey);
 ```
 
 ## Modules
@@ -143,15 +146,15 @@ Codes currently emitted:
 
 A few primitives that are hard to find elsewhere done well:
 
-- **`hash.verifyHmac(body, expected, secret)`** — Stripe / GitHub / Slack / Twilio / Vercel all sign webhooks with
+- **`verifyHmac(body, expected, secret)`** — Stripe / GitHub / Slack / Twilio / Vercel all sign webhooks with
   HMAC-SHA-256. This is a one-line, timing-safe verify.
-- **`hash.fingerprint(any)`** — canonical (RFC 8785) hash of any JSON-shaped value. Same content, different key order →
+- **`fingerprint(any)`** — canonical (RFC 8785) hash of any JSON-shaped value. Same content, different key order →
   same fingerprint. Use as a cache key, ETag, dedup key, idempotency key.
-- **`hash.signValue(value, secret) / unsignValue`** — the Express `cookie-signature` / Django `signing` primitive.
+- **`signValue(value, secret) / unsignValue`** — the Express `cookie-signature` / Django `signing` primitive.
   `<value>.<mac>`, timing-safe.
 - **`cipher.seal(payload, secret, { ttl })`** — encrypted, authenticated, auto-expiring token. Payload is private
   (unlike a JWT), expiry is unforgeable. Password reset, email verification, magic-link tokens.
-- **`sign.thumbprint(key)`** — the JWT `kid` value for any keypair, matching common JOSE conventions.
+- **`thumbprint(key)`** — the JWT `kid` value for any keypair, matching common JOSE conventions.
 - **`random.pin(n)`, `random.code(n)`, `random.token(size, { prefix })`** — rejection-sampled uniform IDs. `pin(6)`
   never returns `'000000'`. `token(32, { prefix: 'sk_live' })` gives a Stripe-style secret.
 

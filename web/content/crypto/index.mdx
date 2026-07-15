@@ -29,8 +29,8 @@ Node's `crypto` module is powerful but full of foot-guns:
   quirks; getting them wrong silently corrupts data.
 
 `@exortek/crypto` ships the correct default for each of these, and refuses the wrong one. `random.pin(6)` never returns
-`'000000'`. `hash.hmac` is timing-safe by construction. `sign.sign('es256')` emits IEEE-P1363 out of the box.
-`hash.pbkdf2` defaults to OWASP 2023 minimums. Every encoder rejects out-of-alphabet characters with an
+`'000000'`. `hmac` is timing-safe by construction. `sign('...', key, { algo: 'es256' })` emits IEEE-P1363 out of the box.
+`pbkdf2` defaults to OWASP 2023 minimums. Every encoder rejects out-of-alphabet characters with an
 `INVALID_ENCODING` error.
 
 ## Is it safe to trust?
@@ -47,7 +47,7 @@ Short answer: yes for the primitives, with the caveats every crypto library has.
   `crypto.timingSafeEqual` on equal-length Buffers.
 - **Every input is validated at the boundary.** Wrong-type arguments raise `CryptoError(INVALID_ARGUMENT)` before
   reaching Node; you don't get a cryptic OpenSSL error thrown from three layers down.
-- **Tests: 448 currently passing** on Node 22 and 24. RFC test vectors are covered where they exist (HMAC-SHA256 RFC
+- **Tests: 454 currently passing** on Node 22 and 24. RFC test vectors are covered where they exist (HMAC-SHA256 RFC
   4231, HKDF RFC 5869, PBKDF2 RFC 6070, Base32 RFC 4648, UUID RFC 9562).
 - **No supply chain.** Zero runtime dependencies. What you audit is what you run.
 
@@ -160,16 +160,16 @@ Which module do you need? Start here.
 | I want to…                                      | Reach for                                                                                                                                                                    |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Generate a session ID / OTP / verification code | [`random.uuid4`](/crypto/random#uuid4), [`random.pin`](/crypto/random#pin), [`random.token`](/crypto/random#token)                                                           |
-| Verify a Stripe / GitHub / Slack webhook        | [`hash.verifyHmac`](/crypto/hash#verifyhmac)                                                                                                                                 |
-| Sign a cookie / URL parameter                   | [`hash.signValue`](/crypto/hash#signvalue--unsignvalue)                                                                                                                      |
-| Derive an encryption key from a passphrase      | [`hash.pbkdf2`](/crypto/hash#pbkdf2), [`hash.scrypt`](/crypto/hash#scrypt), or [`cipher.encryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase) |
+| Verify a Stripe / GitHub / Slack webhook        | [`verifyHmac`](/crypto/hash#verifyhmac)                                                                                                                                 |
+| Sign a cookie / URL parameter                   | [`signValue`](/crypto/hash#signvalue--unsignvalue)                                                                                                                      |
+| Derive an encryption key from a passphrase      | [`pbkdf2`](/crypto/hash#pbkdf2), [`scrypt`](/crypto/hash#scrypt), or [`cipher.encryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase) |
 | Encrypt a value into a token                    | [`cipher.encryptToString`](/crypto/cipher#encrypttostring)                                                                                                                   |
 | Encrypt something with a human passphrase       | [`cipher.encryptWithPassphrase`](/crypto/cipher#encryptwithpassphrase--decryptwithpassphrase)                                                                                |
 | Mint a 1-hour password-reset ticket             | [`cipher.seal`](/crypto/cipher#seal--unseal)                                                                                                                                 |
-| Produce a stable cache key from an object       | [`hash.fingerprint`](/crypto/hash#fingerprint)                                                                                                                               |
-| Sign / verify a JWT (asymmetric)                | [`sign.sign`](/crypto/sign#sign), [`sign.verify`](/crypto/sign#verify), [`sign.thumbprint`](/crypto/sign#thumbprint)                                                         |
+| Produce a stable cache key from an object       | [`fingerprint`](/crypto/hash#fingerprint)                                                                                                                               |
+| Sign / verify a JWT (asymmetric)                | [`sign`](/crypto/sign#sign), [`verify`](/crypto/sign#verify), [`thumbprint`](/crypto/sign#thumbprint)                                                         |
 | Establish a shared secret between two parties   | [`cipher.deriveSharedSecret`](/crypto/cipher#derivesharedsecret)                                                                                                             |
-| Derive multiple keys from one secret            | [`hash.hkdf`](/crypto/hash#hkdf)                                                                                                                                             |
+| Derive multiple keys from one secret            | [`hkdf`](/crypto/hash#hkdf)                                                                                                                                             |
 | Encode / decode bytes                           | [`encode.*`](/crypto/encode)                                                                                                                                                 |
 | Wipe a secret Buffer after use                  | [`binary.wipe`](/crypto/binary#wipe)                                                                                                                                         |
 
@@ -194,13 +194,14 @@ Three styles, all supported, all tree-shakable.
   </Tabs.Tab>
   <Tabs.Tab>
     ```js
-    import { random, cipher, hash } from '@exortek/crypto'
+    import { random, cipher, hmac } from '@exortek/crypto'
 
     random.uuid4()
-    hash.hmac('data', SECRET)
     await cipher.generateKey()
+    hmac('data', SECRET) // hash primitives are named exports, not a namespace
     ```
-    Namespace form — great for REPL / interactive exploration.
+    Namespace form — `random` and `cipher` bundle their members; hash / sign
+    primitives are named exports. Great for REPL / interactive exploration.
 
   </Tabs.Tab>
 </Tabs>
@@ -237,7 +238,7 @@ try {
 
 - **Not a password hasher.** PBKDF2 / scrypt are here for deriving cipher key material from a passphrase, not for
   storing user password verifiers. Use a memory-hard password hasher (Argon2id / bcrypt) for login flows.
-- **Not a full JWT library.** [`sign.sign`](/crypto/sign#sign) / [`sign.verify`](/crypto/sign#verify) are the primitives
+- **Not a full JWT library.** [`sign`](/crypto/sign#sign) / [`verify`](/crypto/sign#verify) are the primitives
   — bytes in, signature bytes out. JWT header / claim validation (`exp`, `nbf`, `iss`, `aud`, algorithm-confusion
   defence) is up to the caller.
 - **Not a session store.** [`cipher.seal`](/crypto/cipher#seal--unseal) mints stateless tokens; anything server-side you
