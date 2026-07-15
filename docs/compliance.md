@@ -67,7 +67,7 @@ building blocks (constant-time compare, timing-safe verify).
 | V6.2.2 | Key management via KMS / HSM         |   🟡   | Library accepts secrets as `Buffer                                        | string` — caller supplies from KMS    |
 | V6.2.3 | Keys rotated                         |   ✅    | `unseal(token, [new, old])`, `createPepper({ secret: [new, old] })`, JWKS |
 | V6.2.4 | Algorithm agility (rehash on log-in) |   ✅    | `password.needsRehash` + cross-algo router                                |
-| V6.4.1 | AEAD ciphers, no CBC without HMAC    |   ✅    | Only AES-256-GCM in `crypto.cipher`                                       |
+| V6.4.1 | AEAD ciphers, no CBC without HMAC    |   🟡   | AEAD by default (AES-256-GCM / ChaCha20-Poly1305); `aes-256-cbc` is an explicit legacy opt-in — wrap it with an HMAC yourself |
 | V6.4.2 | HMAC output ≥ 128 bits               |   ✅    | Minimum SHA-256 (256 bits)                                                |
 
 ## NIST SP 800-63B — Digital Identity Guidelines
@@ -87,8 +87,8 @@ Applies at AAL2 (multi-factor). Selected controls:
 | 5.1.5.2 | Single-factor OTP — RFC 4226 / 6238 compliant                     |   ✅    | Full RFC 4226 + 6238 coverage                                            |
 | 5.1.5.2 | OTP replay defence                                                |   ✅    | `otp.verifyTotp({ replay })` — atomic CAS                                |
 | 5.2.5   | Verifier compromise resistance — pepper / device binding          |   ✅    | `createPepper`                                                           |
-| 5.2.7   | Reauthentication cadence per AAL                                  |   🟡   | Session package roadmap                                                  |
-| 5.2.10  | Session bindings — key rotation on privilege escalation           |   🟡   | Session package roadmap                                                  |
+| 5.2.7   | Reauthentication cadence per AAL                                  |   ✅    | `sessions.markFresh` + `requireFreshAuth` (sudo mode)                    |
+| 5.2.10  | Session bindings — key rotation on privilege escalation           |   ✅    | `sessions.rotate(req)` — new sid, old record revoked                     |
 
 ## NIST SP 800-131A / FIPS 140-3 — Approved algorithms
 
@@ -162,8 +162,10 @@ never transmit plaintext passwords over the network.
 - ✅ **OWASP ASVS 4.0.3 V2 / V6** — password + storage controls
 - ✅ **PCI-DSS 4.0 §8.3** — password strength, history, MFA
 - ✅ **FIPS-compatible mode** — via presets and Node `--enable-fips`
-- 🟡 **ASVS V3 session, V2.9 cryptographic authenticators** — coming
-  with `@exortek/session` and `@exortek/passkey`
+- ✅ **OWASP ASVS 4.0.3 V3 session management** — `@exortek/session`
+  (CSPRNG ids, `__Host-` cookies, server-side revocation, rotation)
+- 🟡 **ASVS V2.9 cryptographic authenticators** — coming with
+  `@exortek/passkey`
 - 🟡 **Observability hooks** for SOC 2 / SIEM ingestion — roadmap
 
 ## Reading

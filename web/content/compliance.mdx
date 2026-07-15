@@ -47,6 +47,20 @@ requirement is marked:
 | V2.8.4    | HOTP counter resynchronisation                                             |   ✅   | `otp.resynchronize`                                                                                    |
 | V2.10.4   | Backup / recovery codes stored hashed                                      |   ✅   | `otp.backupCodes` + `password.scrypt.hash`                                                             |
 
+### V3 — Session Management
+
+| §    | Requirement                                | Status | How                                                                    |
+| ---- | ------------------------------------------ | :----: | ---------------------------------------------------------------------- |
+| V3.2 | Session token generation via CSPRNG        |   ✅   | `session.generateSessionId()` — 128-bit `crypto.randomBytes`           |
+| V3.4 | Cookie flags: Secure, HttpOnly, SameSite   |   ✅   | Secure + HttpOnly + SameSite=Lax by default                            |
+| V3.5 | Token binding (`__Host-` prefix)           |   ✅   | Default cookie name is `__Host-sid`; prefix rules enforced at boot     |
+| V3.7 | Server-side session invalidation on logout |   ✅   | `sessions.revoke(req)` — verify short-circuits on the revoked record   |
+
+### V4 — Access Control
+
+Above our layer — authorisation is your app's concern. We provide the
+building blocks (constant-time compare, timing-safe verify).
+
 ### V6 — Stored Cryptography
 
 | §       | Requirement                                             | Status | How                                                                         |
@@ -54,7 +68,7 @@ requirement is marked:
 | V6.2.1  | Approved algorithms only                                |   ✅   | NIST-approved / IETF-standardised throughout                                |
 | V6.2.3  | Keys rotated                                            |   ✅   | `unseal([new, old])`, `createPepper([new, old])`, JWKS                       |
 | V6.2.4  | Algorithm agility (rehash on log-in)                    |   ✅   | `password.needsRehash` + cross-algo router                                  |
-| V6.4.1  | AEAD ciphers, no CBC without HMAC                       |   ✅   | AES-256-GCM only                                                            |
+| V6.4.1  | AEAD ciphers, no CBC without HMAC                       |   🟡   | AEAD by default (AES-256-GCM / ChaCha20-Poly1305); `aes-256-cbc` is a legacy opt-in — wrap with an HMAC |
 | V6.4.2  | HMAC output ≥ 128 bits                                  |   ✅   | Minimum SHA-256                                                             |
 
 ## NIST SP 800-63B — Digital Identity (AAL2)
@@ -98,14 +112,37 @@ requirement is marked:
 When Node is started with `--enable-fips` on a FIPS-enabled OpenSSL,
 `@exortek/crypto` inherits the OS restrictions automatically.
 
+## SOC 2 CC6 — Logical and Physical Access
+
+Above our layer for the most part. What we contribute:
+
+- CC6.1 — logical access secured via strong authentication (`@exortek/otp` + `@exortek/password`)
+- CC6.6 — auth failures + rate-limit hits emitted via observability hooks (roadmap)
+- CC6.7 — key management via rotation-aware primitives (seal, sign-value, pepper)
+
+## HIPAA / HITECH
+
+Above our layer. The library holds up its end (approved crypto, no
+insecure defaults) — the covered-entity audit surface is your app +
+infrastructure.
+
+## GDPR / Data Protection
+
+Above our layer. Password hashes are considered personal data under
+some interpretations; our KDFs are one-way and salted, which satisfies
+the "pseudonymisation" bar in most authorities' interpretations. We
+never transmit plaintext passwords over the network.
+
 ## Summary
 
 - ✅ **NIST SP 800-63B AAL2** — memorized secret + OOB OTP paths
 - ✅ **OWASP ASVS 4.0.3 V2 / V6** — password + storage controls
 - ✅ **PCI-DSS 4.0 §8.3** — strength, history, MFA
 - ✅ **FIPS-compatible mode** — via presets and Node `--enable-fips`
-- 🟡 **ASVS V3 session, V2.9 cryptographic authenticators** — coming
-  with `@exortek/session` and `@exortek/passkey`
+- ✅ **OWASP ASVS 4.0.3 V3 session management** — `@exortek/session`
+  (CSPRNG ids, `__Host-` cookies, server-side revocation, rotation)
+- 🟡 **ASVS V2.9 cryptographic authenticators** — coming with
+  `@exortek/passkey`
 - 🟡 **Observability hooks** for SOC 2 / SIEM — roadmap
 
 ## Reading
