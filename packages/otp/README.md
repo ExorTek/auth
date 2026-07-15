@@ -3,7 +3,7 @@
 > Zero-dependency TOTP + HOTP for Node.js 22+ — built on `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/otp.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/otp)
-[![tests](https://img.shields.io/badge/tests-106%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-108%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/otp.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/otp)](https://packagephobia.com/result?p=@exortek/otp)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
@@ -11,7 +11,7 @@
 [![license](https://img.shields.io/npm/l/@exortek/otp.svg?color=blue)](./LICENSE)
 
 RFC 4226 HOTP and RFC 6238 TOTP with secure defaults, tunable window / algorithm / digits, opt-in **replay defense** via
-any store that implements `{ get, set }`, unambiguous **backup codes**, and Google-Authenticator-compatible
+any store exposing an atomic `incr(key, ttlMs)`, unambiguous **backup codes**, and Google-Authenticator-compatible
 **provisioning URIs** for QR enrollment. No runtime dependencies — pure `node:crypto`.
 
 📖 **Docs:** [**auth.memet.dev/otp**](https://auth.memet.dev/otp)
@@ -217,7 +217,9 @@ The `replay` option makes verify **single-use per counter per key**:
 
 ```js
 import { verifyTotp } from '@exortek/otp';
-// Any store shaped like { get, set } — the @exortek/security stores fit:
+// Any store exposing an atomic `incr(key, ttlMs)` — the @exortek/security
+// stores (memory / Redis / custom) all fit. `incr` is used as a
+// compare-and-set so two concurrent requests with the same code can't both pass.
 import { rateLimit } from '@exortek/security';
 
 const store = rateLimit.stores.memory();
