@@ -5,8 +5,6 @@
  * {@link ErrorCode.MISSING_ALG_ALLOWLIST}. `alg: 'none'` on the token
  * is refused up front with {@link ErrorCode.ALGORITHM_NONE_FORBIDDEN};
  * no flag can enable it.
- *
- * `verifyDetached` lands in the detached-content commit.
  */
 
 import { JwsError, ErrorCode } from './internal/errors.js';
