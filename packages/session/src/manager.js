@@ -277,6 +277,12 @@ export function createSessionManager(config) {
     const claims = options.claims && typeof options.claims === 'object' ? options.claims : {};
 
     const req = options.req;
+    if (bindTo && !req) {
+      throw new SessionError(
+        ErrorCode.INVALID_ARGUMENT,
+        'issue: bindTo is configured but no `req` was passed — the resulting session would ship no fingerprint and silently skip binding checks at verify. Pass options.req.',
+      );
+    }
     const ip = req ? readIp(req) : undefined;
     const ua = req ? readUserAgent(req) : undefined;
     const fp = req && bindTo ? computeFingerprint(req, bindTo) : undefined;

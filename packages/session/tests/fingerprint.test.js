@@ -119,3 +119,17 @@ test('explicit deviceLabel overrides auto', async () => {
   assert.equal(session.deviceLabel, 'Custom Label');
   sessions.store._stop();
 });
+
+test('bindTo: issue without req throws INVALID_ARGUMENT (fail-closed, not silent skip)', async () => {
+  const sessions = createSessionManager({
+    secret: SECRET,
+    ttl: '7d',
+    idleTtl: '30m',
+    bindTo: ['ip', 'ua'],
+  });
+  await assert.rejects(
+    () => sessions.issue({ userId: 'u1' }),
+    err => err.code === 'INVALID_ARGUMENT' && /bindTo.*req/.test(err.message),
+  );
+  sessions.store._stop();
+});

@@ -5,7 +5,7 @@
 > cookies, and adapters for Fastify, Express, Hono, and Elysia. Built on `@exortek/crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/session.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/session)
-[![tests](https://img.shields.io/badge/tests-162%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-163%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/session.svg?color=339933)](https://nodejs.org)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![license](https://img.shields.io/npm/l/@exortek/session.svg?color=blue)](./LICENSE)
@@ -388,7 +388,7 @@ Codes: `INVALID_ARGUMENT`, `MISSING_TOKEN`, `INVALID_TOKEN`, `EXPIRED`, `IDLE_TI
   rolling-touch writes overwriting it (the old lost-revoke class of bug)
 - **Redis pub/sub** — cross-worker revocation propagation
 - **Framework adapters** — Fastify, Express (with cookie append), Hono, Elysia
-- **162 unit tests** — token roundtrip, rotation (incl. concurrent-rotate race),
+- **163 unit tests** — token roundtrip, rotation (incl. concurrent-rotate race),
   concurrent-limit convergence, revoke variants, fresh-auth, fingerprint binding
   (both strictness modes), impersonation (TTL, nest-refusal), events, CSRF (masking too),
   trusted-device (claim-clobber regression), all four adapter shapes, and a live Redis
