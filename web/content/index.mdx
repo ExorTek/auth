@@ -63,6 +63,7 @@ npm install @exortek/security
 npm install @exortek/otp
 npm install @exortek/password         # + optional: argon2, bcryptjs
 npm install @exortek/session          # + optional: ioredis or redis
+npm install @exortek/jwk
 ```
 
 Node.js **22 or newer**.
@@ -78,6 +79,8 @@ Node.js **22 or newer**.
   strength / policy / generate / passphrase / pepper (with rotation) / history / HIBP / constant-time verify.
 - **[`@exortek/session` reference →](/session)** — sealed-cookie sessions with rotation, revocation, sudo mode,
   impersonation, concurrent limits, Redis pub/sub, CSRF derivation, trusted-device cookie, and 4 framework adapters.
+- **[`@exortek/jwk` reference →](/jwk)** — generate / import / export EC · RSA · OKP · oct keys, RFC 7638 + 9278
+  thumbprints, `toPublic()` / `matches()` / strict `use` × `key_ops` consistency.
 - **[Source](https://github.com/ExorTek/auth)** — GitHub repo.
 - **[Contributing](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md)** — branch prefixes, commit conventions,
   changeset flow.
