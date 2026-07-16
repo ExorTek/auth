@@ -388,7 +388,7 @@ Codes: `INVALID_ARGUMENT`, `MISSING_TOKEN`, `INVALID_TOKEN`, `EXPIRED`, `IDLE_TI
   rolling-touch writes overwriting it (the old lost-revoke class of bug)
 - **Redis pub/sub** — cross-worker revocation propagation
 - **Framework adapters** — Fastify, Express (with cookie append), Hono, Elysia
-- **166 unit tests** — token roundtrip, rotation (incl. concurrent-rotate race),
+- **162 unit tests** — token roundtrip, rotation (incl. concurrent-rotate race),
   concurrent-limit convergence, revoke variants, fresh-auth, fingerprint binding
   (both strictness modes), impersonation (TTL, nest-refusal), events, CSRF (masking too),
   trusted-device (claim-clobber regression), all four adapter shapes, and a live Redis

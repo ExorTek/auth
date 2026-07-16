@@ -3,7 +3,7 @@
 > Framework-agnostic defensive HTTP layer for Node.js 22+ — built on `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/security.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/security)
-[![tests](https://img.shields.io/badge/tests-241%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-247%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/security.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/security)](https://packagephobia.com/result?p=@exortek/security)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
