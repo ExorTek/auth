@@ -4,14 +4,12 @@ import { generateKeyPairSync, randomBytes } from 'node:crypto';
 
 import { sign, verify, decode, JwsError, ErrorCode } from '../src/index.js';
 
-// -- Helpers ---------------------------------------------------------
-
+// Helpers
 function ecP256() {
   return generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 }
 
-// -- Roundtrip -------------------------------------------------------
-
+// Roundtrip
 test('b64:false — HS256 roundtrip preserves raw payload verbatim', async () => {
   const secret = randomBytes(32);
   const token = await sign('hello world', secret, { alg: 'HS256', b64: false });
@@ -40,8 +38,7 @@ test('b64:false — ES256 roundtrip', async () => {
   assert.equal(payload, 'unencoded');
 });
 
-// -- Header + crit management ----------------------------------------
-
+// Header + crit management
 test('b64:false — sets header.b64=false and adds "b64" to crit', async () => {
   const secret = randomBytes(32);
   const token = await sign('x', secret, { alg: 'HS256', b64: false });
@@ -86,8 +83,7 @@ test('b64:false — non-array crit is rejected with INVALID_HEADER', async () =>
   );
 });
 
-// -- '.' guard -------------------------------------------------------
-
+// '.' guard
 test('b64:false — payload containing "." raises INVALID_PAYLOAD', async () => {
   const secret = randomBytes(32);
   await assert.rejects(
@@ -104,8 +100,7 @@ test('b64:false — Buffer payload containing 0x2E raises INVALID_PAYLOAD', asyn
   );
 });
 
-// -- Verify: tamper detection stays honest under b64:false -----------
-
+// Verify: tamper detection stays honest under b64:false
 test('b64:false — payload tamper flips INVALID_SIGNATURE', async () => {
   const secret = randomBytes(32);
   const token = await sign('trusted', secret, { alg: 'HS256', b64: false });
@@ -117,8 +112,7 @@ test('b64:false — payload tamper flips INVALID_SIGNATURE', async () => {
   );
 });
 
-// -- Verify surface still enforces the security invariants -----------
-
+// Verify surface still enforces the security invariants
 test('b64:false — verify still requires an alg allowlist', async () => {
   const secret = randomBytes(32);
   const token = await sign('x', secret, { alg: 'HS256', b64: false });
@@ -136,8 +130,7 @@ test('b64:false — verify without "b64" in knownCriticalHeaders still works (b6
   assert.equal(payload, 'x');
 });
 
-// -- Default remains b64:true ----------------------------------------
-
+// Default remains b64:true
 test('b64:false is opt-in — omitting it keeps standard base64url payload', async () => {
   const secret = randomBytes(32);
   const token = await sign({ hi: 'there' }, secret, { alg: 'HS256' });

@@ -4,8 +4,7 @@ import { generateKeyPairSync, randomBytes } from 'node:crypto';
 
 import { jws, sign, verify, decode, decodeProtectedHeader, JwsError, ErrorCode } from '../src/index.js';
 
-// -- Helpers ---------------------------------------------------------
-
+// Helpers
 function ecP256() {
   const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   return { publicKey, privateKey };
@@ -17,8 +16,7 @@ function ed25519() {
   return generateKeyPairSync('ed25519');
 }
 
-// -- Roundtrip: HS256 ------------------------------------------------
-
+// Roundtrip: HS256
 test('HS256: sign + verify roundtrip (KeyObject via Buffer)', async () => {
   const secret = randomBytes(32);
   const token = await sign({ hi: 'there' }, secret, { alg: 'HS256' });
@@ -35,8 +33,7 @@ test('HS256: RFC 7518 §3.2 secret length is enforced', async () => {
   );
 });
 
-// -- Roundtrip: RS256 / PS256 ----------------------------------------
-
+// Roundtrip: RS256 / PS256
 test('RS256: sign + verify roundtrip', async () => {
   const { publicKey, privateKey } = rsa2048();
   const token = await sign({ user: 'u1' }, privateKey, { alg: 'RS256', kid: 'k1' });
@@ -53,8 +50,7 @@ test('PS256: sign + verify roundtrip', async () => {
   assert.deepEqual(payload, { x: 1 });
 });
 
-// -- Roundtrip: ES256 / EdDSA ----------------------------------------
-
+// Roundtrip: ES256 / EdDSA
 test('ES256: sign + verify roundtrip (raw R||S conversion)', async () => {
   const { publicKey, privateKey } = ecP256();
   const token = await sign({ foo: 'bar' }, privateKey, { alg: 'ES256' });
@@ -69,8 +65,7 @@ test('EdDSA (Ed25519): sign + verify roundtrip', async () => {
   assert.deepEqual(payload, { ok: true });
 });
 
-// -- Security: `none` refused ----------------------------------------
-
+// Security: `none` refused
 test('sign: alg "none" refused with ALGORITHM_NONE_FORBIDDEN', async () => {
   await assert.rejects(
     () => sign({}, randomBytes(32), { alg: 'none' }),
@@ -88,8 +83,7 @@ test('verify: token that claims alg "none" refused before allowlist check', asyn
   );
 });
 
-// -- Security: allowlist ---------------------------------------------
-
+// Security: allowlist
 test('verify: missing options raises MISSING_ALG_ALLOWLIST', async () => {
   const secret = randomBytes(32);
   const token = await sign({}, secret, { alg: 'HS256' });
@@ -117,8 +111,7 @@ test('verify: token alg not in allowlist raises ALGORITHM_MISMATCH', async () =>
   );
 });
 
-// -- Security: tampering ---------------------------------------------
-
+// Security: tampering
 test('verify: signature bit-flip raises INVALID_SIGNATURE', async () => {
   const secret = randomBytes(32);
   const token = await sign({ x: 1 }, secret, { alg: 'HS256' });
@@ -153,8 +146,7 @@ test('verify: alg confusion — HS256 token verified with RSA public key fails',
   );
 });
 
-// -- Token shape -----------------------------------------------------
-
+// Token shape
 test('verify: truncated token raises INVALID_TOKEN', async () => {
   await assert.rejects(
     () => verify('a.b', randomBytes(32), { alg: ['HS256'] }),
@@ -176,8 +168,7 @@ test('verify: non-base64url part raises INVALID_TOKEN', async () => {
   );
 });
 
-// -- maxTokenSize -----------------------------------------------------
-
+// maxTokenSize
 test('verify: maxTokenSize enforced', async () => {
   const secret = randomBytes(32);
   const token = await sign({ x: 1 }, secret, { alg: 'HS256' });
@@ -187,8 +178,7 @@ test('verify: maxTokenSize enforced', async () => {
   );
 });
 
-// -- decode ----------------------------------------------------------
-
+// decode
 test('decode: parses header + payload + signature without verification', async () => {
   const secret = randomBytes(32);
   const token = await sign({ hi: 'there' }, secret, { alg: 'HS256', kid: 'k' });
@@ -218,8 +208,7 @@ test('decodeProtectedHeader: kid extraction', async () => {
   await verify(token, publicKey, { alg: ['ES256'] });
 });
 
-// -- Namespace -------------------------------------------------------
-
+// Namespace
 test('jws namespace exposes sign/verify/decode', () => {
   assert.equal(jws.sign, sign);
   assert.equal(jws.verify, verify);

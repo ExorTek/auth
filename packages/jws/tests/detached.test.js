@@ -4,14 +4,12 @@ import { generateKeyPairSync, randomBytes } from 'node:crypto';
 
 import { signDetached, verifyDetached, verify, JwsError, ErrorCode } from '../src/index.js';
 
-// -- Helpers ---------------------------------------------------------
-
+// Helpers
 function ecP256() {
   return generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 }
 
-// -- Roundtrip -------------------------------------------------------
-
+// Roundtrip
 test('detached: HS256 roundtrip preserves payload bytes', async () => {
   const secret = randomBytes(32);
   const payload = Buffer.from('a long body that never gets base64ed twice');
@@ -49,8 +47,7 @@ test('detached: kid + header decoration flows through', async () => {
   assert.equal(kid, 'kid-42');
 });
 
-// -- Payload substitution --------------------------------------------
-
+// Payload substitution
 test('detached: substituting a different payload flips INVALID_SIGNATURE', async () => {
   const secret = randomBytes(32);
   const { token } = await signDetached(Buffer.from('trusted'), secret, { alg: 'HS256' });
@@ -72,8 +69,7 @@ test('detached: swapping just one payload byte flips INVALID_SIGNATURE', async (
   );
 });
 
-// -- Shape guards ----------------------------------------------------
-
+// Shape guards
 test('signDetached: non-Buffer payload raises INVALID_PAYLOAD', async () => {
   await assert.rejects(
     () => signDetached(/** @type {any} */ ('a string'), randomBytes(32), { alg: 'HS256' }),
@@ -100,8 +96,7 @@ test('verifyDetached: token with non-empty payload segment raises INVALID_TOKEN'
   );
 });
 
-// -- Security surface applies to detached, too -----------------------
-
+// Security surface applies to detached, too
 test('signDetached: alg "none" refused with ALGORITHM_NONE_FORBIDDEN', async () => {
   await assert.rejects(
     () => signDetached(Buffer.from('x'), randomBytes(32), { alg: 'none' }),
@@ -127,8 +122,7 @@ test('verifyDetached: alg not in allowlist raises ALGORITHM_MISMATCH', async () 
   );
 });
 
-// -- Cross-mode isolation --------------------------------------------
-
+// Cross-mode isolation
 test('verify (attached) rejects a detached token — empty payload → INVALID_SIGNATURE', async () => {
   const secret = randomBytes(32);
   const { token } = await signDetached(Buffer.from('x'), secret, { alg: 'HS256' });

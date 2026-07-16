@@ -14,9 +14,7 @@ import { verify } from '../src/index.js';
  * with a fresh nonce every time — we can only pin the verify side.
  */
 
-// ---------------------------------------------------------------------
 // A.1 — HS256
-// ---------------------------------------------------------------------
 
 test('RFC 7515 §A.1 — HS256 reference token verifies', async () => {
   // Copied verbatim from RFC 7515 §A.1.
@@ -52,9 +50,7 @@ test('RFC 7515 §A.1 — HS256 reference token has an oct JWK secret', async () 
   assert.equal(bytes.length, 64);
 });
 
-// ---------------------------------------------------------------------
 // A.2 — RS256
-// ---------------------------------------------------------------------
 
 test('RFC 7515 §A.2 — RS256 reference token verifies', async () => {
   const token =
@@ -89,9 +85,7 @@ test('RFC 7515 §A.2 — RS256 reference token verifies', async () => {
   assert.equal(payload['http://example.com/is_root'], true);
 });
 
-// ---------------------------------------------------------------------
 // A.3 — ES256
-// ---------------------------------------------------------------------
 
 test('RFC 7515 §A.3 — ES256 reference token verifies', async () => {
   const token =
@@ -114,9 +108,7 @@ test('RFC 7515 §A.3 — ES256 reference token verifies', async () => {
   assert.equal(payload.iss, 'joe');
 });
 
-// ---------------------------------------------------------------------
 // A.4 — ES512
-// ---------------------------------------------------------------------
 
 test('RFC 7515 §A.4 — ES512 reference token verifies', async () => {
   const token =

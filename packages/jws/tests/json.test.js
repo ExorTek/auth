@@ -4,13 +4,11 @@ import { generateKeyPairSync, randomBytes } from 'node:crypto';
 
 import { signJson, verifyJson, JwsError, ErrorCode } from '../src/index.js';
 
-// -- Helpers ---------------------------------------------------------
-
+// Helpers
 function ecP256() {
   return generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 }
-// -- Flattened form --------------------------------------------------
-
+// Flattened form
 test('signJson (1 signer) emits flattened form', async () => {
   const secret = randomBytes(32);
   const jws = await signJson({ hi: 'there' }, [{ key: secret, options: { alg: 'HS256', kid: 'k1' } }]);
@@ -38,8 +36,7 @@ test('signJson: unprotected header lands on the emitted signature', async () => 
   assert.deepEqual(/** @type {any} */ (jws).header, { source: 'admin' });
 });
 
-// -- General form ----------------------------------------------------
-
+// General form
 test('signJson (2 signers) emits general form', async () => {
   const secret = randomBytes(32);
   const { privateKey } = ecP256();
@@ -112,8 +109,7 @@ test('verifyJson (general): all-bad set fails with INVALID_SIGNATURE-family erro
   );
 });
 
-// -- Security surface ------------------------------------------------
-
+// Security surface
 test('signJson: alg "none" refused with ALGORITHM_NONE_FORBIDDEN', async () => {
   await assert.rejects(
     () => signJson({}, [{ key: randomBytes(32), options: { alg: 'none' } }]),
@@ -139,8 +135,7 @@ test('verifyJson: alg not in allowlist raises ALGORITHM_MISMATCH', async () => {
   );
 });
 
-// -- Shape guards ----------------------------------------------------
-
+// Shape guards
 test('signJson: empty signers array raises INVALID_ARGUMENT', async () => {
   await assert.rejects(
     () => signJson({}, []),

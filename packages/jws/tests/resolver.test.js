@@ -8,8 +8,7 @@ function ecP256() {
   return generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 }
 
-// -- JWK object ------------------------------------------------------
-
+// JWK object
 test('resolver: single JWK object → verify accepts', async () => {
   const { publicKey, privateKey } = ecP256();
   const token = await sign({ hi: 'there' }, privateKey, { alg: 'ES256' });
@@ -33,8 +32,7 @@ test('resolver: single oct JWK for HMAC', async () => {
   assert.deepEqual(payload, { x: 1 });
 });
 
-// -- JWK array (JWKS-like) -------------------------------------------
-
+// JWK array (JWKS-like)
 test('resolver: JWK array with matching kid resolves the right key', async () => {
   const a = ecP256();
   const b = ecP256();
@@ -87,8 +85,7 @@ test('resolver: empty JWK array raises KEY_NOT_FOUND', async () => {
   );
 });
 
-// -- Async resolver function -----------------------------------------
-
+// Async resolver function
 test('resolver: async (header) => key — kid-driven lookup', async () => {
   const { publicKey, privateKey } = ecP256();
   const token = await sign({ ok: true }, privateKey, { alg: 'ES256', kid: 'lookup-me' });

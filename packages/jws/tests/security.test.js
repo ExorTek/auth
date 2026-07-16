@@ -4,8 +4,7 @@ import { generateKeyPairSync, randomBytes } from 'node:crypto';
 
 import { sign, verify, JwsError, ErrorCode } from '../src/index.js';
 
-// -- Helpers ---------------------------------------------------------
-
+// Helpers
 function rsa2048() {
   return generateKeyPairSync('rsa', { modulusLength: 2048 });
 }
@@ -14,8 +13,7 @@ function _b64uJson(value) {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
 }
 
-// -- CVE-2015-9235 — algorithm confusion (RSA public key as HMAC secret) --
-
+// CVE-2015-9235 — algorithm confusion (RSA public key as HMAC secret)
 test('CVE-2015-9235: HS256 token forged with RSA public key as secret is refused', async () => {
   // Attacker takes an RSA public key that the server uses to verify RS256
   // tokens, wraps it in a token signed with HS256 using the public key
@@ -48,8 +46,7 @@ test('CVE-2015-9235: HS256 token forged against a JWK RSA public also rejected',
   );
 });
 
-// -- CVE-2015-2951 — `alg: none` acceptance --------------------------
-
+// CVE-2015-2951 — `alg: none` acceptance
 test('CVE-2015-2951: alg "none" token refused unconditionally on verify', async () => {
   const encHeader = _b64uJson({ alg: 'none' });
   const encPayload = _b64uJson({ user: 'attacker', role: 'admin' });
@@ -85,8 +82,7 @@ test('CVE-2015-2951: sign side cannot emit alg "none" either', async () => {
   );
 });
 
-// -- Silent allowlist omission ---------------------------------------
-
+// Silent allowlist omission
 test('silent-allowlist regression: verify without options raises MISSING_ALG_ALLOWLIST', async () => {
   const secret = randomBytes(32);
   const token = await sign({}, secret, { alg: 'HS256' });
@@ -105,8 +101,7 @@ test('silent-allowlist regression: verify with options but no alg key raises MIS
   );
 });
 
-// -- crit -----------------------------------------------------------
-
+// crit
 test('crit: verify — unknown critical parameter refused with CRIT_UNSUPPORTED', async () => {
   // Hand-craft a header that lists an unknown critical parameter.
   const encHeader = _b64uJson({ alg: 'HS256', crit: ['app-role'], 'app-role': 'admin' });
@@ -175,8 +170,7 @@ test('crit: verify — crit listing itself is malformed → INVALID_HEADER', asy
   );
 });
 
-// -- Header integrity ------------------------------------------------
-
+// Header integrity
 test('tamper: header bit-flip flips INVALID_SIGNATURE', async () => {
   const secret = randomBytes(32);
   const token = await sign({ x: 1 }, secret, { alg: 'HS256' });
@@ -191,8 +185,7 @@ test('tamper: header bit-flip flips INVALID_SIGNATURE', async () => {
   );
 });
 
-// -- Segment shape ---------------------------------------------------
-
+// Segment shape
 test('token shape: empty header segment → INVALID_TOKEN', async () => {
   await assert.rejects(
     () => verify('.payload.sig', randomBytes(32), { alg: ['HS256'] }),
@@ -220,8 +213,7 @@ test('token shape: header alg is not a string → INVALID_HEADER', async () => {
   );
 });
 
-// -- HMAC key length --------------------------------------------------
-
+// HMAC key length
 test('RFC 7518 §3.2: HS384 requires at least 48-byte secret', async () => {
   const shortSecret = randomBytes(32);
   await assert.rejects(
@@ -238,8 +230,7 @@ test('RFC 7518 §3.2: HS512 requires at least 64-byte secret', async () => {
   );
 });
 
-// -- DoS surface ------------------------------------------------------
-
+// DoS surface
 test('DoS guard: token larger than 1 MB refused via maxTokenSize=1024', async () => {
   // Build an oversized token — just repeat a base64url char.
   const large = 'a'.repeat(2000);
