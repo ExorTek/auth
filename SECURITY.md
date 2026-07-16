@@ -87,10 +87,11 @@ reporting policy above.
   `prototype` keys are dropped unconditionally, survivors written as own properties via `Object.defineProperty`.
 - **Default XFF distrust** on edge-runtime adapters (Hono / Elysia rate-limit) — `X-Forwarded-For` is client-controlled
   without a proxy in front, so we require an explicit `trustProxy: true` opt-in.
-- **Every failure carries a machine-readable code** (`OtpError`, `SecurityError`, `PasswordError`, `CryptoError`) so
-  callers branch on `code`, not on message text that can change across versions.
+- **Every failure carries a machine-readable code** (`CryptoError`, `SecurityError`, `OtpError`, `PasswordError`,
+  `SessionError`, `JwkError`, `JwsError`) so callers branch on `code`, not on message text that can change across versions.
 - **RFC test-vector coverage** for every standardised primitive: RFC 4226 Appendix D (HOTP), RFC 6238 Appendix B (TOTP),
-  RFC 7914 §12 (scrypt), RFC 8018 (PBKDF2), RFC 9106 (Argon2). `yarn test` from the workspace root exercises them.
+  RFC 7914 §12 (scrypt), RFC 8018 (PBKDF2), RFC 9106 (Argon2), RFC 7638 §3.1 (JWK thumbprint), and RFC 7515 Appendix A
+  (JWS reference tokens for HS256 / RS256 / ES256 / ES512). `yarn test` from the workspace root exercises them.
 - **Peer isolation for optional native bindings** — `argon2` / `bcryptjs` load lazily and are cached at runtime, so a
   scrypt-only or pbkdf2-only consumer pays nothing and the umbrella can import cleanly even when the peer is missing.
 
