@@ -148,10 +148,10 @@ packages/<name>/
 ### TypeScript
 
 Pure JavaScript with JSDoc types, not `.ts`. `tsc --emitDeclarationOnly`
-generates `.d.ts` at build time. Maintain JSDoc on every public API — see
-`ARCHITECTURE.md` §"JSDoc Yazım Kuralları" (~line 1968) and the worked
-`@exortek/jwt` example (~line 2646) for the expected style before adding types
-to a new module. `strict`, `noImplicitAny`, and `isolatedModules` are all on.
+generates `.d.ts` at build time. Maintain JSDoc on every public API. For the
+expected style, look at a shipping package — `packages/jwk` or
+`packages/session` are complete references. `strict`, `noImplicitAny`, and
+`isolatedModules` are all on.
 
 ### Code style
 
@@ -316,14 +316,9 @@ Deliberate constraints — reject PRs that violate them:
 
 ## Notes
 
-- `ARCHITECTURE.md` is the design doc for the whole 22-package surface — read
-  the section for the package you are about to touch before writing code, and
-  update it in the same PR when the surface you land differs from what was
-  designed. Keep API names, config keys, and code identifiers exact.
-- RFC references for each protocol package live in the "RFC & Standards
-  References" section of `ARCHITECTURE.md`. Consult them when implementing
-  JWT / JWS / JWE / JWK / JWKS / OAuth2 / OIDC / WebAuthn / PASETO behaviour
-  rather than reverse-engineering vendor libraries.
+- `ARCHITECTURE.md` describes the design principles, the 22-package stack,
+  dependency layering, and RFC references. Read it before writing code for a
+  new package.
 - Anthropic Claude Code users: `.claude/` holds Claude-specific configuration
   and plan files (gitignored). Other agents pick up their configuration from
   their own conventions.
