@@ -32,7 +32,7 @@
     "web:preview": "yarn workspace web preview",
     "changeset": "changeset",
     "changeset:ver": "changeset version",
-    "release": "yarn build && changeset publish",
+    "release": "yarn build && yarn workspaces foreach --all --topological --no-private npm publish --tolerate-republish --access public && changeset tag",
     "verify": "yarn typecheck && yarn lint && yarn format:check && yarn test"
   },
   "devDependencies": {
