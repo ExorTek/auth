@@ -105,6 +105,27 @@ Same security invariants as the compact `verify`:
 - `crit` strict by default.
 - Multi-key JWK array + async resolver support the same shapes.
 
+## Out of scope for 1.0
+
+<Callout type="info">
+  **`b64: false` in the JSON serialisation is not supported in 1.0.**
+  `signJson` always base64url-encodes the payload; `verifyJson` always
+  decodes it as base64url. RFC 7797 §5 permits the unencoded payload in
+  the JSON form too, but it is rare in practice — most `b64: false`
+  deployments use the compact or detached form. Use `sign` /
+  `signDetached` with `b64: false` for those; open an issue if you need
+  the JSON variant.
+</Callout>
+
+<Callout type="info">
+  **`kid` dispatch in `verifyJson` reads only the protected header.** RFC
+  7515 §7.2 allows a per-signature `kid` in the unprotected `header`
+  member too. Signatures that carry `kid` only in the unprotected header
+  currently fail with `KEY_NOT_FOUND` when using JWK-array dispatch.
+  Move `kid` into the protected header, or use an async resolver that
+  looks at both places.
+</Callout>
+
 ## Errors
 
 | Code                       | When                                                                                  |
