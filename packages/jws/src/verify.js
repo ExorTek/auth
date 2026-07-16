@@ -70,20 +70,57 @@ export async function verify(token, keyish, options) {
 }
 
 /**
- * Verify a detached-content JWS. Not yet implemented — arrives in the
- * follow-up commit.
+ * Verify a detached-content JWS (RFC 7515 Appendix F). The token
+ * itself carries an empty payload segment; the caller supplies the
+ * payload bytes alongside so we can reconstruct the signing input.
+ * The returned `payload` mirrors what the caller supplied — no
+ * decoding heuristics are applied.
  *
- * @param {string} _token
- * @param {Buffer | Uint8Array} _detachedPayload
- * @param {KeyInput | KeyInput[] | KeyResolverFn} _keyish
- * @param {VerifyOptions} _options
+ * @param {string} token
+ * @param {Buffer | Uint8Array} detachedPayload
+ * @param {KeyInput | KeyInput[] | KeyResolverFn} keyish
+ * @param {VerifyOptions} options
  * @returns {Promise<VerifyResult>}
  */
-export async function verifyDetached(_token, _detachedPayload, _keyish, _options) {
-  throw new JwsError(
-    ErrorCode.INVALID_ARGUMENT,
-    'verifyDetached: not yet implemented — arrives in the detached-content commit',
-  );
+export async function verifyDetached(token, detachedPayload, keyish, options) {
+  if (!Buffer.isBuffer(detachedPayload) && !(detachedPayload instanceof Uint8Array)) {
+    throw new JwsError(
+      ErrorCode.INVALID_PAYLOAD,
+      'verifyDetached: payload must be a Buffer or Uint8Array supplied by the caller',
+    );
+  }
+  const allowlist = _requireAllowlist(options);
+  _sizeCheck(token, options?.maxTokenSize ?? DEFAULT_MAX_TOKEN_SIZE);
+
+  const { encHeader, encPayload, encSig } = _splitCompact(token);
+  if (encPayload !== '') {
+    throw new JwsError(
+      ErrorCode.INVALID_TOKEN,
+      'verifyDetached: token payload segment must be empty for a detached JWS (RFC 7515 §F)',
+    );
+  }
+  const header = /** @type {Record<string, unknown>} */ (b64uDecodeJson(encHeader, 'header'));
+  _assertHeaderShape(header);
+
+  const alg = /** @type {string} */ (header.alg);
+  _assertAlgAllowed(alg, allowlist);
+
+  assertCritVerify(header.crit, header, options.knownCriticalHeaders);
+
+  const meta = lookupAlg(alg);
+  const keyObj = await resolveKey(keyish, header, alg);
+
+  const payloadBuf = Buffer.from(detachedPayload.buffer, detachedPayload.byteOffset, detachedPayload.byteLength);
+  const encPayloadForInput = payloadBuf.toString('base64url');
+  const signingInput = Buffer.from(`${encHeader}.${encPayloadForInput}`, 'utf8');
+  const signature = b64uDecode(encSig);
+
+  const ok = await meta.verify(keyObj, signingInput, signature);
+  if (!ok) {
+    throw new JwsError(ErrorCode.INVALID_SIGNATURE, `verifyDetached: signature does not match (alg=${alg})`);
+  }
+
+  return { header, payload: payloadBuf, kid: /** @type {string | undefined} */ (header.kid) };
 }
 
 /**

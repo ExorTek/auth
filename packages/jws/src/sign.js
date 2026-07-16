@@ -64,19 +64,55 @@ export async function sign(payload, key, options) {
 }
 
 /**
- * Sign with the RFC 7515 Appendix F detached-content variant. Not yet
- * implemented — lands in a follow-up commit.
+ * Sign with the RFC 7515 Appendix F detached-content variant. The
+ * returned `token` carries an empty payload segment; the caller keeps
+ * the `detached` bytes and ships them out-of-band, then hands both
+ * back to {@link verifyDetached}. Handy for large uploads where the
+ * payload never lives in memory at once but a small signature does.
  *
- * @param {Buffer | Uint8Array} _payload
- * @param {KeyInput} _key
- * @param {SignOptions} _options
+ * @param {Buffer | Uint8Array} payload
+ * @param {KeyInput} key
+ * @param {SignOptions} options
  * @returns {Promise<{ token: string, detached: Buffer }>}
  */
-export async function signDetached(_payload, _key, _options) {
-  throw new JwsError(
-    ErrorCode.INVALID_ARGUMENT,
-    'signDetached: not yet implemented — arrives in the detached-content commit',
-  );
+export async function signDetached(payload, key, options) {
+  if (!Buffer.isBuffer(payload) && !(payload instanceof Uint8Array)) {
+    throw new JwsError(
+      ErrorCode.INVALID_PAYLOAD,
+      'signDetached: payload must be a Buffer or Uint8Array — the caller is responsible for the byte encoding',
+    );
+  }
+  if (options == null || typeof options !== 'object') {
+    throw new JwsError(ErrorCode.INVALID_ARGUMENT, 'signDetached: options object is required');
+  }
+  const alg = options.alg;
+  if (typeof alg !== 'string' || alg.length === 0) {
+    throw new JwsError(ErrorCode.INVALID_ARGUMENT, 'signDetached: `alg` is required and must be a string');
+  }
+  if (alg === 'none') {
+    throw new JwsError(
+      ErrorCode.ALGORITHM_NONE_FORBIDDEN,
+      'signDetached: alg "none" is refused by this library — no configuration can enable it (RFC 8725 §3.1)',
+    );
+  }
+
+  const meta = lookupAlg(alg);
+  const keyObj = await normalizeKey(key, alg, 'sign');
+
+  const header = _buildHeader(alg, options);
+  assertCritSign(header.crit, header);
+
+  const encHeader = b64uEncodeJson(header);
+  const payloadBuf = Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength);
+  const encPayload = b64uEncode(payloadBuf);
+
+  // RFC 7515 §5.1 signing-input construction — identical whether the
+  // payload segment is emitted or not.
+  const signingInput = Buffer.from(`${encHeader}.${encPayload}`, 'utf8');
+  const signature = await meta.sign(keyObj, signingInput);
+  const encSig = b64uEncode(signature);
+
+  return { token: `${encHeader}..${encSig}`, detached: payloadBuf };
 }
 
 /**
