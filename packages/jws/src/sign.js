@@ -105,16 +105,23 @@ export async function signDetached(payload, key, options) {
   const meta = lookupAlg(alg);
   const keyObj = await normalizeKey(key, alg, 'sign');
 
+  const b64 = options.b64 !== false;
   const header = _buildHeader(alg, options);
+  if (!b64) {
+    header.b64 = false;
+    header.crit = _mergeCritForB64False(header.crit);
+  }
   assertCritSign(header.crit, header);
 
   const encHeader = b64uEncodeJson(header);
   const payloadBuf = Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength);
-  const encPayload = b64uEncode(payloadBuf);
 
-  // RFC 7515 §5.1 signing-input construction — identical whether the
-  // payload segment is emitted or not.
-  const signingInput = Buffer.from(`${encHeader}.${encPayload}`, 'utf8');
+  // RFC 7515 §5.1 signing-input construction. b64:false (RFC 7797) feeds
+  // the raw payload bytes into the signing input; the emitted token
+  // still has an empty payload segment because it is detached.
+  const signingInput = b64
+    ? Buffer.from(`${encHeader}.${payloadBuf.toString('base64url')}`, 'utf8')
+    : Buffer.concat([Buffer.from(`${encHeader}.`, 'utf8'), payloadBuf]);
   const signature = await meta.sign(keyObj, signingInput);
   const encSig = b64uEncode(signature);
 

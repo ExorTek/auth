@@ -122,6 +122,55 @@ test('verifyDetached: alg not in allowlist raises ALGORITHM_MISMATCH', async () 
   );
 });
 
+// RFC 7797 + Appendix F combination (canonical for x-jws-signature / JAdES)
+test('detached + b64:false — HS256 roundtrip', async () => {
+  const secret = Buffer.alloc(32, 0x41);
+  const payload = Buffer.from('opaque protocol frame');
+  const { token, detached } = await signDetached(payload, secret, {
+    alg: 'HS256',
+    b64: false,
+  });
+  const parts = token.split('.');
+  assert.equal(parts[1], '', 'payload segment must be empty (detached)');
+
+  const { header, payload: back } = await verifyDetached(token, detached, secret, {
+    alg: ['HS256'],
+  });
+  assert.equal(header.b64, false);
+  assert.deepEqual(header.crit, ['b64']);
+  assert.deepEqual(back, payload);
+});
+
+test('detached + b64:false — ES256 roundtrip preserves raw bytes', async () => {
+  const { publicKey, privateKey } = ecP256();
+  const payload = Buffer.from([0x00, 0x2e, 0xff, 0x01, 0x02]); // includes 0x2E ('.')
+  const { token, detached } = await signDetached(payload, privateKey, {
+    alg: 'ES256',
+    b64: false,
+  });
+  const { payload: back } = await verifyDetached(token, detached, publicKey, {
+    alg: ['ES256'],
+  });
+  // b64:false detached tolerates '.' in the payload — the detached form has no ambiguity.
+  assert.deepEqual(back, payload);
+});
+
+test('detached + b64:false — verify with the sign side using b64:true fails INVALID_SIGNATURE', async () => {
+  const secret = Buffer.alloc(32, 0x41);
+  const payload = Buffer.from('same bytes');
+  const { token, detached } = await signDetached(payload, secret, { alg: 'HS256' });
+  // Force the header to claim b64:false without re-signing — verify must not treat it as such.
+  const parts = token.split('.');
+  const forgedHeader = Buffer.from(JSON.stringify({ alg: 'HS256', b64: false, crit: ['b64'] }), 'utf8').toString(
+    'base64url',
+  );
+  const forged = `${forgedHeader}..${parts[2]}`;
+  await assert.rejects(
+    () => verifyDetached(forged, detached, secret, { alg: ['HS256'] }),
+    err => err instanceof JwsError && err.code === ErrorCode.INVALID_SIGNATURE,
+  );
+});
+
 // Cross-mode isolation
 test('verify (attached) rejects a detached token — empty payload → INVALID_SIGNATURE', async () => {
   const secret = randomBytes(32);

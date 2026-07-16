@@ -109,8 +109,12 @@ export async function verifyDetached(token, detachedPayload, keyish, options) {
   const keyObj = await resolveKey(keyish, header, alg);
 
   const payloadBuf = Buffer.from(detachedPayload.buffer, detachedPayload.byteOffset, detachedPayload.byteLength);
-  const encPayloadForInput = payloadBuf.toString('base64url');
-  const signingInput = Buffer.from(`${encHeader}.${encPayloadForInput}`, 'utf8');
+  // RFC 7797 §3: b64:false detached tokens sign the raw payload bytes,
+  // not the base64url of the payload. Mirror the sign side.
+  const signingInput =
+    header.b64 === false
+      ? Buffer.concat([Buffer.from(`${encHeader}.`, 'utf8'), payloadBuf])
+      : Buffer.from(`${encHeader}.${payloadBuf.toString('base64url')}`, 'utf8');
   const signature = b64uDecode(encSig);
 
   const ok = await meta.verify(keyObj, signingInput, signature);
