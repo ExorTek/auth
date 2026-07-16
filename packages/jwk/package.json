@@ -1,0 +1,88 @@
+{
+  "name": "@exortek/jwk",
+  "version": "0.0.0",
+  "description": "JSON Web Key (JWK) — RFC 7517 / RFC 7638 / RFC 8037 for Node.js. Generate, import, export, thumbprint EC / RSA / OKP / oct keys. Zero-dependency, built on node:crypto.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./generate": {
+      "types": "./dist/generate.d.ts",
+      "import": "./dist/generate.mjs",
+      "require": "./dist/generate.cjs"
+    },
+    "./import": {
+      "types": "./dist/import.d.ts",
+      "import": "./dist/import.mjs",
+      "require": "./dist/import.cjs"
+    },
+    "./export": {
+      "types": "./dist/export.d.ts",
+      "import": "./dist/export.mjs",
+      "require": "./dist/export.cjs"
+    },
+    "./thumbprint": {
+      "types": "./dist/thumbprint.d.ts",
+      "import": "./dist/thumbprint.mjs",
+      "require": "./dist/thumbprint.cjs"
+    },
+    "./validate": {
+      "types": "./dist/validate.d.ts",
+      "import": "./dist/validate.mjs",
+      "require": "./dist/validate.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+  },
+  "keywords": [
+    "backend",
+    "security",
+    "jwk",
+    "jose",
+    "rfc-7517",
+    "rfc-7638",
+    "rfc-8037",
+    "rfc-9278",
+    "rsa",
+    "ec",
+    "ed25519",
+    "x25519",
+    "thumbprint",
+    "node-crypto"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/jwk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git",
+    "directory": "packages/jwk"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

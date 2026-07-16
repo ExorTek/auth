@@ -348,6 +348,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@exortek/jwk@workspace:packages/jwk":
+  version: 0.0.0-use.local
+  resolution: "@exortek/jwk@workspace:packages/jwk"
+  languageName: unknown
+  linkType: soft
+
 "@exortek/otp@workspace:packages/otp":
   version: 0.0.0-use.local
   resolution: "@exortek/otp@workspace:packages/otp"
