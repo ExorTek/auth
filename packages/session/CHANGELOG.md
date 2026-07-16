@@ -1,5 +1,14 @@
 # @exortek/session
 
+## 1.0.2
+
+### Patch Changes
+
+- **Fix broken install: `1.0.1` shipped with `"@exortek/crypto": "workspace:^"` in its `dependencies`, which
+  `npm install` cannot resolve (`EUNSUPPORTEDPROTOCOL`).** The root release script now goes through `yarn npm publish`,
+  which rewrites Yarn's workspace protocol to a real semver range at pack time. This release lists `@exortek/crypto` as
+  `^1.0.6` and installs cleanly. No code changed — please upgrade `1.0.1 → 1.0.2` to unblock installs.
+
 ## 1.0.1
 
 ### Patch Changes
