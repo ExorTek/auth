@@ -119,6 +119,28 @@ try {
 Codes: `INVALID_ARGUMENT`, `UNSUPPORTED_KTY`, `UNSUPPORTED_CURVE`, `UNSUPPORTED_ALGORITHM`,
 `INVALID_KEY`, `INVALID_JWK`, `INVALID_FORMAT`, `MISSING_REQUIRED_MEMBER`, `KEY_OPS_CONFLICT`.
 
+## Post-quantum roadmap
+
+Post-quantum signatures (**ML-DSA** — FIPS 204, formerly Dilithium) and
+key-encapsulation (**ML-KEM** — FIPS 203, formerly Kyber) are on the
+roadmap, but shipping them today would mean bundling a JS implementation
+of NIST-selected lattice cryptography — a red line we're not crossing.
+The correct path is `node:crypto` native support:
+
+- **OpenSSL** added ML-DSA / ML-KEM in **3.5** (April 2025).
+- **Node.js 22 – 24** ship OpenSSL 3.0 – 3.4; no `generateKeyPair('ml-dsa-65')` yet.
+- **Node.js 25/26** (2026 – 2027) will expose these once the OpenSSL bump lands.
+- **IETF** — `draft-ietf-jose-pqc` (JWK / JWS registrations, provisional `kty: "AKP"`) is still a draft.
+
+When both boxes tick — Node native primitives *and* a stable JOSE
+registration — we'll add `generate('ML-DSA-{44,65,87}')` and
+`generate('ML-KEM-{512,768,1024}')` to this same surface, plus the
+corresponding `crv` / `alg` support in `validate`, `import`, `export`,
+and `thumbprint`. Until then the API stays where the standards are.
+
+Need PQ today? [`@noble/post-quantum`](https://github.com/paulmillr/noble-post-quantum) is a
+credible, audited JS implementation you can plug into your own code path.
+
 ## Highlights
 
 - **Strict base64url.** Rejects padding, whitespace, out-of-alphabet characters, and non-canonical
