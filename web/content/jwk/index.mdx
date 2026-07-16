@@ -1,0 +1,123 @@
+---
+title: '@exortek/jwk — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/jwk`
+
+JSON Web Key for Node.js 22+ — **RFC 7517** (JWK), **RFC 7638** (thumbprint),
+**RFC 8037** (OKP curves), **RFC 8812** (`secp256k1`), and **RFC 9278**
+(thumbprint URI). Zero dependencies. Pure `node:crypto`.
+
+Generate, import, export, and identify EC / RSA / OKP / oct keys with
+defaults that match the modern JOSE ecosystem, plus four helpers `jose`
+doesn't ship: `toPublic()`, `matches()`, `thumbprintURI()`, and strict
+RFC 7517 §4.3 `use` / `key_ops` consistency checking.
+
+## What problem does this solve?
+
+Every JOSE stack quietly rewrites the same key-management scaffolding.
+The subtle mistakes surface long after code review:
+
+- **Leaking secrets to a JWKS endpoint.** You publish a "public" JWK
+  and forget that `d` / `p` / `q` / `dp` / `dq` / `qi` are still there.
+  RSA private keys are the classic footgun — six extra members to strip.
+- **Silently wrong thumbprints.** Producers that include `kid` / `alg` in
+  the digest input, or use non-lexicographic member order, drift from
+  RFC 7638. Two "valid" implementations produce different digests for
+  the same key.
+- **`use` / `key_ops` inconsistency.** A JWK with `use: "sig"` and
+  `key_ops: ["encrypt"]` is malformed per RFC 7517 §4.3, but most
+  libraries pass it through.
+- **Partial RSA CRT parameters.** Missing one of `p` / `q` / `dp` / `dq`
+  / `qi` silently degrades Node's key import to a slow non-CRT path.
+- **Base64url lenience.** `Buffer.from(str, 'base64url')` accepts
+  padding, whitespace, and `+` / `/` — all of which the JWK spec
+  forbids.
+
+`@exortek/jwk` closes each of these at the JWK boundary, with actionable
+error codes.
+
+## The four differentiators
+
+<Callout type="info">
+These are the reasons this package exists alongside `jose`. Everything
+else — `generate`, `import`, `export`, `thumbprint` — is table stakes we
+also do, correctly.
+</Callout>
+
+### `toPublic(jwk)` — defensive private-member strip
+
+One call yields a JWKS-safe projection. Type-agnostic: EC drops `d`;
+RSA drops `d` + all CRT parameters + `oth`; OKP drops `d`. `oct` throws
+(symmetric keys have no public form) — the error catches accidental
+secret publication.
+
+### `matches(a, b)` — thumbprint-based semantic equality
+
+Compare two JWKs across their private ↔ public projections, insensitive
+to `kid` / `use` / `alg` decoration. No hand-rolled canonicalisation on
+the caller's part.
+
+### `thumbprintURI(jwk)` — RFC 9278
+
+The URI form:
+`urn:ietf:params:oauth:jwk-thumbprint:sha-256:<base64url-digest>`. Handy
+as a `sub` / `iss` / registered claim value or as a stable key
+identifier in tokens.
+
+### Strict `use` / `key_ops` consistency
+
+Per RFC 7517 §4.3: when both members are present, they MUST be
+consistent. `use: "sig"` disallows `encrypt` / `decrypt` / `wrapKey` /
+`unwrapKey` / `deriveKey` / `deriveBits`. `use: "enc"` disallows `sign`
+/ `verify`. Any conflict raises `KEY_OPS_CONFLICT` with the offending
+op named.
+
+## Is it safe to trust?
+
+- **Every primitive is a thin wrapper around `node:crypto`.** No
+  hand-rolled elliptic-curve or RSA math — Node delegates to OpenSSL.
+- **RFC 7638 §3.1 vector pinned in tests.** The spec's reference JWK
+  (`2048-bit RSA n=…`) has a fixed expected thumbprint
+  (`NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs`); a red-line assertion
+  guards against regressions in the canonical projection code.
+- **All supported curves round-tripped.** Every EC curve (`P-256`,
+  `P-384`, `P-521`, `secp256k1`) and every OKP curve (`Ed25519`,
+  `Ed448`, `X25519`, `X448`) has a generate → validate → import → export
+  → thumbprint pipeline test.
+- **Strict base64url.** Rejects padding, whitespace, out-of-alphabet
+  characters, and non-canonical encodings at the JWK boundary.
+- **`matches` is timing-safe by construction.** Thumbprints are public
+  identifiers — string equality is the correct primitive; no
+  `crypto.timingSafeEqual` needed on a hash you'd ship over the wire.
+
+## Post-quantum roadmap
+
+Post-quantum signatures (**ML-DSA** — FIPS 204) and key-encapsulation
+(**ML-KEM** — FIPS 203) are on the roadmap. Shipping today would mean
+bundling a JS implementation of NIST-selected lattice cryptography — a
+red line we're not crossing. The correct path is `node:crypto` native
+support:
+
+- OpenSSL added ML-DSA / ML-KEM in **3.5** (April 2025).
+- Node.js 22 – 24 ships OpenSSL 3.0 – 3.4; no native PQ yet.
+- Node.js 25 / 26 (2026 – 2027) will expose these once the OpenSSL bump lands.
+- `draft-ietf-jose-pqc` (JOSE registrations, provisional `kty: "AKP"`) is still a draft.
+
+When both boxes tick we'll add `generate('ML-DSA-{44,65,87}')` and
+`generate('ML-KEM-{512,768,1024}')` to this same surface.
+
+Need PQ today? [`@noble/post-quantum`](https://github.com/paulmillr/noble-post-quantum)
+is a credible, audited JS implementation you can plug into your own code path.
+
+## Where next?
+
+- [`generate`](/jwk/generate) — mint EC / RSA / OKP / oct keys, both projections.
+- [`import`](/jwk/import) — JWK, SPKI, PKCS#8, X.509 → `KeyObject`.
+- [`export`](/jwk/export) — `KeyObject` → JWK / PEM, plus `toPublic()`.
+- [`thumbprint`](/jwk/thumbprint) — RFC 7638 digest, RFC 9278 URI, `matches()`.
+- [`validate`](/jwk/validate) — strict RFC 7517 shape + `use`/`key_ops` consistency.
+- [`errors`](/jwk/errors) — `JwkError` and every `ErrorCode`.

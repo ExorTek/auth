@@ -5,5 +5,6 @@ export default {
   otp: '@exortek/otp',
   password: '@exortek/password',
   session: '@exortek/session',
+  jwk: '@exortek/jwk',
   compliance: 'Compliance',
 };
