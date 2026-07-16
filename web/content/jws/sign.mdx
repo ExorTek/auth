@@ -1,0 +1,132 @@
+---
+title: 'jws.sign / signDetached — mint a signed token'
+sidebarTitle: sign
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `jws.sign` / `jws.signDetached`
+
+Sign a payload and emit a JWS compact serialisation (`header.payload.signature`),
+or a detached-content JWS where the payload rides out of band.
+
+`alg` is **mandatory** on every call. `none` is refused up front.
+
+```js
+import { sign, signDetached } from '@exortek/jws'
+
+const token = await sign(
+  { userId: 1, role: 'admin' },
+  key,
+  { alg: 'ES256', kid: 'signing-key-2026' },
+)
+```
+
+## Signature
+
+```ts
+sign(payload, key, options) → Promise<string>
+signDetached(payloadBytes, key, options) → Promise<{ token, detached }>
+```
+
+## Options
+
+| Field    | Type                              | Notes                                                                                                     |
+| -------- | --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `alg`    | `string`                          | **REQUIRED.** One of `HS256/384/512`, `RS256/384/512`, `PS256/384/512`, `ES256/384/512/256K`, `EdDSA`.     |
+| `kid`    | `string`                          | Shortcut for adding `kid` to the protected header.                                                        |
+| `header` | `Record<string, unknown>`          | Extra protected header parameters. Merged after `alg` / `kid`. `alg` here is ignored (top-level wins).    |
+| `crit`   | `string[]`                        | Critical header list per RFC 7515 §4.1.11. Every entry must appear as a header member.                     |
+| `b64`    | `boolean`                         | RFC 7797 unencoded-payload switch. Default `true`. See below.                                              |
+
+## Payload types
+
+Buffers and `Uint8Array` are signed byte-for-byte. Strings are UTF-8. Anything
+else goes through `JSON.stringify`.
+
+```js
+await sign({ user: 'u1' },       key, { alg: 'HS256' })   // JSON
+await sign('opaque payload',     key, { alg: 'HS256' })   // string (UTF-8)
+await sign(Buffer.from([1,2,3]), key, { alg: 'HS256' })   // raw bytes
+```
+
+## Key input
+
+| Shape                          | When it works                                                                    |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| `KeyObject` (private)          | Asymmetric algorithms — RSA, ECDSA, EdDSA.                                        |
+| `KeyObject` (secret)           | HMAC algorithms — HS256 / HS384 / HS512.                                          |
+| `Buffer` / `Uint8Array`        | HMAC only. Rejected for asymmetric algs with `INVALID_KEY`.                       |
+| JWK object (`{ kty, ... }`)    | All algorithms. Must include the private component (`d` / `k`) for signing.       |
+
+<Callout type="warning">
+  HMAC secrets must meet the RFC 7518 §3.2 minimum — 32 bytes for HS256, 48 for
+  HS384, 64 for HS512. Shorter secrets raise `INVALID_KEY` at the sign call, not
+  quietly downgraded.
+</Callout>
+
+## Modes
+
+<Tabs items={['Compact', 'Detached', 'b64:false (RFC 7797)']}>
+<Tabs.Tab>
+
+Standard compact serialisation — `header.payload.signature`.
+
+```js
+const token = await sign({ userId: 1 }, key, { alg: 'ES256' })
+// eyJhbGciOiJFUzI1NiJ9.eyJ1c2VySWQiOjF9.MEQC…
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+RFC 7515 Appendix F. Emits an `encHeader..encSig` token (empty payload
+segment) plus the raw payload the caller keeps out-of-band. Handy for large
+uploads where the payload never lives in memory next to the signature.
+
+```js
+const { token, detached } = await signDetached(bigBuffer, key, {
+  alg: 'ES256',
+  kid: 'signing-key-2026',
+})
+// token: eyJhbGciOiJFUzI1NiJ9..MEUC…
+// detached: <Buffer …>  — ship separately.
+```
+
+`signDetached` requires a `Buffer` or `Uint8Array` payload — strings and
+objects raise `INVALID_PAYLOAD`. The caller decides the byte encoding.
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+RFC 7797. Payload segment carries the raw string; `crit` gets `b64`
+auto-injected so verifiers unaware of the extension refuse the token.
+
+```js
+const token = await sign('opaque protocol frame', secret, {
+  alg: 'HS256',
+  b64: false,
+})
+// header.b64 = false, header.crit = ['b64']
+// token: eyJhbGciOiJIUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19.opaque protocol frame.…
+```
+
+<Callout type="warning">
+  Payload contents cannot include `.` in `b64: false` compact form — the
+  segment separator is otherwise ambiguous. Both string and byte payloads
+  are guarded; a `.` raises `INVALID_PAYLOAD`.
+</Callout>
+
+</Tabs.Tab>
+</Tabs>
+
+## Errors
+
+| Code                       | When                                                                         |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| `INVALID_ARGUMENT`         | Missing options object, missing `alg`, or malformed input shape.             |
+| `ALGORITHM_NONE_FORBIDDEN` | `alg: 'none'` — refused unconditionally.                                     |
+| `UNSUPPORTED_ALGORITHM`    | `alg` outside the algorithm matrix above.                                    |
+| `INVALID_KEY`              | Key/alg mismatch, short HMAC secret, or public key supplied for signing.     |
+| `INVALID_PAYLOAD`          | `signDetached` given non-bytes, or `b64: false` payload contains `.`.        |
+| `INVALID_HEADER`           | `crit` is malformed (empty, listing itself, references a missing member).    |

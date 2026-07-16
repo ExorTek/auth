@@ -1,0 +1,57 @@
+---
+title: 'jws.decode / decodeProtectedHeader — UNSAFE inspection'
+sidebarTitle: decode
+---
+
+import { Callout } from 'nextra/components';
+
+# `jws.decode` / `jws.decodeProtectedHeader`
+
+Parse a compact JWS **without verifying the signature**. For inspection,
+`kid` extraction before choosing a resolver, or debugging a token pulled
+out of a log.
+
+<Callout type="warning">
+  **Never gate authorisation on `decode`.** It returns whatever bytes were
+  in the token. A well-formed but forged token decodes cleanly. Always run
+  authorised paths through `verify`.
+</Callout>
+
+## `decode(token)`
+
+```js
+import { decode } from '@exortek/jws'
+
+const { header, payload, signature } = decode(token)
+// header:    { alg: 'ES256', kid: 'k1', ... }
+// payload:   whatever was signed — object, string, or Buffer
+// signature: raw bytes as a Buffer
+```
+
+Payload decoding follows the compact-verify heuristic:
+
+- If the header's `b64` is `false` (RFC 7797), the payload segment is
+  returned as-is (string).
+- Otherwise the base64url segment is decoded and parsed as JSON.
+- If JSON parse fails, the raw bytes are returned as a `Buffer`.
+
+## `decodeProtectedHeader(token)`
+
+Reads only the header — handy when the very next step is picking a
+resolver keyed by `kid`:
+
+```js
+import { decodeProtectedHeader, verify } from '@exortek/jws'
+
+const { kid, alg } = decodeProtectedHeader(token)
+const key = await store.get(kid)
+await verify(token, key, { alg: [alg] })
+```
+
+## Errors
+
+| Code            | When                                              |
+| --------------- | ------------------------------------------------- |
+| `INVALID_TOKEN` | Malformed compact serialisation.                  |
+| `INVALID_HEADER`| Header segment doesn't decode to a JSON object.   |
+| `INVALID_PAYLOAD`| Payload segment doesn't decode to a JSON value AND cannot fall back to raw bytes (rare). |

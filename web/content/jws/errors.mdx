@@ -1,0 +1,95 @@
+---
+title: 'jws.errors — JwsError + ErrorCode'
+sidebarTitle: errors
+---
+
+# `JwsError` / `ErrorCode`
+
+Every recoverable failure raised by `@exortek/jws` is a `JwsError` with
+a stable `code` from the `ErrorCode` enum and a `status` — the HTTP
+response status a middleware layer would use when translating the
+error.
+
+Branch on `code`, never on the message. Messages are human-readable,
+free-form, and may drift across versions.
+
+```js
+import { verify, JwsError, ErrorCode } from '@exortek/jws'
+
+try {
+  await verify(token, key, { alg: ['ES256'] })
+} catch (err) {
+  if (!(err instanceof JwsError)) throw err
+
+  switch (err.code) {
+    case ErrorCode.MISSING_ALG_ALLOWLIST:
+      // Config bug — allowlist required.
+      break
+    case ErrorCode.ALGORITHM_MISMATCH:
+      // Token alg outside caller's allowlist.
+      break
+    case ErrorCode.ALGORITHM_NONE_FORBIDDEN:
+      // Refused unconditionally.
+      break
+    case ErrorCode.INVALID_SIGNATURE:
+      // Tampered token.
+      break
+    // …
+  }
+}
+```
+
+## `ErrorCode` catalogue
+
+| Code                       | Meaning                                                                              | Default `status` |
+| -------------------------- | ------------------------------------------------------------------------------------ | :--------------: |
+| `INVALID_ARGUMENT`         | Bad input shape unrelated to a token (missing options, malformed signer spec, …).    | 400              |
+| `INVALID_TOKEN`            | Malformed compact serialisation (wrong dot count, non-base64url part, JSON shape).   | 401              |
+| `INVALID_HEADER`           | Protected header not a JSON object, `alg` not a string, `crit` malformed.            | 401              |
+| `INVALID_PAYLOAD`          | Payload segment cannot be decoded, or `b64: false` payload contains `.`.             | 401              |
+| `INVALID_SIGNATURE`        | Signature does not match, or (JSON verify) every signature failed.                    | 401              |
+| `INVALID_KEY`              | Key type incompatible with the token's alg (alg confusion), or short HMAC secret.    | 401              |
+| `UNSUPPORTED_ALGORITHM`    | `alg` outside our algorithm matrix.                                                   | 400              |
+| `ALGORITHM_MISMATCH`       | Token alg not in the caller's allowlist.                                              | 401              |
+| `ALGORITHM_NONE_FORBIDDEN` | `alg: 'none'` — refused everywhere, no configuration turns this off.                  | 401              |
+| `MISSING_ALG_ALLOWLIST`    | `verify` called without `options.alg` (or empty / malformed).                          | 400              |
+| `CRIT_UNSUPPORTED`         | Token's `crit` lists a name the verifier doesn't understand.                          | 401              |
+| `KEY_NOT_FOUND`            | Resolver couldn't find a matching key (kid missing, empty JWK array, resolver reject). | 401              |
+| `TOKEN_TOO_LARGE`          | Token exceeds `maxTokenSize`.                                                         | 413              |
+
+Verify-side failures default to HTTP `401` — the token itself is
+untrustworthy. Configuration failures (missing allowlist, unsupported
+alg) default to `400`. Override with the constructor:
+
+```js
+throw new JwsError(ErrorCode.INVALID_KEY, 'signing key retired', { status: 410 })
+```
+
+## The `JwsError` shape
+
+```ts
+class JwsError extends Error {
+  name: 'JwsError'
+  code: ErrorCode
+  status: number   // HTTP status hint
+  cause?: unknown  // upstream error (e.g. the node:crypto rejection)
+}
+```
+
+`cause` is populated when the failure originates in `node:crypto` — you
+get both the actionable JWS-level message and the original OpenSSL /
+Node error for debugging.
+
+## CVE-class coverage
+
+The security-labelled tests in this package pin the following:
+
+- **CVE-2015-9235** — algorithm confusion (RSA public key used as HMAC
+  secret) surfaces as `INVALID_KEY` at the key boundary. Both `Buffer`
+  and JWK RSA input shapes are guarded.
+- **CVE-2015-2951** — `alg: 'none'` acceptance is refused with
+  `ALGORITHM_NONE_FORBIDDEN`. Mixed-case (`None`, `NONE`) lands in
+  `UNSUPPORTED_ALGORITHM` / `ALGORITHM_MISMATCH`.
+- **Silent-allowlist regressions** — every `verify` call without a
+  proper `options.alg` array raises `MISSING_ALG_ALLOWLIST` before any
+  parsing.

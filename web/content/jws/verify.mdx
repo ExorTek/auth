@@ -1,0 +1,146 @@
+---
+title: 'jws.verify / verifyDetached — check a token'
+sidebarTitle: verify
+---
+
+import { Callout } from 'nextra/components';
+
+# `jws.verify` / `jws.verifyDetached`
+
+Verify a compact JWS and receive the parsed header + payload. The `alg`
+allowlist is **mandatory** on every call — omitting it is not a shortcut,
+it is a bug that raises `MISSING_ALG_ALLOWLIST`.
+
+```js
+import { verify } from '@exortek/jws'
+
+const { header, payload, kid } = await verify(token, key, {
+  alg: ['ES256'],   // REQUIRED
+})
+```
+
+## Signature
+
+```ts
+verify(token, keyish, options) → Promise<{ header, payload, kid }>
+verifyDetached(token, detachedPayload, keyish, options) → Promise<{ header, payload, kid }>
+```
+
+## Options
+
+| Field                   | Type                | Notes                                                                                        |
+| ----------------------- | ------------------- | -------------------------------------------------------------------------------------------- |
+| `alg`                   | `string[]`          | **REQUIRED.** Non-empty array of accepted JOSE algorithm identifiers.                         |
+| `knownCriticalHeaders`  | `Iterable<string>`  | Extra `crit` names this verifier is prepared to process. `b64` is always accepted.            |
+| `maxTokenSize`          | `number`            | Default 8192 bytes. Larger tokens raise `TOKEN_TOO_LARGE` before any parsing.                 |
+
+## Key input
+
+The second argument is polymorphic. All five shapes are first-class.
+
+| Shape                          | Behaviour                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------ |
+| `KeyObject` (public / secret)  | Used directly.                                                                        |
+| `Buffer` / `Uint8Array`        | HMAC secret. Non-HS* algorithms raise `INVALID_KEY`.                                 |
+| JWK object                     | Normalised into a `KeyObject`. `kty` must match the algorithm family.                 |
+| JWK array (JWKS-like)          | Picked by matching `kid` against the token's header. Single-key array bypasses match. |
+| `async (header) => key`        | Awaited, then normalised. Return a `KeyObject`, JWK, or `Buffer`.                     |
+
+### JWKS-like multi-key input
+
+```js
+const jwks = [
+  { kty: 'EC', crv: 'P-256', x: '…', y: '…', kid: 'signing-2025' },
+  { kty: 'EC', crv: 'P-256', x: '…', y: '…', kid: 'signing-2026' },
+]
+await verify(token, jwks, { alg: ['ES256'] })
+```
+
+The resolver matches the token's `kid` header against each JWK's `kid`.
+No matching `kid` raises `KEY_NOT_FOUND`. A single-key array without a
+`kid` on the token skips the match.
+
+### Async resolver function
+
+```js
+const store = new Map([['k1', jwk1], ['k2', jwk2]])
+await verify(token, async header => {
+  const jwk = store.get(header.kid)
+  if (!jwk) throw new JwsError(ErrorCode.KEY_NOT_FOUND, `no jwk for ${header.kid}`)
+  return jwk
+}, { alg: ['ES256'] })
+```
+
+The resolver receives the parsed protected header. Throw
+`KEY_NOT_FOUND` yourself when the store has no match, or return any
+supported key shape.
+
+## Security invariants
+
+<Callout type="warning">
+  Everything below is enforced by construction. No flag, no environment
+  variable, no `unsafe: true` option turns them off.
+</Callout>
+
+1. **`options.alg` array is required.** Omitting it raises
+   `MISSING_ALG_ALLOWLIST`. Empty array likewise.
+2. **`alg: 'none'` refused unconditionally.** Even before the allowlist
+   check runs. `ALGORITHM_NONE_FORBIDDEN`. Mixed-case (`None`, `NONE`)
+   still refused because the algorithm table has no entry.
+3. **Token alg outside allowlist** raises `ALGORITHM_MISMATCH`.
+4. **`crit` is strict.** Unknown critical headers raise
+   `CRIT_UNSUPPORTED`. Extend via `knownCriticalHeaders` per verify call.
+5. **Algorithm confusion** (CVE-2015-9235 — RSA public key as HMAC
+   secret) is caught at the key boundary with `INVALID_KEY`.
+6. **HMAC verification is timing-safe** — `crypto.timingSafeEqual` on
+   equal-length digest buffers.
+7. **DoS guard** — tokens larger than `maxTokenSize` (default 8 KB) raise
+   `TOKEN_TOO_LARGE` before parsing.
+
+## Detached content
+
+```js
+import { verifyDetached } from '@exortek/jws'
+
+const { header, payload } = await verifyDetached(
+  token,           // encHeader..encSig — payload segment empty
+  payloadBytes,    // caller-supplied out-of-band bytes
+  key,
+  { alg: ['ES256'] },
+)
+```
+
+The `payload` returned mirrors the caller-supplied bytes. No decoding
+heuristics are applied. Feeding a non-detached token (one whose payload
+segment is not empty) raises `INVALID_TOKEN`.
+
+## `b64: false` payloads
+
+Tokens signed with `b64: false` (RFC 7797) are decoded transparently —
+the payload segment is the raw text and `verify` returns it as a string.
+
+```js
+const token = await sign('opaque frame', secret, { alg: 'HS256', b64: false })
+const { payload } = await verify(token, secret, { alg: ['HS256'] })
+// payload === 'opaque frame'
+```
+
+`b64` is one of the two built-in known `crit` names, so tokens with
+`crit: ['b64']` pass without an explicit `knownCriticalHeaders` opt-in.
+
+## Errors
+
+| Code                       | When                                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------- |
+| `MISSING_ALG_ALLOWLIST`    | `options.alg` missing / empty / not an array of strings.                                          |
+| `ALGORITHM_MISMATCH`       | Token alg not in the caller's allowlist.                                                          |
+| `ALGORITHM_NONE_FORBIDDEN` | Token uses `alg: 'none'`.                                                                          |
+| `UNSUPPORTED_ALGORITHM`    | Token uses an alg outside our matrix.                                                              |
+| `INVALID_TOKEN`            | Malformed compact serialisation (wrong dot count, non-base64url part, empty header segment, etc). |
+| `INVALID_HEADER`           | Header isn't a JSON object, `alg` isn't a string, `crit` malformed.                               |
+| `INVALID_PAYLOAD`          | `verifyDetached` given non-bytes payload.                                                          |
+| `INVALID_SIGNATURE`        | Signature does not match, or (for `verify`) applied to a detached token whose payload was empty.   |
+| `INVALID_KEY`              | Key type incompatible with the token's alg (alg confusion), or short HMAC secret.                  |
+| `CRIT_UNSUPPORTED`         | Token's `crit` lists a name the verifier doesn't understand.                                       |
+| `KEY_NOT_FOUND`            | Resolver couldn't find a key for the token (kid missing, empty JWK array, resolver rejects).      |
+| `TOKEN_TOO_LARGE`          | Token exceeds `maxTokenSize`.                                                                     |

@@ -1,0 +1,121 @@
+---
+title: 'jws.signJson / verifyJson — RFC 7515 §7.2 serialisation'
+sidebarTitle: json
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `jws.signJson` / `jws.verifyJson`
+
+JSON serialisation (RFC 7515 §7.2) — general (multi-signature) and
+flattened (single-signature) forms. One payload signed by one or more
+keys, delivered as JSON rather than the dotted compact string.
+
+```js
+import { signJson, verifyJson } from '@exortek/jws'
+
+const jws = await signJson(payload, [
+  { key: hmacSecret, options: { alg: 'HS256', kid: 'hs1' } },
+  { key: rsaPrivateKey, options: { alg: 'RS256', kid: 'rs1' } },
+])
+// General form: { payload, signatures: [ ..., ... ] }
+
+const { matchedSignatureIndex, header, payload } = await verifyJson(jws, jwks, {
+  alg: ['HS256', 'RS256'],
+})
+```
+
+## Forms
+
+<Tabs items={['Flattened (1 signer)', 'General (n signers)']}>
+<Tabs.Tab>
+
+Single-signer output. Top-level `protected` / `header` / `signature`
+alongside the payload:
+
+```json
+{
+  "payload": "eyJ4IjoxfQ",
+  "protected": "eyJhbGciOiJIUzI1NiJ9",
+  "header": { "source": "admin" },
+  "signature": "…"
+}
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+Multi-signer output. `signatures` array carries one entry per signer:
+
+```json
+{
+  "payload": "eyJ4IjoxfQ",
+  "signatures": [
+    { "protected": "…", "header": { "kid": "hs1" }, "signature": "…" },
+    { "protected": "…", "header": { "kid": "rs1" }, "signature": "…" }
+  ]
+}
+```
+
+</Tabs.Tab>
+</Tabs>
+
+`signJson` picks the flattened form for one signer and the general form
+for two or more. `verifyJson` accepts either shape.
+
+## `signJson(payload, signers)`
+
+Payload is serialised once (base64url) and each signer computes its own
+signature over `${encProtected}.${encPayload}`. Per-signer options:
+
+| Field         | Type                        | Notes                                                            |
+| ------------- | --------------------------- | ---------------------------------------------------------------- |
+| `alg`         | `string`                    | **REQUIRED.** JOSE algorithm identifier.                          |
+| `kid`         | `string`                    | Shortcut for `kid` in the protected header.                       |
+| `header`      | `Record<string, unknown>`    | Extra protected header parameters.                                |
+| `crit`        | `string[]`                  | Critical parameter list.                                          |
+| `unprotected` | `Record<string, unknown>`    | Emitted as the JSON `header` field alongside `protected`.         |
+
+```js
+await signJson({ user: 'u1' }, [
+  { key, options: { alg: 'ES256', kid: 'k1', unprotected: { source: 'admin' } } },
+])
+```
+
+## `verifyJson(jws, keyish, options)`
+
+Multi-signature verification returns the **first** signature that
+resolves + verifies. Signatures whose keys are unavailable
+(`KEY_NOT_FOUND`) or whose bytes are tampered with (`INVALID_SIGNATURE`)
+are skipped so a JWS with one valid + one tampered signature still
+authenticates.
+
+<Callout type="info">
+  `matchedSignatureIndex` tells the caller which signer landed the token
+  — useful for audit logs or downstream routing.
+</Callout>
+
+If every signature fails, the most recent `JwsError` is thrown (or a
+final `INVALID_SIGNATURE` if none produced one).
+
+Same security invariants as the compact `verify`:
+
+- `options.alg` allowlist is mandatory.
+- `alg: 'none'` on any signature is refused.
+- `crit` strict by default.
+- Multi-key JWK array + async resolver support the same shapes.
+
+## Errors
+
+| Code                       | When                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| `INVALID_ARGUMENT`         | Empty `signers` array, malformed signer spec.                                          |
+| `MISSING_ALG_ALLOWLIST`    | Verify options missing / malformed.                                                    |
+| `ALGORITHM_NONE_FORBIDDEN` | Any signature (sign or verify) uses `alg: 'none'`.                                     |
+| `ALGORITHM_MISMATCH`       | Signature alg outside allowlist (per-signature).                                       |
+| `INVALID_TOKEN`            | Malformed JSON shape — missing `payload`, no `signature`/`signatures` present.         |
+| `INVALID_HEADER`           | Malformed protected header per signature.                                              |
+| `INVALID_KEY`              | Alg-key mismatch per signature.                                                        |
+| `INVALID_SIGNATURE`        | All signatures failed to verify.                                                       |
+| `INVALID_PAYLOAD`          | `signJson`: payload is `undefined`. `verifyJson`: payload decode failure.              |
+| `CRIT_UNSUPPORTED`         | A signature's `crit` lists a name the verifier doesn't understand.                     |
