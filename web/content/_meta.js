@@ -6,5 +6,6 @@ export default {
   password: '@exortek/password',
   session: '@exortek/session',
   jwk: '@exortek/jwk',
+  jws: '@exortek/jws',
   compliance: 'Compliance',
 };

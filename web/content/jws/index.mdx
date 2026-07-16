@@ -1,0 +1,125 @@
+---
+title: '@exortek/jws — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/jws`
+
+JSON Web Signature for Node.js 22+ — **RFC 7515** (core), **RFC 7518 §3**
+(algorithms), **RFC 7797** (unencoded payload), **RFC 8037** (Ed25519 /
+Ed448), **RFC 8812** (`secp256k1`), **RFC 8725** (best current practices).
+Zero dependencies. Pure `node:crypto`.
+
+Compact and JSON serialisation, detached content, unencoded payload, HMAC
+/ RSA / RSA-PSS / ECDSA / EdDSA — with five modern guarantees `jose`
+doesn't enforce out of the box.
+
+## Why this exists
+
+`jose` is the reference JOSE library, and it is excellent. Its verify
+contract, however, lets you leave the algorithm allowlist off — which is
+the #1 way JWT authenticators have been bypassed for a decade. Other Node
+JOSE libraries either predate modern secure defaults (`jsonwebtoken`) or
+skip the JWS layer entirely (`fast-jwt`).
+
+`@exortek/jws` sits in the JWS layer, is server-only, has zero runtime
+dependencies, and refuses to let the caller opt out of the checks that
+matter.
+
+## The five guarantees
+
+<Callout type="info">
+Every one of these is enforced by construction. There is no flag, no
+environment variable, no `unsafe: true` option that turns them off.
+</Callout>
+
+### 1. Algorithm allowlist is mandatory on verify
+
+```js
+await verify(token, key, { alg: ['ES256'] })   // ✓
+await verify(token, key)                        // ✗ MISSING_ALG_ALLOWLIST
+await verify(token, key, {})                    // ✗ MISSING_ALG_ALLOWLIST
+await verify(token, key, { alg: [] })           // ✗ MISSING_ALG_ALLOWLIST
+```
+
+No default, no fallback.
+
+### 2. `alg: 'none'` is refused everywhere
+
+Sign side, verify side, JSON serialisation surface. The algorithm table
+has no `none` entry, and even before that the sign / verify entry points
+short-circuit with `ALGORITHM_NONE_FORBIDDEN`. `CVE-2015-2951`
+regressions are pinned by dedicated tests.
+
+### 3. `crit` is strict by default
+
+Unknown critical headers raise `CRIT_UNSUPPORTED`. Opt in named
+extensions via `options.knownCriticalHeaders`. `b64` is built-in for RFC
+7797.
+
+### 4. Async key resolver is first-class
+
+```js
+await verify(token, async header => store.get(header.kid), { alg: ['ES256'] })
+```
+
+Plain function. Return a `KeyObject`, JWK, or `Buffer`; throw
+`KEY_NOT_FOUND` yourself if the store misses. `jose`'s equivalent
+requires the `createLocalJWKSet` factory dance.
+
+### 5. Granular `ErrorCode` enum
+
+13 machine-branchable codes. `switch (err.code)` reads well, is
+grep-able, and doesn't rot when a message changes phrasing.
+
+## What ships
+
+- **Compact serialisation** — `sign(payload, key, { alg })` and
+  `verify(token, key, { alg: [...] })`.
+- **Detached content (RFC 7515 §F)** — `signDetached(bytes, key, opts)` /
+  `verifyDetached(token, bytes, key, opts)` — payload rides out-of-band.
+- **Unencoded payload (RFC 7797)** — `sign(payload, key, { alg, b64:
+  false })`, `crit: ['b64']` auto-added, `.` in payload refused.
+- **JSON serialisation** — `signJson` / `verifyJson`, general +
+  flattened forms, multi-signature over one payload.
+- **Async key resolver** — `verify(token, async header => key, opts)`.
+- **JWK array with kid dispatch** — `verify(token, jwks, opts)`.
+- **UNSAFE inspection** — `decode(token)` and `decodeProtectedHeader(token)`
+  for reading a token without verifying (extract `kid` before resolver
+  lookup, debug from a log).
+
+## Algorithm matrix
+
+| Family      | `alg`                                       | Node primitive                                                        |
+| ----------- | ------------------------------------------- | --------------------------------------------------------------------- |
+| HMAC        | HS256, HS384, HS512                         | `crypto.createHmac(sha).digest()`                                     |
+| RSA-PKCS#1  | RS256, RS384, RS512                         | `crypto.sign(sha, ..., { padding: RSA_PKCS1_PADDING })`                |
+| RSA-PSS     | PS256, PS384, PS512                         | `crypto.sign(sha, ..., { padding: RSA_PKCS1_PSS_PADDING, saltLength })` |
+| ECDSA       | ES256, ES384, ES512                         | `crypto.sign(sha, ..., ecKey)` + raw R‖S ↔ DER conversion              |
+| ECDSA (BTC) | ES256K                                      | secp256k1 (RFC 8812) — Web3 interop                                    |
+| EdDSA       | EdDSA (Ed25519, Ed448)                      | `crypto.sign(null, ..., okpKey)` per RFC 8037                          |
+
+## Post-quantum roadmap
+
+**ML-DSA** (FIPS 204) and **ML-KEM** (FIPS 203) are on the roadmap. The
+gate is `node:crypto` native support:
+
+- OpenSSL added ML-DSA / ML-KEM in **3.5** (April 2025).
+- Node.js 22–24 ships OpenSSL 3.0–3.4 — no native PQ yet.
+- Node.js 25 / 26 (2026–2027) will expose them once the OpenSSL bump lands.
+- `draft-ietf-jose-pqc` (JOSE registrations) is still a draft.
+
+When both boxes tick we add `alg: 'ML-DSA-{44,65,87}'` to this same
+`sign` / `verify` surface. Until then,
+[`@noble/post-quantum`](https://github.com/paulmillr/noble-post-quantum) is
+the credible JavaScript alternative.
+
+## Where next?
+
+- [`sign`](/jws/sign) — compact, detached, and `b64: false` sign flows.
+- [`verify`](/jws/verify) — mandatory allowlist, polymorphic keys, kid dispatch.
+- [`decode`](/jws/decode) — UNSAFE inspection.
+- [`json`](/jws/json) — general + flattened multi-signature.
+- [`errors`](/jws/errors) — full `JwsError` + `ErrorCode` catalogue.
