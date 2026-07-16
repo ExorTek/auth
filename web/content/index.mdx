@@ -21,6 +21,7 @@ JavaScript with JSDoc → `.d.ts`. Runs under Express, Fastify, Hono, and Elysia
 | **[`@exortek/otp`](/otp)**           |  `1.x`  |
 | **[`@exortek/password`](/password)** |  `1.x`  |
 | **[`@exortek/session`](/session)**   |  `1.x`  |
+| **[`@exortek/jwk`](/jwk)**           |  `1.x`  |
 
 ## The stack
 
@@ -33,7 +34,7 @@ time.
 | 02 | [`@exortek/password`](/password) | Argon2id / scrypt / bcrypt / PBKDF2, strength scoring, HIBP breach check, peppering  |
 | 03 | [`@exortek/otp`](/otp)           | TOTP / HOTP, backup codes, QR provisioning URI                                       |
 | 04 | `@exortek/challenge`             | e-mail / SMS one-time code storage + verification                                    |
-| 05 | `@exortek/jwk`                   | generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278 thumbprints |
+| 05 | [`@exortek/jwk`](/jwk)           | generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278 thumbprints |
 | 06 | `@exortek/jws`                   | JOSE signed payloads (compact + JSON)                                                |
 | 07 | `@exortek/jwt`                   | JWT sign / verify with algorithm allowlists, clock skew                              |
 | 08 | `@exortek/jwe`                   | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                       |
