@@ -1,0 +1,103 @@
+---
+title: 'jwk.import / importPEM — key material → KeyObject'
+sidebarTitle: import
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwk.import` / `jwk.importPEM`
+
+Turn key material (a JWK object, an SPKI / PKCS#8 PEM, an X.509
+certificate, or their DER equivalents) into a `node:crypto.KeyObject` —
+the shape `jws`, `jwt`, and `jwe` will expect downstream.
+
+```js
+import { jwk } from '@exortek/jwk'
+
+// JWK → KeyObject
+const key = await jwk.import(privateJwk)
+
+// PEM → KeyObject
+const publicKey  = await jwk.importPEM(spkiPem)                 // 'spki' default
+const privateKey = await jwk.importPEM(pkcs8Pem, 'pkcs8')
+const fromCert   = await jwk.importPEM(x509CertPem, 'x509')     // extracts public key
+```
+
+The named exports `importJWK` and `importPEM` are single-purpose; the
+`jwk` namespace exposes `jwk.import` as an alias for `importJWK`.
+
+## `importJWK(jwk, options?)`
+
+Runs [`validate`](/jwk/validate) first, then hands the JWK to
+`createPrivateKey` / `createPublicKey` / `createSecretKey` per kty.
+
+| Input kind             | Result                                    |
+| ---------------------- | ----------------------------------------- |
+| Public JWK (no `d`)    | `KeyObject { type: 'public' }`            |
+| Private JWK (`d`)      | `KeyObject { type: 'private' }`           |
+| `kty: 'oct'`           | `KeyObject { type: 'secret' }`            |
+
+Everything the JWK carries — `kid` / `use` / `alg` / `key_ops` — is
+already validated. Node ignores JWK metadata during import; retain the
+JWK itself if you need those fields later.
+
+## `importPEM(pemOrDer, format='spki')`
+
+Explicit format selection — this is the surface for interop with
+`openssl`, `ssh-keygen`, KMS providers, and X.509 certificate authorities.
+
+| `format`  | Meaning                              | Result                     |
+| --------- | ------------------------------------ | -------------------------- |
+| `'spki'`  | SubjectPublicKeyInfo (public)        | `type: 'public'`           |
+| `'pkcs8'` | PrivateKeyInfo (private)             | `type: 'private'`          |
+| `'x509'`  | X.509 certificate; public key lifted | `type: 'public'`           |
+
+**Input encoding.** Strings are treated as PEM; `Buffer` is treated as
+DER. The same call handles both.
+
+```js
+// PEM string
+const key = await jwk.importPEM(spkiPemString)
+// DER buffer
+const key2 = await jwk.importPEM(derBuffer)
+```
+
+<Callout type="info">
+  There is deliberately no `'sec1'` or `'pkcs1'` format — SEC1 and PKCS#1
+  encode either public or private keys depending on internal fields,
+  which would leave the shape ambiguous. Convert those to SPKI / PKCS#8
+  once at the source (`openssl pkcs8 -topk8 -in sec1.pem -out pkcs8.pem`)
+  and use `importPEM` from there.
+</Callout>
+
+## Round-tripping
+
+```js
+const spkiPem = await jwk.exportPEM(publicKey)      // 'spki' by default
+const back    = await jwk.importPEM(spkiPem)        // 'spki' by default
+// back is a fresh KeyObject with equivalent material.
+```
+
+For JWK ↔ JWK trips through a `KeyObject`, metadata (`kid` / `use` / `alg`)
+is stripped by Node — pass it back explicitly on `exportJWK`:
+
+```js
+const key = await jwk.import(privateJwk)
+const back = await jwk.export(key, {
+  kid: privateJwk.kid,
+  use: privateJwk.use,
+  alg: privateJwk.alg,
+})
+```
+
+## Errors
+
+| Code                    | When                                                                         |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `INVALID_JWK`           | The JWK failed `validate` (shape / coord length / secret-carrying mismatch). |
+| `UNSUPPORTED_KTY`       | `kty` not one of the four supported.                                         |
+| `UNSUPPORTED_CURVE`     | `crv` outside the per-kty matrix.                                            |
+| `KEY_OPS_CONFLICT`      | `use` and `key_ops` inconsistent per RFC 7517 §4.3.                          |
+| `INVALID_KEY`           | `node:crypto` rejected the JWK / PEM / DER after validation passed.          |
+| `INVALID_FORMAT`        | `importPEM` given a `format` other than `'spki'` / `'pkcs8'` / `'x509'`.     |
+| `INVALID_ARGUMENT`      | `importPEM` given non-string, non-Buffer input.                              |

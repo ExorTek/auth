@@ -1,0 +1,117 @@
+---
+title: 'jwk.thumbprint / thumbprintURI / matches — RFC 7638 + 9278'
+sidebarTitle: thumbprint
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwk.thumbprint` / `jwk.thumbprintURI` / `jwk.matches`
+
+Stable, kty-defined digests over the JWK's required members. A
+thumbprint gives every key a canonical identifier independent of `kid`
+/ whitespace / member order — perfect for equality checks, `kid`
+fallbacks, and cross-projection comparisons.
+
+```js
+import { jwk } from '@exortek/jwk'
+
+const digest = await jwk.thumbprint(publicJwk)
+// 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs'
+
+const uri = await jwk.thumbprintURI(publicJwk)
+// 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:NzbLsXh8u…'
+
+const same = await jwk.matches(publicJwk, privateJwk)
+// true — thumbprint of both projections is identical.
+```
+
+## `jwk.thumbprint(jwk, digest='sha256')`
+
+RFC 7638 §3. The digest is computed over a canonical JSON projection of
+the JWK's kty-required members — nothing else. `kid` / `use` / `alg` /
+`key_ops` are ignored on purpose so the identity is stable through
+decoration changes.
+
+| `digest`   | Output length (bytes) | Use case                       |
+| ---------- | :-------------------: | ------------------------------ |
+| `'sha256'` | 32                    | Default. RFC-standard.         |
+| `'sha384'` | 48                    | Higher security margin.        |
+| `'sha512'` | 64                    | Maximum classical strength.    |
+
+### The canonical projection
+
+Per kty, the members that participate in the digest — in
+lexicographic order:
+
+| `kty`  | Members hashed        |
+| ------ | --------------------- |
+| `EC`   | `crv`, `kty`, `x`, `y` |
+| `RSA`  | `e`, `kty`, `n`        |
+| `oct`  | `k`, `kty`             |
+| `OKP`  | `crv`, `kty`, `x`      |
+
+The JSON is minimal — no whitespace, no trailing newline — and byte-for-byte
+compatible with the RFC 7638 §3.1 reference vector. Our test suite pins
+this exactly.
+
+## `jwk.thumbprintURI(jwk, digest='sha256')`
+
+RFC 9278 §3. Wraps a thumbprint in the canonical URI form so it can be
+used as an identifier value in JOSE / OAuth / OIDC contexts (`sub`, `iss`,
+JWKS `kid` fallback, etc):
+
+```
+urn:ietf:params:oauth:jwk-thumbprint:sha-256:<base64url-digest>
+```
+
+The digest label follows RFC 9278 (`sha-256`, `sha-384`, `sha-512` —
+hyphenated), not the Node function name (`sha256`).
+
+## `jwk.matches(a, b, digest='sha256')`
+
+Semantic equality across projections. Two JWKs match when their
+kty-required members produce the same digest, regardless of `kid` /
+`use` / `alg` decoration — even when one is the private form and the
+other is the public projection.
+
+```js
+const { publicJwk, privateJwk } = await jwk.generate('EC', { curve: 'P-256' })
+await jwk.matches(publicJwk, privateJwk)  // true
+```
+
+<Callout type="info">
+  Constant-time comparison is unnecessary here — thumbprints are public
+  identifiers, and string equality is the correct primitive. `matches`
+  computes both digests with `Promise.all` and returns a plain `===`.
+</Callout>
+
+## Common uses
+
+**Set `kid` from thumbprint.** JWKS producers often want a stable,
+content-derived `kid`:
+
+```js
+const jwk = /* … */
+jwk.kid = await jwk.thumbprint(jwk)
+```
+
+**Detect key rotation.** Store the thumbprint of every key you've
+issued; a new JWK from an OIDC provider whose thumbprint you don't
+recognise is one you must re-authorize.
+
+**Verify a claim in a JWT.** `sub` claims carrying a thumbprint URI can
+be checked with a single call:
+
+```js
+const expected = await jwk.thumbprintURI(publicJwk)
+if (jwtPayload.sub !== expected) throw new Error('sub mismatch')
+```
+
+## Errors
+
+| Code                    | When                                                            |
+| ----------------------- | --------------------------------------------------------------- |
+| `UNSUPPORTED_ALGORITHM` | `digest` not one of `sha256` / `sha384` / `sha512`.             |
+| `UNSUPPORTED_KTY`       | `kty` not one of the four thumbprintable kinds.                 |
+| `MISSING_REQUIRED_MEMBER` | A member required for the canonical projection is absent.     |
+| `INVALID_ARGUMENT`      | The JWK isn't an object.                                        |

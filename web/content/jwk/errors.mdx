@@ -1,0 +1,74 @@
+---
+title: 'jwk.errors — JwkError + ErrorCode'
+sidebarTitle: errors
+---
+
+# `JwkError` / `ErrorCode`
+
+Every recoverable failure raised by `@exortek/jwk` is a `JwkError` with
+a stable `code` from the `ErrorCode` enum and a `status` — the HTTP
+response status a middleware layer would use when translating the
+error.
+
+Branch on `code`, never on the message. Messages are diagnostic,
+human-readable, and may drift across versions.
+
+```js
+import { jwk, JwkError, ErrorCode } from '@exortek/jwk'
+
+try {
+  jwk.validate(untrustedJwk, { requirePublic: true })
+} catch (err) {
+  if (!(err instanceof JwkError)) throw err
+
+  switch (err.code) {
+    case ErrorCode.INVALID_JWK:
+      // Shape / length / secret-carrying mismatch.
+      break
+    case ErrorCode.KEY_OPS_CONFLICT:
+      // use=sig with key_ops=[encrypt], etc.
+      break
+    case ErrorCode.MISSING_REQUIRED_MEMBER:
+      // Missing kty / x / y / n / …
+      break
+    // …
+  }
+}
+```
+
+## `ErrorCode` catalogue
+
+| Code                       | Meaning                                                                                              | Default `status` |
+| -------------------------- | ---------------------------------------------------------------------------------------------------- | :--------------: |
+| `INVALID_ARGUMENT`         | Bad input shape unrelated to a JWK (`KeyObject` expected, wrong `format`, non-`Buffer`).             | 400              |
+| `UNSUPPORTED_KTY`          | `kty` not `EC` / `RSA` / `OKP` / `oct`.                                                              | 400              |
+| `UNSUPPORTED_CURVE`        | `crv` outside the per-kty matrix.                                                                    | 400              |
+| `UNSUPPORTED_ALGORITHM`    | `digest` (thumbprint) not `sha256` / `sha384` / `sha512`.                                            | 400              |
+| `INVALID_KEY`              | `node:crypto` rejected the JWK / PEM / DER (usually meaning invalid material after validation).      | 400              |
+| `INVALID_JWK`              | JWK shape / length / secret-carrying mismatch.                                                       | 400              |
+| `INVALID_FORMAT`           | Base64url decoding error, or wrong `format` argument on `importPEM` / `jwk.export`.                  | 400              |
+| `MISSING_REQUIRED_MEMBER`  | A required JWK member (`kty`, `x`, `y`, `n`, `e`, `k`, `crv` …) is absent or empty.                  | 400              |
+| `KEY_OPS_CONFLICT`         | `use` and `key_ops` set together, but inconsistent per RFC 7517 §4.3.                                | 400              |
+
+Every code returns HTTP `400` by default — JWK errors are always
+"client sent bad key material" from the perspective of a JWKS
+endpoint or a token verifier. Override with the constructor:
+
+```js
+throw new JwkError(ErrorCode.INVALID_KEY, 'signing key retired', { status: 410 })
+```
+
+## The `JwkError` shape
+
+```ts
+class JwkError extends Error {
+  name: 'JwkError'
+  code: ErrorCode
+  status: number   // HTTP status hint
+  cause?: unknown  // upstream error (e.g. the node:crypto rejection)
+}
+```
+
+`cause` is populated when the failure originates in `node:crypto` — you
+get both the actionable JWK-level message and the original OpenSSL /
+Node error for debugging.

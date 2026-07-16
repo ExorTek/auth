@@ -1,0 +1,152 @@
+---
+title: 'jwk.generate — mint fresh keys'
+sidebarTitle: generate
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `jwk.generate`
+
+Mint a fresh JWK — asymmetric key types return **both** the public and
+private projection in a single call; the `oct` type returns one object
+(both slots reference it because symmetric keys have no split).
+
+```js
+import { jwk } from '@exortek/jwk'
+
+const { publicJwk, privateJwk } = await jwk.generate('EC', {
+  curve: 'P-256',
+  use: 'sig',
+  alg: 'ES256',
+  kid: 'signing-key-2026',
+})
+```
+
+Decoration fields (`kid`, `use`, `alg`, `key_ops`) are copied verbatim
+onto both projections when provided — one call, no post-processing.
+
+## Signature
+
+```ts
+generate(kty: 'EC'   | 'RSA' | 'OKP' | 'oct', options?): Promise<GeneratedKeyPair>
+```
+
+| Field         | Type                                            | Notes                                                             |
+| ------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
+| `publicJwk`   | `object`                                        | Public projection; for `oct` this is the same reference as below. |
+| `privateJwk`  | `object`                                        | Contains `d` (EC / RSA / OKP) or `k` (oct).                       |
+
+## Kty × curve matrix
+
+<Tabs items={['EC', 'RSA', 'OKP', 'oct']}>
+<Tabs.Tab>
+
+Elliptic-curve keys (RFC 7518 §6.2 + RFC 8812 for `secp256k1`).
+
+| `curve`      | Coordinate bytes | Common `alg` | Use case                    |
+| ------------ | :--------------: | ------------ | --------------------------- |
+| `P-256`      | 32               | `ES256`      | JWT default — the safe pick |
+| `P-384`      | 48               | `ES384`      | Higher security margin      |
+| `P-521`      | 66               | `ES512`      | Maximum classical strength  |
+| `secp256k1`  | 32               | `ES256K`     | Bitcoin / Ethereum interop  |
+
+```js
+const { publicJwk, privateJwk } = await jwk.generate('EC', {
+  curve: 'P-256',   // default
+  kid: 'ec-key-1',
+  use: 'sig',
+  alg: 'ES256',
+})
+// privateJwk: { kty:'EC', crv:'P-256', x:'…', y:'…', d:'…', kid, use, alg }
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+RSA keys (RFC 7518 §6.3).
+
+| Option           | Default   | Notes                                                     |
+| ---------------- | :-------: | --------------------------------------------------------- |
+| `modulusLength`  | `2048`    | Must be a multiple of 8, ≥ 2048. Rejected otherwise.      |
+| `publicExponent` | `0x10001` | Any odd integer ≥ 3.                                      |
+
+```js
+const { privateJwk } = await jwk.generate('RSA', {
+  modulusLength: 3072,
+  kid: 'rsa-signing',
+  use: 'sig',
+  alg: 'PS256',
+})
+// privateJwk contains n, e, d, p, q, dp, dq, qi (full CRT form)
+```
+
+<Callout type="warning">
+  `modulusLength` under 2048 raises `INVALID_ARGUMENT` — RSA below 2048
+  is deprecated by NIST SP 800-131A. Use RSA-3072 for keys with a
+  lifetime beyond 2030.
+</Callout>
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+Octet Key Pair (RFC 8037).
+
+| `curve`   | Key bytes | Purpose               |
+| --------- | :-------: | --------------------- |
+| `Ed25519` | 32        | EdDSA signatures      |
+| `Ed448`   | 57        | EdDSA (higher margin) |
+| `X25519`  | 32        | ECDH key agreement    |
+| `X448`    | 56        | ECDH (higher margin)  |
+
+```js
+// Signing (default curve = Ed25519)
+const { privateJwk } = await jwk.generate('OKP', { use: 'sig', alg: 'EdDSA' })
+
+// Key agreement (ECDH-ES)
+const { publicJwk } = await jwk.generate('OKP', { curve: 'X25519', use: 'enc' })
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+Symmetric secret (RFC 7518 §6.4).
+
+| Option | Default | Notes                                                |
+| ------ | :-----: | ---------------------------------------------------- |
+| `bits` | `256`   | Must be a multiple of 8, ≥ 128. Rejected otherwise.  |
+
+```js
+const { publicJwk, privateJwk } = await jwk.generate('oct', {
+  bits: 256,
+  use: 'sig',
+  alg: 'HS256',
+})
+// publicJwk === privateJwk — same object, same `k`.
+```
+
+<Callout type="warning">
+  Symmetric keys don't have a "public" side. `toPublic(publicJwk)` on an
+  `oct` JWK throws `INVALID_ARGUMENT` — the guard catches accidental
+  publication of a secret to a JWKS endpoint.
+</Callout>
+
+</Tabs.Tab>
+</Tabs>
+
+## Decoration fields
+
+Any of the following are forwarded onto both projections:
+
+- `kid` — key identifier string.
+- `use` — `"sig"` or `"enc"`.
+- `alg` — JOSE algorithm identifier (e.g. `ES256`, `PS384`, `EdDSA`).
+- `key_ops` — array of operations. Must be consistent with `use` when
+  both are set (see [`validate`](/jwk/validate)).
+
+## Errors
+
+| Code                    | When                                                          |
+| ----------------------- | ------------------------------------------------------------- |
+| `UNSUPPORTED_KTY`       | `kty` not one of `EC` / `RSA` / `OKP` / `oct`.                |
+| `UNSUPPORTED_CURVE`     | `curve` not in the per-kty matrix above.                      |
+| `INVALID_ARGUMENT`      | `modulusLength` under 2048 or `bits` under 128 (or non-8x).   |

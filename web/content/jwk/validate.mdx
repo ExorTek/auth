@@ -1,0 +1,99 @@
+---
+title: 'jwk.validate / isValid — strict shape checks'
+sidebarTitle: validate
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwk.validate` / `jwk.isValid`
+
+Strict RFC 7517 §4 (common) + RFC 7518 §6 (per-kty) + RFC 8037 §2 (OKP)
+shape enforcement. Runs on every `importJWK` and every `thumbprint`
+implicitly — call it directly when you're receiving JWKs at a
+system boundary (JWKS fetch, admin panel input, DB read).
+
+```js
+import { jwk } from '@exortek/jwk'
+
+jwk.validate(untrustedJwk)                                 // throws JwkError on failure
+jwk.validate(untrustedJwk, { requirePublic: true })        // additional guard
+const ok = jwk.isValid(untrustedJwk)                       // non-throwing variant
+```
+
+## What gets checked
+
+### Common members (RFC 7517 §4)
+
+| Member    | Check                                                                 |
+| --------- | --------------------------------------------------------------------- |
+| `kty`     | Required string; one of `EC` / `RSA` / `oct` / `OKP`.                 |
+| `kid`     | If present, must be a string.                                         |
+| `use`     | If present, `"sig"` or `"enc"` — nothing else.                        |
+| `alg`     | If present, must be a string.                                         |
+| `key_ops` | Array of unique strings from `sign` / `verify` / `encrypt` / `decrypt` / `wrapKey` / `unwrapKey` / `deriveKey` / `deriveBits`. |
+
+### `use` × `key_ops` consistency (§4.3)
+
+When both are set the JWK MUST be consistent:
+
+| `use`   | Allowed `key_ops`                                                        |
+| ------- | ------------------------------------------------------------------------ |
+| `'sig'` | `sign`, `verify`                                                         |
+| `'enc'` | `encrypt`, `decrypt`, `wrapKey`, `unwrapKey`, `deriveKey`, `deriveBits`  |
+
+Any `key_ops` entry outside its `use`'s allowlist raises
+`KEY_OPS_CONFLICT` with the offending op named.
+
+### Per-kty members
+
+<Callout type="info">
+  Coordinate / component lengths are decoded from base64url and
+  measured — the wrong-length `x` on a P-256 key is caught here, not by
+  a cryptic OpenSSL error deep inside `createPublicKey`.
+</Callout>
+
+- **`EC`** — `crv` in the supported set; `x`, `y` decode to
+  `EC_COORD_BYTES[crv]` bytes; `d` (private) same length.
+- **`RSA`** — `n`, `e` present and base64url; `d` (private) present;
+  CRT parameters `p / q / dp / dq / qi` all present or all absent
+  (partial sets rejected — RFC 7518 §6.3.2).
+- **`oct`** — `k` present, base64url, non-empty.
+- **`OKP`** — `crv` in the RFC 8037 set; `x` decodes to
+  `OKP_KEY_BYTES[crv]` bytes; `d` (private) same length.
+
+## `requirePublic` / `requirePrivate` guards
+
+Assert secret-carrying state at the JWK boundary — no more "did I get
+the private form by accident?" foot-guns:
+
+```js
+// Endpoints that publish JWKS: refuse anything carrying secrets.
+jwk.validate(receivedJwk, { requirePublic: true })
+
+// Endpoints that sign / decrypt: refuse public-only material.
+jwk.validate(receivedJwk, { requirePrivate: true })
+```
+
+Both are opt-in — the default (`validate(jwk)`) accepts either shape.
+
+## `isValid` — non-throwing filter
+
+Handy for JWKS ingestion, where a single bad key shouldn't kill the
+whole set:
+
+```js
+const rotationSet = (jwks.keys || []).filter(k => jwk.isValid(k, { requirePublic: true }))
+```
+
+`isValid` swallows `JwkError` and returns `false`; any other error type
+(a bug in a validator) still throws.
+
+## Errors
+
+| Code                      | When                                                                                     |
+| ------------------------- | ---------------------------------------------------------------------------------------- |
+| `INVALID_JWK`             | Shape / length / secret-carrying mismatch, `use` / `key_ops` shape.                      |
+| `MISSING_REQUIRED_MEMBER` | `kty`, or a per-kty required string, is missing.                                         |
+| `UNSUPPORTED_KTY`         | `kty` not `EC` / `RSA` / `oct` / `OKP`.                                                  |
+| `UNSUPPORTED_CURVE`       | `crv` outside the per-kty matrix.                                                        |
+| `KEY_OPS_CONFLICT`        | `use` and `key_ops` inconsistent per §4.3.                                               |

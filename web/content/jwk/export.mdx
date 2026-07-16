@@ -1,0 +1,112 @@
+---
+title: 'jwk.export / exportPEM / toPublic — KeyObject → JWK / PEM'
+sidebarTitle: export
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwk.export` / `jwk.exportPEM` / `jwk.toPublic`
+
+Serialize a `node:crypto.KeyObject` (or strip a JWK object) for
+publication, storage, or interop. Three distinct helpers cover three
+distinct needs.
+
+## `jwk.export(key, options?)`
+
+Namespace dispatcher matching the ARCHITECTURE example — one entry point,
+`options.format` picks the output shape.
+
+```js
+import { jwk } from '@exortek/jwk'
+
+const asJwk = await jwk.export(key)                        // JWK (default)
+const asJwk2 = await jwk.export(key, { format: 'jwk', kid: 'k' })
+const asPem  = await jwk.export(key, { format: 'pem' })    // PEM (auto SPKI / PKCS#8)
+const asPemStrict = await jwk.export(key, { format: 'pem', pemType: 'pkcs8' })
+```
+
+| `format`    | Result                                                              |
+| ----------- | ------------------------------------------------------------------- |
+| `'jwk'`     | JWK object; `kid` / `use` / `alg` / `key_ops` from options applied. |
+| `'pem'`     | PEM string; `pemType` picks SPKI / PKCS#8 or defaults per key type. |
+| _anything else_ | Throws `INVALID_FORMAT`.                                        |
+
+Both named exports (`exportJWK`, `exportPEM`) remain single-purpose — the
+dispatcher is for callers who want the ARCHITECTURE shape.
+
+## `jwk.exportJWK(key, options?)`
+
+Pure JWK output. Decoration passthrough:
+
+```js
+const publicJwk = await jwk.exportJWK(publicKey, {
+  kid: 'signing-key-2026',
+  use: 'sig',
+  alg: 'ES256',
+  key_ops: ['verify'],
+})
+```
+
+Node produces the raw JWK members (`kty`, `crv`, `x`, `y`, `d` …) — this
+helper adds the metadata Node dropped, in one place, so every export
+site stays consistent.
+
+## `jwk.exportPEM(key, format?)`
+
+Pure PEM output. Smart default — SPKI for public, PKCS#8 for private:
+
+```js
+const spki  = await jwk.exportPEM(publicKey)             // '-----BEGIN PUBLIC KEY-----'
+const pkcs8 = await jwk.exportPEM(privateKey)            // '-----BEGIN PRIVATE KEY-----'
+```
+
+Explicit format overrides:
+
+```js
+const pkcs8 = await jwk.exportPEM(privateKey, 'pkcs8')
+const spki  = await jwk.exportPEM(publicKey, 'spki')
+```
+
+<Callout type="warning">
+  **Ambiguous combinations are rejected.** `exportPEM(privateKey, 'spki')`
+  throws `INVALID_ARGUMENT` — emitting a public SPKI from a private key
+  silently discards `d` and leaves the caller unsure whether they got a
+  signing key or a verifying one. Extract the public key first:
+
+  ```js
+  import { createPublicKey } from 'node:crypto'
+  const publicKey = createPublicKey(privateKey)
+  const spki = await jwk.exportPEM(publicKey)   // unambiguous
+  ```
+
+  Symmetric (`type: 'secret'`) keys have no PEM form; the call throws
+  with a message pointing to `exportJWK` instead.
+</Callout>
+
+## `jwk.toPublic(jwk)`
+
+The differentiator. Strip every private / secret member from a JWK
+object — no `KeyObject` roundtrip — so a JWKS endpoint can be built
+straight from private material.
+
+```js
+const { privateJwk } = await jwk.generate('RSA')
+const publishable = jwk.toPublic(privateJwk)
+// publishable is a shallow copy with:
+//   RSA: d, p, q, dp, dq, qi, oth  removed
+//   EC / OKP: d  removed
+//   kid / use / alg / key_ops / kty / crv / n / e / x / y  retained
+```
+
+`toPublic` refuses `oct` — symmetric keys have no public projection,
+and the throw catches accidental publication of a secret. That guard
+is the whole reason this helper exists at a higher level than a spread
++ `delete`.
+
+## Errors
+
+| Code                | When                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `INVALID_ARGUMENT`  | Input is not a `KeyObject` / JWK; `exportPEM(privateKey, 'spki')`; `toPublic` on `oct`.  |
+| `INVALID_FORMAT`    | `jwk.export` given a `format` other than `'jwk'` / `'pem'`; `exportPEM` bad `format`.    |
+| `INVALID_KEY`       | `node:crypto` refused the export (e.g. non-exportable secret key).                       |
