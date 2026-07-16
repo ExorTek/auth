@@ -1,12 +1,10 @@
 /**
- * JWS Compact Serialization signing (RFC 7515 §7.1).
+ * JWS Compact Serialization signing (RFC 7515 §7.1) plus the unencoded
+ * payload extension (RFC 7797) and detached content (RFC 7515 §F).
  *
  * `alg` is **mandatory** on every call — there is no default. `none`
  * is refused up front with a dedicated error code so the diagnostic is
  * actionable rather than "unsupported algorithm".
- *
- * `signDetached` and `b64: false` land in follow-up commits (RFC 7515
- * Appendix F and RFC 7797 respectively).
  */
 
 import { JwsError, ErrorCode } from './internal/errors.js';
@@ -23,6 +21,10 @@ import { encode as b64uEncode, encodeJson as b64uEncodeJson } from './internal/b
  * @property {string} [kid]                               `kid` header shortcut.
  * @property {Record<string, unknown>} [header]           Extra protected header parameters (merged after `alg` / `kid`).
  * @property {string[]} [crit]                            Marks header names as critical (RFC 7515 §4.1.11).
+ * @property {boolean} [b64]                              RFC 7797 unencoded-payload switch. Default `true` (standard base64url payload).
+ *                                                       When `false`, the compact segment carries the raw payload; `crit`
+ *                                                       gets `"b64"` auto-injected per RFC 7797 §5.1, and the payload MUST
+ *                                                       NOT contain a `.` (compact serialisation ambiguity).
  */
 
 /**
@@ -51,16 +53,20 @@ export async function sign(payload, key, options) {
   const meta = lookupAlg(alg);
   const keyObj = await normalizeKey(key, alg, 'sign');
 
+  const b64 = options.b64 !== false;
   const header = _buildHeader(alg, options);
+  if (!b64) {
+    header.b64 = false;
+    header.crit = _mergeCritForB64False(header.crit);
+  }
   assertCritSign(header.crit, header);
 
   const encHeader = b64uEncodeJson(header);
-  const encPayload = _encodePayload(payload);
-  const signingInput = Buffer.from(`${encHeader}.${encPayload}`, 'utf8');
+  const { segment, signingInput } = _prepareCompact(payload, encHeader, b64);
   const signature = await meta.sign(keyObj, signingInput);
   const encSig = b64uEncode(signature);
 
-  return `${encHeader}.${encPayload}.${encSig}`;
+  return `${encHeader}.${segment}.${encSig}`;
 }
 
 /**
@@ -141,22 +147,80 @@ function _buildHeader(alg, options) {
 }
 
 /**
- * Serialise the payload into the base64url segment. Buffers/Uint8Arrays
- * are copied byte-for-byte; strings are UTF-8; everything else goes
- * through `JSON.stringify`.
+ * Build the compact payload segment + signing input.
+ *
+ *   - `b64 === true` (default) → segment is base64url of the payload bytes;
+ *     signing input is `${encHeader}.${segment}`.
+ *   - `b64 === false` (RFC 7797) → segment is the raw payload string;
+ *     signing input hashes the raw bytes directly. `.` in the payload is
+ *     rejected because the compact form has no way to parse it back.
  *
  * @param {unknown} payload
- * @returns {string}
+ * @param {string} encHeader
+ * @param {boolean} b64
+ * @returns {{ segment: string, signingInput: Buffer }}
  */
-function _encodePayload(payload) {
-  if (Buffer.isBuffer(payload) || payload instanceof Uint8Array) {
-    return b64uEncode(Buffer.from(payload));
-  }
-  if (typeof payload === 'string') {
-    return Buffer.from(payload, 'utf8').toString('base64url');
-  }
+function _prepareCompact(payload, encHeader, b64) {
   if (payload === undefined) {
     throw new JwsError(ErrorCode.INVALID_PAYLOAD, 'sign: payload is required');
   }
-  return b64uEncodeJson(payload);
+  const bytes = _payloadBytes(payload);
+  if (b64) {
+    const segment = bytes.toString('base64url');
+    return {
+      segment,
+      signingInput: Buffer.from(`${encHeader}.${segment}`, 'utf8'),
+    };
+  }
+  const segment = bytes.toString('utf8');
+  if (segment.includes('.')) {
+    throw new JwsError(
+      ErrorCode.INVALID_PAYLOAD,
+      'sign: b64:false payload must not contain "." — compact serialisation cannot disambiguate the payload segment (RFC 7797 §5.2)',
+    );
+  }
+  return {
+    segment,
+    signingInput: Buffer.concat([Buffer.from(`${encHeader}.`, 'utf8'), bytes]),
+  };
+}
+
+/**
+ * Convert an arbitrary payload into raw bytes ready for signing.
+ * Buffers / Uint8Arrays pass through; strings are UTF-8; everything else
+ * goes through `JSON.stringify`.
+ *
+ * @param {unknown} payload
+ * @returns {Buffer}
+ */
+function _payloadBytes(payload) {
+  if (Buffer.isBuffer(payload)) {
+    return payload;
+  }
+  if (payload instanceof Uint8Array) {
+    return Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength);
+  }
+  if (typeof payload === 'string') {
+    return Buffer.from(payload, 'utf8');
+  }
+  return Buffer.from(JSON.stringify(payload), 'utf8');
+}
+
+/**
+ * When the caller opts into `b64: false`, RFC 7797 §5.1 requires the
+ * `crit` header to advertise `b64` so verifiers unaware of the extension
+ * refuse the token. Callers may pass their own `crit` list; we merge
+ * `b64` into it.
+ *
+ * @param {unknown} existing
+ * @returns {string[]}
+ */
+function _mergeCritForB64False(existing) {
+  if (existing === undefined) {
+    return ['b64'];
+  }
+  if (!Array.isArray(existing)) {
+    throw new JwsError(ErrorCode.INVALID_HEADER, 'sign: crit must be a JSON array of strings');
+  }
+  return existing.includes('b64') ? /** @type {string[]} */ (existing) : [.../** @type {string[]} */ (existing), 'b64'];
 }
