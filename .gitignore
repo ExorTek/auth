@@ -46,6 +46,6 @@ Thumbs.db
 # Claude Code / personal working notes
 /.claude
 skills-lock.json
-ARCHITECTURE.md
+ARCHITECTURE-local.md
 CLAUDE.md
 /scripts/setup-labels.sh
