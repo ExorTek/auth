@@ -67,8 +67,9 @@ Node.js **22 or newer**.
 
 - **Docs:** [auth.memet.dev](https://auth.memet.dev)
 - **Architecture:** [ARCHITECTURE.md](./ARCHITECTURE.md)
+- **AI agents:** [AGENTS.md](./AGENTS.md)
 - **Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md)
 - **Issues:** [github.com/ExorTek/auth/issues](https://github.com/ExorTek/auth/issues)
 - **Security:** email `memet@memet.dev`
 
-MIT © ExorTek.
+[MIT](/LICENSE) © ExorTek.
