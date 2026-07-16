@@ -150,7 +150,7 @@ packages/<name>/
 │   ├── index.js              # public entrypoint — named exports + namespace object
 │   ├── <feature>.js          # public modules (one per subpath export)
 │   └── internal/*.js         # helpers not part of the public API
-├── tests/*.test.js           # colocated tests via `node --test`
+├── tests/*.test.js           # tests directory (NOT colocated in src/), run via `node --test`
 ├── rollup.config.js          # thin call into rollup.config.base.js
 ├── tsconfig.json             # extends ../../tsconfig.base.json
 ├── package.json              # per-subpath `exports`, `files`, `scripts`
