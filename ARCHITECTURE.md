@@ -30,15 +30,26 @@ These are the invariants — expect PRs that violate them to be rejected.
 ### 1. Zero runtime dependencies
 
 Every package depends on `node:crypto` and its declared peer dependencies —
-nothing else. The single planned exception is `@exortek/web3-evm`, which
-uses `ethereum-cryptography`.
+nothing else. The single planned external exception is `@exortek/web3-evm`,
+which will use `ethereum-cryptography`.
 
-### 2. Fully standalone packages
+### 2. Fully standalone packages (with one sanctioned exception)
 
-**No package imports from another `@exortek/*` package at runtime.** Utility
-duplication (a `base64url` helper in every JOSE package, an `ErrorCode`
-enum per package) is accepted deliberately. A user who installs a single
-package pulls no workspace peers.
+**New packages do not import from another `@exortek/*` package at runtime.**
+Utility duplication (a `base64url` helper in every JOSE package, an
+`ErrorCode` enum per package) is accepted deliberately. A user who installs
+a single package pulls no workspace peers.
+
+The one sanctioned exception is `@exortek/session`, which imports `seal`,
+`unseal`, and `CryptoError` from `@exortek/crypto`. It was written before
+the standalone policy was formalised and the sealed-cookie primitive was
+too surface-heavy to duplicate. Session's `package.json` declares
+`@exortek/crypto` as a runtime dependency, and installing session pulls
+crypto with it — call this out to anyone marketing "zero dependencies"
+downstream.
+
+Every other shipped package (`crypto`, `otp`, `password`, `security`, `jwk`,
+`jws` at time of writing) is fully standalone at runtime.
 
 The dependency graph below tells you the *semantic* order, not the runtime
 import graph. It is preserved so package authors know which package is

@@ -87,14 +87,22 @@ apikey → rate-limit
 auth (umbrella) → re-exports everything above
 ```
 
-**Current policy: every package is fully standalone.** Cross-`@exortek/*`
-dependencies are **not** taken today — utility duplication (e.g. `base64url` in
-both `jwk` and `jws`) is accepted deliberately so a user who installs a single
-package pulls no transitive workspace deps. The layering above tells you the
-*semantic* order, not the runtime import graph.
+**Current policy: new packages are fully standalone.** Cross-`@exortek/*`
+runtime dependencies are **not** taken for new work — utility duplication
+(e.g. `base64url` in both `jwk` and `jws`) is accepted deliberately so a
+user who installs a single package pulls no transitive workspace deps.
+The layering above tells you the *semantic* order, not the runtime import
+graph.
 
-`@exortek/crypto` may only depend on `node:crypto`. The single non-zero-dep
-exception is `@exortek/web3-evm` (planned), which uses `ethereum-cryptography`.
+**One sanctioned exception:** `@exortek/session` depends on
+`@exortek/crypto` at runtime for the sealed-cookie primitive
+(`seal` / `unseal` / `CryptoError`). It was written before the standalone
+policy was formalised. Do not add new cross-package deps; if session ever
+gets a major refactor, inline the seal helpers to fall in line.
+
+`@exortek/crypto` may only depend on `node:crypto`. The single planned
+external exception is `@exortek/web3-evm`, which will use
+`ethereum-cryptography`.
 
 ### Server-only
 
