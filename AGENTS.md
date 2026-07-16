@@ -63,9 +63,12 @@ node --test 'tests/**/*.test.js'          # run all tests
 node --test tests/path/to/file.test.js    # run one test file
 ```
 
-CI (`.github/workflows/ci.yml`) runs `format:check → lint → typecheck → build →
-test` on Node 22.x and 24.x. `publish.yml` runs the Changesets action on pushes
-to `master`.
+**No hosted CI today** — nothing guards `master` between local pushes. `yarn
+verify` is the mirror of what a CI job would run (`format:check → lint →
+typecheck → build → test`); run it locally before every push. Adding
+`.github/workflows/ci.yml` (Node 22.x + 24.x) and a `publish.yml` Changesets
+job is on the roadmap; until they exist, releases go through
+`yarn release` on a maintainer's machine.
 
 ## Architecture
 
