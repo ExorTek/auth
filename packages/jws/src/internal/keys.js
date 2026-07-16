@@ -83,6 +83,29 @@ function _assertKeyObject(key, meta, direction, alg) {
       `alg ${alg} expects key type ${expectedNodeType.join(' | ')}; got ${nodeType}`,
     );
   }
+  _assertRsaModulus(key, meta, alg);
+}
+
+/**
+ * RFC 7518 §3.3 (RS*) and §3.5 (PS*) both mandate a modulus of at least
+ * 2048 bits. `crypto.KeyObject.asymmetricKeyDetails.modulusLength`
+ * exposes it — enforce, matching the HMAC minimum-length policy already
+ * applied to HS*.
+ *
+ * @param {KeyObject} key
+ * @param {import('./algorithms.js').AlgDescriptor} meta
+ * @param {string} alg
+ */
+function _assertRsaModulus(key, meta, alg) {
+  if (meta.family !== 'RSA' && meta.family !== 'RSA-PSS') return;
+  const details = key.asymmetricKeyDetails;
+  const modulusLength = details && details.modulusLength;
+  if (typeof modulusLength === 'number' && modulusLength < 2048) {
+    throw new JwsError(
+      ErrorCode.INVALID_KEY,
+      `alg ${alg} requires an RSA key of at least 2048 bits (RFC 7518 §3.3 / §3.5); got ${modulusLength}`,
+    );
+  }
 }
 
 /**
@@ -126,10 +149,13 @@ async function _fromJwk(jwk, meta, direction, alg) {
   }
 
   try {
-    return hasPrivate
+    const keyObj = hasPrivate
       ? createPrivateKey({ key: /** @type {any} */ (jwk), format: 'jwk' })
       : createPublicKey({ key: /** @type {any} */ (jwk), format: 'jwk' });
+    _assertRsaModulus(keyObj, meta, alg);
+    return keyObj;
   } catch (err) {
+    if (err instanceof JwsError) throw err;
     throw new JwsError(
       ErrorCode.INVALID_KEY,
       `alg ${alg}: node:crypto rejected the JWK — ${err instanceof Error ? err.message : String(err)}`,

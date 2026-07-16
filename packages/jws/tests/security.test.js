@@ -231,6 +231,39 @@ test('RFC 7518 §3.2: HS512 requires at least 64-byte secret', async () => {
 });
 
 // DoS surface
+// RFC 7518 §3.3 / §3.5 — RSA minimum modulus size (RS/PS algorithms)
+test('RFC 7518 §3.3: RS256 refuses RSA-1024 KeyObject', async () => {
+  const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 1024 });
+  await assert.rejects(
+    () => sign({}, privateKey, { alg: 'RS256' }),
+    err => err instanceof JwsError && err.code === ErrorCode.INVALID_KEY,
+  );
+  // verify path guarded too
+  const encHeader = _b64uJson({ alg: 'RS256' });
+  const encPayload = _b64uJson({ x: 1 });
+  const encSig = Buffer.alloc(128).toString('base64url');
+  await assert.rejects(
+    () => verify(`${encHeader}.${encPayload}.${encSig}`, publicKey, { alg: ['RS256'] }),
+    err => err instanceof JwsError && err.code === ErrorCode.INVALID_KEY,
+  );
+});
+
+test('RFC 7518 §3.5: PS384 refuses RSA-1024 JWK', async () => {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 1024 });
+  const rsaJwk = privateKey.export({ format: 'jwk' });
+  await assert.rejects(
+    () => sign({ x: 1 }, rsaJwk, { alg: 'PS384' }),
+    err => err instanceof JwsError && err.code === ErrorCode.INVALID_KEY,
+  );
+});
+
+test('RFC 7518 §3.3: RSA-2048 is accepted (regression against over-eager rejection)', async () => {
+  const { publicKey, privateKey } = rsa2048();
+  const token = await sign({ ok: true }, privateKey, { alg: 'RS256' });
+  const { payload } = await verify(token, publicKey, { alg: ['RS256'] });
+  assert.deepEqual(payload, { ok: true });
+});
+
 test('DoS guard: token larger than 1 MB refused via maxTokenSize=1024', async () => {
   // Build an oversized token — just repeat a base64url char.
   const large = 'a'.repeat(2000);
