@@ -33,7 +33,7 @@ time.
 | 02 | [`@exortek/password`](/password) | Argon2id / scrypt / bcrypt / PBKDF2, strength scoring, HIBP breach check, peppering  |
 | 03 | [`@exortek/otp`](/otp)           | TOTP / HOTP, backup codes, QR provisioning URI                                       |
 | 04 | `@exortek/challenge`             | e-mail / SMS one-time code storage + verification                                    |
-| 05 | `@exortek/jwk`                   | JWK ↔ PEM ↔ DER converters, key rotation                                             |
+| 05 | `@exortek/jwk`                   | generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278 thumbprints |
 | 06 | `@exortek/jws`                   | JOSE signed payloads (compact + JSON)                                                |
 | 07 | `@exortek/jwt`                   | JWT sign / verify with algorithm allowlists, clock skew                              |
 | 08 | `@exortek/jwe`                   | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                       |
@@ -43,7 +43,7 @@ time.
 | 12 | `@exortek/device`                | device fingerprinting, trusted-device tokens                                         |
 | 13 | `@exortek/apikey`                | prefixed API keys (`sk_live_...`), rate-limited by default                           |
 | 14 | `@exortek/magic-link`            | passwordless email / SMS link tokens                                                 |
-| 15 | `@exortek/passkey`               | WebAuthn / FIDO2 (server + browser client)                                           |
+| 15 | `@exortek/passkey`               | WebAuthn / FIDO2 server verification (browser side via `@simplewebauthn/browser`)    |
 | 16 | `@exortek/opaque`                | OPAQUE (aPAKE) — zero-knowledge password auth                                        |
 | 17 | `@exortek/paseto`                | PASETO v4 (`local` / `public`)                                                       |
 | 18 | `@exortek/oauth2`                | OAuth 2.1 client (PKCE) + provider presets                                           |
