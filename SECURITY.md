@@ -11,6 +11,7 @@ lines are not patched unless the project has an explicit LTS commitment (none do
 | `@exortek/security` | `1.x` — current |
 | `@exortek/otp`      | `1.x` — current |
 | `@exortek/password` | `1.x` — current |
+| `@exortek/session`  | `1.x` — current |
 
 Everything else in the roadmap is **not yet published** — file bug reports through the usual template once a version is
 out.
