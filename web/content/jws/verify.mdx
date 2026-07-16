@@ -128,6 +128,15 @@ const { payload } = await verify(token, secret, { alg: ['HS256'] })
 `b64` is one of the two built-in known `crit` names, so tokens with
 `crit: ['b64']` pass without an explicit `knownCriticalHeaders` opt-in.
 
+<Callout type="info">
+  **A note on strictness.** RFC 7797 §5.1 says a JOSE-profile producer
+  MUST set `crit: ["b64"]` alongside `b64: false`; RFC 7797 §6 permits
+  private-agreement deployments to omit `crit`. `verify` follows the
+  permissive reading — it honours `b64: false` even when `crit` is
+  absent — for interop with libraries that emit that shape. Our own
+  `sign` always injects `crit` when writing `b64: false`.
+</Callout>
+
 ## Errors
 
 | Code                       | When                                                                                              |

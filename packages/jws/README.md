@@ -3,7 +3,7 @@
 > JSON Web Signature for Node.js 22+ — **RFC 7515** (JWS core), **RFC 7518 §3** (JWA), **RFC 7797** (unencoded payload), **RFC 8037** (Ed25519 / Ed448), **RFC 8812** (`secp256k1`), **RFC 8725** (BCP). Zero-dependency, built on `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/jws.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/jws)
-[![tests](https://img.shields.io/badge/tests-97%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-103%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/jws.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/jws)](https://packagephobia.com/result?p=@exortek/jws)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
@@ -98,6 +98,18 @@ Unencoded payload (RFC 7797):
 ```js
 await sign('opaque protocol frame', secret, { alg: 'HS256', b64: false })
 // header.b64 = false, crit = ['b64'] auto-added.
+```
+
+Detached + unencoded together — canonical form for `x-jws-signature` (Open
+Banking) and JAdES:
+
+```js
+const { token, detached } = await signDetached(payloadBuf, key, {
+  alg: 'ES256',
+  b64: false,
+})
+await verifyDetached(token, detached, publicKey, { alg: ['ES256'] })
+// b64:false detached tolerates '.' in the payload — no compact-form ambiguity.
 ```
 
 JSON serialisation with multiple signers:
@@ -202,9 +214,16 @@ credible JS alternative you can plug into your own code path.
   are padded per the spec.
 - **HMAC verification is timing-safe.** `crypto.timingSafeEqual` on
   equal-length digest buffers.
+- **HMAC secret length enforced (RFC 7518 §3.2).** HS256 ≥ 32 B,
+  HS384 ≥ 48 B, HS512 ≥ 64 B — short secrets raise `INVALID_KEY` at the
+  sign call, never quietly downgraded.
+- **RSA modulus length enforced (RFC 7518 §3.3 / §3.5).** RS/PS keys
+  under 2048 bits are refused with `INVALID_KEY`, matching the HMAC
+  policy above.
 - **`crit` and `b64` handled correctly.** `b64: false` auto-injects `crit:
   ['b64']` per RFC 7797 §5.1; unknown critical params refuse; `crit`
-  cannot list itself.
+  cannot list itself. `detached + b64:false` fully supported for
+  `x-jws-signature` / JAdES interop.
 - **`maxTokenSize` DoS guard** — default 8 KB, configurable per call.
 
 ## Links

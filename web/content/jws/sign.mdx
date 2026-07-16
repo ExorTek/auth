@@ -60,9 +60,15 @@ await sign(Buffer.from([1,2,3]), key, { alg: 'HS256' })   // raw bytes
 | JWK object (`{ kty, ... }`)    | All algorithms. Must include the private component (`d` / `k`) for signing.       |
 
 <Callout type="warning">
-  HMAC secrets must meet the RFC 7518 §3.2 minimum — 32 bytes for HS256, 48 for
-  HS384, 64 for HS512. Shorter secrets raise `INVALID_KEY` at the sign call, not
-  quietly downgraded.
+  **Minimum key material:**
+
+  - **HMAC (RFC 7518 §3.2)** — HS256 ≥ 32 B, HS384 ≥ 48 B, HS512 ≥ 64 B.
+  - **RSA (RFC 7518 §3.3 / §3.5)** — RS/PS keys must have a modulus of at
+    least **2048 bits**. Enforced whether the key arrives as a `KeyObject`
+    or a JWK.
+
+  Both minimums raise `INVALID_KEY` at the sign call — never quietly
+  downgraded.
 </Callout>
 
 ## Modes
@@ -96,6 +102,20 @@ const { token, detached } = await signDetached(bigBuffer, key, {
 `signDetached` requires a `Buffer` or `Uint8Array` payload — strings and
 objects raise `INVALID_PAYLOAD`. The caller decides the byte encoding.
 
+**Detached + `b64: false`** — the canonical form for `x-jws-signature`
+(Open Banking) and JAdES. Set both options together; the emitted token
+still has an empty payload segment, and the signing input is
+`encHeader.rawBytes` (not base64url). `.` bytes in the payload are fine
+here because the compact form has no ambiguity when the payload segment
+is empty.
+
+```js
+const { token, detached } = await signDetached(payloadBuf, key, {
+  alg: 'ES256',
+  b64: false,
+})
+```
+
 </Tabs.Tab>
 <Tabs.Tab>
 
@@ -114,7 +134,8 @@ const token = await sign('opaque protocol frame', secret, {
 <Callout type="warning">
   Payload contents cannot include `.` in `b64: false` compact form — the
   segment separator is otherwise ambiguous. Both string and byte payloads
-  are guarded; a `.` raises `INVALID_PAYLOAD`.
+  are guarded; a `.` raises `INVALID_PAYLOAD`. (The detached tab shows the
+  b64:false + detached combination where the guard does not apply.)
 </Callout>
 
 </Tabs.Tab>
