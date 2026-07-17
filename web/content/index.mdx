@@ -22,6 +22,7 @@ JavaScript with JSDoc → `.d.ts`. Runs under Express, Fastify, Hono, and Elysia
 | **[`@exortek/password`](/password)** |  `1.x`  |
 | **[`@exortek/session`](/session)**   |  `1.x`  |
 | **[`@exortek/jwk`](/jwk)**           |  `1.x`  |
+| **[`@exortek/jws`](/jws)**           |  `1.x`  |
 
 ## The stack
 
@@ -35,7 +36,7 @@ time.
 | 03 | [`@exortek/otp`](/otp)           | TOTP / HOTP, backup codes, QR provisioning URI                                       |
 | 04 | `@exortek/challenge`             | e-mail / SMS one-time code storage + verification                                    |
 | 05 | [`@exortek/jwk`](/jwk)           | generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278 thumbprints |
-| 06 | `@exortek/jws`                   | JOSE signed payloads (compact + JSON)                                                |
+| 06 | [`@exortek/jws`](/jws)           | JWS compact + JSON, detached (§F), `b64:false`, HS / RS / PS / ES / EdDSA + secp256k1 |
 | 07 | `@exortek/jwt`                   | JWT sign / verify with algorithm allowlists, clock skew                              |
 | 08 | `@exortek/jwe`                   | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                       |
 | 09 | `@exortek/jwks`                  | JWKS URI fetching, caching, `kid` rotation                                           |
@@ -64,6 +65,7 @@ npm install @exortek/otp
 npm install @exortek/password         # + optional: argon2, bcryptjs
 npm install @exortek/session          # + optional: ioredis or redis
 npm install @exortek/jwk
+npm install @exortek/jws
 ```
 
 Node.js **22 or newer**.
@@ -81,6 +83,8 @@ Node.js **22 or newer**.
   impersonation, concurrent limits, Redis pub/sub, CSRF derivation, trusted-device cookie, and 4 framework adapters.
 - **[`@exortek/jwk` reference →](/jwk)** — generate / import / export EC · RSA · OKP · oct keys, RFC 7638 + 9278
   thumbprints, `toPublic()` / `matches()` / strict `use` × `key_ops` consistency.
+- **[`@exortek/jws` reference →](/jws)** — JWS compact + JSON serialisation, detached content, unencoded payload,
+  mandatory `alg` allowlist, `alg: 'none'` refused everywhere, granular `ErrorCode` enum.
 - **[Source](https://github.com/ExorTek/auth)** — GitHub repo.
 - **[Contributing](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md)** — branch prefixes, commit conventions,
   changeset flow.
