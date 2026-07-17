@@ -163,6 +163,15 @@ test('RFC 7518 §3.2: HS384 refuses short secret (INVALID_KEY)', async () => {
   );
 });
 
+test('RFC 7518 §3.2: HS256 refuses short-secret KeyObject (INVALID_KEY)', async () => {
+  const { createSecretKey } = await import('node:crypto');
+  const shortKey = createSecretKey(Buffer.from('x'));
+  await assert.rejects(
+    () => sign({}, shortKey, { alg: 'HS256' }),
+    err => err.code === ErrorCode.INVALID_KEY,
+  );
+});
+
 test('RFC 7518 §3.3: RS256 refuses RSA-1024 KeyObject (INVALID_KEY)', async () => {
   const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 1024 });
   await assert.rejects(

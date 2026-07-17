@@ -161,6 +161,12 @@ function _assertKeyObject(key, meta, direction, alg) {
     if (key.type !== 'secret') {
       throw new JwtError(ErrorCode.INVALID_KEY, `alg ${alg} requires a secret KeyObject; got type=${key.type}`);
     }
+    if (meta.hmacMinBytes && typeof key.symmetricKeySize === 'number' && key.symmetricKeySize < meta.hmacMinBytes) {
+      throw new JwtError(
+        ErrorCode.INVALID_KEY,
+        `alg ${alg} requires a secret of at least ${meta.hmacMinBytes} bytes (RFC 7518 §3.2); got ${key.symmetricKeySize}`,
+      );
+    }
     return;
   }
   if (direction === 'sign' && key.type !== 'private') {
