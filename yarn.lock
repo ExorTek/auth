@@ -360,6 +360,20 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@exortek/jwt@workspace:packages/jwt":
+  version: 0.0.0-use.local
+  resolution: "@exortek/jwt@workspace:packages/jwt"
+  peerDependencies:
+    ioredis: ">=5.0.0"
+    redis: ">=4.0.0"
+  peerDependenciesMeta:
+    ioredis:
+      optional: true
+    redis:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
 "@exortek/otp@workspace:packages/otp":
   version: 0.0.0-use.local
   resolution: "@exortek/otp@workspace:packages/otp"

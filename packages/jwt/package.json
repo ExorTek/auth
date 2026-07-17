@@ -1,0 +1,90 @@
+{
+  "name": "@exortek/jwt",
+  "version": "0.0.0",
+  "description": "JSON Web Token (JWT) — RFC 7519 / RFC 7518 / RFC 8725 / RFC 9068 for Node.js 22+. sign / verify / decode / peek, tokenPair (access + refresh) with reuse detection, blacklist store (memory / redis / custom), claims validation (exp / nbf / iat / iss / aud / sub / jti / nonce / typ / maxAge / scope), PEM + X.509 cert input, custom fn escape hatch on every knob. Alg allowlist mandatory. `none` never accepted. Zero-dependency, built on node:crypto.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./token-pair": {
+      "types": "./dist/token-pair.d.ts",
+      "import": "./dist/token-pair.mjs",
+      "require": "./dist/token-pair.cjs"
+    },
+    "./stores": {
+      "types": "./dist/stores.d.ts",
+      "import": "./dist/stores.mjs",
+      "require": "./dist/stores.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+  },
+  "peerDependencies": {
+    "ioredis": ">=5.0.0",
+    "redis": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ioredis": {
+      "optional": true
+    },
+    "redis": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "backend",
+    "security",
+    "jwt",
+    "jose",
+    "jsonwebtoken",
+    "rfc-7519",
+    "rfc-8725",
+    "rfc-9068",
+    "access-token",
+    "refresh-token",
+    "token-pair",
+    "reuse-detection",
+    "revocation",
+    "blacklist",
+    "hs256",
+    "rs256",
+    "es256",
+    "eddsa",
+    "node-crypto"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/jwt#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git",
+    "directory": "packages/jwt"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
