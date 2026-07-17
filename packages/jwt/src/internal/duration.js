@@ -20,6 +20,13 @@
  * The parser is deliberately strict — anything it doesn't understand
  * raises {@link ErrorCode.INVALID_ARGUMENT} instead of silently
  * defaulting.
+ *
+ * Cross-package note: `@exortek/session` and `@exortek/crypto` ship
+ * duration parsers with the same unit alphabet (`ms|s|m|h|d|w`) but
+ * they return **milliseconds** and accept a stricter grammar (no
+ * long/plural forms, no fractional values, no whitespace). Every
+ * short-form value accepted here is accepted there too; a long-form
+ * value like `'15 minutes'` is jwt-only.
  */
 
 import { JwtError, ErrorCode } from './errors.js';
