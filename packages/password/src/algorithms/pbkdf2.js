@@ -25,6 +25,12 @@ const HASH_ITERATIONS = Object.freeze({
 
 const SUPPORTED_HASHES = new Set(['sha256', 'sha512']);
 
+// Sanity ceiling on iterations read back from a stored PHC hash. A
+// poisoned row with i=10^9 would otherwise turn every login attempt
+// into a multi-second CPU DoS. 10M covers OWASP's outer target by ~16×
+// and still returns in well under a second on commodity hardware.
+const MAX_VERIFY_ITERATIONS = 10_000_000;
+
 /**
  * @typedef {'sha256' | 'sha512'} Pbkdf2HashName
  */
@@ -103,7 +109,7 @@ export async function verify(password, phcHash) {
   }
   const hashName = record.algorithm === 'pbkdf2-sha256' ? 'sha256' : 'sha512';
   const iterations = Number(record.params.i);
-  if (!Number.isInteger(iterations) || iterations < 1) {
+  if (!Number.isInteger(iterations) || iterations < 1 || iterations > MAX_VERIFY_ITERATIONS) {
     return false;
   }
   let pwBytes;

@@ -48,3 +48,15 @@ test('pbkdf2.needsRehash: sha256 vs sha512 target mismatch → true', async () =
 test('pbkdf2: unsupported hash rejected', async () => {
   await assert.rejects(pbkdf2.hash('pw', { hash: 'md5', iterations: 1000 }));
 });
+
+test('pbkdf2.verify: rejects poisoned iteration counts (DoS ceiling)', async () => {
+  // A poisoned DB row with i beyond the sanity ceiling must be rejected
+  // without spending CPU on the derivation.
+  const poisoned =
+    '$pbkdf2-sha256$i=100000000000$c2FsdC1zYWx0LXNhbHQtc2FsdA$aGFzaC1oYXNoLWhhc2gtaGFzaC1oYXNoLWhhc2gtaGFzaC1oYQ';
+  const t0 = Date.now();
+  const ok = await pbkdf2.verify('pw', poisoned);
+  const elapsed = Date.now() - t0;
+  assert.equal(ok, false);
+  assert.ok(elapsed < 100, `poisoned verify should short-circuit, took ${elapsed}ms`);
+});
