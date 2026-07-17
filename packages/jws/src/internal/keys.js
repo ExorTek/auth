@@ -97,7 +97,9 @@ function _assertKeyObject(key, meta, direction, alg) {
  * @param {string} alg
  */
 function _assertRsaModulus(key, meta, alg) {
-  if (meta.family !== 'RSA' && meta.family !== 'RSA-PSS') return;
+  if (meta.family !== 'RSA' && meta.family !== 'RSA-PSS') {
+    return;
+  }
   const details = key.asymmetricKeyDetails;
   const modulusLength = details && details.modulusLength;
   if (typeof modulusLength === 'number' && modulusLength < 2048) {
@@ -155,7 +157,9 @@ async function _fromJwk(jwk, meta, direction, alg) {
     _assertRsaModulus(keyObj, meta, alg);
     return keyObj;
   } catch (err) {
-    if (err instanceof JwsError) throw err;
+    if (err instanceof JwsError) {
+      throw err;
+    }
     throw new JwsError(
       ErrorCode.INVALID_KEY,
       `alg ${alg}: node:crypto rejected the JWK — ${err instanceof Error ? err.message : String(err)}`,
