@@ -71,6 +71,19 @@ export async function validateClaims(payload, header, options) {
     throw new JwtError(ErrorCode.INVALID_PAYLOAD, 'verify: `iat` claim must be a NumericDate');
   }
 
+  if (opts.maxAge !== undefined) {
+    if (typeof payload.iat !== 'number') {
+      throw new JwtError(ErrorCode.MISSING_CLAIM, 'verify: `maxAge` requires `iat` in the token; got none');
+    }
+    const maxAgeSec = parseDuration(opts.maxAge);
+    if (payload.iat + maxAgeSec + tolerance < now) {
+      throw new JwtError(
+        ErrorCode.TOKEN_TOO_OLD,
+        `verify: token is older than maxAge (${opts.maxAge}); iat=${new Date(payload.iat * 1000).toISOString()}`,
+      );
+    }
+  }
+
   if (opts.typ !== undefined) {
     const expected = Array.isArray(opts.typ) ? opts.typ : [opts.typ];
     if (typeof header.typ !== 'string' || !expected.includes(header.typ)) {
@@ -80,6 +93,155 @@ export async function validateClaims(payload, header, options) {
       );
     }
   }
+
+  if (payload.sub !== undefined && typeof payload.sub !== 'string') {
+    throw new JwtError(
+      ErrorCode.INVALID_SUBJECT,
+      'verify: `sub` claim must be a case-sensitive string (RFC 7519 §4.1.2)',
+    );
+  }
+  if (opts.subject !== undefined) {
+    if (typeof opts.subject !== 'string') {
+      throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'verify: options.subject must be a string');
+    }
+    if (payload.sub !== opts.subject) {
+      throw new JwtError(
+        ErrorCode.INVALID_SUBJECT,
+        `verify: token sub ${JSON.stringify(payload.sub)} does not match expected ${JSON.stringify(opts.subject)}`,
+      );
+    }
+  }
+
+  if (opts.issuer !== undefined) {
+    if (payload.iss === undefined) {
+      throw new JwtError(ErrorCode.INVALID_ISSUER, 'verify: token is missing an `iss` claim');
+    }
+    const ok = await _matchClaim(opts.issuer, /** @type {string} */ (payload.iss));
+    if (!ok) {
+      throw new JwtError(
+        ErrorCode.INVALID_ISSUER,
+        `verify: token iss ${JSON.stringify(payload.iss)} does not match the caller's expected issuer`,
+      );
+    }
+  }
+
+  if (opts.audience !== undefined) {
+    const claimed = Array.isArray(payload.aud)
+      ? /** @type {string[]} */ (payload.aud)
+      : payload.aud !== undefined
+        ? [/** @type {string} */ (payload.aud)]
+        : [];
+    if (claimed.length === 0) {
+      throw new JwtError(ErrorCode.INVALID_AUDIENCE, 'verify: token is missing an `aud` claim');
+    }
+    for (const value of claimed) {
+      if (typeof value !== 'string') {
+        throw new JwtError(
+          ErrorCode.INVALID_AUDIENCE,
+          `verify: token \`aud\` entries must be strings; got ${JSON.stringify(value)}`,
+        );
+      }
+    }
+    let matched = false;
+    for (const value of claimed) {
+      if (await _matchClaim(opts.audience, value)) {
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      throw new JwtError(
+        ErrorCode.INVALID_AUDIENCE,
+        `verify: token aud [${claimed.map(a => JSON.stringify(a)).join(', ')}] does not match the caller's expected audience`,
+      );
+    }
+  }
+
+  if (opts.nonce !== undefined) {
+    if (typeof opts.nonce !== 'string') {
+      throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'verify: options.nonce must be a string');
+    }
+    if (payload.nonce !== opts.nonce) {
+      throw new JwtError(ErrorCode.INVALID_NONCE, 'verify: token `nonce` does not match the caller-supplied value');
+    }
+  }
+
+  if (opts.requiredClaims && opts.requiredClaims.length > 0) {
+    for (const name of opts.requiredClaims) {
+      if (!(name in payload) || payload[name] === undefined) {
+        throw new JwtError(
+          ErrorCode.MISSING_CLAIM,
+          `verify: required claim ${JSON.stringify(name)} is missing from the payload`,
+        );
+      }
+    }
+  }
+
+  if (opts.requiredScopes && opts.requiredScopes.length > 0) {
+    const scopeSet = _extractScopes(payload);
+    for (const required of opts.requiredScopes) {
+      if (!scopeSet.has(required)) {
+        throw new JwtError(
+          ErrorCode.INSUFFICIENT_SCOPE,
+          `verify: token is missing required scope ${JSON.stringify(required)}`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Match a single claim value against a matcher. Matcher can be a string
+ * (exact), a RegExp (test), an array of either, or an async predicate
+ * function returning boolean.
+ *
+ * @param {string | string[] | RegExp | Array<string | RegExp> | ((claimed: string) => boolean | Promise<boolean>)} matcher
+ * @param {string} value
+ * @returns {Promise<boolean>}
+ */
+async function _matchClaim(matcher, value) {
+  if (typeof matcher === 'function') {
+    return Boolean(await matcher(value));
+  }
+  if (typeof matcher === 'string') {
+    return matcher === value;
+  }
+  if (matcher instanceof RegExp) {
+    return matcher.test(value);
+  }
+  if (Array.isArray(matcher)) {
+    for (const entry of matcher) {
+      if (typeof entry === 'string' && entry === value) {
+        return true;
+      }
+      if (entry instanceof RegExp && entry.test(value)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  throw new JwtError(
+    ErrorCode.INVALID_ARGUMENT,
+    'claims matcher must be string | RegExp | array of either | async predicate function',
+  );
+}
+
+/**
+ * Extract OAuth2 scopes from the payload. Standard OAuth2 encodes them
+ * as space-separated `scope` (RFC 8693 §4.2), but some deployments use
+ * an array `scp`. Support both.
+ *
+ * @param {Record<string, unknown>} payload
+ * @returns {Set<string>}
+ */
+function _extractScopes(payload) {
+  if (typeof payload.scope === 'string') {
+    return new Set(payload.scope.split(/\s+/).filter(Boolean));
+  }
+  if (Array.isArray(payload.scp)) {
+    return new Set(/** @type {unknown[]} */ (payload.scp).filter(x => typeof x === 'string'));
+  }
+  return new Set();
 }
 
 /**
