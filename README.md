@@ -1,6 +1,6 @@
 # @exortek/auth
 
-A framework-agnostic authentication toolkit for Node.js — designed as 22 small packages under one scope; **6 are
+A framework-agnostic authentication toolkit for Node.js — designed as 22 small packages under one scope; **7 are
 published today** (see Shipping below), the rest are planned. Pick the one you need. Built on `node:crypto`.
 
 [![license](https://img.shields.io/github/license/ExorTek/auth?color=blue)](./LICENSE)
@@ -17,6 +17,7 @@ published today** (see Shipping below), the rest are planned. Pick the one you n
 | [`@exortek/password`](./packages/password) — Argon2id / scrypt / bcrypt / PBKDF2 + strength / policy / generate / pepper (rotation) / history / HIBP + constant-time verify       | [![npm](https://img.shields.io/npm/v/@exortek/password.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/password) | [auth.memet.dev/password](https://auth.memet.dev/password) |
 | [`@exortek/session`](./packages/session) — sealed-cookie sessions, rotation, revocation, sudo mode, impersonation, concurrent limits, Redis pub/sub + Fastify/Express/Hono/Elysia |  [![npm](https://img.shields.io/npm/v/@exortek/session.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/session)  | [auth.memet.dev/session](https://auth.memet.dev/session)   |
 | [`@exortek/jwk`](./packages/jwk) — generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278 thumbprints, `toPublic()` / `matches()` differentiators           |      [![npm](https://img.shields.io/npm/v/@exortek/jwk.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/jwk)      | [auth.memet.dev/jwk](https://auth.memet.dev/jwk)           |
+| [`@exortek/jws`](./packages/jws) — JSON Web Signature (RFC 7515) — compact + JSON serialisation, detached (§F), unencoded payload (RFC 7797), HS / RS / PS / ES / EdDSA           |      [![npm](https://img.shields.io/npm/v/@exortek/jws.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/jws)      | [auth.memet.dev/jws](https://auth.memet.dev/jws)           |
 
 ## The stack
 
@@ -30,7 +31,7 @@ Linked entries are **published on npm**; the rest are **planned** and not yet in
 | 03 | [`@exortek/otp`](./packages/otp)           | shipped   | TOTP / HOTP, backup codes, QR provisioning URI                                           |
 | 04 | `@exortek/challenge`                       | _planned_ | e-mail / SMS one-time code storage + verification                                        |
 | 05 | [`@exortek/jwk`](./packages/jwk)           | shipped   | generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278 thumbprints |
-| 06 | `@exortek/jws`                             | _planned_ | JOSE signed payloads (compact + JSON)                                                    |
+| 06 | [`@exortek/jws`](./packages/jws)           | shipped   | JWS compact + JSON, detached, `b64:false`, HS / RS / PS / ES / EdDSA + secp256k1          |
 | 07 | `@exortek/jwt`                             | _planned_ | JWT sign / verify with algorithm allowlists, clock skew                                  |
 | 08 | `@exortek/jwe`                             | _planned_ | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                           |
 | 09 | `@exortek/jwks`                            | _planned_ | JWKS URI fetching, caching, `kid` rotation                                               |
@@ -59,6 +60,7 @@ npm install @exortek/otp
 npm install @exortek/password
 npm install @exortek/session
 npm install @exortek/jwk
+npm install @exortek/jws
 ```
 
 Node.js **22 or newer**.
