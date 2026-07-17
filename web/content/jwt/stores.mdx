@@ -29,7 +29,7 @@ const store = createStore('memory', {
 | ---------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
 | `interval` | `setInterval` sweep (default 5 min). Timer is `unref()`'d so it never blocks process exit.        | Default. High-churn workloads, background workers.           |
 | `lazy`     | No timer. Expiry checked inside `has` / `get`.                                                    | Zero background CPU. Serverless / short-lived processes.    |
-| `lru`      | `interval` sweep + `maxSize` cap. Oldest insertion evicted when the cap is exceeded.              | Bounded memory. Sub-second churn where expiry alone lags.   |
+| `lru`      | `interval` sweep + `maxSize` cap. Oldest insertion evicted when the cap is exceeded.              | Bounded memory for **refresh-token** stores. **Never for revocation blacklists** — eviction silently un-revokes tokens. |
 
 ### Options
 
@@ -42,6 +42,14 @@ createStore('memory', {
   },
 })
 ```
+
+<Callout type="warning">
+  Do **not** use `lru` for a **revocation blacklist**. LRU eviction drops
+  the oldest-inserted record regardless of its expiry, which for a
+  blacklist silently re-enables a revoked token as soon as the cap is
+  hit. `lru` is intended for refresh-token stores where the cap is a
+  ceiling on live sessions.
+</Callout>
 
 ## `redis` — native TTL
 
