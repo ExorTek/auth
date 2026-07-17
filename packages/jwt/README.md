@@ -156,9 +156,9 @@ await tokenPair.revokeAll(familyId,   { store })
 
 | Subpath                                                | Purpose                                                                                       |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| [`@exortek/jwt`](./src/index.js)                       | `sign`, `verify`, `peek`, `decode`, `decodeProtectedHeader`                                    |
-| [`@exortek/jwt/token-pair`](./src/token-pair.js)       | `tokenPair.create / .rotate / .revoke / .revokeAll` with RFC 6749 §10.4 reuse detection       |
-| [`@exortek/jwt/stores`](./src/stores.js)               | `createStore('memory' \| 'redis' \| 'custom', ...)` with interval / lazy / lru GC strategies  |
+| [`@exortek/jwt`](https://github.com/ExorTek/auth/blob/master/packages/jwt/src/index.js)             | `sign`, `verify`, `peek`, `decode`, `decodeProtectedHeader`                                    |
+| [`@exortek/jwt/token-pair`](https://github.com/ExorTek/auth/blob/master/packages/jwt/src/token-pair.js) | `tokenPair.create / .rotate / .revoke / .revokeAll` with RFC 6749 §10.4 reuse detection       |
+| [`@exortek/jwt/stores`](https://github.com/ExorTek/auth/blob/master/packages/jwt/src/stores.js)     | `createStore('memory' \| 'redis' \| 'custom', ...)` with interval / lazy / lru GC strategies  |
 
 ## Error handling
 
@@ -229,7 +229,7 @@ plug into your own code path.
 
 - **Source:** [github.com/ExorTek/auth](https://github.com/ExorTek/auth)
 - **Issues:** [github.com/ExorTek/auth/issues](https://github.com/ExorTek/auth/issues)
-- **Changelog:** [CHANGELOG.md](./CHANGELOG.md)
+- **Changelog:** [CHANGELOG.md](https://github.com/ExorTek/auth/blob/master/packages/jwt/CHANGELOG.md)
 
 ## License
 
