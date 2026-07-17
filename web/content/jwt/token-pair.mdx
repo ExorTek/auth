@@ -56,7 +56,7 @@ const { accessToken, refreshToken, accessExpiresAt, refreshExpiresAt, familyId }
 | `access`                 | `SignOptions`                                    | Same shape as `sign`'s options — `alg` mandatory, `expiresIn` recommended.                 |
 | `refresh.alg`            | `string`                                         | REQUIRED. Unused when `opaque: true` (default) but validated for consistency.              |
 | `refresh.expiresIn`      | `string \| number`                               | REQUIRED. `'7d'`, `'30d'`, etc.                                                             |
-| `refresh.opaque`         | `boolean`                                        | Default `true` — random string. `false` → signed JWT refresh carrying the family reference. |
+| `refresh.opaque`         | `boolean`                                        | Default `true` — random string. `false` → signed JWT refresh carrying the family reference. See note below. |
 | `refresh.tokenSize`      | `number`                                         | Default 32 bytes.                                                                          |
 | `refresh.encoding`       | `'base64url' \| 'base64' \| 'hex' \| 'crockford' \| 'uuid'` | Default `'base64url'`.                                                       |
 | `refresh.hashAlgo`       | `'sha256' \| 'sha384' \| 'sha512'`               | Default `'sha256'`. What the store key is derived by.                                       |
@@ -64,6 +64,16 @@ const { accessToken, refreshToken, accessExpiresAt, refreshExpiresAt, familyId }
 | `refresh.generate`       | `async () => { plaintext, storeKey }`             | Full custom generator — wins over `hashFn`.                                                 |
 | `refresh.store`          | `Store`                                          | REQUIRED. From `createStore(...)`.                                                          |
 | `familyId`               | `string`                                         | Override the auto-generated family id (e.g. re-use across devices for one session).         |
+
+<Callout type="info">
+  **Signed-JWT refresh (`opaque: false`) — the signature is decorative.**
+  `rotate` authorises the refresh purely by its store record (looked up
+  via `hashFn(plaintext)`); the JWT signature is never re-verified on
+  rotation. Treat the JWT layer as an application-visible envelope, not
+  as an added security boundary — the store is the sole authority on
+  which refresh tokens are live. Default `opaque: true` is the
+  simpler, equivalent choice.
+</Callout>
 
 ### Custom generator example
 
