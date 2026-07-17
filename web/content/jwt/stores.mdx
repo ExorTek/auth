@@ -1,0 +1,121 @@
+---
+title: 'jwt.stores — blacklist / refresh adapters'
+sidebarTitle: stores
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwt.stores`
+
+`createStore('memory' | 'redis' | 'custom', ...)` — three built-in
+adapters for the blacklist / refresh-token registry that `tokenPair`
+(and any custom blacklist path) rides on.
+
+```js
+import { createStore } from '@exortek/jwt/stores'
+```
+
+## `memory` — in-process with configurable GC
+
+```js
+const store = createStore('memory', {
+  gc: { strategy: 'interval', interval: '5m' },   // default
+})
+```
+
+### GC strategies
+
+| Strategy   | How it works                                                                                     | Use when                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| `interval` | `setInterval` sweep (default 5 min). Timer is `unref()`'d so it never blocks process exit.        | Default. High-churn workloads, background workers.           |
+| `lazy`     | No timer. Expiry checked inside `has` / `get`.                                                    | Zero background CPU. Serverless / short-lived processes.    |
+| `lru`      | `interval` sweep + `maxSize` cap. Oldest insertion evicted when the cap is exceeded.              | Bounded memory. Sub-second churn where expiry alone lags.   |
+
+### Options
+
+```js
+createStore('memory', {
+  gc: {
+    strategy: 'lru',
+    interval: '1m',        // string or seconds
+    maxSize: 10_000,       // caps evict oldest first
+  },
+})
+```
+
+## `redis` — native TTL
+
+```js
+import Redis from 'ioredis'                   // or: import { createClient } from 'redis'
+const client = new Redis(process.env.REDIS_URL)
+
+const store = createStore('redis', {
+  client,
+  keyPrefix: 'auth:jwt:',
+})
+```
+
+The client is auto-detected — `ioredis` uses positional `EX` args,
+`redis@4` uses an options object. Both work without config.
+
+<Callout type="info">
+  Redis TTL is native (`SET … EX ttl`), so no interval GC is needed. The
+  `keyPrefix` also enables safe `deleteAll` via `SCAN` + prefix
+  matching.
+</Callout>
+
+## `custom` — bring your own KV
+
+```js
+const impl = {
+  async add(key, expiresAt, metadata) { … },
+  async has(key) { … },
+  async get(key) { … },
+  async delete(key) { … },
+  async deleteAll(filter) { … },
+  size() { … },
+  _stop() { … },
+}
+
+const store = createStore('custom', { impl })
+```
+
+Every method receives / returns the same shape the built-ins do. Wire
+up MongoDB, SQLite, DynamoDB, Cloudflare KV, or any other backing
+store.
+
+## `Store` shape
+
+```ts
+interface Store {
+  add(key: string, expiresAt: number, metadata?: object): Promise<void>
+  has(key: string): Promise<boolean>
+  get(key: string): Promise<{ expiresAt: number, metadata?: object } | null>
+  delete(key: string): Promise<void>
+  deleteAll(filter: Record<string, unknown>): Promise<number>
+  size(): number                       // memory only; redis throws
+  _stop(): void
+}
+```
+
+- `expiresAt` is a NumericDate (seconds since epoch).
+- `metadata` is opaque — used by `tokenPair` for `familyId`, `payload`,
+  `usedAt`. Custom stores must persist and return it verbatim.
+- `deleteAll({ familyId: 'F1' })` matches on **metadata field equality**
+  and returns the count of removed entries. `tokenPair.revokeAll`
+  depends on it.
+
+## Errors
+
+Every failure raises `STORE_ERROR` with the underlying error preserved
+in `err.cause`:
+
+```js
+try {
+  await store.add(key, expiresAt)
+} catch (err) {
+  if (err.code === 'STORE_ERROR') {
+    // Underlying Redis / custom backend blew up — err.cause has details.
+  }
+}
+```

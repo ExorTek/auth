@@ -1,0 +1,139 @@
+---
+title: 'jwt.verify / peek — check + validate'
+sidebarTitle: verify
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwt.verify` / `jwt.peek`
+
+Verify a JWT signature and validate its claims. `options.alg` is
+**mandatory** — omission raises `MISSING_ALG_ALLOWLIST`.
+
+```js
+import { verify } from '@exortek/jwt'
+
+const { header, payload, kid } = await verify(token, key, {
+  alg: ['ES256'],                     // REQUIRED
+  issuer: 'api.myapp.com',
+  audience: /^myapp:/,
+  clockTolerance: '10s',
+  maxAge: '2h',
+  requiredScopes: ['read:users'],
+})
+```
+
+## Signature
+
+```ts
+verify(token, keyish, options) → Promise<{ header, payload, kid }>
+peek(token,   keyish, { alg, knownCriticalHeaders?, maxTokenSize? }) → Promise<{ header, payload, kid }>
+```
+
+## Verify options — full matrix
+
+| Field                    | Type                                                                                        | Notes                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `alg`                    | `string[]`                                                                                  | **REQUIRED.** Non-empty array.                            |
+| `issuer`                 | `string \| RegExp \| Array<string \| RegExp> \| async fn`                                    | See "Claim matchers" below.                               |
+| `audience`               | Same shape                                                                                   | Runs against every entry of `payload.aud`.                |
+| `subject`                | `string`                                                                                    | Exact match.                                              |
+| `nonce`                  | `string`                                                                                    | Exact match.                                              |
+| `typ`                    | `string \| string[]`                                                                        | Enforces `header.typ`.                                    |
+| `clockTolerance`         | `number \| string`                                                                          | Seconds or duration. Absorbs skew on `exp` + `nbf` + `maxAge`. |
+| `maxAge`                 | `number \| string`                                                                          | Reject if `iat + maxAge < now` — leaked-token mitigation. |
+| `currentDate`            | `Date`                                                                                      | Override "now" — deterministic testing.                    |
+| `requiredClaims`         | `string[]`                                                                                  | Names that must be present.                                |
+| `requiredScopes`         | `string[]`                                                                                  | OAuth2 scopes — reads `payload.scope` (space-separated) or `payload.scp` (array). |
+| `knownCriticalHeaders`   | `Iterable<string>`                                                                          | Extra `crit` names the verifier is prepared to process.   |
+| `maxTokenSize`           | `number`                                                                                    | Default 8 KB — larger tokens raise `TOKEN_TOO_LARGE` before parsing. |
+
+## Claim matchers
+
+Every claim matcher (`issuer`, `audience`) accepts the same shape
+family:
+
+```js
+verify(token, key, { alg: ['ES256'], issuer: 'https://api.myapp.com' })  // exact string
+verify(token, key, { alg: ['ES256'], issuer: /^https:\/\/.+\.myapp\.com$/ })  // RegExp
+verify(token, key, { alg: ['ES256'], issuer: ['tenant-a', 'tenant-b'] })  // array
+verify(token, key, { alg: ['ES256'], issuer: async claimed => await store.isValid(claimed) })
+```
+
+`audience` runs the matcher against every entry of `payload.aud`
+(RFC 7519 §4.1.3 permits a string or array); a single match passes.
+
+## Key input
+
+Same polymorphic surface as `sign`, plus **JWK array with kid dispatch**
+and **async resolver function**:
+
+```js
+// Single key (any shape)
+await verify(token, publicKey, opts)
+await verify(token, jwk, opts)
+await verify(token, readFileSync('./public.pem', 'utf8'), opts)
+
+// JWK array — matched by kid
+await verify(token, [
+  { kty: 'EC', crv: 'P-256', x: '…', y: '…', kid: 'k1' },
+  { kty: 'EC', crv: 'P-256', x: '…', y: '…', kid: 'k2' },
+], opts)
+
+// Async resolver — full custom logic
+await verify(token, async header => await kmsClient.getKey(header.kid), opts)
+```
+
+## Security invariants
+
+<Callout type="warning">
+  Everything below is enforced by construction. No flag, no environment
+  variable, no `unsafe: true` option turns them off.
+</Callout>
+
+1. **`options.alg` array is required** — omission raises `MISSING_ALG_ALLOWLIST`.
+2. **`alg: 'none'` refused unconditionally** — dedicated `ALGORITHM_NONE_FORBIDDEN`.
+3. **Algorithm confusion** (CVE-2015-9235 — RSA public key as HMAC secret) caught at the key boundary with `INVALID_KEY`.
+4. **HMAC verification is timing-safe** — `crypto.timingSafeEqual` on equal-length digests.
+5. **DoS guard** — tokens larger than `maxTokenSize` (default 8 KB) raise `TOKEN_TOO_LARGE` before any parsing.
+
+## `peek` — signature-verified inspection
+
+Audit paths that need identity even from expired tokens:
+
+```js
+import { peek } from '@exortek/jwt'
+
+const { payload } = await peek(expiredToken, key, { alg: ['ES256'] })
+logger.info({ userId: payload.userId })
+```
+
+Signature check runs; claim validation (`exp`, `nbf`, `iat`, `maxAge`,
+`iss`, `aud`, `sub`, `nonce`, `typ`, `requiredClaims`, `requiredScopes`)
+is skipped. Never gate authorisation on this — use `verify` for that.
+
+## Errors
+
+| Code                       | When                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `MISSING_ALG_ALLOWLIST`    | `options.alg` missing / empty / not an array of strings.                                          |
+| `ALGORITHM_MISMATCH`       | Token alg not in the caller's allowlist.                                                          |
+| `ALGORITHM_NONE_FORBIDDEN` | Token uses `alg: 'none'`.                                                                          |
+| `INVALID_TOKEN`            | Malformed compact serialisation.                                                                  |
+| `INVALID_HEADER`           | Header isn't a JSON object, `alg` isn't a string, `crit` malformed.                               |
+| `INVALID_PAYLOAD`          | Payload isn't a JSON object; NumericDate claim isn't numeric.                                     |
+| `INVALID_SIGNATURE`        | Signature doesn't match.                                                                          |
+| `INVALID_KEY`              | Key incompatible with token's alg (alg confusion) or short HMAC secret / RSA modulus < 2048.       |
+| `TOKEN_EXPIRED`            | `payload.exp + clockTolerance < now`.                                                              |
+| `TOKEN_NOT_YET_VALID`      | `payload.nbf - clockTolerance > now`.                                                              |
+| `TOKEN_TOO_OLD`            | `payload.iat + maxAge + clockTolerance < now`.                                                     |
+| `TOKEN_TOO_LARGE`          | Token exceeds `maxTokenSize`.                                                                     |
+| `INVALID_ISSUER`           | `iss` mismatch or missing when `options.issuer` is set.                                            |
+| `INVALID_AUDIENCE`         | `aud` mismatch or missing when `options.audience` is set.                                          |
+| `INVALID_SUBJECT`          | `sub` non-string or mismatch.                                                                     |
+| `INVALID_NONCE`            | `nonce` mismatch.                                                                                  |
+| `INVALID_TYP`              | Header `typ` not in `options.typ`.                                                                 |
+| `MISSING_CLAIM`            | `requiredClaims` name absent or `maxAge` set without `iat` in token.                                |
+| `INSUFFICIENT_SCOPE`       | `requiredScopes` entry not in `payload.scope` / `payload.scp`.                                     |
+| `CRIT_UNSUPPORTED`         | Token's `crit` lists a name the verifier doesn't understand.                                      |
+| `KEY_NOT_FOUND`            | Resolver couldn't find a key.                                                                     |

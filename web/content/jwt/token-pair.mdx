@@ -1,0 +1,140 @@
+---
+title: 'jwt.tokenPair — access + refresh with reuse detection'
+sidebarTitle: token-pair
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwt.tokenPair` — the killer differentiator
+
+Access + refresh token pair with **reuse detection** — the RFC 6749
+§10.4 pattern every production JWT flow reinvents by hand. No other
+JWT library ships this natively.
+
+```js
+import { tokenPair } from '@exortek/jwt/token-pair'
+import { createStore } from '@exortek/jwt/stores'
+
+const store = createStore('memory', { gc: { strategy: 'interval' } })
+```
+
+## The threat model (RFC 6749 §10.4)
+
+- Attacker steals a refresh token (browser storage, log leak, MITM).
+- Attacker uses it before the legitimate user does.
+- Legitimate user uses it — but the token was already rotated.
+- **Detection.** The second use, outside the network-race grace
+  window, means one party has stolen the other's tokens. `tokenPair`
+  revokes the entire family (every refresh token sharing the
+  `familyId`) and raises `REFRESH_REUSED`.
+
+<Callout type="warning">
+  When `REFRESH_REUSED` fires, force the user to re-authenticate — do
+  not silently issue a new pair. The family is compromised.
+</Callout>
+
+## `create`
+
+```js
+const { accessToken, refreshToken, accessExpiresAt, refreshExpiresAt, familyId } =
+  await tokenPair.create(
+    { userId: 1, sub: 'user-1' },
+    {
+      secret: { access: accessSecret, refresh: refreshSecret },
+      access:  { alg: 'ES256', expiresIn: '15m' },
+      refresh: { alg: 'HS256', expiresIn: '7d', store },
+    },
+  )
+```
+
+### Options
+
+| Field                    | Type                                             | Notes                                                                                     |
+| ------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `secret.access`          | `KeyInput`                                       | REQUIRED. Any shape `sign` accepts.                                                        |
+| `secret.refresh`         | `KeyInput`                                       | REQUIRED. Independent from `secret.access`.                                                |
+| `access`                 | `SignOptions`                                    | Same shape as `sign`'s options — `alg` mandatory, `expiresIn` recommended.                 |
+| `refresh.alg`            | `string`                                         | REQUIRED. Unused when `opaque: true` (default) but validated for consistency.              |
+| `refresh.expiresIn`      | `string \| number`                               | REQUIRED. `'7d'`, `'30d'`, etc.                                                             |
+| `refresh.opaque`         | `boolean`                                        | Default `true` — random string. `false` → signed JWT refresh carrying the family reference. |
+| `refresh.tokenSize`      | `number`                                         | Default 32 bytes.                                                                          |
+| `refresh.encoding`       | `'base64url' \| 'base64' \| 'hex' \| 'crockford' \| 'uuid'` | Default `'base64url'`.                                                       |
+| `refresh.hashAlgo`       | `'sha256' \| 'sha384' \| 'sha512'`               | Default `'sha256'`. What the store key is derived by.                                       |
+| `refresh.hashFn`         | `async (pt) => storeKey`                          | Custom hasher — wins over `hashAlgo`.                                                       |
+| `refresh.generate`       | `async () => { plaintext, storeKey }`             | Full custom generator — wins over `hashFn`.                                                 |
+| `refresh.store`          | `Store`                                          | REQUIRED. From `createStore(...)`.                                                          |
+| `familyId`               | `string`                                         | Override the auto-generated family id (e.g. re-use across devices for one session).         |
+
+### Custom generator example
+
+```js
+tokenPair.create(payload, {
+  secret: { access, refresh },
+  access:  { alg: 'ES256', expiresIn: '15m' },
+  refresh: {
+    alg: 'HS256',
+    expiresIn: '7d',
+    store,
+    generate: async () => {
+      const bytes = await hsmClient.getBytes(32)
+      const plaintext = base64url(bytes)
+      const storeKey  = await hsmClient.hmac('refresh-hash', plaintext)
+      return { plaintext, storeKey }
+    },
+  },
+})
+```
+
+## `rotate`
+
+```js
+try {
+  const next = await tokenPair.rotate(oldRefreshToken, {
+    secret: { access, refresh },
+    access:  { alg: 'ES256', expiresIn: '15m' },
+    refresh: { alg: 'HS256', expiresIn: '7d', store },
+    detectReuse: true,          // default
+    reuseWindow: 5,             // seconds grace for network races
+  })
+} catch (err) {
+  if (err.code === 'REFRESH_REUSED') {
+    // Family is compromised — force re-login.
+  }
+}
+```
+
+### How rotation works
+
+1. Hash the incoming refresh; look it up in the store.
+2. **Not found** → `REVOKED` (unknown token or already revoked family).
+3. Look at the stored `usedAt` metadata:
+   - `null` → this is the first use. Mark it consumed (`usedAt = now`)
+     and issue a new pair.
+   - Already set, **within `reuseWindow`** → treat as an idempotent
+     network-race replay; issue a fresh pair, no revocation.
+   - Already set, **outside `reuseWindow`** → **reuse detected**.
+     Revoke the whole family (`store.deleteAll({ familyId })`) and
+     throw `REFRESH_REUSED`.
+
+The old refresh stays in the store (marked consumed) until its native
+TTL expires so a *third* use will still trip the detector.
+
+## `revoke` and `revokeAll`
+
+```js
+await tokenPair.revoke(refreshToken, { store })
+await tokenPair.revokeAll(familyId,  { store })
+```
+
+`revoke` deletes one refresh token by hash. `revokeAll` nukes every
+refresh in a family — call it on password change, MFA reset, "sign out
+everywhere", etc.
+
+## Errors
+
+| Code                | When                                                                            |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `REFRESH_REUSED`    | Second use outside `reuseWindow` — family revoked. Force re-login.               |
+| `REVOKED`           | Refresh not in store — unknown, expired, or already revoked.                     |
+| `INVALID_ARGUMENT`  | Malformed options (missing `secret`, `access.alg`, `refresh.alg`, `store`, …).   |
+| `STORE_ERROR`       | Underlying store failure — inspect `err.cause`.                                   |

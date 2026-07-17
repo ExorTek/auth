@@ -1,0 +1,120 @@
+---
+title: 'jwt.sign — mint a JWT'
+sidebarTitle: sign
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwt.sign`
+
+Mint a JWT with the given payload, key, and options. `alg` is
+mandatory. `alg: 'none'` is refused. Claims (`iat`, `exp`, `nbf`,
+`iss`, `aud`, `sub`, `jti`, `nonce`) are injected from options — no
+manual claim building.
+
+```js
+import { sign } from '@exortek/jwt'
+
+const token = await sign(
+  { userId: 1, role: 'admin' },
+  key,
+  { alg: 'ES256', expiresIn: '15m', issuer: 'api.myapp.com' },
+)
+```
+
+## Signature
+
+```ts
+sign(payload, key, options) → Promise<string | SignResultMeta>
+```
+
+## Options
+
+| Field             | Type                                | Notes                                                                                        |
+| ----------------- | ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| `alg`             | `string`                            | **REQUIRED.** One of HS/RS/PS/ES/EdDSA + ES256K. `none` refused.                              |
+| `expiresIn`       | `string \| number`                  | `'15m'`, `'2h'`, `'7d'`, `'500ms'`, or seconds. Sets `exp`.                                    |
+| `notBefore`       | `string \| number`                  | Same shape. Sets `nbf`.                                                                       |
+| `issuer`          | `string`                            | Sets `iss`.                                                                                   |
+| `audience`        | `string \| string[]`                | Sets `aud`. Arrays land as `aud: [...]` per RFC 7519 §4.1.3.                                  |
+| `subject`         | `string`                            | Sets `sub`. RFC 7519 §4.1.2 says case-sensitive string.                                       |
+| `nonce`           | `string`                            | Sets `nonce` (OIDC).                                                                          |
+| `jwtId`           | `true \| { size?, encoding? } \| fn`| See below.                                                                                    |
+| `typ`             | `string`                            | Header `typ`. Default `'JWT'`. `'at+jwt'` for RFC 9068 access tokens.                          |
+| `kid`             | `string`                            | Header `kid` shortcut.                                                                        |
+| `header`          | `Record<string, unknown>`           | Extra protected header parameters (`alg` here is ignored).                                    |
+| `noTimestamp`     | `boolean`                           | Skip the auto `iat` inject.                                                                   |
+| `returnMetadata`  | `boolean`                           | Return `{ token, jti, expiresAt, issuedAt, alg, kid }` instead of the token string.           |
+
+## `jwtId`
+
+<Callout type="info">
+  Three-tier convention — same pattern as every configurable knob in
+  this package.
+</Callout>
+
+```js
+sign(payload, key, { alg: 'HS256', jwtId: true })
+// → 16 random bytes as lowercase hex
+
+sign(payload, key, { alg: 'HS256', jwtId: { size: 24, encoding: 'base64url' } })
+// → 24 random bytes as base64url
+
+sign(payload, key, { alg: 'HS256', jwtId: { encoding: 'uuid' } })
+// → v4 UUID string
+
+sign(payload, key, { alg: 'HS256', jwtId: async () => `req_${await customIdSource()}` })
+// → whatever your function returns
+```
+
+## Key input
+
+| Shape                     | When it works                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| `KeyObject`               | Any alg.                                                                          |
+| `Buffer` / `Uint8Array`   | HMAC only.                                                                        |
+| **PEM string**            | Private key PEM → sign. Public key PEM / X.509 cert → verify only.                |
+| **HMAC secret string**    | UTF-8 bytes, HMAC only.                                                           |
+| JWK object                | Any alg. Must include the private component (`d` / `k`) for signing.              |
+
+`RSA modulus ≥ 2048` (RFC 7518 §3.3 / §3.5) and HMAC minimum bytes
+(RFC 7518 §3.2) are enforced across every input branch. Short keys
+raise `INVALID_KEY` at the sign call — never quietly downgraded.
+
+## Metadata return
+
+```js
+const result = await sign(
+  { userId: 1 },
+  key,
+  {
+    alg: 'ES256',
+    kid: 'signing-key-2026',
+    expiresIn: '15m',
+    jwtId: true,
+    returnMetadata: true,
+  },
+)
+// {
+//   token:      'eyJhbGciOiJFUzI1NiI…',
+//   jti:        'a3f9…',
+//   expiresAt:  Date { … },
+//   issuedAt:   Date { … },
+//   alg:        'ES256',
+//   kid:        'signing-key-2026',
+// }
+```
+
+Auditability differentiator — the caller can log / persist without
+re-parsing the token.
+
+## Errors
+
+| Code                       | When                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| `INVALID_ARGUMENT`         | Missing options / missing `alg` / malformed input shape.                              |
+| `ALGORITHM_NONE_FORBIDDEN` | `alg: 'none'` — refused unconditionally.                                              |
+| `UNSUPPORTED_ALGORITHM`    | `alg` outside the matrix.                                                              |
+| `INVALID_KEY`              | Key/alg mismatch, short HMAC secret, RSA modulus < 2048, public key given for signing. |
+| `INVALID_PAYLOAD`          | Payload isn't a JSON object; `sub` isn't a string; NumericDate claim isn't numeric.    |
+| `INVALID_HEADER`           | `typ` isn't a string; `crit` malformed.                                                |

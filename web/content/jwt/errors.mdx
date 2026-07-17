@@ -1,0 +1,94 @@
+---
+title: 'jwt.errors — JwtError + ErrorCode'
+sidebarTitle: errors
+---
+
+# `JwtError` / `ErrorCode`
+
+Every recoverable failure raised by `@exortek/jwt` is a `JwtError`
+with a stable `code` from the `ErrorCode` enum and a `status` — the
+HTTP response status a middleware layer would use when translating
+the error.
+
+Branch on `code`, never on the message. Messages are diagnostic,
+human-readable, and may drift across versions.
+
+```js
+import { verify, JwtError, ErrorCode } from '@exortek/jwt'
+
+try {
+  await verify(token, key, { alg: ['ES256'] })
+} catch (err) {
+  if (!(err instanceof JwtError)) throw err
+
+  switch (err.code) {
+    case ErrorCode.MISSING_ALG_ALLOWLIST:    /* forgot options.alg */                  break
+    case ErrorCode.ALGORITHM_NONE_FORBIDDEN: /* attacker sent alg:none */              break
+    case ErrorCode.TOKEN_EXPIRED:            /* refresh flow triggered */              break
+    case ErrorCode.TOKEN_TOO_OLD:            /* maxAge tripped */                      break
+    case ErrorCode.INVALID_SIGNATURE:        /* tampered */                            break
+    case ErrorCode.INVALID_KEY:              /* alg confusion / short secret */        break
+    case ErrorCode.REFRESH_REUSED:           /* family revoked — force re-login */     break
+    // …
+  }
+}
+```
+
+## `ErrorCode` catalogue
+
+| Code                       | Meaning                                                                                | Default `status` |
+| -------------------------- | -------------------------------------------------------------------------------------- | :--------------: |
+| `INVALID_ARGUMENT`         | Bad input shape unrelated to a token (missing options, malformed store, …).             | 400              |
+| `UNSUPPORTED_ALGORITHM`    | `alg` outside our matrix.                                                                | 400              |
+| `MISSING_ALG_ALLOWLIST`    | `verify` called without `options.alg` (or empty / malformed).                            | 400              |
+| `INVALID_TOKEN`            | Malformed compact serialisation.                                                         | 401              |
+| `INVALID_HEADER`           | Header isn't a JSON object, `alg` isn't a string, `crit` malformed.                     | 401              |
+| `INVALID_PAYLOAD`          | Payload isn't a JSON object; NumericDate claim isn't numeric.                            | 401              |
+| `INVALID_SIGNATURE`        | Signature doesn't match.                                                                 | 401              |
+| `INVALID_KEY`              | Key incompatible with token's alg, short HMAC secret, RSA modulus < 2048.                 | 401              |
+| `ALGORITHM_MISMATCH`       | Token alg not in the caller's allowlist.                                                  | 401              |
+| `ALGORITHM_NONE_FORBIDDEN` | `alg: 'none'` — refused unconditionally.                                                 | 401              |
+| `TOKEN_EXPIRED`            | `exp + clockTolerance < now`.                                                             | 401              |
+| `TOKEN_NOT_YET_VALID`      | `nbf - clockTolerance > now`.                                                             | 401              |
+| `TOKEN_TOO_OLD`            | `iat + maxAge + clockTolerance < now` — leaked-token mitigation.                          | 401              |
+| `TOKEN_TOO_LARGE`          | Token exceeds `maxTokenSize` (default 8 KB).                                             | 413              |
+| `INVALID_ISSUER`           | `iss` mismatch or missing when `options.issuer` is set.                                   | 401              |
+| `INVALID_AUDIENCE`         | `aud` mismatch or missing when `options.audience` is set.                                 | 401              |
+| `INVALID_SUBJECT`          | `sub` non-string or mismatch.                                                             | 401              |
+| `INVALID_NONCE`            | `nonce` mismatch.                                                                          | 401              |
+| `INVALID_TYP`              | Header `typ` not in `options.typ`.                                                        | 401              |
+| `MISSING_CLAIM`            | `requiredClaims` name absent or `maxAge` set without `iat`.                                | 401              |
+| `INSUFFICIENT_SCOPE`       | `requiredScopes` entry not in `payload.scope` / `payload.scp`.                            | 403              |
+| `CRIT_UNSUPPORTED`         | Token's `crit` lists a name the verifier doesn't understand.                              | 401              |
+| `KEY_NOT_FOUND`            | Resolver couldn't find a key for the token.                                               | 401              |
+| `REFRESH_REUSED`           | Refresh token reuse detected — family revoked (RFC 6749 §10.4).                            | 401              |
+| `REVOKED`                  | Refresh not in store — unknown, expired, or already revoked.                              | 401              |
+| `STORE_ERROR`              | Underlying store failure — inspect `err.cause`.                                            | 500              |
+
+## The `JwtError` shape
+
+```ts
+class JwtError extends Error {
+  name: 'JwtError'
+  code: ErrorCode
+  status: number   // HTTP status hint
+  cause?: unknown  // upstream error (e.g. Redis rejection)
+}
+```
+
+`cause` is populated when the failure originates in `node:crypto` or a
+store client — you get both the actionable jwt-level message and the
+original error for debugging.
+
+## CVE-class coverage
+
+The security-labelled tests in this package pin the following:
+
+- **CVE-2015-9235** — algorithm confusion (RSA public key used as HMAC
+  secret) surfaces as `INVALID_KEY` at the key boundary.
+- **CVE-2015-2951** — `alg: 'none'` acceptance refused with
+  `ALGORITHM_NONE_FORBIDDEN`. Mixed-case (`None`, `NONE`) lands in
+  `UNSUPPORTED_ALGORITHM` / `ALGORITHM_MISMATCH`.
+- **Silent-allowlist regressions** — every `verify` call without a
+  proper `options.alg` array raises `MISSING_ALG_ALLOWLIST` before any
+  parsing.

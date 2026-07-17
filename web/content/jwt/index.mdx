@@ -1,0 +1,166 @@
+---
+title: '@exortek/jwt — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/jwt`
+
+JSON Web Token for Node.js 22+ — **RFC 7519** (JWT core), **RFC 8725**
+(best current practice), **RFC 9068** (OAuth 2.0 access-token profile),
+**RFC 6749 §10.4** (refresh-token reuse-detection threat model). Zero
+dependencies. Pure `node:crypto`.
+
+sign / verify / decode / peek across HS/RS/PS/ES/EdDSA + secp256k1,
+plus the twelve differentiators headlined by **`tokenPair` with reuse
+detection**.
+
+## Why this exists
+
+`jsonwebtoken` (30M/wk) is old, callback-first, and lets the caller
+skip the algorithm allowlist. `jose` is modern but runtime-agnostic
+(bloat) and has no built-in refresh / rotation / revocation.
+`fast-jwt` is speed-focused with minimal validation. `@exortek/jwt`
+is server-only, zero-dep, and enforces every check that matters — by
+construction.
+
+## The twelve differentiators
+
+<Callout type="info">
+  Every one of these is enforced by construction. There is no flag, no
+  environment variable, no `unsafe: true` option that turns them off.
+</Callout>
+
+### 1. `tokenPair` with reuse detection (the killer)
+
+RFC 6749 §10.4: when a refresh token is submitted twice outside the
+network-race grace window, the entire family (every refresh sharing the
+`familyId`) is revoked and `REFRESH_REUSED` raised. No other JWT
+library ships this — every production auth flow reinvents it by hand.
+
+### 2. Algorithm allowlist is mandatory on verify
+
+```js
+await verify(token, key, { alg: ['ES256'] })   // ✓
+await verify(token, key)                        // ✗ MISSING_ALG_ALLOWLIST
+await verify(token, key, { alg: [] })           // ✗ MISSING_ALG_ALLOWLIST
+```
+
+### 3. `alg: 'none'` refused everywhere
+
+Sign side, verify side. No flag, no env var. `ALGORITHM_NONE_FORBIDDEN`
+is a dedicated code so log analysis can spot forgery attempts at a
+glance.
+
+### 4. Blacklist store — memory + Redis + custom
+
+Three built-ins: `memory` (in-process + interval GC), `redis` (native
+TTL), `custom` (bring your own KV). Three GC strategies for memory:
+`interval` (default), `lazy` (no timer), `lru` (bounded cap).
+
+### 5. Custom-fn escape hatch on every knob
+
+Three-tier convention everywhere:
+
+1. Omit → industry default
+2. Built-in string / object → dispatched to the built-in matrix
+3. Async function → your logic wins
+
+`refresh.hashFn`, `refresh.generate`, `issuer` / `audience` predicate
+functions, `jwtId` factory, encoding matrix — every one accepts a
+custom async function that overrides the shortcut.
+
+### 6. `typ` enforcement + RFC 9068 preset
+
+```js
+sign(payload, key, { alg: 'ES256', typ: 'at+jwt' })    // OAuth2 access token
+verify(token, key, { alg: ['ES256'], typ: 'at+jwt' })  // typ mismatch → INVALID_TYP
+```
+
+### 7. `maxAge` — iat freshness policy
+
+```js
+verify(token, key, { alg: ['ES256'], maxAge: '2h' })
+// iat + 2h < now → TOKEN_TOO_OLD
+```
+Mitigates leaked long-lived tokens without changing the token lifetime.
+
+### 8. `scope` validation first-class
+
+```js
+verify(token, key, {
+  alg: ['ES256'],
+  requiredScopes: ['read:users', 'write:posts'],
+})
+```
+Reads either `payload.scope` (space-separated, RFC 8693 §4.2) or
+`payload.scp` (array).
+
+### 9. `peek` — signature-verified inspection
+
+Audit paths that need identity even from expired tokens:
+
+```js
+const { payload } = await peek(token, key, { alg: ['ES256'] })
+```
+Signature check runs; claim validation is skipped. Never gate
+authorisation on this.
+
+### 10. `sign` metadata return
+
+```js
+const { token, jti, expiresAt, issuedAt, alg, kid } = await sign(
+  payload, key,
+  { alg: 'ES256', expiresIn: '15m', jwtId: true, returnMetadata: true },
+)
+```
+Auditability differentiator — no downstream re-parse to know the token's
+identifiers.
+
+### 11. `aud` array + `iss` array on verify
+
+RFC 7519 §4.1.3 permits `aud` as string OR array; `verify` handles
+both. Multi-tenant SaaS deployments:
+
+```js
+verify(token, key, { alg: ['ES256'], issuer: ['tenant-a', 'tenant-b'] })
+verify(token, key, { alg: ['ES256'], audience: /^myapp:/ })
+verify(token, key, { alg: ['ES256'], issuer: async claimed => await isKnown(claimed) })
+```
+
+### 12. PEM string + X.509 cert input
+
+```js
+import { readFileSync } from 'node:fs'
+const priv = readFileSync('./private.pem', 'utf8')
+const pub  = readFileSync('./server.crt',  'utf8')   // X.509 auto-detected
+
+await sign(payload, priv, { alg: 'RS256' })
+await verify(token, pub, { alg: ['RS256'] })
+```
+Header (`-----BEGIN PRIVATE KEY-----`, `PUBLIC KEY`, `CERTIFICATE`) is
+inspected and the right `node:crypto` call is chosen. HMAC secrets can
+still be passed as plain strings (matching `jsonwebtoken`).
+
+## Algorithm matrix
+
+| Family      | `alg`                     | Node primitive                                                        |
+| ----------- | ------------------------- | --------------------------------------------------------------------- |
+| HMAC        | HS256, HS384, HS512       | `crypto.createHmac(sha).digest()`                                     |
+| RSA-PKCS#1  | RS256, RS384, RS512       | `crypto.sign(sha, …, { padding: RSA_PKCS1_PADDING })`                  |
+| RSA-PSS     | PS256, PS384, PS512       | `crypto.sign(sha, …, { padding: RSA_PKCS1_PSS_PADDING, saltLength })`  |
+| ECDSA       | ES256, ES384, ES512       | `crypto.sign(sha, …, ecKey)` + raw R‖S ↔ DER conversion                |
+| ECDSA (BTC) | ES256K                    | secp256k1 (RFC 8812) — Web3 interop                                    |
+| EdDSA       | EdDSA (Ed25519, Ed448)    | `crypto.sign(null, …, okpKey)` per RFC 8037                            |
+
+RSA modulus ≥ 2048 bits enforced (RFC 7518 §3.3 / §3.5); HMAC minimum
+secret bytes enforced (RFC 7518 §3.2).
+
+## Where next?
+
+- [`sign`](/jwt/sign) — every option, every payload shape.
+- [`verify`](/jwt/verify) — polymorphic keys, full claim matcher matrix, `peek`.
+- [`token-pair`](/jwt/token-pair) — create / rotate / revoke with reuse detection.
+- [`stores`](/jwt/stores) — memory + redis + custom, GC strategies.
+- [`errors`](/jwt/errors) — the full `JwtError` + `ErrorCode` catalogue.
