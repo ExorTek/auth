@@ -27,6 +27,22 @@ test('memory: expired entry returns false under lazy strategy', async () => {
   store._stop();
 });
 
+test('memory: expired entry returns false under interval strategy (before next sweep)', async () => {
+  const store = createStore('memory', { gc: { strategy: 'interval', interval: '1h' } });
+  await store.add('a', NOW() - 1);
+  assert.equal(await store.has('a'), false);
+  assert.equal(await store.get('a'), null);
+  store._stop();
+});
+
+test('memory: expired entry returns false under lru strategy (before next sweep)', async () => {
+  const store = createStore('memory', { gc: { strategy: 'lru', interval: '1h', maxSize: 100 } });
+  await store.add('a', NOW() - 1);
+  assert.equal(await store.has('a'), false);
+  assert.equal(await store.get('a'), null);
+  store._stop();
+});
+
 test('memory: deleteAll matches on metadata filter', async () => {
   const store = createStore('memory');
   await store.add('r1', NOW() + 60, { family: 'F1', userId: 'u1' });

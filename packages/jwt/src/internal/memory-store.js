@@ -1,15 +1,18 @@
 /**
  * In-process blacklist / refresh-token store with configurable GC.
  *
- * Uses a `Map<string, StoreRecord>` for O(1) lookups; entries expire
- * via one of three strategies:
+ * Uses a `Map<string, StoreRecord>` for O(1) lookups. Expiry is always
+ * enforced on `has` / `get` — expired records are never returned. The
+ * GC strategy only controls how the underlying map reclaims memory:
  *
  *   - `interval` (default) — a periodic sweep drops expired entries;
  *     safe under high churn but wakes the event loop at fixed cadence.
- *   - `lazy` — no sweep; expiry is checked on `has` / `get`. Zero
- *     background CPU, but the map grows until entries are queried.
+ *   - `lazy` — no sweep; expired entries linger in the map until they
+ *     are queried. Zero background CPU.
  *   - `lru` — like `interval` but with a `maxSize` cap; the
  *     least-recently-added record is evicted when the cap is reached.
+ *     WARNING: never use `lru` as a revocation blacklist — eviction
+ *     silently un-revokes tokens whose entry got dropped for capacity.
  */
 
 import { JwtError, ErrorCode } from './errors.js';
@@ -118,7 +121,7 @@ export function createMemoryStore(options) {
       if (!record) {
         return false;
       }
-      if (strategy === 'lazy' && record.expiresAt <= now()) {
+      if (record.expiresAt <= now()) {
         map.delete(key);
         return false;
       }
@@ -129,7 +132,7 @@ export function createMemoryStore(options) {
       if (!record) {
         return null;
       }
-      if (strategy === 'lazy' && record.expiresAt <= now()) {
+      if (record.expiresAt <= now()) {
         map.delete(key);
         return null;
       }
