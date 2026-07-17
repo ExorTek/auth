@@ -18,6 +18,7 @@ import { SessionError, ErrorCode } from './errors.js';
 // {@link unmaskCsrfToken} before {@link verifyCsrfToken}.
 
 const NAMESPACE = Buffer.from('exortek/session/csrf/v1', 'utf8');
+const MIN_SECRET_BYTES = 32;
 
 /**
  * Derive a CSRF token from a session ID + a server-side secret. The
@@ -39,6 +40,12 @@ export function deriveCsrfToken(sessionId, secret) {
     );
   }
   const key = typeof secret === 'string' ? Buffer.from(secret, 'utf8') : Buffer.from(secret);
+  if (key.byteLength < MIN_SECRET_BYTES) {
+    throw new SessionError(
+      ErrorCode.INVALID_ARGUMENT,
+      `deriveCsrfToken: secret must be at least ${MIN_SECRET_BYTES} bytes (got ${key.byteLength})`,
+    );
+  }
   return createHmac('sha256', key).update(NAMESPACE).update(sessionId).digest('base64url').slice(0, 32);
 }
 

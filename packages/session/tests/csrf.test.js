@@ -16,7 +16,15 @@ test('deriveCsrfToken: different session → different token', () => {
 });
 
 test('deriveCsrfToken: different secret → different token', () => {
-  assert.notEqual(deriveCsrfToken('sid-abc', SECRET), deriveCsrfToken('sid-abc', 'other-secret'));
+  const other = 'a-different-thirty-two-byte-server-secret';
+  assert.notEqual(deriveCsrfToken('sid-abc', SECRET), deriveCsrfToken('sid-abc', other));
+});
+
+test('deriveCsrfToken: rejects secret < 32 bytes (guessable token surface)', () => {
+  assert.throws(
+    () => deriveCsrfToken('sid-abc', 'short-secret'),
+    err => err instanceof SessionError && err.code === ErrorCode.INVALID_ARGUMENT,
+  );
 });
 
 test('deriveCsrfToken: base64url only', () => {
