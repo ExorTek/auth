@@ -461,6 +461,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@exortek/shared@workspace:packages/shared":
+  version: 0.0.0-use.local
+  resolution: "@exortek/shared@workspace:packages/shared"
+  languageName: unknown
+  linkType: soft
+
 "@fastify/ajv-compiler@npm:^4.0.5":
   version: 4.0.5
   resolution: "@fastify/ajv-compiler@npm:4.0.5"
