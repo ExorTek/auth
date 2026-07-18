@@ -66,7 +66,9 @@ export function createKeyNormalizer({ ErrorClass, ErrorCode, lookupAlg }) {
    * @param {string} alg
    */
   function assertRsaModulus(key, meta, alg) {
-    if (meta.family !== 'RSA' && meta.family !== 'RSA-PSS') return;
+    if (meta.family !== 'RSA' && meta.family !== 'RSA-PSS') {
+      return;
+    }
     const details = key.asymmetricKeyDetails;
     const modulusLength = details && details.modulusLength;
     if (typeof modulusLength === 'number' && modulusLength < 2048) {
@@ -104,16 +106,9 @@ export function createKeyNormalizer({ ErrorClass, ErrorCode, lookupAlg }) {
   function assertKeyObject(key, meta, direction, alg) {
     if (meta.family === 'HMAC') {
       if (key.type !== 'secret') {
-        throw new ErrorClass(
-          ErrorCode.INVALID_KEY,
-          `alg ${alg} requires a secret KeyObject; got type=${key.type}`,
-        );
+        throw new ErrorClass(ErrorCode.INVALID_KEY, `alg ${alg} requires a secret KeyObject; got type=${key.type}`);
       }
-      if (
-        meta.hmacMinBytes &&
-        typeof key.symmetricKeySize === 'number' &&
-        key.symmetricKeySize < meta.hmacMinBytes
-      ) {
+      if (meta.hmacMinBytes && typeof key.symmetricKeySize === 'number' && key.symmetricKeySize < meta.hmacMinBytes) {
         throw new ErrorClass(
           ErrorCode.INVALID_KEY,
           `alg ${alg} requires a secret of at least ${meta.hmacMinBytes} bytes (RFC 7518 §3.2); got ${key.symmetricKeySize}`,
@@ -138,10 +133,7 @@ export function createKeyNormalizer({ ErrorClass, ErrorCode, lookupAlg }) {
    */
   function fromBytes(key, meta, alg) {
     if (meta.family !== 'HMAC') {
-      throw new ErrorClass(
-        ErrorCode.INVALID_KEY,
-        `alg ${alg} requires an asymmetric key; raw bytes are HMAC-only`,
-      );
+      throw new ErrorClass(ErrorCode.INVALID_KEY, `alg ${alg} requires an asymmetric key; raw bytes are HMAC-only`);
     }
     if (meta.hmacMinBytes && key.byteLength < meta.hmacMinBytes) {
       throw new ErrorClass(
@@ -198,7 +190,9 @@ export function createKeyNormalizer({ ErrorClass, ErrorCode, lookupAlg }) {
       assertRsaModulus(keyObj, meta, alg);
       return keyObj;
     } catch (err) {
-      if (err instanceof ErrorClass) throw err;
+      if (err instanceof ErrorClass) {
+        throw err;
+      }
       throw new ErrorClass(
         ErrorCode.INVALID_KEY,
         `alg ${alg}: node:crypto rejected the JWK — ${err instanceof Error ? err.message : String(err)}`,
@@ -244,7 +238,9 @@ export function createKeyNormalizer({ ErrorClass, ErrorCode, lookupAlg }) {
    */
   async function normalizeKey(key, alg, direction) {
     const out = await normalizeCore(key, alg, direction);
-    if (out !== null) return out;
+    if (out !== null) {
+      return out;
+    }
     throw new ErrorClass(
       ErrorCode.INVALID_KEY,
       `unsupported key input for alg ${alg}: expected KeyObject | Buffer | JWK, got ${typeof key}`,

@@ -31,7 +31,7 @@
 
 const TOKEN_RE = /^[!#$%&'*+\-.0-9A-Z^_`a-z|~]+$/;
 const DOMAIN_RE = /^[a-zA-Z0-9.-]+$/;
-// eslint-disable-next-line no-control-regex
+
 const PATH_UNSAFE_RE = /[;,\s\x00-\x1f\x7f]/;
 
 /**
@@ -45,12 +45,18 @@ const PATH_UNSAFE_RE = /[;,\s\x00-\x1f\x7f]/;
  */
 export function parseCookies(header) {
   const out = Object.create(null);
-  if (typeof header !== 'string' || header.length === 0) return out;
+  if (typeof header !== 'string' || header.length === 0) {
+    return out;
+  }
   for (const part of header.split(/;\s*/)) {
     const eq = part.indexOf('=');
-    if (eq <= 0) continue;
+    if (eq <= 0) {
+      continue;
+    }
     const name = part.slice(0, eq).trim();
-    if (!name || out[name] !== undefined) continue;
+    if (!name || out[name] !== undefined) {
+      continue;
+    }
     let value = part.slice(eq + 1).trim();
     // Quoted values (rare, but RFC 6265 allows them). Strip the quotes
     // before decoding.
@@ -123,14 +129,22 @@ export function serialiseCookie(name, value, options = {}) {
     );
   }
   const parts = [`${name}=${encodeURIComponent(value)}`];
-  if (options.domain) parts.push(`Domain=${options.domain}`);
+  if (options.domain) {
+    parts.push(`Domain=${options.domain}`);
+  }
   parts.push(`Path=${options.path ?? '/'}`);
-  if (options.expires instanceof Date) parts.push(`Expires=${options.expires.toUTCString()}`);
+  if (options.expires instanceof Date) {
+    parts.push(`Expires=${options.expires.toUTCString()}`);
+  }
   if (typeof options.maxAge === 'number' && Number.isFinite(options.maxAge)) {
     parts.push(`Max-Age=${Math.floor(options.maxAge)}`);
   }
-  if (secure) parts.push('Secure');
-  if (httpOnly) parts.push('HttpOnly');
+  if (secure) {
+    parts.push('Secure');
+  }
+  if (httpOnly) {
+    parts.push('HttpOnly');
+  }
   parts.push(`SameSite=${sameSite[0].toUpperCase()}${sameSite.slice(1)}`);
   return parts.join('; ');
 }

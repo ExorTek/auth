@@ -17,18 +17,12 @@ describe('assertRedisClient', () => {
 
   test('rejects when a required method is missing', () => {
     const client = { get: () => {}, set: () => {} };
-    assert.throws(
-      () => assertRedisClient(client, ['get', 'set', 'del'], trap),
-      /WRAPPED: client is missing 'del\(\)'/,
-    );
+    assert.throws(() => assertRedisClient(client, ['get', 'set', 'del'], trap), /WRAPPED: client is missing 'del\(\)'/);
   });
 
   test('rejects when a required method is present but not a function', () => {
     const client = { get: 'nope', set: () => {}, del: () => {} };
-    assert.throws(
-      () => assertRedisClient(client, ['get', 'set', 'del'], trap),
-      /WRAPPED: client is missing 'get\(\)'/,
-    );
+    assert.throws(() => assertRedisClient(client, ['get', 'set', 'del'], trap), /WRAPPED: client is missing 'get\(\)'/);
   });
 
   test('accepts a client with every required method', () => {

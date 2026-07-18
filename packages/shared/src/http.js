@@ -23,6 +23,8 @@
  * @returns {string | string[]}
  */
 export function appendSetCookieHeader(existing, value) {
-  if (!existing) return value;
+  if (!existing) {
+    return value;
+  }
   return Array.isArray(existing) ? [...existing, value] : [existing, value];
 }

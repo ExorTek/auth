@@ -7,13 +7,9 @@ import { OtpError, ErrorCode } from './internal/errors.js';
 const NSchema = number().refine(v => Number.isInteger(v) && v >= 1 && v <= 100, 'must be an integer in [1, 100]');
 
 const BackupCodesOptionsSchema = object({
-  length: optional(
-    number().refine(v => Number.isInteger(v) && v >= 6 && v <= 32, 'must be an integer in [6, 32]'),
-  ),
+  length: optional(number().refine(v => Number.isInteger(v) && v >= 6 && v <= 32, 'must be an integer in [6, 32]')),
   groups: optional(number().refine(v => Number.isInteger(v) && v >= 1, 'must be a positive integer')),
-  alphabet: optional(
-    string().refine(s => s.length >= 8 && s.length <= 256, 'must be a string of 8-256 characters'),
-  ),
+  alphabet: optional(string().refine(s => s.length >= 8 && s.length <= 256, 'must be a string of 8-256 characters')),
 });
 
 /**

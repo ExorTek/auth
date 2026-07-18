@@ -20,9 +20,7 @@ const SessionManagerConfigSchema = object({
   touchEvery: optional(duration()),
   cookie: optional(any()),
   anonymous: optional(boolean()),
-  concurrentLimit: optional(
-    number().refine(v => Number.isInteger(v) && v >= 1, 'must be a positive integer'),
-  ),
+  concurrentLimit: optional(number().refine(v => Number.isInteger(v) && v >= 1, 'must be a positive integer')),
   bindTo: optional(array(oneOf(['ip', 'ua']))),
   bindStrictness: optional(oneOf(['strict', 'soft'])),
   impersonation: optional(boolean()),
@@ -183,7 +181,6 @@ export function createSessionManager(config) {
   // "same-token rotated twice" races. Only meaningful for the memory
   // store; distributed stores need their own atomic primitives.
   const mutex = createKeyMutex();
-
 
   function cookieFor(value, options = {}) {
     return serialiseCookie(cookieName, value, { ...cookieOptions, ...options });

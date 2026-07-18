@@ -46,7 +46,9 @@ export async function normalizeKey(key, alg, direction) {
     return _fromString(key, lookupAlg(alg), direction, alg);
   }
   const out = await shared.normalizeCore(key, alg, direction);
-  if (out !== null) return out;
+  if (out !== null) {
+    return out;
+  }
   throw new JwtError(
     ErrorCode.INVALID_KEY,
     `unsupported key input for alg ${alg}: expected KeyObject | Buffer | JWK | PEM string, got ${typeof key}`,
@@ -101,7 +103,9 @@ function _fromString(key, meta, direction, alg) {
         `unrecognised PEM header — expected PRIVATE KEY / PUBLIC KEY / CERTIFICATE / RSA PRIVATE KEY / EC PRIVATE KEY`,
       );
     } catch (err) {
-      if (err instanceof JwtError) throw err;
+      if (err instanceof JwtError) {
+        throw err;
+      }
       throw new JwtError(
         ErrorCode.INVALID_KEY,
         `alg ${alg}: node:crypto rejected the PEM — ${err instanceof Error ? err.message : String(err)}`,

@@ -77,7 +77,10 @@ describe('serialiseCookie', () => {
   });
 
   test('__Secure- prefix demands secure', () => {
-    assert.throws(() => serialiseCookie('__Secure-x', 'v', { secure: false }), /__Secure- prefix — Secure is mandatory/);
+    assert.throws(
+      () => serialiseCookie('__Secure-x', 'v', { secure: false }),
+      /__Secure- prefix — Secure is mandatory/,
+    );
   });
 
   test('rejects domain with unsafe chars', () => {
