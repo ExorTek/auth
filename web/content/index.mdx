@@ -23,6 +23,7 @@ JavaScript with JSDoc → `.d.ts`. Runs under Express, Fastify, Hono, and Elysia
 | **[`@exortek/session`](/session)**   |  `1.x`  |
 | **[`@exortek/jwk`](/jwk)**           |  `1.x`  |
 | **[`@exortek/jws`](/jws)**           |  `1.x`  |
+| **[`@exortek/jwt`](/jwt)**           |  `1.x`  |
 
 ## The stack
 
@@ -37,7 +38,7 @@ time.
 | 04 | `@exortek/challenge`             | e-mail / SMS one-time code storage + verification                                    |
 | 05 | [`@exortek/jwk`](/jwk)           | generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278 thumbprints |
 | 06 | [`@exortek/jws`](/jws)           | JWS compact + JSON, detached (§F), `b64:false`, HS / RS / PS / ES / EdDSA + secp256k1 |
-| 07 | `@exortek/jwt`                   | JWT sign / verify with algorithm allowlists, clock skew                              |
+| 07 | [`@exortek/jwt`](/jwt)           | JWT sign / verify / peek, tokenPair with RFC 6749 §10.4 reuse detection, blacklist stores |
 | 08 | `@exortek/jwe`                   | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                       |
 | 09 | `@exortek/jwks`                  | JWKS URI fetching, caching, `kid` rotation                                           |
 | 10 | [`@exortek/session`](/session)   | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub        |
@@ -66,6 +67,7 @@ npm install @exortek/password         # + optional: argon2, bcryptjs
 npm install @exortek/session          # + optional: ioredis or redis
 npm install @exortek/jwk
 npm install @exortek/jws
+npm install @exortek/jwt              # + optional: ioredis or redis
 ```
 
 Node.js **22 or newer**.
@@ -85,6 +87,8 @@ Node.js **22 or newer**.
   thumbprints, `toPublic()` / `matches()` / strict `use` × `key_ops` consistency.
 - **[`@exortek/jws` reference →](/jws)** — JWS compact + JSON serialisation, detached content, unencoded payload,
   mandatory `alg` allowlist, `alg: 'none'` refused everywhere, granular `ErrorCode` enum.
+- **[`@exortek/jwt` reference →](/jwt)** — RFC 7519 + 8725 + 9068 JWT with `sign` / `verify` / `peek`, `tokenPair`
+  create / rotate / revoke with RFC 6749 §10.4 reuse detection, memory / Redis / custom stores, 26 error codes.
 - **[Source](https://github.com/ExorTek/auth)** — GitHub repo.
 - **[Contributing](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md)** — branch prefixes, commit conventions,
   changeset flow.
