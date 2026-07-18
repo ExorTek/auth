@@ -119,5 +119,9 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "argon2": "^0.44.0",
+    "bcryptjs": "^3.0.3"
   }
 }
