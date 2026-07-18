@@ -14,6 +14,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import { resolveOrCall, randomBuffer } from '@exortek/shared/resolve';
+import { encode as crockfordEncode } from '@exortek/shared/crockford';
 import { JwtError, ErrorCode } from './errors.js';
 
 export { resolveOrCall, randomBuffer };
@@ -76,30 +77,4 @@ export function resolveEncoding(encoding) {
         `resolveEncoding: unknown encoding ${JSON.stringify(encoding)}. Built-in: base64url | base64 | hex | crockford | uuid.`,
       );
   }
-}
-
-// Crockford Base32 alphabet — RFC 4648 §7 style but with I / L / O / U
-// dropped for human legibility (used by Stripe / GitHub IDs).
-const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-
-/**
- * @param {Buffer} bytes
- * @returns {string}
- */
-function crockfordEncode(bytes) {
-  let out = '';
-  let bits = 0;
-  let acc = 0;
-  for (const b of bytes) {
-    acc = (acc << 8) | b;
-    bits += 8;
-    while (bits >= 5) {
-      bits -= 5;
-      out += CROCKFORD_ALPHABET[(acc >> bits) & 0x1f];
-    }
-  }
-  if (bits > 0) {
-    out += CROCKFORD_ALPHABET[(acc << (5 - bits)) & 0x1f];
-  }
-  return out;
 }
