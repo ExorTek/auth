@@ -12,7 +12,16 @@
 
 import { KeyObject } from 'node:crypto';
 
+import { array, object, oneOf, optional, string } from '@exortek/shared/validate';
+
 import { JwkError, ErrorCode } from './internal/errors.js';
+
+const ExportJWKOptionsSchema = object({
+  kid: optional(string()),
+  use: optional(oneOf(['sig', 'enc'])),
+  alg: optional(string()),
+  key_ops: optional(array(string())),
+});
 
 /**
  * @typedef {Object} ExportJWKOptions
@@ -46,7 +55,12 @@ export async function exportJWK(key, options) {
       { cause: err },
     );
   }
-  const opts = options || {};
+  let opts;
+  try {
+    opts = /** @type {ExportJWKOptions} */ (ExportJWKOptionsSchema.parse(options || {}, 'exportJWK.options'));
+  } catch (err) {
+    throw new JwkError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
+  }
   if (opts.kid !== undefined) {
     jwk.kid = opts.kid;
   }
