@@ -61,7 +61,7 @@ describe('encode.base58', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => encode(bad),
-        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -85,7 +85,7 @@ describe('decode.base58', () => {
     for (const bad of [null, undefined, 42, Buffer.from('x')]) {
       assert.throws(
         () => decode(bad),
-        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

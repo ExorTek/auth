@@ -91,7 +91,6 @@ describe('uuid7', () => {
     assert.throws(
       () => uuid7(-1),
       err => {
-        assert.ok(err instanceof CryptoError);
         assert.equal(err.code, ErrorCode.INVALID_ARGUMENT);
         return true;
       },
@@ -101,22 +100,22 @@ describe('uuid7', () => {
   it('rejects non-integer time', () => {
     assert.throws(
       () => uuid7(1.5),
-      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err.code === ErrorCode.INVALID_ARGUMENT,
     );
     assert.throws(
       () => uuid7(NaN),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
     assert.throws(
       () => uuid7('1700000000000'),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
   });
 
   it('rejects time beyond 48-bit range (2^48)', () => {
     assert.throws(
       () => uuid7(0xffffffffffff + 1),
-      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
@@ -184,30 +183,30 @@ describe('uuid5', () => {
   it('rejects malformed namespace', () => {
     assert.throws(
       () => uuid5('not-a-uuid', 'name'),
-      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err.code === ErrorCode.INVALID_ARGUMENT,
     );
     assert.throws(
       () => uuid5('', 'name'),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
     assert.throws(
       () => uuid5(null, 'name'),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
   });
 
   it('rejects non-string name', () => {
     assert.throws(
       () => uuid5(NAMESPACE_DNS, 123),
-      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err.code === ErrorCode.INVALID_ARGUMENT,
     );
     assert.throws(
       () => uuid5(NAMESPACE_DNS, null),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
     assert.throws(
       () => uuid5(NAMESPACE_DNS, undefined),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
   });
 

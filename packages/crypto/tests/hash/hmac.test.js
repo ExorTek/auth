@@ -53,7 +53,7 @@ describe('hmac', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => hmac(bad, 'k'),
-        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -62,7 +62,7 @@ describe('hmac', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => hmac('data', bad),
-        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

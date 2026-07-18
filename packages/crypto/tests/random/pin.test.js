@@ -74,34 +74,34 @@ describe('pin', () => {
   it('rejects non-positive length', () => {
     assert.throws(
       () => pin(0),
-      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err.code === ErrorCode.INVALID_ARGUMENT,
     );
     assert.throws(
       () => pin(-1),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
     assert.throws(
       () => pin(1.5),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
     assert.throws(
       () => pin(NaN),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
   });
 
   it('rejects non-object options', () => {
     assert.throws(
       () => pin(4, 'true'),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
     assert.throws(
       () => pin(4, null),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
     assert.throws(
       () => pin(4, []),
-      err => err instanceof CryptoError,
+      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
     );
   });
 

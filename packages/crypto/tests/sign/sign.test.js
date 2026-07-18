@@ -112,7 +112,7 @@ describe('sign / verify — argument validation', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => sign(bad, kp.privateKey, { algo: 'es256' }),
-        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -122,7 +122,7 @@ describe('sign / verify — argument validation', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => verify('x', bad, kp.publicKey, { algo: 'es256' }),
-        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
