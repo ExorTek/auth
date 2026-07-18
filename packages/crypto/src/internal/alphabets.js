@@ -20,8 +20,10 @@ export const UPPER_ALPHANUM = UPPER + DIGITS;
 /**
  * Crockford base32 alphabet (ULID). 32 chars, deliberately omits `I`,
  * `L`, `O`, `U` for visual clarity and to avoid accidental profanity.
+ * Sourced from `@exortek/shared/crockford` so the codec + random ID
+ * generators + backup-code alphabet never drift.
  */
-export const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+export { ALPHABET as CROCKFORD } from '@exortek/shared/crockford';
 
 /**
  * Bitcoin base58 alphabet. Omits `0`, `O`, `I`, `l` to avoid
