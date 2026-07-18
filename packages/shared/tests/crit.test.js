@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { assertSignSide, assertVerifySide } from '../src/signing/crit.js';
+import { assertSignSide, assertVerifySide } from '../src/crit.js';
 
 test('sign: undefined crit passes', () => {
   assertSignSide(undefined, {});

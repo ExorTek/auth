@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { timingSafeEqual } from '../src/crypto/timing-safe.js';
+import { timingSafeEqual } from '../src/timing-safe.js';
 
 test('equal buffers → true', () => {
   const a = Buffer.from('secret');

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import * as v from '../src/validate/schema.js';
+import * as v from '../src/validate.js';
 
 test('string: passes strings, rejects others with path', () => {
   const s = v.string();

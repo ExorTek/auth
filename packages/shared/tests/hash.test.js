@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, createHmac } from 'node:crypto';
 
-import { hash } from '../src/crypto/hash.js';
-import { hmac } from '../src/crypto/hmac.js';
-import { randomBuffer } from '../src/crypto/random.js';
+import { hash } from '../src/hash.js';
+import { hmac } from '../src/hmac.js';
+import { randomBuffer } from '../src/random.js';
 
 test('hash: sha256 hex matches node:crypto direct', () => {
   const data = 'the quick brown fox';

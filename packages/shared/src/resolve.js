@@ -7,7 +7,7 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 
-import { randomBuffer } from './crypto/random.js';
+import { randomBuffer } from './random.js';
 
 /**
  * Call `value` with the given args if it's a function, otherwise

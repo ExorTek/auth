@@ -27,7 +27,9 @@ export function assertSignSide(crit, protectedHeader) {
   _shapeChecks(crit);
   for (const name of /** @type {string[]} */ (crit)) {
     if (!(name in protectedHeader)) {
-      throw new Error(`crit lists ${JSON.stringify(name)} but the protected header has no such member (RFC 7515 §4.1.11)`);
+      throw new Error(
+        `crit lists ${JSON.stringify(name)} but the protected header has no such member (RFC 7515 §4.1.11)`,
+      );
     }
   }
 }
@@ -54,7 +56,9 @@ export function assertVerifySide(crit, protectedHeader, known, extraKnown) {
       );
     }
     if (!(name in protectedHeader)) {
-      throw new Error(`crit lists ${JSON.stringify(name)} but the protected header has no such member (RFC 7515 §4.1.11)`);
+      throw new Error(
+        `crit lists ${JSON.stringify(name)} but the protected header has no such member (RFC 7515 §4.1.11)`,
+      );
     }
   }
 }

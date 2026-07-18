@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveOrCall, resolveHashFn, resolveEncoding, randomBuffer } from '../src/polymorphic.js';
+import { resolveOrCall, resolveHashFn, resolveEncoding, randomBuffer } from '../src/resolve.js';
 
 test('resolveOrCall: passes value through unchanged', async () => {
   assert.equal(await resolveOrCall(42), 42);

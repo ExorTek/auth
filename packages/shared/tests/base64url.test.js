@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { encode, encodeString, encodeJson, decode, decodeToString, decodeJson } from '../src/encoding/base64url.js';
+import { encode, encodeString, encodeJson, decode, decodeToString, decodeJson } from '../src/base64url.js';
 
 test('encode: Buffer round-trip', () => {
   const bytes = Buffer.from([0, 1, 2, 254, 255]);

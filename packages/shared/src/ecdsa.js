@@ -1,5 +1,5 @@
 /**
- * ASN.1 DER ↔ raw R‖S signature conversion for ECDSA algorithms
+ * ASN.1 DER ↔ raw R‖S signature conversion for ECDSA signatures
  * (RFC 7515 §3.4).
  *
  * Node's `crypto.sign('sha256', data, ecKey)` produces an ASN.1 DER

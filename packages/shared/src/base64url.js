@@ -2,9 +2,9 @@
  * RFC 4648 §5 base64url codec.
  *
  * Node's `Buffer.from(str, 'base64url')` is lenient: it accepts
- * padding, `+`, `/`, and whitespace. Wire-level use (JOSE compact
- * serialisation, JWK ingest, etc.) requires strict rejection of
- * everything that isn't a canonical unpadded encoding — hence the
+ * padding, `+`, `/`, and whitespace. Wire-level use (JWS / JWT
+ * compact serialisation, JWK ingest, etc.) requires strict rejection
+ * of everything that isn't a canonical unpadded encoding — hence the
  * roundtrip check in `decode`.
  *
  * Throws plain `Error` / `TypeError` on malformed input. Callers that

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createKeyMutex } from '../src/concurrency/mutex.js';
+import { createKeyMutex } from '../src/mutex.js';
 
 test('withLock: serialises concurrent callers with the same key', async () => {
   const mutex = createKeyMutex();

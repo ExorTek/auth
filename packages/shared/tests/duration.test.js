@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parseDuration } from '../src/time/duration.js';
+import { parseDuration } from '../src/duration.js';
 
 test('bare number is milliseconds (Node standard)', () => {
   assert.equal(parseDuration(0), 0);

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign as nodeSign, verify as nodeVerify } from 'node:crypto';
 
-import { derToRaw, rawToDer, EC_COORD_BYTES } from '../src/signing/ecdsa.js';
+import { derToRaw, rawToDer, EC_COORD_BYTES } from '../src/ecdsa.js';
 
 test('EC_COORD_BYTES: known curves', () => {
   assert.equal(EC_COORD_BYTES['P-256'], 32);
