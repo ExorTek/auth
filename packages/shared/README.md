@@ -22,37 +22,58 @@ tarball ends up with the code but not the workspace dep.
 
 ```
 src/
-  encoding/                  RFC 4648 §5 codec
-  time/                      human-duration parser
-  crypto/                    length-safe compare, hash, hmac wrappers
-  concurrency/               per-key async mutex
-  errors/                    base error class + status map
-  polymorphic.js             resolveOrCall / resolveEncoding
-  signing/                   sign/verify flow shared utilities
+  base32.js                  RFC 4648 §6 codec (case-insensitive decode)
+  base64url.js               RFC 4648 §5 codec (strict, canonical)
+  duration.js                human-duration parser → integer ms
+  hash.js  hmac.js           node:crypto digest wrappers
+  random.js                  CSPRNG buffer helper
+  timing-safe.js             length-safe constant-time compare
+  mutex.js                   per-key async mutex
+  key-resolver.js            verify-side polymorphic key resolver
+  resolve.js                 resolveOrCall / resolveHashFn / resolveEncoding
+  errors.js                  BaseError — shared error base class
+  validate.js                tiny schema builder for option validation
+  algorithms.js              signing algorithm factories + createRegistry (RFC 7518/8037/8812)
+  crit.js                    header crit validation (RFC 7515 §4.1.11)
+  ecdsa.js                   DER ↔ raw R‖S signature conversion
 ```
 
-## Consumer pattern — error factory
+Import via flat subpaths: `@exortek/shared/base64url`,
+`@exortek/shared/duration`, `@exortek/shared/mutex`, …
 
-Shared utilities that need to throw typed errors accept a factory so
-each consumer's own error class (e.g. `JwtError`) is preserved:
+## Consumer pattern — thin wrappers
+
+Shared utilities throw plain `Error` / `TypeError`. Each package keeps
+a thin internal wrapper that translates failures into its own typed
+error class at the surface boundary:
 
 ```js
-// packages/shared/src/encoding/base64url.js
-export function createBase64url(ErrorClass, ErrorCode) {
-  return {
-    encode(bytes) { … },
-    decode(text) {
-      if (!ALPHABET.test(text)) throw new ErrorClass(ErrorCode.INVALID_TOKEN, …);
-      …
-    },
-  };
-}
-
 // packages/jwt/src/internal/base64url.js
-import { createBase64url } from '@exortek/shared/encoding/base64url';
+import * as sb from '@exortek/shared/base64url';
 import { JwtError, ErrorCode } from './errors.js';
-export const { encode, decode, encodeJson } = createBase64url(JwtError, ErrorCode);
+
+export function decode(text) {
+  try {
+    return sb.decode(text);
+  } catch (err) {
+    throw new JwtError(ErrorCode.INVALID_TOKEN, err.message);
+  }
+}
 ```
 
-`err instanceof JwtError` keeps working in downstream code — the
-factory guarantees the thrown class matches the consuming package.
+Error classes themselves come from the shared base class — one
+subclass per package:
+
+```js
+// packages/session/src/errors.js
+import { BaseError } from '@exortek/shared/errors';
+
+export class SessionError extends BaseError {
+  static statuses = { INVALID_ARGUMENT: 400 /* … */ };
+  static defaultStatus = 500;
+}
+```
+
+`err instanceof SessionError` keeps working in downstream code, and a
+package that wants no HTTP `status` at all (e.g. `@exortek/crypto`)
+simply declares no `statuses`.
