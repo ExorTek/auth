@@ -35,23 +35,36 @@ All exported from `@exortek/security`.
 ```ts
 getClientIp(req, {
   trustProxy?: boolean | string[],
+  proxyCount?: number,
   headers?: string[],
 }): string | undefined
 ```
 
 Extract the real client IP, honoring a trust-proxy allowlist. Node behind a load balancer sees the LB's IP in
-`req.socket.remoteAddress` — the real client is in the **left-most** entry of `X-Forwarded-For`, but only if the direct
-connection actually came from a trusted proxy.
+`req.socket.remoteAddress`. The real client sits inside `X-Forwarded-For`, reachable by walking the header
+**right-to-left** past the trusted proxy hops — a client can forge left-most entries and every conforming proxy
+*appends* the real address, so the first entry from the right that isn't a trusted proxy is the closest thing to the
+true origin.
 
 ```js
+// Named allowlist — pass the addresses of every proxy in front of Node.
 const ip = getClientIp(req, {
   trustProxy: ['10.0.0.1', '10.0.0.2'],
 });
+
+// Chain-depth allowlist — Cloudflare + a k8s ingress, addresses unstable.
+const ip = getClientIp(req, {
+  proxyCount: 2,
+});
 ```
 
-- `trustProxy: false` (default) — always return `req.socket.remoteAddress`.
-- `trustProxy: true` — always read `X-Forwarded-For`.
-- `trustProxy: string[]` — read XFF only when the direct peer is on the list.
+- `trustProxy: false` (default) — return `req.socket.remoteAddress`; ignore XFF. Correct when Node is edge-facing.
+- `trustProxy: true` — trust every hop and return the **left-most** XFF entry. **Spoofable unless the first proxy
+  strips inbound XFF headers** — prefer `trustProxy: string[]` or `proxyCount` in production.
+- `trustProxy: string[]` — walk XFF right-to-left, skipping entries whose value is in the set. Return the first
+  untrusted hop.
+- `proxyCount: N` — skip **N** rightmost XFF entries and return the `(N + 1)`-th from the right. Wins over
+  `trustProxy` when both are set.
 
 ## `bearer`
 

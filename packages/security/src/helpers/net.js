@@ -3,10 +3,28 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
 
 /**
  * Extract the real client IP from a request-like object, honouring a
- * trust-proxy allowlist. Node behind a load balancer sees the LB's IP in
- * `req.socket.remoteAddress`; the real client sits in the LEFT-most entry
- * of `X-Forwarded-For` — but only if the request actually came from a
- * trusted proxy (otherwise the header is attacker-controlled).
+ * trust-proxy allowlist. Node behind a load balancer sees the LB's IP
+ * in `req.socket.remoteAddress`; the real client sits inside
+ * `X-Forwarded-For` — but only reachable safely by walking the header
+ * **right-to-left** past the trusted proxy hops, because a client can
+ * forge left-most entries and every conforming proxy *appends* the
+ * real address.
+ *
+ * ### `trustProxy` semantics
+ *
+ * | Value              | Meaning                                                                                     |
+ * | ------------------ | ------------------------------------------------------------------------------------------- |
+ * | `false` (default)  | Ignore XFF entirely; return `socket.remoteAddress`. Only correct when Node is edge-facing.  |
+ * | `true`             | Trust every hop. Returns the left-most XFF entry — **spoofable unless the first proxy strips inbound XFF**. |
+ * | `string[]`         | Right-to-left walk skipping entries whose value is in the set; returns the first untrusted hop. |
+ *
+ * ### `proxyCount`
+ *
+ * Alternative to `trustProxy: string[]` when the proxy chain depth is
+ * known but the addresses aren't stable (e.g. Cloudflare + a k8s
+ * ingress). Skips **N** rightmost XFF entries and returns the
+ * `(N + 1)`-th from the right — i.e. the last hop before the trusted
+ * chain begins. Wins over `trustProxy` when both are set.
  *
  * @param {{
  *   headers?: Record<string, string | string[] | undefined>,
@@ -15,34 +33,57 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
  * }} req
  * @param {{
  *   trustProxy?: boolean | string[],
+ *   proxyCount?: number,
  *   headers?: string[],
  * }} [options]
  * @returns {string | undefined}
  */
 export function getClientIp(req, options = {}) {
   const trustProxy = options.trustProxy ?? false;
+  const proxyCount = options.proxyCount;
   const headerNames = options.headers ?? ['x-forwarded-for', 'x-real-ip'];
 
   const remote = req.socket?.remoteAddress || req.ip;
 
-  if (trustProxy === false) {
+  if (trustProxy === false && proxyCount === undefined) {
     return remote || undefined;
   }
-  const trusted = trustProxy === true ? true : Array.isArray(trustProxy) ? new Set(trustProxy) : true;
-  if (trusted !== true && remote && !trusted.has(remote)) {
+  const trustedSet = Array.isArray(trustProxy) ? new Set(trustProxy) : null;
+  if (trustedSet && remote && !trustedSet.has(remote) && proxyCount === undefined) {
     return remote || undefined;
   }
 
   for (const name of headerNames) {
     const raw = req.headers?.[name];
     const value = Array.isArray(raw) ? raw[0] : raw;
-    if (typeof value === 'string' && value.length > 0) {
-      // Left-most entry is the original client; subsequent are downstream proxies.
-      const first = value.split(',')[0].trim();
-      if (first) {
-        return first;
-      }
+    if (typeof value !== 'string' || value.length === 0) {
+      continue;
     }
+    const parts = value
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (parts.length === 0) {
+      continue;
+    }
+
+    if (typeof proxyCount === 'number' && proxyCount >= 0) {
+      const idx = parts.length - proxyCount - 1;
+      return idx >= 0 ? parts[idx] : parts[0];
+    }
+
+    if (trustedSet) {
+      for (let i = parts.length - 1; i >= 0; i--) {
+        if (!trustedSet.has(parts[i])) {
+          return parts[i];
+        }
+      }
+      return parts[0]; // every hop trusted — fall back to the original client
+    }
+
+    // trustProxy === true → every hop is trusted; the client sits at the
+    // left. This is spoofable unless the first proxy strips inbound XFF.
+    return parts[0];
   }
   return remote || undefined;
 }

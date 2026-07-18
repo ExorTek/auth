@@ -43,6 +43,44 @@ test('getClientIp: falls back gracefully with no info', () => {
   assert.equal(getClientIp({}), undefined);
 });
 
+test('getClientIp: trustProxy=list walks right-to-left, skipping trusted hops (spoof-resistant)', () => {
+  // Attacker spoofs a leading XFF entry. Chain: client → real-lb → node.
+  // Correct answer: 203.0.113.42 (the last untrusted hop), NOT the spoofed
+  // '1.2.3.4' the attacker put at the front.
+  const req = {
+    socket: { remoteAddress: '10.0.0.1' },
+    headers: { 'x-forwarded-for': '1.2.3.4, 203.0.113.42, 10.0.0.2' },
+  };
+  assert.equal(getClientIp(req, { trustProxy: ['10.0.0.1', '10.0.0.2'] }), '203.0.113.42');
+});
+
+test('getClientIp: trustProxy=list — every hop trusted falls back to left-most', () => {
+  const req = {
+    socket: { remoteAddress: '10.0.0.1' },
+    headers: { 'x-forwarded-for': '10.0.0.2, 10.0.0.3' },
+  };
+  assert.equal(getClientIp(req, { trustProxy: ['10.0.0.1', '10.0.0.2', '10.0.0.3'] }), '10.0.0.2');
+});
+
+test('getClientIp: proxyCount=N skips N rightmost hops', () => {
+  const req = {
+    socket: { remoteAddress: '10.0.0.1' },
+    headers: { 'x-forwarded-for': '1.2.3.4, 203.0.113.42, 172.16.0.5, 10.0.0.2' },
+  };
+  // 2 trusted proxy hops from the right → return the 3rd-from-right
+  assert.equal(getClientIp(req, { proxyCount: 2 }), '203.0.113.42');
+});
+
+test('getClientIp: proxyCount=0 returns the right-most hop', () => {
+  const req = { headers: { 'x-forwarded-for': '1.2.3.4, 203.0.113.42, 10.0.0.2' } };
+  assert.equal(getClientIp(req, { proxyCount: 0 }), '10.0.0.2');
+});
+
+test('getClientIp: proxyCount larger than chain returns left-most', () => {
+  const req = { headers: { 'x-forwarded-for': '1.2.3.4, 203.0.113.42' } };
+  assert.equal(getClientIp(req, { proxyCount: 5 }), '1.2.3.4');
+});
+
 // bearer
 
 test('bearer: parses `Bearer <token>` case-insensitively', () => {
