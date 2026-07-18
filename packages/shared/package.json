@@ -15,6 +15,7 @@
     "./concurrency/mutex": "./src/concurrency/mutex.js",
     "./polymorphic": "./src/polymorphic.js",
     "./signing/algorithms": "./src/signing/algorithms.js",
+    "./signing/crit": "./src/signing/crit.js",
     "./signing/ecdsa": "./src/signing/ecdsa.js",
     "./validate": "./src/validate/schema.js"
   },
