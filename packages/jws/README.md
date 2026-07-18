@@ -3,7 +3,7 @@
 > JSON Web Signature for Node.js 22+ — **RFC 7515** (JWS core), **RFC 7518 §3** (JWA), **RFC 7797** (unencoded payload), **RFC 8037** (Ed25519 / Ed448), **RFC 8812** (`secp256k1`), **RFC 8725** (BCP). Zero-dependency, built on `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/jws.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/jws)
-[![tests](https://img.shields.io/badge/tests-103%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/jws.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/jws)](https://packagephobia.com/result?p=@exortek/jws)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)

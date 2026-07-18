@@ -3,7 +3,7 @@
 > Zero-dependency TOTP + HOTP for Node.js 22+ — built on `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/otp.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/otp)
-[![tests](https://img.shields.io/badge/tests-108%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/otp.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/otp)](https://packagephobia.com/result?p=@exortek/otp)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)

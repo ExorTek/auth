@@ -3,7 +3,7 @@
 > JSON Web Token for Node.js 22+ — **RFC 7519** (JWT core) + **RFC 8725** (BCP) + **RFC 9068** (OAuth 2.0 profile). Zero-dependency, built on `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/jwt.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/jwt)
-[![tests](https://img.shields.io/badge/tests-96%20passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/jwt.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/jwt)](https://packagephobia.com/result?p=@exortek/jwt)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
