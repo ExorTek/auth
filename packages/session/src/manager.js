@@ -1,3 +1,5 @@
+import { any, array, boolean, duration, number, object, oneOf, optional } from '@exortek/shared/validate';
+
 import { SessionError, ErrorCode } from './errors.js';
 import { generateSessionId, encodeToken, decodeToken } from './token.js';
 import { memoryStore } from './stores/memory.js';
@@ -6,6 +8,29 @@ import { parseCookies, serialiseCookie, serialiseDeleteCookie } from './cookie.j
 import { computeFingerprint, readIp, readUserAgent } from './fingerprint.js';
 import { deriveDeviceLabel } from './device-label.js';
 import { createKeyMutex } from './internal/mutex.js';
+
+const SessionManagerConfigSchema = object({
+  // `secret` and `store` are structural — normalisation and duck-typing
+  // happen at the call site because the schema can't express the shape
+  // they need to satisfy.
+  secret: any(),
+  store: optional(any()),
+  ttl: duration(),
+  idleTtl: duration(),
+  touchEvery: optional(duration()),
+  cookie: optional(any()),
+  anonymous: optional(boolean()),
+  concurrentLimit: optional(
+    number().refine(v => Number.isInteger(v) && v >= 1, 'must be a positive integer'),
+  ),
+  bindTo: optional(array(oneOf(['ip', 'ua']))),
+  bindStrictness: optional(oneOf(['strict', 'soft'])),
+  impersonation: optional(boolean()),
+  impersonationTtl: optional(duration()),
+  deviceLabels: optional(boolean()),
+  events: optional(any()),
+  suspiciousActivity: optional(any()),
+});
 
 /**
  * @typedef {import('./token.js').SessionTokenPayload} SessionTokenPayload
@@ -109,8 +134,10 @@ import { createKeyMutex } from './internal/mutex.js';
  * @param {SessionManagerConfig} config
  */
 export function createSessionManager(config) {
-  if (!config || typeof config !== 'object') {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'createSessionManager: config is required');
+  try {
+    SessionManagerConfigSchema.parse(config, 'createSessionManager.config');
+  } catch (err) {
+    throw new SessionError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
   }
   const secret = normaliseSecret(config.secret);
   const ttlMs = parseDuration(config.ttl, 'ttl');
@@ -143,12 +170,6 @@ export function createSessionManager(config) {
   const concurrentLimit = config.concurrentLimit;
   const bindTo = Array.isArray(config.bindTo) ? Object.freeze([...config.bindTo]) : null;
   const bindStrictness = config.bindStrictness ?? 'strict';
-  if (bindStrictness !== 'strict' && bindStrictness !== 'soft') {
-    throw new SessionError(
-      ErrorCode.INVALID_ARGUMENT,
-      `createSessionManager: bindStrictness must be 'strict' | 'soft'; got '${bindStrictness}'`,
-    );
-  }
   const impersonationEnabled = config.impersonation === true;
   const impersonationTtlMs = impersonationEnabled
     ? parseDuration(config.impersonationTtl ?? '30m', 'impersonationTtl')
@@ -163,24 +184,6 @@ export function createSessionManager(config) {
   // store; distributed stores need their own atomic primitives.
   const mutex = createKeyMutex();
 
-  if (bindTo) {
-    for (const b of bindTo) {
-      if (b !== 'ip' && b !== 'ua') {
-        throw new SessionError(
-          ErrorCode.INVALID_ARGUMENT,
-          `createSessionManager: bindTo entries must be 'ip' | 'ua'; got '${b}'`,
-        );
-      }
-    }
-  }
-  if (concurrentLimit !== undefined) {
-    if (!Number.isInteger(concurrentLimit) || concurrentLimit < 1) {
-      throw new SessionError(
-        ErrorCode.INVALID_ARGUMENT,
-        `createSessionManager: concurrentLimit must be a positive integer; got ${concurrentLimit}`,
-      );
-    }
-  }
 
   function cookieFor(value, options = {}) {
     return serialiseCookie(cookieName, value, { ...cookieOptions, ...options });
