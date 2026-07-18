@@ -1,6 +1,6 @@
 {
   "name": "@exortek/session",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Sealed-cookie session manager for Node.js — rotation, revocation, sudo mode, impersonation, concurrent limits, fingerprint binding, device labels, Redis distributed revocation, and adapters for Fastify, Express, Hono, and Elysia.",
   "type": "module",
   "sideEffects": false,

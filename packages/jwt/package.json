@@ -1,6 +1,6 @@
 {
   "name": "@exortek/jwt",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "JSON Web Token (JWT) — RFC 7519 / RFC 7518 / RFC 8725 / RFC 9068 for Node.js 22+. sign / verify / decode / peek, tokenPair (access + refresh) with reuse detection, blacklist store (memory / redis / custom), claims validation (exp / nbf / iat / iss / aud / sub / jti / nonce / typ / maxAge / scope), PEM + X.509 cert input, custom fn escape hatch on every knob. Alg allowlist mandatory. `none` never accepted. Zero-dependency, built on node:crypto.",
   "type": "module",
   "sideEffects": false,
