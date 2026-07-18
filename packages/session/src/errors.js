@@ -3,6 +3,8 @@
  * `@exortek/session` can raise. Branch on `code`, never on the message
  * text — messages are free-form and change across versions.
  */
+import { BaseError } from '@exortek/shared/errors';
+
 export const ErrorCode = Object.freeze({
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
 
@@ -47,45 +49,22 @@ export const ErrorCode = Object.freeze({
  *   throw err
  * }
  */
-export class SessionError extends Error {
-  /**
-   * @param {string} code    One of {@link ErrorCode}.
-   * @param {string} message Human-readable diagnostic. Free-form; may
-   *                         change across versions. Branch on `code`.
-   * @param {{ cause?: unknown, status?: number, details?: Record<string, unknown> }} [options]
-   */
-  constructor(code, message, options = {}) {
-    super(message, options.cause ? { cause: options.cause } : undefined);
-    this.name = 'SessionError';
-    this.code = code;
-    this.status = options.status ?? statusFor(code);
-    if (options.details) {
-      this.details = options.details;
-    }
-  }
-}
-
-function statusFor(code) {
-  switch (code) {
-    case ErrorCode.INVALID_ARGUMENT:
-      return 400;
-    case ErrorCode.MISSING_TOKEN:
-    case ErrorCode.INVALID_TOKEN:
-    case ErrorCode.EXPIRED:
-    case ErrorCode.IDLE_TIMEOUT:
-    case ErrorCode.REVOKED:
-    case ErrorCode.SESSION_NOT_FOUND:
-    case ErrorCode.TOKEN_ROTATION_REQUIRED:
-    case ErrorCode.FINGERPRINT_MISMATCH:
-    case ErrorCode.SUSPICIOUS_ACTIVITY:
-    case ErrorCode.CONCURRENT_LIMIT_EXCEEDED:
-    case ErrorCode.FRESH_AUTH_REQUIRED:
-      return 401;
-    case ErrorCode.IMPERSONATION_INVALID:
-      return 403;
-    case ErrorCode.MISSING_PEER_DEP:
-      return 500;
-    default:
-      return 500;
-  }
+export class SessionError extends BaseError {
+  static statuses = {
+    [ErrorCode.INVALID_ARGUMENT]: 400,
+    [ErrorCode.MISSING_TOKEN]: 401,
+    [ErrorCode.INVALID_TOKEN]: 401,
+    [ErrorCode.EXPIRED]: 401,
+    [ErrorCode.IDLE_TIMEOUT]: 401,
+    [ErrorCode.REVOKED]: 401,
+    [ErrorCode.SESSION_NOT_FOUND]: 401,
+    [ErrorCode.TOKEN_ROTATION_REQUIRED]: 401,
+    [ErrorCode.FINGERPRINT_MISMATCH]: 401,
+    [ErrorCode.SUSPICIOUS_ACTIVITY]: 401,
+    [ErrorCode.CONCURRENT_LIMIT_EXCEEDED]: 401,
+    [ErrorCode.FRESH_AUTH_REQUIRED]: 401,
+    [ErrorCode.IMPERSONATION_INVALID]: 403,
+    [ErrorCode.MISSING_PEER_DEP]: 500,
+  };
+  static defaultStatus = 500;
 }

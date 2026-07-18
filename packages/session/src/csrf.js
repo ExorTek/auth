@@ -1,4 +1,5 @@
-import { createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
+import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { SessionError, ErrorCode } from './errors.js';
 
 // CSRF token derivation from a session ID + a server secret. The token
@@ -69,9 +70,9 @@ export function verifyCsrfToken(candidate, sessionId, secret) {
   } catch {
     return false;
   }
-  if (expected.length !== candidate.length) {
-    return false;
-  }
+  // The shared compare is length-safe: a length mismatch burns a
+  // comparison and returns false instead of short-circuiting, so
+  // "wrong length" is not distinguishable from "wrong value".
   return timingSafeEqual(Buffer.from(expected, 'utf8'), Buffer.from(candidate, 'utf8'));
 }
 
