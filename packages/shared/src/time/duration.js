@@ -68,7 +68,8 @@ const SUPPORTED_UNITS = 'ms, s, m, h, d, w (and long/plural forms)';
  * @throws {Error} on malformed input
  *
  * @example
- *   parseDuration(900)        // → 900       (Node convention: ms)
+ *   parseDuration(900)        // → 900       (ms)
+ *   parseDuration('900')      // → 900       (unit-less string = ms too)
  *   parseDuration('500ms')    // → 500
  *   parseDuration('15m')      // → 900_000
  *   parseDuration('2 hours')  // → 7_200_000
@@ -88,11 +89,11 @@ export function parseDuration(input) {
   const match = DURATION_RE.exec(input);
   if (!match) {
     throw new Error(
-      `parseDuration: could not parse ${JSON.stringify(input)}. Examples: 900 (seconds), '15m', '2h', '7d', '500ms', '30s'.`,
+      `parseDuration: could not parse ${JSON.stringify(input)}. Examples: 900 (ms), '15m', '2h', '7d', '500ms', '30s'.`,
     );
   }
   const value = Number(match[1]);
-  const unit = (match[2] || 's').toLowerCase();
+  const unit = (match[2] || 'ms').toLowerCase();
   const multiplier = UNIT_MS[/** @type {keyof typeof UNIT_MS} */ (unit)];
   if (multiplier === undefined) {
     throw new Error(`parseDuration: unknown time unit ${JSON.stringify(unit)}. Supported: ${SUPPORTED_UNITS}.`);

@@ -38,11 +38,9 @@ test('duration strings — fractional values', () => {
   assert.equal(parseDuration('0.5s'), 500);
 });
 
-test('unit-less string defaults to seconds', () => {
-  // Duration strings without a unit are historically seconds by convention
-  // (backward compat with jwt's '900' meaning 15 minutes). Numbers still
-  // mean milliseconds — the two branches deliberately differ.
-  assert.equal(parseDuration('900'), 900_000);
+test('unit-less string defaults to milliseconds (matches bare-number branch)', () => {
+  assert.equal(parseDuration('900'), 900);
+  assert.equal(parseDuration('60000'), 60_000);
 });
 
 test('rejects non-finite numbers', () => {
