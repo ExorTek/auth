@@ -1,7 +1,20 @@
 import { randomBytes } from 'node:crypto';
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { ALPHABET as CROCKFORD_ALPHABET } from '@exortek/shared/crockford';
+import { number, object, optional, string } from '@exortek/shared/validate';
 import { OtpError, ErrorCode } from './internal/errors.js';
+
+const NSchema = number().refine(v => Number.isInteger(v) && v >= 1 && v <= 100, 'must be an integer in [1, 100]');
+
+const BackupCodesOptionsSchema = object({
+  length: optional(
+    number().refine(v => Number.isInteger(v) && v >= 6 && v <= 32, 'must be an integer in [6, 32]'),
+  ),
+  groups: optional(number().refine(v => Number.isInteger(v) && v >= 1, 'must be a positive integer')),
+  alphabet: optional(
+    string().refine(s => s.length >= 8 && s.length <= 256, 'must be a string of 8-256 characters'),
+  ),
+});
 
 /**
  * Ready-made shapes for the most common backup-code conventions.
@@ -77,24 +90,21 @@ export const backupPresets = Object.freeze({
  * @returns {string[]}
  */
 export function backupCodes(n = 10, options = {}) {
-  if (!Number.isInteger(n) || n < 1 || n > 100) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, `backupCodes: n must be an integer in [1, 100]; got ${n}`);
+  try {
+    NSchema.parse(n, 'backupCodes.n');
+    BackupCodesOptionsSchema.parse(options, 'backupCodes.options');
+  } catch (err) {
+    throw new OtpError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
   }
   const length = options.length ?? 10;
   const groups = options.groups ?? 2;
   const alphabet = options.alphabet ?? CROCKFORD_ALPHABET;
 
-  if (!Number.isInteger(length) || length < 6 || length > 32) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, `backupCodes: length must be an integer in [6, 32]; got ${length}`);
-  }
-  if (!Number.isInteger(groups) || groups < 1 || groups > length) {
+  if (groups > length) {
     throw new OtpError(
       ErrorCode.INVALID_ARGUMENT,
-      `backupCodes: groups must be an integer in [1, length]; got ${groups}`,
+      `backupCodes.options.groups: must be ≤ length (${length}); got ${groups}`,
     );
-  }
-  if (typeof alphabet !== 'string' || alphabet.length < 8 || alphabet.length > 256) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, 'backupCodes: alphabet must be a string of 8-256 unique characters');
   }
 
   const groupSize = Math.floor(length / groups);
