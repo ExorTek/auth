@@ -113,8 +113,8 @@ export async function exportPEM(key, format) {
  * Strip every private / secret member from a JWK, returning a defensive
  * shallow copy that is safe to publish (e.g. via a JWKS endpoint).
  *
- * Not exposed by `jose`: callers there have to remember which kty stores
- * the secret in which member.
+ * Convenience over hand-stripping — callers don't have to remember
+ * which `kty` stores the secret material in which member.
  *
  * @param {object} jwk
  * @returns {object}
