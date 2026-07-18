@@ -26,10 +26,7 @@ describe('assertPositiveInt', () => {
   });
 
   test('error message includes the argument name', () => {
-    assert.throws(
-      () => assertPositiveInt(-1, 'options.iterations'),
-      /options\.iterations must be a positive integer/,
-    );
+    assert.throws(() => assertPositiveInt(-1, 'options.iterations'), /options\.iterations must be a positive integer/);
   });
 });
 

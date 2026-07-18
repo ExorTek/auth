@@ -7,21 +7,29 @@
  *   - **schema** for whole options objects (`object({...})`, `parse`).
  *   - **asserts** for one-liner argument guards at the call site.
  *
- * Failures throw plain `Error` — consumers wrap into their typed
- * error class at the surface, same convention as every other shared
- * module. Typical shape:
+ * Failures throw a plain `Error` **carrying `err.code =
+ * 'INVALID_ARGUMENT'`** — the machine-readable code every
+ * `@exortek/*` package's typed errors already expose. Consumers
+ * import and use directly; there is no per-package wrapping
+ * ceremony:
  *
- *   // packages/crypto/src/internal/validate.js
- *   import * as sa from '@exortek/shared/asserts';
- *   const wrap = fn => (...args) => {
- *     try { return fn(...args); }
- *     catch (err) { throw new CryptoError(ErrorCode.INVALID_ARGUMENT, err.message); }
- *   };
- *   export const assertPositiveInt = wrap(sa.assertPositiveInt);
+ *   import { assertPositiveInt } from '@exortek/shared/asserts';
+ *   assertPositiveInt(options.iterations, 'options.iterations');
+ *
+ * Callers that need to branch on the failure branch on
+ * `err.code === 'INVALID_ARGUMENT'`, same as they do for the typed
+ * classes. `instanceof CryptoError` (or the like) does NOT match —
+ * that's the deliberate trade for the "one-line callsite, no wrap"
+ * ergonomics.
  */
 
 function fail(name, description) {
-  throw new Error(`${name} must be ${description}`);
+  const err = new Error(`${name} must be ${description}`);
+  // Machine-readable marker so consumers branch on `err.code` even
+  // though the class is a plain `Error` — the same convention every
+  // `@exortek/*` package's typed errors already use.
+  err.code = 'INVALID_ARGUMENT';
+  throw err;
 }
 
 /**
