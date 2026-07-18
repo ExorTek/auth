@@ -10,7 +10,7 @@ import {
   rateLimitDenialBody,
   buildCorsCheck,
   buildHeaders,
-} from './shared.js';
+} from './core.js';
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 
 /*
@@ -174,7 +174,7 @@ export const rateLimitPlugin = fp(
  * above if you want to compose them yourself.
  *
  * @param {import('fastify').FastifyInstance} fastify
- * @param {import('./shared.js').SecurityMiddlewareOptions} options
+ * @param {import('./core.js').SecurityMiddlewareOptions} options
  */
 async function securityPluginImpl(fastify, options) {
   const cfg = normalizeUmbrella(options);

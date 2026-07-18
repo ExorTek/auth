@@ -1,7 +1,4 @@
-import {
-  parseCookies as sharedParseCookies,
-  serialiseCookie as sharedSerialiseCookie,
-} from '@exortek/shared/cookie';
+import { parseCookies as sharedParseCookies, serialiseCookie as sharedSerialiseCookie } from '@exortek/shared/cookie';
 
 import { cors as buildCorsCheck } from '../cors/index.js';
 import { headers as buildHeaders } from '../headers/index.js';

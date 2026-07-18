@@ -12,7 +12,7 @@ import {
   rateLimitDenialBody,
   buildCorsCheck,
   buildHeaders,
-} from './shared.js';
+} from './core.js';
 
 /*
  * Express adapter. Each concern is exposed as its own middleware factory:
@@ -201,7 +201,7 @@ export function rateLimitMiddleware(options) {
  * Each concern is opt-in; set to `false` to skip. See the individual
  * factories above if you want to compose them yourself.
  *
- * @param {import('./shared.js').SecurityMiddlewareOptions} options
+ * @param {import('./core.js').SecurityMiddlewareOptions} options
  */
 export function securityMiddleware(options = {}) {
   const cfg = normalizeUmbrella(options);

@@ -9,7 +9,7 @@ import {
   rateLimitDenialBody,
   buildCorsCheck,
   buildHeaders,
-} from './shared.js';
+} from './core.js';
 
 /*
  * Hono adapter. Each concern is exposed as its own middleware factory:
@@ -187,7 +187,7 @@ export function rateLimitMiddleware(options) {
 /**
  * Umbrella middleware — headers + cors + csrf + rate-limit in one `app.use`.
  *
- * @param {import('./shared.js').SecurityMiddlewareOptions} options
+ * @param {import('./core.js').SecurityMiddlewareOptions} options
  */
 export function securityMiddleware(options = {}) {
   const cfg = normalizeUmbrella(options);

@@ -10,7 +10,7 @@ import {
   rateLimitDenialBody,
   buildCorsCheck,
   buildHeaders,
-} from './shared.js';
+} from './core.js';
 
 /*
  * Elysia adapter. Each concern is exposed as a plugin factory returning a
@@ -252,7 +252,7 @@ export function rateLimitMiddleware(options) {
 /**
  * Umbrella plugin — headers + cors + csrf + rate-limit in one `.use()`.
  *
- * @param {import('./shared.js').SecurityMiddlewareOptions} options
+ * @param {import('./core.js').SecurityMiddlewareOptions} options
  */
 export function securityMiddleware(options = {}) {
   const cfg = normalizeUmbrella(options);
