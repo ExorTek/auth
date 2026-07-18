@@ -13,6 +13,7 @@
     "./duration": "./src/duration.js",
     "./hash": "./src/hash.js",
     "./hmac": "./src/hmac.js",
+    "./http": "./src/http.js",
     "./random": "./src/random.js",
     "./timing-safe": "./src/timing-safe.js",
     "./mutex": "./src/mutex.js",
