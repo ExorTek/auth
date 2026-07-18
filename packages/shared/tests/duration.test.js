@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 
 import { parseDuration } from '../src/time/duration.js';
 
-test('bare number is interpreted as seconds, returned as ms', () => {
+test('bare number is milliseconds (Node standard)', () => {
   assert.equal(parseDuration(0), 0);
-  assert.equal(parseDuration(1), 1000);
-  assert.equal(parseDuration(900), 900_000);
+  assert.equal(parseDuration(1), 1);
+  assert.equal(parseDuration(900), 900);
+  assert.equal(parseDuration(60_000), 60_000);
 });
 
 test('duration strings — short forms', () => {
@@ -38,6 +39,9 @@ test('duration strings — fractional values', () => {
 });
 
 test('unit-less string defaults to seconds', () => {
+  // Duration strings without a unit are historically seconds by convention
+  // (backward compat with jwt's '900' meaning 15 minutes). Numbers still
+  // mean milliseconds — the two branches deliberately differ.
   assert.equal(parseDuration('900'), 900_000);
 });
 

@@ -3,16 +3,18 @@
  * `@exortek/*` stack.
  *
  * Accepts:
- *   - `number` (positive integer) → interpreted as **seconds** to
- *     match the repository-wide convention (`expiresIn: 900` means
- *     15 minutes everywhere).
+ *   - `number` → **milliseconds** (Node's native time unit —
+ *     `setTimeout`, `Date.now`, `PerformanceObserver` all use ms).
+ *     Consumer packages that historically treated bare numbers as
+ *     seconds (jwt, session) do the conversion at their own
+ *     surface boundary if they want to preserve that convention.
  *   - `string` with a unit suffix — long / plural / short forms all
  *     work. Whitespace and fractional values tolerated on the input
  *     side; the output is always integer milliseconds after rounding.
  *
- * Returns: **milliseconds** — Node's native time unit. Callers that
- * need integer seconds (e.g. JWT `exp` claims per RFC 7519 NumericDate)
- * divide by 1000 at their surface boundary.
+ * Returns: **milliseconds**. Callers that need integer seconds
+ * (e.g. JWT `exp` claims per RFC 7519 NumericDate) divide by 1000 at
+ * their surface boundary.
  *
  * Supported units:
  *
@@ -66,7 +68,7 @@ const SUPPORTED_UNITS = 'ms, s, m, h, d, w (and long/plural forms)';
  * @throws {Error} on malformed input
  *
  * @example
- *   parseDuration(900)        // → 900_000  (bare number = seconds)
+ *   parseDuration(900)        // → 900       (Node convention: ms)
  *   parseDuration('500ms')    // → 500
  *   parseDuration('15m')      // → 900_000
  *   parseDuration('2 hours')  // → 7_200_000
@@ -77,9 +79,7 @@ export function parseDuration(input) {
     if (!Number.isFinite(input)) {
       throw new Error(`parseDuration: numeric input must be finite; got ${input}`);
     }
-    // Repository convention: bare number is seconds, matching every
-    // shipped package's public API (`expiresIn: 900` → 15 minutes).
-    return Math.round(input * 1000);
+    return Math.round(input);
   }
   if (typeof input !== 'string') {
     throw new TypeError(`parseDuration: expected string or number; got ${typeof input}`);
