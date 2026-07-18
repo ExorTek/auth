@@ -40,7 +40,11 @@ export function sliding(config) {
       // drift on rejection-heavy traffic.
       const current = await store.incr(currentKey, windowMs * 2);
       const previous = await store.get(previousKey);
-      const previousCount = previous ? previous.count : 0;
+      // `store.get` preserves the raw wire type — sliding stores its
+      // count via `incr` (integer), but the Redis adapter returns it
+      // as a string on the wire. Coerce explicitly for the arithmetic
+      // below.
+      const previousCount = previous ? Number(previous.count) || 0 : 0;
 
       const interpolated = current.count + previousCount * (1 - positionInWindow);
       const reset = new Date(now + Math.ceil(windowMs * (1 - positionInWindow)));

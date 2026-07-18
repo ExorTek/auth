@@ -18,17 +18,21 @@ end
 return { count, pttl }
 `.trim();
 
+// Returns the raw stored value + TTL. Do NOT coerce with `tonumber` in
+// Lua — `read()` and `get()` share this script, and bucket-algorithm
+// state is a compact string like `'4.5|1234567890'` that Lua would
+// silently turn into `nil`. The JS wrapper coerces where numeric.
 const READ_SCRIPT = `
 local key = KEYS[1]
 local current = redis.call('GET', key)
 if not current then
-  return { 0, -1 }
+  return { false, -1 }
 end
 local ttl = redis.call('PTTL', key)
 if ttl < 0 then
   ttl = 0
 end
-return { tonumber(current), ttl }
+return { current, ttl }
 `.trim();
 
 // Exists-guarded DECR: a rollback must never create the key (a plain DECR
@@ -188,14 +192,24 @@ export function redisStore(client, options = {}) {
   }
 
   return {
+    // `get` is called by both numeric callers (sliding, with-ban) and
+    // bucket algorithms whose state is an opaque string like
+    // `'4.5|1234567890'`. Coerce to `Number` for pure integer values
+    // only — anything else passes through as the raw string so the
+    // CAS loop in tokenBucket / leakyBucket keeps working.
     async get(key) {
-      const { count, ttl } = parsePair(await runRead(k(key)));
-      if (!Number.isFinite(count) || count <= 0 || ttl < 0) {
+      const raw = await runRead(k(key));
+      const [countRaw, ttlRaw] = Array.isArray(raw) ? raw : [raw, -1];
+      const ttl = Number(ttlRaw);
+      if (countRaw === null || countRaw === undefined || countRaw === false || ttl < 0) {
         return null;
       }
+      const count = /^-?\d+$/.test(String(countRaw)) ? Number(countRaw) : countRaw;
       return { count, expiresAt: Date.now() + ttl };
     },
 
+    // `read` is called by fixed / sliding which persist their state as
+    // an integer counter (from INCR). Numeric parsing is correct here.
     async read(key) {
       const { count, ttl } = parsePair(await runRead(k(key)));
       if (!Number.isFinite(count) || count <= 0 || ttl < 0) {
