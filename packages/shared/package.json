@@ -24,6 +24,7 @@
     "./errors": "./src/errors.js",
     "./validate": "./src/validate.js",
     "./algorithms": "./src/algorithms.js",
+    "./asserts": "./src/asserts.js",
     "./crit": "./src/crit.js",
     "./ecdsa": "./src/ecdsa.js"
   },
