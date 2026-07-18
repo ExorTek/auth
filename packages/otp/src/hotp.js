@@ -155,6 +155,13 @@ export function verifyHotp(code, secret, counter, options = {}) {
  * throw `HOTP window must be an integer in [0, 10]`.
  *
  * @private
+ * @unstable This export exists so `verifyTotp` can share the timing-safe
+ * forward scan without re-implementing it. It is **not** part of the
+ * public API — the underscore prefix, the `@private` tag, and this
+ * note are all signals that the signature can move to `internal/`,
+ * change shape, or disappear entirely in any future release with no
+ * major-version bump. Do not import it from `@exortek/otp/hotp`.
+ *
  * @param {string} code
  * @param {string | Buffer | Uint8Array} secret
  * @param {number} start        First counter to try (non-negative).
