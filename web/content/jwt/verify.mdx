@@ -68,6 +68,15 @@ verify(token, key, { alg: ['ES256'], issuer: async claimed => await store.isVali
 Same polymorphic surface as `sign`, plus **JWK array with kid dispatch**
 and **async resolver function**:
 
+<Callout type="info">
+  **Hot path tip.** `verify` re-normalises the input key on every call
+  — PEM parsing runs `crypto.createPrivateKey` / `createPublicKey`, JWK
+  input runs `crypto.createSecretKey` / `crypto.createPublicKey`. On a
+  request-per-second service that's per-request work. Pass a Node
+  `KeyObject` directly (build it once at boot with `createPublicKey` or
+  `createPrivateKey`) and the fast path skips normalisation entirely.
+</Callout>
+
 ```js
 // Single key (any shape)
 await verify(token, publicKey, opts)

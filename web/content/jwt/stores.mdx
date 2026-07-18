@@ -72,6 +72,16 @@ The client is auto-detected — `ioredis` uses positional `EX` args,
   matching.
 </Callout>
 
+<Callout type="warning">
+  **Redis `deleteAll` cost.** The Redis adapter implements
+  metadata-filter `deleteAll` as `SCAN` + one `GET` per matching-prefix
+  key, so cost is proportional to the store's key population — not to
+  the number of records that end up matching. On the `tokenPair` reuse
+  path this runs on every family-revocation event; sized deployments
+  will want a secondary index (Redis SET per `familyId`) rather than
+  scanning. That index is a 1.1 target.
+</Callout>
+
 ## `custom` — bring your own KV
 
 ```js
