@@ -1,3 +1,5 @@
+import { assertRedisClient } from '@exortek/shared/redis-guard';
+
 import { SecurityError, ErrorCode } from '../../internal/errors.js';
 
 const INCR_SCRIPT = `
@@ -104,20 +106,9 @@ return 1
  * @returns {import('../index.js').RateLimitStore}
  */
 export function redisStore(client, options = {}) {
-  if (!client || typeof client !== 'object') {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      'redisStore(client) requires a Redis-compatible client (ioredis, node-redis, or @upstash/redis)',
-    );
-  }
-  for (const name of ['eval', 'get', 'set', 'del']) {
-    if (typeof client[name] !== 'function') {
-      throw new SecurityError(
-        ErrorCode.INVALID_ARGUMENT,
-        `redisStore: client.${name} is required — is this a Redis-compatible client?`,
-      );
-    }
-  }
+  assertRedisClient(client, ['eval', 'get', 'set', 'del'], msg => {
+    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `redisStore: ${msg}`);
+  });
 
   const prefix = options.prefix ?? 'rl:';
   const k = key => `${prefix}${key}`;

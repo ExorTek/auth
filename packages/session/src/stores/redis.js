@@ -1,3 +1,5 @@
+import { assertRedisClient } from '@exortek/shared/redis-guard';
+
 import { SessionError, ErrorCode } from '../errors.js';
 
 /**
@@ -50,17 +52,9 @@ import { SessionError, ErrorCode } from '../errors.js';
  * @returns {SessionStore & { channel: string }}
  */
 export function redisStore(client, options = {}) {
-  if (!client || typeof client !== 'object') {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'redisStore: client is required');
-  }
-  for (const method of ['get', 'set', 'del']) {
-    if (typeof client[method] !== 'function') {
-      throw new SessionError(
-        ErrorCode.INVALID_ARGUMENT,
-        `redisStore: client is missing '${method}()' — pass an ioredis / node-redis client`,
-      );
-    }
-  }
+  assertRedisClient(client, ['get', 'set', 'del'], msg => {
+    throw new SessionError(ErrorCode.INVALID_ARGUMENT, `redisStore: ${msg}`);
+  });
   const keyPrefix = options.keyPrefix ?? 'sess:';
   const publishRevocations = options.publishRevocations === true;
   const channel = options.channel ?? `${keyPrefix}events`;
