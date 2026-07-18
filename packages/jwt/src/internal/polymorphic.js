@@ -11,25 +11,12 @@
  *   3. `async fn` → user's own logic wins
  */
 
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
+import { resolveOrCall, randomBuffer } from '@exortek/shared/resolve';
 import { JwtError, ErrorCode } from './errors.js';
 
-/**
- * If `value` is a function, call it with `args` and await; otherwise
- * return `value` unchanged.
- *
- * @template T
- * @param {T | ((...a: any[]) => T | Promise<T>)} value
- * @param {any[]} args
- * @returns {Promise<T>}
- */
-export async function resolveOrCall(value, ...args) {
-  if (typeof value === 'function') {
-    return /** @type {any} */ (value)(...args);
-  }
-  return value;
-}
+export { resolveOrCall, randomBuffer };
 
 /** Supported built-in hash algorithms for the JWT store-key derivation. */
 const HASH_ALGO_BUILTIN = new Set(['sha256', 'sha384', 'sha512']);
@@ -89,16 +76,6 @@ export function resolveEncoding(encoding) {
         `resolveEncoding: unknown encoding ${JSON.stringify(encoding)}. Built-in: base64url | base64 | hex | crockford | uuid.`,
       );
   }
-}
-
-/**
- * Produce `count` random bytes.
- *
- * @param {number} count
- * @returns {Buffer}
- */
-export function randomBuffer(count) {
-  return randomBytes(count);
 }
 
 // Crockford Base32 alphabet — RFC 4648 §7 style but with I / L / O / U

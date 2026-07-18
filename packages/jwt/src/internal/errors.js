@@ -2,6 +2,8 @@
  * Stable machine-readable codes for every failure that `@exortek/jwt`
  * can raise. Branch on `code`, never on the message.
  */
+import { BaseError } from '@exortek/shared/errors';
+
 export const ErrorCode = Object.freeze({
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   INVALID_TOKEN: 'INVALID_TOKEN',
@@ -41,55 +43,34 @@ export const ErrorCode = Object.freeze({
  * `code` (from {@link ErrorCode}) and a `status` — the HTTP response
  * status a middleware layer would use when translating the error.
  */
-export class JwtError extends Error {
-  /**
-   * @param {string} code    One of {@link ErrorCode}.
-   * @param {string} message Human-readable diagnostic. Free-form; may
-   *                         change across versions. Branch on `code`.
-   * @param {{ cause?: unknown, status?: number }} [options]
-   */
-  constructor(code, message, options = {}) {
-    super(message, options.cause ? { cause: options.cause } : undefined);
-    this.name = 'JwtError';
-    this.code = code;
-    this.status = options.status ?? statusFor(code);
-  }
-}
-
-function statusFor(code) {
-  switch (code) {
-    case ErrorCode.INVALID_ARGUMENT:
-    case ErrorCode.UNSUPPORTED_ALGORITHM:
-    case ErrorCode.MISSING_ALG_ALLOWLIST:
-      return 400;
-    case ErrorCode.INVALID_TOKEN:
-    case ErrorCode.INVALID_HEADER:
-    case ErrorCode.INVALID_PAYLOAD:
-    case ErrorCode.INVALID_SIGNATURE:
-    case ErrorCode.INVALID_KEY:
-    case ErrorCode.ALGORITHM_MISMATCH:
-    case ErrorCode.ALGORITHM_NONE_FORBIDDEN:
-    case ErrorCode.CRIT_UNSUPPORTED:
-    case ErrorCode.KEY_NOT_FOUND:
-    case ErrorCode.TOKEN_EXPIRED:
-    case ErrorCode.TOKEN_NOT_YET_VALID:
-    case ErrorCode.TOKEN_TOO_OLD:
-    case ErrorCode.INVALID_ISSUER:
-    case ErrorCode.INVALID_AUDIENCE:
-    case ErrorCode.INVALID_SUBJECT:
-    case ErrorCode.INVALID_NONCE:
-    case ErrorCode.INVALID_TYP:
-    case ErrorCode.MISSING_CLAIM:
-    case ErrorCode.REFRESH_REUSED:
-    case ErrorCode.REVOKED:
-      return 401;
-    case ErrorCode.INSUFFICIENT_SCOPE:
-      return 403;
-    case ErrorCode.TOKEN_TOO_LARGE:
-      return 413;
-    case ErrorCode.STORE_ERROR:
-      return 500;
-    default:
-      return 500;
-  }
+export class JwtError extends BaseError {
+  static statuses = {
+    [ErrorCode.INVALID_ARGUMENT]: 400,
+    [ErrorCode.UNSUPPORTED_ALGORITHM]: 400,
+    [ErrorCode.MISSING_ALG_ALLOWLIST]: 400,
+    [ErrorCode.INVALID_TOKEN]: 401,
+    [ErrorCode.INVALID_HEADER]: 401,
+    [ErrorCode.INVALID_PAYLOAD]: 401,
+    [ErrorCode.INVALID_SIGNATURE]: 401,
+    [ErrorCode.INVALID_KEY]: 401,
+    [ErrorCode.ALGORITHM_MISMATCH]: 401,
+    [ErrorCode.ALGORITHM_NONE_FORBIDDEN]: 401,
+    [ErrorCode.CRIT_UNSUPPORTED]: 401,
+    [ErrorCode.KEY_NOT_FOUND]: 401,
+    [ErrorCode.TOKEN_EXPIRED]: 401,
+    [ErrorCode.TOKEN_NOT_YET_VALID]: 401,
+    [ErrorCode.TOKEN_TOO_OLD]: 401,
+    [ErrorCode.INVALID_ISSUER]: 401,
+    [ErrorCode.INVALID_AUDIENCE]: 401,
+    [ErrorCode.INVALID_SUBJECT]: 401,
+    [ErrorCode.INVALID_NONCE]: 401,
+    [ErrorCode.INVALID_TYP]: 401,
+    [ErrorCode.MISSING_CLAIM]: 401,
+    [ErrorCode.REFRESH_REUSED]: 401,
+    [ErrorCode.REVOKED]: 401,
+    [ErrorCode.INSUFFICIENT_SCOPE]: 403,
+    [ErrorCode.TOKEN_TOO_LARGE]: 413,
+    [ErrorCode.STORE_ERROR]: 500,
+  };
+  static defaultStatus = 500;
 }

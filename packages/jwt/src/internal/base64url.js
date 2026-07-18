@@ -3,7 +3,7 @@
  * failures surface as typed `JwtError` for the package's public API.
  */
 
-import * as sb from '@exortek/shared/encoding/base64url';
+import * as sb from '@exortek/shared/base64url';
 import { JwtError, ErrorCode } from './errors.js';
 
 export function encode(bytes) {

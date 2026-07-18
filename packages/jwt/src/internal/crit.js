@@ -1,8 +1,7 @@
 /**
- * `crit` header validation (RFC 7515 §4.1.11). Standalone per package
- * policy — code kept in sync with `@exortek/jws`. JWT rarely uses
- * `crit` in practice, but the JWS spec still applies to any token that
- * carries one.
+ * `crit` header validation (RFC 7515 §4.1.11) — adapter over the
+ * shared implementation. JWT rarely uses `crit` in practice, but the
+ * JWS spec still applies to any token that carries one.
  *
  * On sign: every name in `crit` must be present as a header parameter,
  * `crit` cannot list itself, and the array must be non-empty.
@@ -13,6 +12,7 @@
  * raise {@link ErrorCode.CRIT_UNSUPPORTED}.
  */
 
+import * as sc from '@exortek/shared/crit';
 import { JwtError, ErrorCode } from './errors.js';
 
 /**
@@ -28,17 +28,10 @@ export const KNOWN_CRIT = Object.freeze(new Set([]));
  * @param {Record<string, unknown>} protectedHeader
  */
 export function assertSignSide(crit, protectedHeader) {
-  if (crit === undefined) {
-    return;
-  }
-  _shapeChecks(crit);
-  for (const name of /** @type {string[]} */ (crit)) {
-    if (!(name in protectedHeader)) {
-      throw new JwtError(
-        ErrorCode.INVALID_HEADER,
-        `crit lists ${JSON.stringify(name)} but the protected header has no such member (RFC 7515 §4.1.11)`,
-      );
-    }
+  try {
+    sc.assertSignSide(crit, protectedHeader);
+  } catch (err) {
+    throw new JwtError(ErrorCode.INVALID_HEADER, err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -48,48 +41,13 @@ export function assertSignSide(crit, protectedHeader) {
  * @param {Iterable<string>} [extraKnown]
  */
 export function assertVerifySide(crit, protectedHeader, extraKnown) {
-  if (crit === undefined) {
-    return;
-  }
-  _shapeChecks(crit);
-  const known = new Set([...KNOWN_CRIT, ...(extraKnown || [])]);
-  for (const name of /** @type {string[]} */ (crit)) {
-    if (!known.has(name)) {
-      throw new JwtError(
-        ErrorCode.CRIT_UNSUPPORTED,
-        `crit lists ${JSON.stringify(name)} — this verifier does not understand it. Add the name to knownCriticalHeaders if the caller is prepared to process it.`,
-      );
-    }
-    if (!(name in protectedHeader)) {
-      throw new JwtError(
-        ErrorCode.INVALID_HEADER,
-        `crit lists ${JSON.stringify(name)} but the protected header has no such member (RFC 7515 §4.1.11)`,
-      );
-    }
-  }
-}
-
-/**
- * @param {unknown} crit
- */
-function _shapeChecks(crit) {
-  if (!Array.isArray(crit)) {
-    throw new JwtError(ErrorCode.INVALID_HEADER, 'crit must be a JSON array of strings');
-  }
-  if (crit.length === 0) {
-    throw new JwtError(ErrorCode.INVALID_HEADER, 'crit must not be an empty array (RFC 7515 §4.1.11)');
-  }
-  const seen = new Set();
-  for (const name of crit) {
-    if (typeof name !== 'string' || name.length === 0) {
-      throw new JwtError(ErrorCode.INVALID_HEADER, `crit contains a non-string entry ${JSON.stringify(name)}`);
-    }
-    if (name === 'crit') {
-      throw new JwtError(ErrorCode.INVALID_HEADER, 'crit must not list itself (RFC 7515 §4.1.11)');
-    }
-    if (seen.has(name)) {
-      throw new JwtError(ErrorCode.INVALID_HEADER, `crit contains duplicate entry ${JSON.stringify(name)}`);
-    }
-    seen.add(name);
+  try {
+    sc.assertVerifySide(crit, protectedHeader, KNOWN_CRIT, extraKnown);
+  } catch (err) {
+    const unknownCrit = err !== null && typeof err === 'object' && 'critName' in err;
+    throw new JwtError(
+      unknownCrit ? ErrorCode.CRIT_UNSUPPORTED : ErrorCode.INVALID_HEADER,
+      err instanceof Error ? err.message : String(err),
+    );
   }
 }
