@@ -1,42 +1,44 @@
+import { any, duration, number, object } from '@exortek/shared/validate';
+
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 
+const positiveInt = label => number().refine(v => Number.isInteger(v) && v >= 1, `${label} must be a positive integer`);
+const positiveNumber = label => number().refine(v => Number.isFinite(v) && v > 0, `${label} must be a positive number`);
+
+const LimiterOptionsSchema = object({
+  requests: positiveInt('requests'),
+  window: duration(),
+  store: any(),
+});
+
+const TokenBucketOptionsSchema = object({
+  capacity: positiveInt('capacity'),
+  refillRate: positiveNumber('refillRate (tokens per second)'),
+  store: any(),
+});
+
+const LeakyBucketOptionsSchema = object({
+  capacity: positiveInt('capacity'),
+  leakRate: positiveNumber('leakRate (tokens per second)'),
+  store: any(),
+});
+
+function parseWith(schema, config, name) {
+  try {
+    schema.parse(config, `rateLimit.${name}(config)`);
+  } catch (err) {
+    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
+  }
+}
+
 export function assertLimiterOptions(config, name) {
-  if (!config || typeof config !== 'object') {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `rateLimit.${name}(config) requires an options object`);
-  }
-  if (!Number.isInteger(config.requests) || config.requests < 1) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      `rateLimit.${name}: config.requests must be a positive integer; got ${config.requests}`,
-    );
-  }
-  if (config.window === undefined || config.window === null) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      `rateLimit.${name}: config.window is required — pass a duration string like '1m' or an integer of milliseconds`,
-    );
-  }
+  parseWith(LimiterOptionsSchema, config, name);
   assertStore(config.store, `rateLimit.${name}`);
 }
 
 export function assertBucketOptions(config, name) {
-  if (!config || typeof config !== 'object') {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `rateLimit.${name}(config) requires an options object`);
-  }
-  if (!Number.isInteger(config.capacity) || config.capacity < 1) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      `rateLimit.${name}: config.capacity must be a positive integer; got ${config.capacity}`,
-    );
-  }
-  const rate = name === 'tokenBucket' ? config.refillRate : config.leakRate;
-  const rateField = name === 'tokenBucket' ? 'refillRate' : 'leakRate';
-  if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      `rateLimit.${name}: config.${rateField} must be a positive number (tokens per second); got ${rate}`,
-    );
-  }
+  const schema = name === 'tokenBucket' ? TokenBucketOptionsSchema : LeakyBucketOptionsSchema;
+  parseWith(schema, config, name);
   assertStore(config.store, `rateLimit.${name}`);
 }
 
