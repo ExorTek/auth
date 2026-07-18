@@ -1,4 +1,5 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { OtpError, ErrorCode } from './internal/errors.js';
 
 // Crockford Base32 alphabet — 0/O/1/I/L are dropped, so a paper printout
@@ -157,15 +158,10 @@ export function compareBackupCode(candidate, stored) {
   if (a.length === 0 || b.length === 0) {
     return false;
   }
-  const bufA = Buffer.from(a, 'utf8');
-  const bufB = Buffer.from(b, 'utf8');
-  if (bufA.length !== bufB.length) {
-    // Still burn one comparison worth of time so callers can't
-    // distinguish "wrong length" from "wrong value" via timing.
-    timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return timingSafeEqual(bufA, bufB);
+  // The shared compare is length-safe: a mismatch burns a comparison
+  // instead of short-circuiting, so "wrong length" is not
+  // distinguishable from "wrong value" via timing.
+  return timingSafeEqual(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
 }
 
 /**
