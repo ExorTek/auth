@@ -1,3 +1,5 @@
+import { appendSetCookieHeader } from '@exortek/shared/http';
+
 import {
   normalizeUmbrella,
   normalizeCsrf,
@@ -102,11 +104,13 @@ async function runCsrf(csrf, req, res) {
   const scheduleSetCookie = value => {
     const serialized = serializeCookie(csrf.cookieName, value, csrf.cookieOptions);
     // Prefer `appendHeader` (Express 5) so multiple middlewares' Set-Cookie
-    // headers don't clobber each other; fall back to setHeader on Express 4.
+    // headers don't clobber each other; on Express 4 read the current
+    // value and stack via the shared helper so we don't drop a
+    // previously-set cookie either.
     if (typeof res.appendHeader === 'function') {
       res.appendHeader('Set-Cookie', serialized);
     } else {
-      res.setHeader('Set-Cookie', serialized);
+      res.setHeader('Set-Cookie', appendSetCookieHeader(res.getHeader('Set-Cookie'), serialized));
     }
   };
 
