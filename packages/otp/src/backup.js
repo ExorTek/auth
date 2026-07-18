@@ -1,11 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
+import { ALPHABET as CROCKFORD_ALPHABET } from '@exortek/shared/crockford';
 import { OtpError, ErrorCode } from './internal/errors.js';
-
-// Crockford Base32 alphabet — 0/O/1/I/L are dropped, so a paper printout
-// has no ambiguous characters. Widely used in incident-recovery
-// scenarios (Stripe, GitHub restore codes look like this).
-const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 /**
  * Ready-made shapes for the most common backup-code conventions.
