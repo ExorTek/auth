@@ -1,15 +1,12 @@
+/**
+ * Duration parsing for rate-limit windows — adapter over the shared
+ * parser. Bare numbers are a positive integer of **milliseconds**;
+ * duration strings resolve through `@exortek/shared/duration`; every
+ * result must be at least 1ms.
+ */
+
+import { parseDuration as sharedParseDuration } from '@exortek/shared/duration';
 import { SecurityError, ErrorCode } from '../internal/errors.js';
-
-const UNITS = {
-  ms: 1,
-  s: 1000,
-  m: 60 * 1000,
-  h: 60 * 60 * 1000,
-  d: 24 * 60 * 60 * 1000,
-  w: 7 * 24 * 60 * 60 * 1000,
-};
-
-const PATTERN = /^\s*(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w)\s*$/i;
 
 /**
  * Parse a duration into milliseconds.
@@ -40,16 +37,16 @@ export function parseDuration(input, field = 'window') {
       `${field} must be a duration string like '1m' / '15m' / '1h' / '7d' or a positive integer of milliseconds; got ${input === null ? 'null' : typeof input}`,
     );
   }
-  const match = PATTERN.exec(input);
-  if (!match) {
+  let ms;
+  try {
+    ms = sharedParseDuration(input);
+  } catch (err) {
     throw new SecurityError(
       ErrorCode.INVALID_ARGUMENT,
       `${field} '${input}' is not a valid duration. Use '<number><unit>' where unit is ms | s | m | h | d | w (e.g. '500ms', '30s', '15m', '1h', '7d', '2w')`,
+      { cause: err },
     );
   }
-  const value = Number(match[1]);
-  const unit = match[2].toLowerCase();
-  const ms = Math.round(value * UNITS[unit]);
   if (ms <= 0) {
     throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `${field} must resolve to at least 1ms; '${input}' → ${ms}ms`);
   }

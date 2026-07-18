@@ -1,4 +1,5 @@
-import { randomBytes as _randomBytes, timingSafeEqual as _timingSafeEqual } from 'node:crypto';
+import { randomBuffer } from '@exortek/shared/random';
+import { timingSafeEqual as sharedTimingSafeEqual } from '@exortek/shared/timing-safe';
 
 /**
  * Cryptographically secure random bytes.
@@ -6,25 +7,20 @@ import { randomBytes as _randomBytes, timingSafeEqual as _timingSafeEqual } from
  * @returns {Buffer}
  */
 export function randomBytes(size) {
-  return _randomBytes(size);
+  return randomBuffer(size);
 }
 
 /**
  * Constant-time buffer comparison. Returns false when lengths differ instead
  * of throwing (unlike `crypto.timingSafeEqual`), so it's safe on untrusted
- * inputs without leaking length via the exception path.
+ * inputs without leaking length via the exception path. Accepts strings for
+ * caller convenience (UTF-8 bytes are compared).
  * @param {Buffer | Uint8Array | string} a
  * @param {Buffer | Uint8Array | string} b
  * @returns {boolean}
  */
 export function timingSafeEqual(a, b) {
-  const ba = typeof a === 'string' ? Buffer.from(a) : Buffer.from(a.buffer, a.byteOffset, a.byteLength);
-  const bb = typeof b === 'string' ? Buffer.from(b) : Buffer.from(b.buffer, b.byteOffset, b.byteLength);
-  if (ba.length !== bb.length) {
-    // Still burn ~one comparison worth of time so callers can't distinguish
-    // "wrong length" from "wrong value" via timing.
-    _timingSafeEqual(ba, ba);
-    return false;
-  }
-  return _timingSafeEqual(ba, bb);
+  const ba = typeof a === 'string' ? Buffer.from(a) : a;
+  const bb = typeof b === 'string' ? Buffer.from(b) : b;
+  return sharedTimingSafeEqual(ba, bb);
 }

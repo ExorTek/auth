@@ -1,16 +1,23 @@
 /**
- * base64url encode (RFC 4648 §5) — no padding, URL/cookie-safe.
+ * base64url helpers (RFC 4648 §5) — thin adapters over the shared
+ * codec, widened to accept plain strings on the encode side (CSRF
+ * tokens and MAC tags are minted from strings in this package).
+ */
+
+import * as sb from '@exortek/shared/base64url';
+
+/**
+ * base64url encode — no padding, URL/cookie-safe.
  * @param {Buffer | Uint8Array | string} input
  * @returns {string}
  */
 export function encodeBase64Url(input) {
-  const buf =
-    typeof input === 'string' ? Buffer.from(input) : Buffer.from(input.buffer, input.byteOffset, input.byteLength);
-  return buf.toString('base64url');
+  return typeof input === 'string' ? sb.encodeString(input) : sb.encode(input);
 }
 
 /**
- * base64url decode. Throws on invalid characters.
+ * base64url decode. Throws on invalid characters and non-canonical
+ * encodings (strict — everything this package mints is canonical).
  * @param {string} input
  * @returns {Buffer}
  */
@@ -18,5 +25,5 @@ export function decodeBase64Url(input) {
   if (typeof input !== 'string') {
     throw new TypeError('base64url input must be a string');
   }
-  return Buffer.from(input, 'base64url');
+  return sb.decode(input);
 }

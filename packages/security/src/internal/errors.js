@@ -1,3 +1,5 @@
+import { BaseError } from '@exortek/shared/errors';
+
 export const ErrorCode = Object.freeze({
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   CSRF_MISSING: 'CSRF_MISSING',
@@ -14,16 +16,12 @@ export const ErrorCode = Object.freeze({
   HONEYPOT_TRIGGERED: 'HONEYPOT_TRIGGERED',
 });
 
-export class SecurityError extends Error {
-  /**
-   * @param {string} code
-   * @param {string} message
-   * @param {number} [status=400]
-   */
-  constructor(code, message, status = 400) {
-    super(message);
-    this.name = 'SecurityError';
-    this.code = code;
-    this.status = status;
-  }
+/**
+ * Every recoverable failure raised by this package. Carries a stable
+ * `code` (from {@link ErrorCode}) and an HTTP `status` (400 unless
+ * overridden via `options.status`).
+ */
+export class SecurityError extends BaseError {
+  static statuses = {};
+  static defaultStatus = 400;
 }

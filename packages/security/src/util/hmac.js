@@ -1,5 +1,4 @@
-import { createHmac } from 'node:crypto';
-import { encodeBase64Url } from './base64url.js';
+import { hmac } from '@exortek/shared/hmac';
 
 /**
  * HMAC-SHA-256 → base64url. Used as the tag for signed CSRF tokens and any
@@ -9,7 +8,5 @@ import { encodeBase64Url } from './base64url.js';
  * @returns {string}
  */
 export function hmacBase64Url(data, secret) {
-  const h = createHmac('sha256', secret);
-  h.update(typeof data === 'string' ? data : Buffer.from(data.buffer, data.byteOffset, data.byteLength));
-  return encodeBase64Url(h.digest());
+  return /** @type {string} */ (hmac('sha256', secret, data, 'base64url'));
 }
