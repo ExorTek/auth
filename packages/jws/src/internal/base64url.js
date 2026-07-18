@@ -1,19 +1,10 @@
 /**
- * `base64url` codec — RFC 4648 §5.
- *
- * Standalone per package policy: this is deliberately not shared with
- * `@exortek/jwk`'s base64url. Users install this package on its own; no
- * cross-`@exortek` dependency is taken.
- *
- * Node's `Buffer.from(str, 'base64url')` is lenient — accepts padding,
- * `+`, `/`, whitespace. The `decode` helper here roundtrips to reject
- * everything that isn't a canonical unpadded encoding, which is exactly
- * what the JWS spec requires at the token boundary.
+ * `base64url` codec — RFC 4648 §5. Wraps the shared implementation so
+ * failures surface as typed `JwsError` for the package's public API.
  */
 
+import * as sb from '@exortek/shared/base64url';
 import { JwsError, ErrorCode } from './errors.js';
-
-const ALPHABET = /^[A-Za-z0-9_-]*$/;
 
 /**
  * Encode a `Buffer` / `Uint8Array` as unpadded base64url.
@@ -22,10 +13,11 @@ const ALPHABET = /^[A-Za-z0-9_-]*$/;
  * @returns {string}
  */
 export function encode(bytes) {
-  if (bytes == null || (!Buffer.isBuffer(bytes) && !(bytes instanceof Uint8Array))) {
-    throw new JwsError(ErrorCode.INVALID_ARGUMENT, 'base64url.encode: expected Buffer or Uint8Array');
+  try {
+    return sb.encode(bytes);
+  } catch (err) {
+    throw new JwsError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
   }
-  return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64url');
 }
 
 /**
@@ -35,10 +27,11 @@ export function encode(bytes) {
  * @returns {string}
  */
 export function encodeString(text) {
-  if (typeof text !== 'string') {
-    throw new JwsError(ErrorCode.INVALID_ARGUMENT, 'base64url.encodeString: expected a string');
+  try {
+    return sb.encodeString(text);
+  } catch (err) {
+    throw new JwsError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
   }
-  return Buffer.from(text, 'utf8').toString('base64url');
 }
 
 /**
@@ -49,7 +42,7 @@ export function encodeString(text) {
  * @returns {string}
  */
 export function encodeJson(value) {
-  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
+  return sb.encodeJson(value);
 }
 
 /**
@@ -61,23 +54,11 @@ export function encodeJson(value) {
  * @returns {Buffer}
  */
 export function decode(text) {
-  if (typeof text !== 'string') {
-    throw new JwsError(ErrorCode.INVALID_TOKEN, 'base64url.decode: expected a string');
+  try {
+    return sb.decode(text);
+  } catch (err) {
+    throw new JwsError(ErrorCode.INVALID_TOKEN, err instanceof Error ? err.message : String(err));
   }
-  if (!ALPHABET.test(text)) {
-    throw new JwsError(
-      ErrorCode.INVALID_TOKEN,
-      'base64url.decode: input contains characters outside the RFC 4648 §5 alphabet',
-    );
-  }
-  const buf = Buffer.from(text, 'base64url');
-  if (buf.toString('base64url') !== text) {
-    throw new JwsError(
-      ErrorCode.INVALID_TOKEN,
-      'base64url.decode: input is not a canonical unpadded base64url encoding',
-    );
-  }
-  return buf;
 }
 
 /**
