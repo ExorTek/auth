@@ -17,6 +17,8 @@ test('duration strings — short forms', () => {
   assert.equal(parseDuration('2h'), 7_200_000);
   assert.equal(parseDuration('7d'), 604_800_000);
   assert.equal(parseDuration('1w'), 604_800_000);
+  assert.equal(parseDuration('1y'), 31_536_000_000);
+  assert.equal(parseDuration('2yr'), 63_072_000_000);
 });
 
 test('duration strings — long / plural forms', () => {

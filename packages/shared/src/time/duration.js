@@ -26,6 +26,7 @@
  *   | h    | `h`, `hr`          | `hour`, `hours`                    |
  *   | d    | `d`                | `day`, `days`                      |
  *   | w    | `w`, `wk`          | `week`, `weeks`                    |
+ *   | y    | `y`, `yr`          | `year`, `years`  (365 d)           |
  *
  * Deliberately strict — anything the parser doesn't understand throws
  * instead of silently defaulting.
@@ -54,11 +55,15 @@ const UNIT_MS = Object.freeze({
   wk: 604_800_000,
   week: 604_800_000,
   weeks: 604_800_000,
+  y: 31_536_000_000,
+  yr: 31_536_000_000,
+  year: 31_536_000_000,
+  years: 31_536_000_000,
 });
 
 const DURATION_RE = /^\s*(-?\d+(?:\.\d+)?)\s*([a-z]+)?\s*$/i;
 
-const SUPPORTED_UNITS = 'ms, s, m, h, d, w (and long/plural forms)';
+const SUPPORTED_UNITS = 'ms, s, m, h, d, w, y (and long/plural forms)';
 
 /**
  * Parse a human duration to milliseconds.
