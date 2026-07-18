@@ -7,7 +7,8 @@
  *
  * Node's `Buffer.from(str, 'base64url')` is lenient — accepts padding,
  * `+`, `/`, whitespace. The `decode` helper here roundtrips to reject
- * everything that isn't a canonical unpadded encoding.
+ * everything that isn't a canonical unpadded encoding, which is exactly
+ * what the JOSE specs require at the token boundary.
  */
 
 import { JwtError, ErrorCode } from './errors.js';
@@ -15,6 +16,8 @@ import { JwtError, ErrorCode } from './errors.js';
 const ALPHABET = /^[A-Za-z0-9_-]*$/;
 
 /**
+ * Encode a `Buffer` / `Uint8Array` as unpadded base64url.
+ *
  * @param {Buffer | Uint8Array} bytes
  * @returns {string}
  */
@@ -26,6 +29,8 @@ export function encode(bytes) {
 }
 
 /**
+ * Encode a UTF-8 string as unpadded base64url.
+ *
  * @param {string} text
  * @returns {string}
  */
@@ -37,6 +42,9 @@ export function encodeString(text) {
 }
 
 /**
+ * Encode a JSON-serialisable value as unpadded base64url of its
+ * UTF-8 JSON representation.
+ *
  * @param {unknown} value
  * @returns {string}
  */
@@ -45,6 +53,10 @@ export function encodeJson(value) {
 }
 
 /**
+ * Decode an unpadded base64url string into a `Buffer`. Rejects strings
+ * containing padding, whitespace, or non-alphabet characters, and
+ * rejects non-canonical encodings via a roundtrip check.
+ *
  * @param {string} text
  * @returns {Buffer}
  */

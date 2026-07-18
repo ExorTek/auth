@@ -1,8 +1,23 @@
 /**
  * Algorithm registry — RFC 7518 §3, RFC 8037 §3, RFC 8812 §3.
  *
- * Standalone per package policy — verbatim copy of `@exortek/jws`.
- * `alg: 'none'` is deliberately **not** in the table.
+ * Standalone per package policy — code kept in sync with `@exortek/jws`
+ * to avoid a runtime cross-`@exortek` dependency. Each entry carries
+ * everything `sign` / `verify` need to route to the right `node:crypto`
+ * primitive without the surface files having to branch by alg
+ * themselves.
+ *
+ *   - HMAC (RFC 7518 §3.2) — HS256 / HS384 / HS512
+ *   - RSA PKCS#1 v1.5 (§3.3) — RS256 / RS384 / RS512
+ *   - RSA-PSS (§3.5) — PS256 / PS384 / PS512
+ *   - ECDSA (§3.4) — ES256 / ES384 / ES512
+ *   - ECDSA secp256k1 (RFC 8812) — ES256K
+ *   - EdDSA (RFC 8037) — Ed25519 / Ed448
+ *
+ * `alg: 'none'` is deliberately **not** in the table. `lookup('none')`
+ * throws {@link ErrorCode.UNSUPPORTED_ALGORITHM}; the sign / verify
+ * surfaces have a dedicated {@link ErrorCode.ALGORITHM_NONE_FORBIDDEN}
+ * fast-path so the user's diagnostic is actionable.
  */
 
 import crypto, { constants, createHmac, sign as _sign, verify as _verify } from 'node:crypto';
@@ -10,6 +25,7 @@ import crypto, { constants, createHmac, sign as _sign, verify as _verify } from 
 import { JwtError, ErrorCode } from './errors.js';
 import { derToRaw, rawToDer, EC_COORD_BYTES } from './ecdsa.js';
 
+/** HMAC minimum secret sizes per RFC 7518 §3.2 — key must be ≥ hash output. */
 const HMAC_MIN_BYTES = { HS256: 32, HS384: 48, HS512: 64 };
 
 /**
@@ -18,11 +34,11 @@ const HMAC_MIN_BYTES = { HS256: 32, HS384: 48, HS512: 64 };
  * @typedef {Object} AlgDescriptor
  * @property {string} alg
  * @property {Family} family
- * @property {string} [hash]
- * @property {'oct' | 'RSA' | 'EC' | 'OKP'} kty
- * @property {string} [curve]
- * @property {number} [hmacMinBytes]
- * @property {number} [rsaSaltLength]
+ * @property {string} [hash]                    Node digest name (`sha256` etc). EdDSA has none.
+ * @property {'oct' | 'RSA' | 'EC' | 'OKP'} kty  Expected JWK `kty`.
+ * @property {string} [curve]                    For ECDSA — expected JWK `crv`.
+ * @property {number} [hmacMinBytes]             For HMAC — RFC 7518 §3.2 minimum.
+ * @property {number} [rsaSaltLength]            For RSA-PSS — matches hash output size.
  * @property {(key: import('node:crypto').KeyObject, message: Buffer) => Promise<Buffer>} sign
  * @property {(key: import('node:crypto').KeyObject, message: Buffer, signature: Buffer) => Promise<boolean>} verify
  */
@@ -49,9 +65,14 @@ const TABLE = Object.freeze({
   EdDSA: _eddsa(),
 });
 
+/** Every JOSE algorithm identifier this package supports. */
 export const SUPPORTED = Object.freeze(Object.keys(TABLE));
 
 /**
+ * Look up an algorithm's descriptor. Throws
+ * {@link ErrorCode.UNSUPPORTED_ALGORITHM} for anything not in the table,
+ * including the placeholder `'none'` alg.
+ *
  * @param {string} alg
  * @returns {AlgDescriptor}
  */

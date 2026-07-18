@@ -1,8 +1,16 @@
 /**
  * `crit` header validation (RFC 7515 §4.1.11). Standalone per package
- * policy — verbatim copy of `@exortek/jws`. JWT rarely uses `crit` in
- * practice, but the JWS spec still applies to any token that carries
- * one.
+ * policy — code kept in sync with `@exortek/jws`. JWT rarely uses
+ * `crit` in practice, but the JWS spec still applies to any token that
+ * carries one.
+ *
+ * On sign: every name in `crit` must be present as a header parameter,
+ * `crit` cannot list itself, and the array must be non-empty.
+ *
+ * On verify: every name in `crit` must be either a header parameter
+ * this library understands out of the box or explicitly opted-in via
+ * the `knownCriticalHeaders` verify option. Unknown critical parameters
+ * raise {@link ErrorCode.CRIT_UNSUPPORTED}.
  */
 
 import { JwtError, ErrorCode } from './errors.js';

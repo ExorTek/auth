@@ -1,15 +1,18 @@
 /**
- * Verify-side key resolver. Standalone per package policy — verbatim
- * copy of `@exortek/jws` with `KeyInput` widened to also accept the
- * jwt-specific PEM string shape (see `keys.js`).
+ * Verify-side key resolver — turn the polymorphic `key` argument into a
+ * concrete `KeyObject`. Standalone per package policy — code kept in
+ * sync with `@exortek/jws`, with `KeyInput` widened to also accept the
+ * jwt-specific PEM string and X.509 certificate shapes (see `keys.js`).
+ *
+ * Supported input shapes:
  *
  *   | Input                          | Behaviour                                                    |
  *   | ------------------------------ | ------------------------------------------------------------ |
- *   | `KeyObject`                    | Use directly                                                  |
- *   | `Buffer` / `Uint8Array`        | HMAC secret; non-HS* algs raise `INVALID_KEY`                |
- *   | PEM string (`-----BEGIN …`)   | Dispatched by header (private / public / X.509 cert)         |
- *   | HMAC string secret             | UTF-8 bytes, HMAC only                                        |
- *   | JWK object (`{ kty, ... }`)   | Normalise through `keys.normalizeKey`                        |
+ *   | `KeyObject`                    | Normalise and use directly                                   |
+ *   | `Buffer` / `Uint8Array`        | HMAC secret only — non-HS* algs raise `INVALID_KEY`          |
+ *   | PEM string (`-----BEGIN …`)    | Dispatched by header (private / public / X.509 cert)         |
+ *   | HMAC string secret             | UTF-8 bytes, HMAC only                                       |
+ *   | JWK object (`{ kty, ... }`)    | Normalise through `keys.normalizeKey`                        |
  *   | JWK array                      | Match the token's `kid`; single-key array bypasses the match |
  *   | `async (header) => key`        | Await, then normalise the return value                       |
  */
@@ -75,7 +78,7 @@ export async function resolveKey(keyish, header, alg) {
 function _kidMatches(candidate, kid) {
   if (candidate instanceof KeyObject) {
     return false;
-  }
+  } // KeyObjects carry no metadata
   if (candidate == null || typeof candidate !== 'object') {
     return false;
   }

@@ -1,5 +1,5 @@
 /**
- * ASN.1 DER ↔ raw R‖S signature conversion for ECDSA.
+ * ASN.1 DER ↔ raw R‖S signature conversion for JOSE ECDSA algorithms.
  *
  * Node's `crypto.sign('sha256', data, ecKey)` produces an ASN.1 DER
  * `SEQUENCE { INTEGER r, INTEGER s }`. RFC 7515 §3.4 requires the
@@ -13,12 +13,14 @@
  *   | P-521       | 66 | 66 | 132   |
  *   | secp256k1   | 32 | 32 | 64    |
  *
- * Standalone per package policy — verbatim copy of `@exortek/jws`.
+ * Standalone per package policy — code kept in sync with
+ * `@exortek/jws`. These helpers are the whole reason `verify` can hand
+ * JOSE signatures to Node without a middleware layer per curve.
  */
 
 import { JwtError, ErrorCode } from './errors.js';
 
-/** Coordinate byte length per curve. */
+/** Coordinate byte length per JWK curve. */
 export const EC_COORD_BYTES = Object.freeze({
   'P-256': 32,
   'P-384': 48,
@@ -27,9 +29,11 @@ export const EC_COORD_BYTES = Object.freeze({
 });
 
 /**
- * @param {Buffer} der
- * @param {string} curve
- * @returns {Buffer}
+ * Convert Node's ASN.1 DER ECDSA signature to raw R‖S per RFC 7515 §3.4.
+ *
+ * @param {Buffer} der    the DER-encoded SEQUENCE Node produces
+ * @param {string} curve  JWK `crv` value — determines the padding length
+ * @returns {Buffer}      raw R‖S of length 2 * EC_COORD_BYTES[curve]
  */
 export function derToRaw(der, curve) {
   const size = EC_COORD_BYTES[curve];
@@ -45,6 +49,7 @@ export function derToRaw(der, curve) {
   }
   offset += _skipLength(der, offset);
 
+  // r
   if (der[offset++] !== 0x02) {
     throw new JwtError(ErrorCode.INVALID_SIGNATURE, 'ecdsa.derToRaw: expected INTEGER for r');
   }
@@ -52,12 +57,15 @@ export function derToRaw(der, curve) {
   let r = der.subarray(offset, offset + rLen);
   offset += rLen;
 
+  // s
   if (der[offset++] !== 0x02) {
     throw new JwtError(ErrorCode.INVALID_SIGNATURE, 'ecdsa.derToRaw: expected INTEGER for s');
   }
   const sLen = der[offset++];
   let s = der.subarray(offset, offset + sLen);
 
+  // Strip a single leading 0x00 padding byte inserted by DER to keep the
+  // signed integer non-negative when the MSB would otherwise be set.
   if (r.length > 0 && r[0] === 0x00) {
     r = r.subarray(1);
   }
