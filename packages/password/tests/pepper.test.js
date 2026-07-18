@@ -46,7 +46,7 @@ test('rejects unsupported hash', () => {
   assert.throws(() => createPepper({ secret: SECRET, hash: 'md5' }));
 });
 
-// ----- rotation -----
+// rotation
 
 test('pepper.size reflects number of secrets', () => {
   assert.equal(createPepper({ secret: SECRET }).size, 1);

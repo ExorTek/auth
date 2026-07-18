@@ -608,9 +608,7 @@ test('withBan: concurrent denials past threshold all land in the ban window (no 
   assert.ok(followUp.retryAfter >= 500, 'a subsequent request should hit the ban window');
 });
 
-// ---------------------------------------------------------------------------
 // Atomic store extras: decr + compareAndSet
-// ---------------------------------------------------------------------------
 
 test('memoryStore.decr: decrements an existing key, never below zero, never creates', async () => {
   const store = rateLimit.stores.memory();

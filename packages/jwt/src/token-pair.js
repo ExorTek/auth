@@ -220,8 +220,6 @@ export async function revokeAll(familyId, options) {
  */
 export const tokenPair = Object.freeze({ create, rotate, revoke, revokeAll });
 
-// ---------------------------------------------------------------------
-
 /**
  * @param {CreateOptions | RotateOptions} options
  */

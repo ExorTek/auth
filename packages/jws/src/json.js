@@ -129,7 +129,7 @@ export async function verifyJson(jwsJson, keyish, options) {
   );
 }
 
-// --- sign helpers ---------------------------------------------------
+// sign helpers
 
 /**
  * @param {SignSpec} spec
@@ -228,7 +228,7 @@ function _payloadBytes(payload) {
   return Buffer.from(JSON.stringify(payload), 'utf8');
 }
 
-// --- verify helpers -------------------------------------------------
+// verify helpers
 
 /**
  * @param {VerifyOptions | undefined} options

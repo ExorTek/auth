@@ -72,7 +72,7 @@ test('needsRehash: unknown target rejected', async () => {
   assert.throws(() => needsRehash(s, { target: 'md5' }));
 });
 
-// ----- constantTimeVerify -----
+// constantTimeVerify
 
 import { constantTimeVerify } from '../src/verify.js';
 
