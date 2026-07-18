@@ -3,6 +3,8 @@
  * can raise. Branch on `code`, never on the message text — messages are
  * free-form and change across versions.
  */
+import { BaseError } from '@exortek/shared/errors';
+
 export const ErrorCode = Object.freeze({
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   INVALID_PASSWORD: 'INVALID_PASSWORD',
@@ -35,43 +37,20 @@ export const ErrorCode = Object.freeze({
  *   throw err
  * }
  */
-export class PasswordError extends Error {
-  /**
-   * @param {string} code    One of {@link ErrorCode}.
-   * @param {string} message Human-readable diagnostic. Free-form; may
-   *                         change across versions. Branch on `code`.
-   * @param {{ cause?: unknown, status?: number, details?: Record<string, unknown> }} [options]
-   */
-  constructor(code, message, options = {}) {
-    super(message, options.cause ? { cause: options.cause } : undefined);
-    this.name = 'PasswordError';
-    this.code = code;
-    this.status = options.status ?? statusFor(code);
-    if (options.details) {
-      this.details = options.details;
-    }
-  }
-}
-
-function statusFor(code) {
-  switch (code) {
-    case ErrorCode.INVALID_ARGUMENT:
-    case ErrorCode.UNSUPPORTED_ALGORITHM:
-    case ErrorCode.UNSUPPORTED_PARAMS:
-    case ErrorCode.INVALID_HASH:
-    case ErrorCode.PASSWORD_TOO_LONG:
-    case ErrorCode.PASSWORD_TOO_SHORT:
-    case ErrorCode.POLICY_VIOLATION:
-      return 400;
-    case ErrorCode.INVALID_PASSWORD:
-      return 401;
-    case ErrorCode.BREACHED_PASSWORD:
-    case ErrorCode.REUSED_PASSWORD:
-      return 422;
-    case ErrorCode.MISSING_PEER_DEP:
-    case ErrorCode.HIBP_UNAVAILABLE:
-      return 500;
-    default:
-      return 500;
-  }
+export class PasswordError extends BaseError {
+  static statuses = {
+    [ErrorCode.INVALID_ARGUMENT]: 400,
+    [ErrorCode.UNSUPPORTED_ALGORITHM]: 400,
+    [ErrorCode.UNSUPPORTED_PARAMS]: 400,
+    [ErrorCode.INVALID_HASH]: 400,
+    [ErrorCode.PASSWORD_TOO_LONG]: 400,
+    [ErrorCode.PASSWORD_TOO_SHORT]: 400,
+    [ErrorCode.POLICY_VIOLATION]: 400,
+    [ErrorCode.INVALID_PASSWORD]: 401,
+    [ErrorCode.BREACHED_PASSWORD]: 422,
+    [ErrorCode.REUSED_PASSWORD]: 422,
+    [ErrorCode.MISSING_PEER_DEP]: 500,
+    [ErrorCode.HIBP_UNAVAILABLE]: 500,
+  };
+  static defaultStatus = 500;
 }
