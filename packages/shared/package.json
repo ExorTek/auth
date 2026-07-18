@@ -14,6 +14,7 @@
     "./random": "./src/random.js",
     "./timing-safe": "./src/timing-safe.js",
     "./mutex": "./src/mutex.js",
+    "./key-resolver": "./src/key-resolver.js",
     "./resolve": "./src/resolve.js",
     "./errors": "./src/errors.js",
     "./validate": "./src/validate.js",
