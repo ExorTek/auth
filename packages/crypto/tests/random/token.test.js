@@ -85,9 +85,14 @@ describe('token', () => {
   });
 
   it('empty-string prefix behaves as no prefix (no separator emitted)', () => {
+    // With an empty prefix the output is pure base64url of 16 random
+    // bytes — length 22 and no separator inserted. Note: `_` is a valid
+    // base64url alphabet character (RFC 4648 §5), so we cannot assert
+    // "does not start with '_'"; that would flake ~1.5% of runs.
+    // The length is the only stable signal of "no separator emitted".
     const t = token(16, { prefix: '' });
     assert.equal(t.length, 22);
-    assert.doesNotMatch(t, /^_/, 'should not lead with the default separator');
+    assert.match(t, /^[A-Za-z0-9_-]+$/);
   });
 
   it('allows arbitrary separator strings (multi-char)', () => {

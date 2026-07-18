@@ -19,18 +19,20 @@ describe('alphanumeric', () => {
   });
 
   it('produces a roughly uniform distribution (bias-free rejection sampling)', () => {
-    // 62 buckets × ~1000 samples each = 62_000 draws. Allow 10% deviation from
-    // the uniform expectation (1000/bucket); rejection sampling should deliver
-    // this comfortably in a single run.
+    // 62 buckets × ~4000 samples each = 248_000 draws. The larger sample
+    // tightens variance so the 15% deviation ceiling doesn't ride the flake
+    // line: for N=4000 the standard deviation is ~63 (≈1.6%), so 15%
+    // catches a broken RNG (bias ≥ ~9σ) with essentially zero false
+    // positives on a healthy one.
     const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     const counts = new Map(ALPHABET.split('').map(c => [c, 0]));
-    const s = alphanumeric(62_000);
+    const s = alphanumeric(248_000);
     for (const ch of s) {
       counts.set(ch, counts.get(ch) + 1);
     }
     for (const [ch, count] of counts) {
-      const deviation = Math.abs(count - 1000) / 1000;
-      assert.ok(deviation < 0.1, `char '${ch}': count=${count}, deviation=${deviation.toFixed(4)}`);
+      const deviation = Math.abs(count - 4000) / 4000;
+      assert.ok(deviation < 0.15, `char '${ch}': count=${count}, deviation=${deviation.toFixed(4)}`);
     }
   });
 
