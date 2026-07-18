@@ -1,0 +1,25 @@
+{
+  "name": "@exortek/shared",
+  "version": "0.0.0",
+  "description": "Private workspace utilities shared across @exortek/* packages. Never published — consumers inline via bundler.",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./encoding/base64url": "./src/encoding/base64url.js",
+    "./concurrency/mutex": "./src/concurrency/mutex.js",
+    "./crypto/timing-safe": "./src/crypto/timing-safe.js"
+  },
+  "scripts": {
+    "build": "echo 'shared has no build step — source consumed via bundler inline'",
+    "test": "node --test 'tests/**/*.test.js' 2>/dev/null || echo 'no tests yet'",
+    "typecheck": "echo 'no build, no typecheck'",
+    "prepack": "cp ../../LICENSE ./LICENSE"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  }
+}
