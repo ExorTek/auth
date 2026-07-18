@@ -50,6 +50,3 @@ ARCHITECTURE-local.md
 CLAUDE.md
 /scripts/setup-labels.sh
 /scripts/deprecate.sh
-
-# Audit reports (user-provided, per-session)
-REPORT.md
