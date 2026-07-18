@@ -62,6 +62,7 @@ npm install @exortek/password
 npm install @exortek/session
 npm install @exortek/jwk
 npm install @exortek/jws
+npm install @exortek/jwt
 ```
 
 Node.js **22 or newer**.
