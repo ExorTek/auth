@@ -1,5 +1,16 @@
 import { createHmac } from 'node:crypto';
+
+import { array, instanceOf, object, oneOf, optional, string, union } from '@exortek/shared/validate';
+
 import { PasswordError, ErrorCode } from './errors.js';
+
+const SecretItemSchema = union(string(), instanceOf(Uint8Array));
+
+const PepperConfigSchema = object({
+  secret: union(SecretItemSchema, array(SecretItemSchema)),
+  hash: optional(oneOf(['sha256', 'sha512'])),
+  encoding: optional(oneOf(['base64', 'hex'])),
+});
 
 /**
  * @typedef {object} PepperConfig
@@ -49,43 +60,27 @@ import { PasswordError, ErrorCode } from './errors.js';
  * @param {PepperConfig} config
  */
 export function createPepper(config) {
-  if (!config || typeof config !== 'object') {
-    throw new PasswordError(ErrorCode.INVALID_ARGUMENT, 'createPepper: config is required');
+  try {
+    PepperConfigSchema.parse(config, 'createPepper.config');
+  } catch (err) {
+    throw new PasswordError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
   }
   const rawSecrets = Array.isArray(config.secret) ? config.secret : [config.secret];
   if (rawSecrets.length === 0) {
-    throw new PasswordError(ErrorCode.INVALID_ARGUMENT, 'createPepper: at least one secret is required');
+    throw new PasswordError(ErrorCode.INVALID_ARGUMENT, 'createPepper.config.secret: at least one secret is required');
   }
   const secrets = rawSecrets.map((s, i) => {
-    if (typeof s !== 'string' && !Buffer.isBuffer(s) && !(s instanceof Uint8Array)) {
-      throw new PasswordError(
-        ErrorCode.INVALID_ARGUMENT,
-        `createPepper: secret[${i}] must be a string, Buffer, or Uint8Array`,
-      );
-    }
     const bytes = typeof s === 'string' ? Buffer.from(s, 'utf8') : Buffer.from(s);
     if (bytes.length < 16) {
       throw new PasswordError(
         ErrorCode.INVALID_ARGUMENT,
-        `createPepper: secret[${i}] must be at least 16 bytes for meaningful defence; got ${bytes.length}`,
+        `createPepper.config.secret[${i}]: must be at least 16 bytes for meaningful defence; got ${bytes.length}`,
       );
     }
     return bytes;
   });
   const hashName = config.hash ?? 'sha256';
-  if (hashName !== 'sha256' && hashName !== 'sha512') {
-    throw new PasswordError(
-      ErrorCode.UNSUPPORTED_ALGORITHM,
-      `createPepper: hash must be sha256 or sha512; got '${hashName}'`,
-    );
-  }
   const encoding = config.encoding ?? 'base64';
-  if (encoding !== 'base64' && encoding !== 'hex') {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      `createPepper: encoding must be base64 or hex; got '${encoding}'`,
-    );
-  }
 
   const wrapWith = (secretBytes, password) => {
     const pwBytes = typeof password === 'string' ? Buffer.from(password, 'utf8') : Buffer.from(password);
