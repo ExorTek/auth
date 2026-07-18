@@ -13,7 +13,16 @@ import { randomBytes } from 'node:crypto';
 import { JwtError, ErrorCode } from './internal/errors.js';
 import { parseDuration } from './internal/duration.js';
 import { resolveHashFn, resolveEncoding, randomBuffer } from './internal/polymorphic.js';
+import { createKeyMutex } from './internal/mutex.js';
 import { sign } from './sign.js';
+
+// Per-storeKey mutex serialises concurrent rotate calls for the same
+// refresh token. In-process only — the mutex protects the get→check→
+// add sequence from being interleaved by a second rotate for the same
+// key. Cross-process atomicity (multi-node deployments hitting a
+// shared Redis) is a separate concern and is not covered by this
+// primitive; see the rotate() docstring.
+const _rotateLock = createKeyMutex();
 
 /**
  * @typedef {import('./internal/keys.js').KeyInput} KeyInput
@@ -108,6 +117,14 @@ export async function create(payload, options) {
  * the entire family (every refresh with the same `familyId`) is
  * revoked and `REFRESH_REUSED` raised.
  *
+ * Concurrent rotations of the *same* refresh token are serialised by
+ * an in-process per-key mutex so the get→check→add sequence cannot
+ * be interleaved — without this guard, two parallel rotates would
+ * both observe `usedAt: null` and both succeed, defeating reuse
+ * detection. The mutex is in-process only; multi-node deployments
+ * sharing a Redis-backed store still need a cross-process primitive
+ * (SET NX / WATCH+MULTI / Lua) — that is a documented 1.1 target.
+ *
  * @param {string} oldRefreshToken
  * @param {RotateOptions} options
  * @returns {Promise<CreateResult>}
@@ -121,43 +138,52 @@ export async function rotate(oldRefreshToken, options) {
   const hashFn = resolveHashFn(refresh);
   const storeKey = await hashFn(oldRefreshToken);
 
-  const record = await refresh.store.get(storeKey);
-  if (!record) {
-    throw new JwtError(
-      ErrorCode.REVOKED,
-      'rotate: refresh token is unknown or already revoked (family may have been invalidated)',
-    );
-  }
-
-  const meta = record.metadata || {};
-  const nowSec = Math.floor(Date.now() / 1000);
-
-  if (typeof meta.usedAt === 'number') {
-    const ageSec = nowSec - meta.usedAt;
-    if (detectReuse && ageSec > graceSec) {
-      // Reuse detected — revoke the whole family
-      if (typeof meta.familyId === 'string') {
-        await refresh.store.deleteAll({ familyId: meta.familyId });
-      } else {
-        await refresh.store.delete(storeKey);
-      }
+  return _rotateLock.withLock(storeKey, async () => {
+    const record = await refresh.store.get(storeKey);
+    if (!record) {
       throw new JwtError(
-        ErrorCode.REFRESH_REUSED,
-        `rotate: refresh token reuse detected (used ${ageSec}s ago, outside ${graceSec}s grace) — family revoked (RFC 6749 §10.4)`,
+        ErrorCode.REVOKED,
+        'rotate: refresh token is unknown or already revoked (family may have been invalidated)',
       );
     }
-    // Inside grace window — network race, treat as idempotent replay.
-    // Return the same shape as create(). The caller sees success.
-  }
 
-  // Mark old refresh as consumed but keep it in the store until its
-  // native TTL runs out so a later reuse attempt can still be detected.
-  await refresh.store.add(storeKey, record.expiresAt, { ...meta, usedAt: nowSec });
+    const meta = record.metadata || {};
+    const nowSec = Math.floor(Date.now() / 1000);
+    const isReplay = typeof meta.usedAt === 'number';
 
-  const payload = /** @type {Record<string, unknown>} */ (options.payload || meta.payload || {});
-  const familyId = typeof meta.familyId === 'string' ? meta.familyId : undefined;
+    if (isReplay) {
+      const ageSec = nowSec - meta.usedAt;
+      // reuseWindow=0 (the default) means "no grace at all" — every
+      // second use is reuse. For reuseWindow>0, a replay at exactly
+      // ageSec == graceSec is still inside the window.
+      const outsideGrace = graceSec === 0 ? true : ageSec > graceSec;
+      if (detectReuse && outsideGrace) {
+        if (typeof meta.familyId === 'string') {
+          await refresh.store.deleteAll({ familyId: meta.familyId });
+        } else {
+          await refresh.store.delete(storeKey);
+        }
+        throw new JwtError(
+          ErrorCode.REFRESH_REUSED,
+          `rotate: refresh token reuse detected (used ${ageSec}s ago, outside ${graceSec}s grace) — family revoked (RFC 6749 §10.4)`,
+        );
+      }
+      // Inside grace window — treat as a network-race replay. Issue a
+      // fresh pair, but do NOT re-stamp usedAt: re-stamping would slide
+      // the reuse-detection window forward on every replay and let an
+      // attacker keep rotating indefinitely while reuseWindow > 0.
+    } else {
+      // First use — mark the old refresh as consumed but keep it in
+      // the store until its native TTL runs out so a later reuse
+      // attempt can still be detected.
+      await refresh.store.add(storeKey, record.expiresAt, { ...meta, usedAt: nowSec });
+    }
 
-  return create(payload, { ...options, familyId });
+    const payload = /** @type {Record<string, unknown>} */ (options.payload || meta.payload || {});
+    const familyId = typeof meta.familyId === 'string' ? meta.familyId : undefined;
+
+    return create(payload, { ...options, familyId });
+  });
 }
 
 /**

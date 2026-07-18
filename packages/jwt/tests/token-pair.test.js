@@ -161,6 +161,49 @@ test('revokeAll: nukes every refresh in the family', async () => {
   store._stop();
 });
 
+// atomicity + grace-window
+test('rotate: concurrent rotations of the same refresh are serialised (no double-spend)', async () => {
+  const { options, store } = fresh();
+  const pair = await create({ userId: 1 }, options);
+  // Two parallel rotate calls with the same input. Without the mutex,
+  // both would observe usedAt:null and both succeed — the double-spend
+  // reuse detection exists to catch. The second call must land after
+  // the first marked usedAt, tripping REVOKED-or-REUSED semantics.
+  const results = await Promise.allSettled([rotate(pair.refreshToken, options), rotate(pair.refreshToken, options)]);
+  const fulfilled = results.filter(r => r.status === 'fulfilled');
+  const rejected = results.filter(r => r.status === 'rejected');
+  assert.equal(fulfilled.length, 1, 'exactly one rotate should succeed');
+  assert.equal(rejected.length, 1, 'exactly one rotate should fail');
+  const err = rejected[0].reason;
+  // Within grace window (0s by default) → second call is treated as
+  // reuse and revokes the family.
+  assert.equal(err.code, ErrorCode.REFRESH_REUSED);
+  store._stop();
+});
+
+test('rotate: grace-window replay does not slide the window forward', async () => {
+  const { options, store } = fresh();
+  options.reuseWindow = '2s';
+  const pair = await create({ userId: 1 }, options);
+  const first = await rotate(pair.refreshToken, options);
+  assert.ok(first.refreshToken);
+
+  // Read the record and force usedAt back so we're at (grace - 1)s.
+  const { createHash } = await import('node:crypto');
+  const key = createHash('sha256').update(pair.refreshToken).digest('hex');
+  const rec = await store.get(key);
+  assert.ok(rec);
+  const originalUsedAt = rec.metadata.usedAt;
+
+  // Replay inside the grace window — issues a fresh pair but must NOT
+  // touch usedAt (or the grace window slides).
+  const second = await rotate(pair.refreshToken, options);
+  assert.ok(second.refreshToken);
+  const recAfter = await store.get(key);
+  assert.equal(recAfter.metadata.usedAt, originalUsedAt, 'usedAt must not be re-stamped on replay');
+  store._stop();
+});
+
 // namespace
 test('tokenPair namespace exposes create/rotate/revoke/revokeAll', () => {
   assert.equal(tokenPair.create, create);
