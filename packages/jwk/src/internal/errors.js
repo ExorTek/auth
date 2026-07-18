@@ -2,6 +2,8 @@
  * Stable machine-readable codes for every failure that `@exortek/jwk`
  * can raise. Branch on `code`, never on the message.
  */
+import { BaseError } from '@exortek/shared/errors';
+
 export const ErrorCode = Object.freeze({
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   UNSUPPORTED_KTY: 'UNSUPPORTED_KTY',
@@ -19,35 +21,17 @@ export const ErrorCode = Object.freeze({
  * `code` (from {@link ErrorCode}) and a `status` — the HTTP response
  * status a middleware layer would use when translating the error.
  */
-export class JwkError extends Error {
-  /**
-   * @param {string} code    One of {@link ErrorCode}.
-   * @param {string} message Human-readable diagnostic. Free-form; may
-   *                         change across versions. Branch on `code`.
-   * @param {{ cause?: unknown, status?: number }} [options]
-   */
-  constructor(code, message, options = {}) {
-    super(message, options.cause ? { cause: options.cause } : undefined);
-    this.name = 'JwkError';
-    this.code = code;
-    this.status = options.status ?? statusFor(code);
-  }
-}
-
-function statusFor(code) {
-  switch (code) {
-    case ErrorCode.INVALID_ARGUMENT:
-    case ErrorCode.UNSUPPORTED_KTY:
-    case ErrorCode.UNSUPPORTED_CURVE:
-    case ErrorCode.UNSUPPORTED_ALGORITHM:
-    case ErrorCode.INVALID_FORMAT:
-    case ErrorCode.MISSING_REQUIRED_MEMBER:
-    case ErrorCode.KEY_OPS_CONFLICT:
-      return 400;
-    case ErrorCode.INVALID_KEY:
-    case ErrorCode.INVALID_JWK:
-      return 400;
-    default:
-      return 500;
-  }
+export class JwkError extends BaseError {
+  static statuses = {
+    [ErrorCode.INVALID_ARGUMENT]: 400,
+    [ErrorCode.UNSUPPORTED_KTY]: 400,
+    [ErrorCode.UNSUPPORTED_CURVE]: 400,
+    [ErrorCode.UNSUPPORTED_ALGORITHM]: 400,
+    [ErrorCode.INVALID_FORMAT]: 400,
+    [ErrorCode.MISSING_REQUIRED_MEMBER]: 400,
+    [ErrorCode.KEY_OPS_CONFLICT]: 400,
+    [ErrorCode.INVALID_KEY]: 400,
+    [ErrorCode.INVALID_JWK]: 400,
+  };
+  static defaultStatus = 500;
 }
