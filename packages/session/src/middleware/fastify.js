@@ -1,3 +1,5 @@
+import { appendSetCookieHeader } from '@exortek/shared/http';
+
 import { createSessionManager } from '../manager.js';
 
 /**
@@ -28,15 +30,22 @@ export function sessionPlugin(configOrManager) {
     fastify.addHook('preHandler', async (request, reply) => {
       request.sessions = sessions;
       request.session = await sessions.verify(request);
+      // `reply.header('Set-Cookie', v)` REPLACES the current value on
+      // Fastify — there's no implicit append. Read whatever the
+      // response already has, then let the shared helper stack the new
+      // value onto it. Multiple Set-Cookie values on one response are
+      // legal.
       reply.setSessionCookie = value => {
-        reply.header('Set-Cookie', appendCookie(reply, value));
+        const existing = typeof reply.getHeader === 'function' ? reply.getHeader('set-cookie') : undefined;
+        reply.header('Set-Cookie', appendSetCookieHeader(existing, value));
       };
       // Returns the promise so callers can `await reply.clearSessionCookie()`
       // before `reply.send()`. Fire-and-forget would race the response
       // and drop the delete-cookie header on the floor.
       reply.clearSessionCookie = async () => {
         const result = await sessions.revoke(request);
-        reply.header('Set-Cookie', appendCookie(reply, result.cookie));
+        const existing = typeof reply.getHeader === 'function' ? reply.getHeader('set-cookie') : undefined;
+        reply.header('Set-Cookie', appendSetCookieHeader(existing, result.cookie));
         return result;
       };
     });
@@ -47,21 +56,6 @@ export function sessionPlugin(configOrManager) {
     manager: sessions,
     plugin,
   };
-}
-
-/**
- * `reply.header('Set-Cookie', v)` REPLACES the current value — unlike
- * Express's `setHeader` array semantics there is no implicit append. A
- * route that sets a CSRF cookie and then calls `setSessionCookie` would
- * lose the first cookie. Accumulate into an array instead; multiple
- * `Set-Cookie` values on one response are legal.
- */
-function appendCookie(reply, value) {
-  const existing = typeof reply.getHeader === 'function' ? reply.getHeader('set-cookie') : undefined;
-  if (!existing) {
-    return value;
-  }
-  return Array.isArray(existing) ? [...existing, value] : [existing, value];
 }
 
 export default sessionPlugin;

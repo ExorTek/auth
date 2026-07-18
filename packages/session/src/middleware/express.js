@@ -1,3 +1,5 @@
+import { appendSetCookieHeader } from '@exortek/shared/http';
+
 import { createSessionManager } from '../manager.js';
 
 /**
@@ -21,10 +23,12 @@ export function sessionMiddleware(configOrManager) {
     try {
       req.sessions = sessions;
       req.session = await sessions.verify(req);
-      res.setSessionCookie = value => res.setHeader('Set-Cookie', appendCookie(res, value));
+      res.setSessionCookie = value => {
+        res.setHeader('Set-Cookie', appendSetCookieHeader(res.getHeader('Set-Cookie'), value));
+      };
       res.clearSessionCookie = async () => {
         const result = await sessions.revoke(req);
-        res.setHeader('Set-Cookie', appendCookie(res, result.cookie));
+        res.setHeader('Set-Cookie', appendSetCookieHeader(res.getHeader('Set-Cookie'), result.cookie));
       };
       next();
     } catch (err) {
@@ -32,19 +36,6 @@ export function sessionMiddleware(configOrManager) {
     }
   };
   return { manager: sessions, middleware };
-}
-
-/**
- * Multiple `Set-Cookie` values on one response are legal — `res.setHeader`
- * with an array is the canonical form. Preserve any existing cookies
- * (CSRF, tracking, feature flags) when appending our session cookie.
- */
-function appendCookie(res, value) {
-  const existing = res.getHeader('Set-Cookie');
-  if (!existing) {
-    return value;
-  }
-  return Array.isArray(existing) ? [...existing, value] : [existing, value];
 }
 
 export default sessionMiddleware;
