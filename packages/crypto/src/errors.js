@@ -1,3 +1,5 @@
+import { BaseError } from '@exortek/shared/errors';
+
 /**
  * Stable error codes thrown by `@exortek/crypto`.
  *
@@ -30,17 +32,13 @@ export const ErrorCode = Object.freeze({
 });
 
 /**
- * @typedef {object} CryptoErrorOptions
- * @property {unknown} [cause]  Underlying error to wrap (e.g. a thrown `node:crypto` exception).
- */
-
-/**
  * Error type raised by every public `@exortek/crypto` API on failure.
  *
  * Carries a stable `code` (see {@link ErrorCode}) for programmatic handling
  * and an optional `cause` chain for diagnostics. HTTP status mapping is
  * intentionally NOT included — this library is framework-agnostic; the
- * consuming application decides how to surface errors.
+ * consuming application decides how to surface errors. (`BaseError`
+ * attaches no `status` when the subclass declares no `statuses`.)
  *
  * @example
  * try {
@@ -51,16 +49,4 @@ export const ErrorCode = Object.freeze({
  *   }
  * }
  */
-export class CryptoError extends Error {
-  /**
-   * @param {string}              code      Stable machine-readable code from {@link ErrorCode}.
-   * @param {string}              message   Human-readable description.
-   * @param {CryptoErrorOptions}  [options]
-   */
-  constructor(code, message, options = {}) {
-    super(message, options.cause !== undefined ? { cause: options.cause } : undefined);
-    this.name = 'CryptoError';
-    /** @type {string} */
-    this.code = code;
-  }
-}
+export class CryptoError extends BaseError {}
