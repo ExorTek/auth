@@ -6,6 +6,7 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./base32": "./src/base32.js",
     "./base64url": "./src/base64url.js",
     "./duration": "./src/duration.js",
     "./hash": "./src/hash.js",
