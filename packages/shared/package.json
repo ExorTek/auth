@@ -16,6 +16,7 @@
     "./timing-safe": "./src/timing-safe.js",
     "./mutex": "./src/mutex.js",
     "./key-resolver": "./src/key-resolver.js",
+    "./normalize-key": "./src/normalize-key.js",
     "./resolve": "./src/resolve.js",
     "./errors": "./src/errors.js",
     "./validate": "./src/validate.js",
