@@ -1,3 +1,8 @@
+import {
+  parseCookies as sharedParseCookies,
+  serialiseCookie as sharedSerialiseCookie,
+} from '@exortek/shared/cookie';
+
 import { cors as buildCorsCheck } from '../cors/index.js';
 import { headers as buildHeaders } from '../headers/index.js';
 import { generate as csrfGenerate, verify as csrfVerify } from '../csrf/index.js';
@@ -194,54 +199,14 @@ export function verifyCsrfPair(csrfConfig, cookie, headerValue) {
 }
 
 export function serializeCookie(name, value, opts) {
-  const parts = [`${name}=${value}`];
-  if (opts.maxAge !== undefined) {
-    parts.push(`Max-Age=${Math.floor(opts.maxAge)}`);
+  try {
+    return sharedSerialiseCookie(name, value, opts);
+  } catch (err) {
+    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
   }
-  if (opts.domain) {
-    parts.push(`Domain=${opts.domain}`);
-  }
-  if (opts.path) {
-    parts.push(`Path=${opts.path}`);
-  }
-  if (opts.expires) {
-    parts.push(`Expires=${opts.expires.toUTCString()}`);
-  }
-  if (opts.httpOnly) {
-    parts.push('HttpOnly');
-  }
-  if (opts.secure) {
-    parts.push('Secure');
-  }
-  if (opts.sameSite) {
-    const v = String(opts.sameSite).toLowerCase();
-    parts.push(`SameSite=${v.charAt(0).toUpperCase()}${v.slice(1)}`);
-  }
-  return parts.join('; ');
 }
 
-export function parseCookies(header) {
-  /** @type {Record<string, string>} */
-  const out = {};
-  if (typeof header !== 'string' || header.length === 0) {
-    return out;
-  }
-  for (const pair of header.split(';')) {
-    const idx = pair.indexOf('=');
-    if (idx < 0) {
-      continue;
-    }
-    const name = pair.slice(0, idx).trim();
-    let value = pair.slice(idx + 1).trim();
-    if (value.startsWith('"') && value.endsWith('"')) {
-      value = value.slice(1, -1);
-    }
-    if (name) {
-      out[name] = value;
-    }
-  }
-  return out;
-}
+export const parseCookies = sharedParseCookies;
 
 export function rateLimitDenialBody(result) {
   return {
