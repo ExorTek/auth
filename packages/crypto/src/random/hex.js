@@ -1,4 +1,5 @@
 import { bytes } from './bytes.js';
+import { assertNonNegativeInt } from '@exortek/shared/asserts';
 
 /**
  * Hex-encoded random string.
@@ -15,5 +16,6 @@ import { bytes } from './bytes.js';
  * hex(16) // 'a3f9b2c1...' — 32-char hex, e.g. a session id or CSRF token
  */
 export function hex(size) {
+  assertNonNegativeInt(size, 'bytes size');
   return bytes(size).toString('hex');
 }

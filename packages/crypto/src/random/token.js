@@ -1,5 +1,5 @@
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertNonNegativeInt, assertObject, assertString } from '../internal/validate.js';
+import { assertNonNegativeInt, assertObject, assertString } from '@exortek/shared/asserts';
 import { base64url } from './base64url.js';
 import { base64 } from './base64.js';
 import { hex } from './hex.js';

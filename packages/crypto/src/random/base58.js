@@ -1,5 +1,6 @@
 import { bytes } from './bytes.js';
 import { encode } from '../encode/base58.js';
+import { assertNonNegativeInt } from '@exortek/shared/asserts';
 
 /**
  * Bitcoin base58 random string.
@@ -20,5 +21,6 @@ import { encode } from '../encode/base58.js';
  * base58(16)  // 'V1StGXR8Z5jdHi6BmyT' — 128 bits of entropy, ~22 chars
  */
 export function base58(size) {
+  assertNonNegativeInt(size, 'base58 size');
   return encode(bytes(size));
 }

@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { assertBytesOrString, assertEncoding, assertOptionalObject } from '../internal/validate.js';
+import { assertBytesOrString, assertEncoding, assertOptionalObject } from '@exortek/shared/asserts';
 import { toBuffer, toBufferWithEncoding } from '../internal/bytes.js';
 import { _resolveOptions } from './hash.js';
 

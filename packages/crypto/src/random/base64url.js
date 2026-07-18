@@ -1,4 +1,5 @@
 import { bytes } from './bytes.js';
+import { assertNonNegativeInt } from '@exortek/shared/asserts';
 
 /**
  * URL-safe base64 random string (RFC 4648 §5), no padding.
@@ -18,5 +19,6 @@ import { bytes } from './bytes.js';
  * base64url(32) // 'rJ9aQ2x-K7vN_pL...' — 43 chars, URL-safe, no '=' padding
  */
 export function base64url(size) {
+  assertNonNegativeInt(size, 'base64url size');
   return bytes(size).toString('base64url');
 }

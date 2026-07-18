@@ -1,4 +1,4 @@
-import { assertPositiveInt } from '../internal/validate.js';
+import { assertPositiveInt } from '@exortek/shared/asserts';
 import { biasFreeSample } from '../internal/sample.js';
 import { ALPHANUM } from '../internal/alphabets.js';
 
@@ -17,6 +17,6 @@ import { ALPHANUM } from '../internal/alphabets.js';
  * alphanumeric(21) // 'V1StGXR8Z5jdHi6BmyTQ' — nanoid-style ID (~126 bits of entropy)
  */
 export function alphanumeric(length) {
-  assertPositiveInt(length, 'length');
+  assertPositiveInt(length, 'alphanumeric length');
   return biasFreeSample(ALPHANUM, length);
 }

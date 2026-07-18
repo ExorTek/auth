@@ -1,5 +1,5 @@
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertString } from '../internal/validate.js';
+import { assertString } from '@exortek/shared/asserts';
 import { toBuffer } from '../internal/bytes.js';
 
 /** Canonical base64url alphabet (RFC 4648 §5), with or without `=` padding. */

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertEncoding, assertKeyObject, assertOptionalObject } from '../internal/validate.js';
+import { assertEncoding, assertOptionalObject } from '@exortek/shared/asserts';
+import { assertKeyObject } from '../internal/validate.js';
 
 /**
  * @typedef {object} ThumbprintOptions

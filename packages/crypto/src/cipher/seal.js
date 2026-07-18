@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertOptionalObject } from '../internal/validate.js';
+import { assertBytesOrString, assertOptionalObject } from '@exortek/shared/asserts';
 import { hkdf } from '../hash/hkdf.js';
 import { toBuffer } from '../internal/bytes.js';
 

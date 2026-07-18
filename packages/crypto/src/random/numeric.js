@@ -1,6 +1,6 @@
-import { assertPositiveInt } from '../internal/validate.js';
 import { biasFreeSample } from '../internal/sample.js';
 import { DIGITS } from '../internal/alphabets.js';
+import { assertPositiveInt } from '@exortek/shared/asserts';
 
 /**
  * Bias-free numeric random string.
@@ -18,6 +18,6 @@ import { DIGITS } from '../internal/alphabets.js';
  * numeric(4)  // '0413'   — leading zero preserved
  */
 export function numeric(length) {
-  assertPositiveInt(length, 'length');
+  assertPositiveInt(length, 'numeric length');
   return biasFreeSample(DIGITS, length);
 }

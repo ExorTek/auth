@@ -1,5 +1,6 @@
 import { bytes } from './bytes.js';
 import { CROCKFORD } from '../internal/alphabets.js';
+import { assertNonNegativeInt } from '@exortek/shared/asserts';
 
 /**
  * Crockford base32 random string (ULID-style).
@@ -22,10 +23,8 @@ import { CROCKFORD } from '../internal/alphabets.js';
  * crockford(16)  // 26-char string, 128 bits of entropy
  */
 export function crockford(size) {
+  assertNonNegativeInt(size, 'crockford size');
   const buf = bytes(size);
-  if (buf.length === 0) {
-    return '';
-  }
   const outLen = Math.ceil((buf.length * 8) / 5);
   let n = 0n;
   for (let i = 0; i < buf.length; i++) {

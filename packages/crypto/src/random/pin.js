@@ -1,4 +1,4 @@
-import { assertObject, assertPositiveInt } from '../internal/validate.js';
+import { assertObject, assertPositiveInt } from '@exortek/shared/asserts';
 import { numeric } from './numeric.js';
 
 /**
@@ -85,9 +85,9 @@ function _isWeak(digits) {
  * pin(4, { avoidWeak: false })    // unfiltered uniform numeric
  */
 export function pin(length, options) {
-  assertPositiveInt(length, 'length');
+  assertPositiveInt(length, 'pin length');
   if (options !== undefined) {
-    assertObject(options, 'options');
+    assertObject(options, 'pin options');
   }
   const avoidWeak = options?.avoidWeak ?? true;
 

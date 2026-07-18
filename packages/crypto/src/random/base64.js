@@ -1,4 +1,5 @@
 import { bytes } from './bytes.js';
+import { assertNonNegativeInt } from '@exortek/shared/asserts';
 
 /**
  * Standard base64 random string (RFC 4648 §4), with `=` padding.
@@ -18,5 +19,6 @@ import { bytes } from './bytes.js';
  * base64(16) // 'V1StGXR8Z5jdHi6BmyT=' — 24 chars, includes '=' padding
  */
 export function base64(size) {
+  assertNonNegativeInt(size, 'base64 size');
   return bytes(size).toString('base64');
 }

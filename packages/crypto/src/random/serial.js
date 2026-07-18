@@ -1,4 +1,4 @@
-import { assertObject, assertPositiveInt, assertString } from '../internal/validate.js';
+import { assertObject, assertPositiveInt, assertString } from '@exortek/shared/asserts';
 import { biasFreeSample } from '../internal/sample.js';
 import { UPPER_ALPHANUM } from '../internal/alphabets.js';
 

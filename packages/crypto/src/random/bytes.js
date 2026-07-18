@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { assertNonNegativeInt } from '../internal/validate.js';
+import { assertNonNegativeInt } from '@exortek/shared/asserts';
 
 /**
  * Cryptographically secure random byte sequence.
@@ -16,6 +16,6 @@ import { assertNonNegativeInt } from '../internal/validate.js';
  * const key = bytes(32) // 256-bit random key
  */
 export function bytes(size) {
-  assertNonNegativeInt(size, 'size');
+  assertNonNegativeInt(size, 'bytes size');
   return crypto.randomBytes(size);
 }

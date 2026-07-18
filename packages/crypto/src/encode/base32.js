@@ -1,6 +1,6 @@
 import * as sb32 from '@exortek/shared/base32';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertOptionalObject, assertString } from '../internal/validate.js';
+import { assertOptionalObject, assertString } from '@exortek/shared/asserts';
 import { toBuffer } from '../internal/bytes.js';
 
 /** Accepts uppercase, lowercase, and optional `=` padding. */

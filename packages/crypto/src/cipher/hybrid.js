@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertObject, assertOptionalObject } from '../internal/validate.js';
+import { assertBytesOrString, assertObject, assertOptionalObject } from '@exortek/shared/asserts';
 import { toBuffer } from '../internal/bytes.js';
 import { encryptAsymmetric, decryptAsymmetric } from './asymmetric.js';
 
