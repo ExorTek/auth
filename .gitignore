@@ -49,3 +49,4 @@ skills-lock.json
 ARCHITECTURE-local.md
 CLAUDE.md
 /scripts/setup-labels.sh
+/scripts/deprecate.sh
