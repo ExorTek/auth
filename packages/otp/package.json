@@ -51,7 +51,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test 'tests/**/*.test.js'",
     "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
-    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "prepack": "cp ../../LICENSE ./LICENSE"
   },
   "keywords": [
     "backend",

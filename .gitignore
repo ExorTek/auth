@@ -50,3 +50,7 @@ ARCHITECTURE-local.md
 CLAUDE.md
 /scripts/setup-labels.sh
 /scripts/deprecate.sh
+
+# LICENSE files are generated per-package at `npm pack` time from root LICENSE
+# via each package's `prepack` script — do not track the copies.
+packages/*/LICENSE
