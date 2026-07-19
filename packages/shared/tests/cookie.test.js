@@ -109,6 +109,20 @@ describe('serialiseCookie', () => {
     assert.doesNotMatch(s, /HttpOnly/);
     assert.match(s, /SameSite=Strict/);
   });
+
+  test('rejects Invalid Date on expires (no silent Expires=Invalid Date)', () => {
+    assert.throws(
+      () => serialiseCookie('s', 'v', { expires: new Date(NaN) }),
+      /expires must be a valid Date; got Invalid Date/,
+    );
+  });
+
+  test('rejects non-Date expires', () => {
+    assert.throws(
+      () => serialiseCookie('s', 'v', { expires: 'tomorrow' }),
+      /expires must be a valid Date; got "tomorrow"/,
+    );
+  });
 });
 
 describe('serialiseDeleteCookie', () => {

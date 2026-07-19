@@ -133,7 +133,14 @@ export function serialiseCookie(name, value, options = {}) {
     parts.push(`Domain=${options.domain}`);
   }
   parts.push(`Path=${options.path ?? '/'}`);
-  if (options.expires instanceof Date) {
+  if (options.expires !== undefined) {
+    if (!(options.expires instanceof Date) || Number.isNaN(+options.expires)) {
+      throw new Error(
+        `serialiseCookie: expires must be a valid Date; got ${
+          options.expires instanceof Date ? 'Invalid Date' : JSON.stringify(options.expires)
+        }`,
+      );
+    }
     parts.push(`Expires=${options.expires.toUTCString()}`);
   }
   if (typeof options.maxAge === 'number' && Number.isFinite(options.maxAge)) {
