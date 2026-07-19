@@ -1,4 +1,5 @@
 import { PasswordError, ErrorCode } from '../errors.js';
+import { assertPositiveInt } from '../internal/guards.js';
 import { normalizePassword } from '../internal/normalize.js';
 import { parseHash } from '../phc.js';
 
@@ -135,11 +136,11 @@ export async function hash(password, options = {}) {
   const parallelism = options.parallelism ?? DEFAULTS.parallelism;
   const hashLength = options.hashLength ?? DEFAULTS.hashLength;
   const saltLength = options.saltLength ?? DEFAULTS.saltLength;
-  assertPositiveInt(memoryCost, 'memoryCost');
-  assertPositiveInt(timeCost, 'timeCost');
-  assertPositiveInt(parallelism, 'parallelism');
-  assertPositiveInt(hashLength, 'hashLength');
-  assertPositiveInt(saltLength, 'saltLength');
+  assertPositiveInt(memoryCost, 'argon2.options.memoryCost');
+  assertPositiveInt(timeCost, 'argon2.options.timeCost');
+  assertPositiveInt(parallelism, 'argon2.options.parallelism');
+  assertPositiveInt(hashLength, 'argon2.options.hashLength');
+  assertPositiveInt(saltLength, 'argon2.options.saltLength');
 
   const pwBytes = normalizePassword(password);
   const impl = await loadArgon2();
@@ -236,8 +237,3 @@ function assertType(type) {
   }
 }
 
-function assertPositiveInt(v, name) {
-  if (!Number.isInteger(v) || v < 1) {
-    throw new PasswordError(ErrorCode.INVALID_ARGUMENT, `argon2: ${name} must be a positive integer; got ${v}`);
-  }
-}

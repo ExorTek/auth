@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { PasswordError, ErrorCode } from '../errors.js';
 import { normalizePassword } from '../internal/normalize.js';
 import { parseHash } from '../phc.js';
+import { invalidArgument } from '../internal/guards.js';
 
 // OWASP Password Storage Cheat Sheet (2024): bcrypt is acceptable if
 // argon2id / scrypt are unavailable. Work factor ≥ 10 is the floor;
@@ -114,10 +115,7 @@ export function preparePasswordForBcrypt(bytes, mode) {
   if (mode === 'truncate') {
     return bytes.subarray(0, BCRYPT_MAX_INPUT_BYTES);
   }
-  throw new PasswordError(
-    ErrorCode.INVALID_ARGUMENT,
-    `bcrypt: mode must be 'prehash' | 'strict' | 'truncate'; got '${mode}'`,
-  );
+  throw invalidArgument(`bcrypt.options.mode must be 'prehash' | 'strict' | 'truncate'; got '${mode}'`);
 }
 
 /**
@@ -205,9 +203,8 @@ export function needsRehash(bcryptHash, target = {}) {
 
 function assertRounds(rounds) {
   if (!Number.isInteger(rounds) || rounds < 4 || rounds > 31) {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      `bcrypt: rounds must be an integer in [4, 31]; got ${rounds}. OWASP 2024 minimum is 10; 12 is a modern default.`,
+    throw invalidArgument(
+      `bcrypt.options.rounds must be an integer in [4, 31]; got ${rounds}. OWASP 2024 minimum is 10; 12 is a modern default.`,
     );
   }
 }

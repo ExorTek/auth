@@ -1,5 +1,6 @@
 import { PasswordError, ErrorCode } from './errors.js';
 import { b64Encode, b64Decode } from './internal/base64.js';
+import { assertObject, invalidArgument } from './internal/guards.js';
 
 /**
  * @typedef {'argon2i' | 'argon2d' | 'argon2id' | 'scrypt' | 'pbkdf2-sha256' | 'pbkdf2-sha512' | 'bcrypt'} PasswordAlgorithm
@@ -134,13 +135,10 @@ export function parseHash(input) {
  * @returns {string}
  */
 export function serialiseHash(record) {
-  if (!record || typeof record !== 'object') {
-    throw new PasswordError(ErrorCode.INVALID_ARGUMENT, 'serialiseHash: record is required');
-  }
+  assertObject(record, 'serialiseHash.record');
   if (record.algorithm === 'bcrypt') {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      'serialiseHash: bcrypt uses a non-PHC format — take the string the bcrypt library returned directly',
+    throw invalidArgument(
+      'serialiseHash.record.algorithm: bcrypt uses a non-PHC format — take the string the bcrypt library returned directly',
     );
   }
   if (!KNOWN_ALGORITHMS.has(record.algorithm)) {

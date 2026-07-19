@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { PasswordError, ErrorCode } from './errors.js';
+import { assertFunction, assertNonEmptyString, invalidArgument } from './internal/guards.js';
 
 const DEFAULT_ENDPOINT = 'https://api.pwnedpasswords.com/range/';
 const DEFAULT_TIMEOUT_MS = 5000;
@@ -60,26 +61,17 @@ const DEFAULT_TIMEOUT_MS = 5000;
 export function createHibpClient(options = {}) {
   const endpoint = options.endpoint ?? DEFAULT_ENDPOINT;
   if (typeof endpoint !== 'string' || !endpoint.endsWith('/')) {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      `createHibpClient: endpoint must end with '/'; got '${endpoint}'`,
-    );
+    throw invalidArgument(`createHibpClient.options.endpoint must end with '/'; got '${endpoint}'`);
   }
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 60_000) {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      `createHibpClient: timeoutMs must be an integer in [100, 60000]; got ${timeoutMs}`,
-    );
+    throw invalidArgument(`createHibpClient.options.timeoutMs must be an integer in [100, 60000]; got ${timeoutMs}`);
   }
   const userAgent = options.userAgent ?? '@exortek/password';
   const fetchImpl = options.fetch ?? globalThis.fetch;
-  if (typeof fetchImpl !== 'function') {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      "createHibpClient: no global fetch available and none was injected. Node 22+ ships a global fetch; on older runtimes pass `fetch: (await import('undici')).fetch`.",
-    );
-  }
+  assertFunction(fetchImpl, 'createHibpClient.options.fetch', {
+    hint: "no global fetch available and none was injected. Node 22+ ships a global fetch; on older runtimes pass `fetch: (await import('undici')).fetch`",
+  });
 
   return {
     /**
@@ -89,9 +81,7 @@ export function createHibpClient(options = {}) {
      * @returns {Promise<HibpCheckResult>}
      */
     async check(password, checkOptions = {}) {
-      if (typeof password !== 'string' || password.length === 0) {
-        throw new PasswordError(ErrorCode.INVALID_ARGUMENT, 'hibp.check: password is required');
-      }
+      assertNonEmptyString(password, 'hibp.check.password');
       const sha1 = createHash('sha1').update(password, 'utf8').digest('hex').toUpperCase();
       const prefix = sha1.slice(0, 5);
       const suffix = sha1.slice(5);

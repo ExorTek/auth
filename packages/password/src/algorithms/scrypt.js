@@ -1,6 +1,6 @@
 import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
-import { PasswordError, ErrorCode } from '../errors.js';
+import { assertPositiveInt, invalidArgument } from '../internal/guards.js';
 import { normalizePassword } from '../internal/normalize.js';
 import { parseHash, serialiseHash } from '../phc.js';
 
@@ -76,10 +76,10 @@ export async function hash(password, options = {}) {
   const keyLength = options.keyLength ?? DEFAULTS.keyLength;
   const saltLength = options.saltLength ?? DEFAULTS.saltLength;
   assertN(N);
-  assertPositiveInt(r, 'r');
-  assertPositiveInt(p, 'p');
-  assertPositiveInt(keyLength, 'keyLength');
-  assertPositiveInt(saltLength, 'saltLength');
+  assertPositiveInt(r, 'scrypt.options.r');
+  assertPositiveInt(p, 'scrypt.options.p');
+  assertPositiveInt(keyLength, 'scrypt.options.keyLength');
+  assertPositiveInt(saltLength, 'scrypt.options.saltLength');
 
   const pwBytes = normalizePassword(password);
   const salt = options.salt ?? randomBytes(saltLength);
@@ -170,22 +170,14 @@ export function needsRehash(phcHash, target = {}) {
 
 function assertN(N) {
   if (!Number.isInteger(N) || N < 2 || (N & (N - 1)) !== 0) {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      `scrypt: N must be a power of two ≥ 2; got ${N}. Typical values: 2^15 (32768) for interactive, 2^17 (131072) for OWASP-2024 default, 2^20 (1048576) for sensitive keys.`,
+    throw invalidArgument(
+      `scrypt.options.N must be a power of two ≥ 2; got ${N}. Typical values: 2^15 (32768) for interactive, 2^17 (131072) for OWASP-2024 default, 2^20 (1048576) for sensitive keys.`,
     );
   }
   if (N > 1 << 24) {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      `scrypt: N=${N} would require multi-gigabyte allocations. If you truly need this, raise the maxmem option and revisit whether a hash is the right primitive here.`,
+    throw invalidArgument(
+      `scrypt.options.N=${N} would require multi-gigabyte allocations. If you truly need this, raise the maxmem option and revisit whether a hash is the right primitive here.`,
     );
-  }
-}
-
-function assertPositiveInt(v, name) {
-  if (!Number.isInteger(v) || v < 1) {
-    throw new PasswordError(ErrorCode.INVALID_ARGUMENT, `scrypt: ${name} must be a positive integer; got ${v}`);
   }
 }
 

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { PasswordError, ErrorCode } from './errors.js';
+import { invalidArgument } from './internal/guards.js';
 
 // Named alphabets — the character sets 99% of "give me a random
 // password" callers actually want. Custom alphabets stay possible via
@@ -49,18 +49,14 @@ export const alphabets = Object.freeze({
 export function generate(options = {}) {
   const length = options.length ?? 24;
   if (!Number.isInteger(length) || length < 1 || length > 1024) {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      `generate: length must be an integer in [1, 1024]; got ${length}`,
-    );
+    throw invalidArgument(`generate.options.length must be an integer in [1, 1024]; got ${length}`);
   }
   const alphabetInput = options.alphabet ?? 'crockford';
   const alphabet =
     typeof alphabetInput === 'string' && alphabets[alphabetInput] ? alphabets[alphabetInput] : alphabetInput;
   if (typeof alphabet !== 'string' || alphabet.length < 2 || alphabet.length > 256) {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      `generate: alphabet must be a string of 2-256 characters (or a named alphabet: ${Object.keys(alphabets).join(', ')}); got ${typeof alphabet === 'string' ? `length ${alphabet.length}` : typeof alphabet}`,
+    throw invalidArgument(
+      `generate.options.alphabet must be a string of 2-256 characters (or a named alphabet: ${Object.keys(alphabets).join(', ')}); got ${typeof alphabet === 'string' ? `length ${alphabet.length}` : typeof alphabet}`,
     );
   }
   // Rejection sampling: read bytes 4× the target length so the rejection
@@ -376,20 +372,16 @@ const DEFAULT_WORDS = [
 export function passphrase(options = {}) {
   const count = options.words ?? 6;
   if (!Number.isInteger(count) || count < 1 || count > 64) {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      `passphrase: words must be an integer in [1, 64]; got ${count}`,
-    );
+    throw invalidArgument(`passphrase.options.words must be an integer in [1, 64]; got ${count}`);
   }
   const separator = options.separator ?? '-';
   if (typeof separator !== 'string') {
-    throw new PasswordError(ErrorCode.INVALID_ARGUMENT, `passphrase: separator must be a string`);
+    throw invalidArgument('passphrase.options.separator must be a string');
   }
   const list = options.wordList ?? DEFAULT_WORDS;
   if (!Array.isArray(list) || list.length < 128) {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      `passphrase: wordList must be an array of ≥ 128 words; got ${Array.isArray(list) ? list.length : typeof list}`,
+    throw invalidArgument(
+      `passphrase.options.wordList must be an array of ≥ 128 words; got ${Array.isArray(list) ? list.length : typeof list}`,
     );
   }
   const capitalize = options.capitalize === true;

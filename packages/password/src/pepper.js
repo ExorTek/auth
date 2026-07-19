@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto';
 
 import { array, instanceOf, object, oneOf, optional, string, union } from '@exortek/shared/validate';
 
-import { PasswordError, ErrorCode } from './errors.js';
+import { assertBytesOrString, invalidArgument, parse } from './internal/guards.js';
 
 const SecretItemSchema = union(string(), instanceOf(Uint8Array));
 
@@ -60,20 +60,15 @@ const PepperConfigSchema = object({
  * @param {PepperConfig} config
  */
 export function createPepper(config) {
-  try {
-    PepperConfigSchema.parse(config, 'createPepper.config');
-  } catch (err) {
-    throw new PasswordError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
-  }
+  parse(PepperConfigSchema, config, 'createPepper.config');
   const rawSecrets = Array.isArray(config.secret) ? config.secret : [config.secret];
   if (rawSecrets.length === 0) {
-    throw new PasswordError(ErrorCode.INVALID_ARGUMENT, 'createPepper.config.secret: at least one secret is required');
+    throw invalidArgument('createPepper.config.secret: at least one secret is required');
   }
   const secrets = rawSecrets.map((s, i) => {
     const bytes = typeof s === 'string' ? Buffer.from(s, 'utf8') : Buffer.from(s);
     if (bytes.length < 16) {
-      throw new PasswordError(
-        ErrorCode.INVALID_ARGUMENT,
+      throw invalidArgument(
         `createPepper.config.secret[${i}]: must be at least 16 bytes for meaningful defence; got ${bytes.length}`,
       );
     }
@@ -97,9 +92,7 @@ export function createPepper(config) {
      * @returns {string}
      */
     wrap(password) {
-      if (typeof password !== 'string' && !Buffer.isBuffer(password) && !(password instanceof Uint8Array)) {
-        throw new PasswordError(ErrorCode.INVALID_ARGUMENT, 'pepper.wrap: password is required');
-      }
+      assertBytesOrString(password, 'pepper.wrap.password');
       return wrapWith(secrets[0], password);
     },
 
@@ -128,9 +121,7 @@ export function createPepper(config) {
      * @returns {string[]}
      */
     wrapAll(password) {
-      if (typeof password !== 'string' && !Buffer.isBuffer(password) && !(password instanceof Uint8Array)) {
-        throw new PasswordError(ErrorCode.INVALID_ARGUMENT, 'pepper.wrapAll: password is required');
-      }
+      assertBytesOrString(password, 'pepper.wrapAll.password');
       return secrets.map(s => wrapWith(s, password));
     },
 

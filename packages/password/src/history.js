@@ -1,5 +1,5 @@
-import { PasswordError, ErrorCode } from './errors.js';
 import { verify as umbrellaVerify } from './verify.js';
+import { assertNonEmptyString, invalidArgument } from './internal/guards.js';
 
 /**
  * @typedef {object} HistoryConfig
@@ -33,10 +33,7 @@ import { verify as umbrellaVerify } from './verify.js';
 export function createHistory(config = {}) {
   const keepLast = config.keepLast ?? 5;
   if (!Number.isInteger(keepLast) || keepLast < 1 || keepLast > 64) {
-    throw new PasswordError(
-      ErrorCode.INVALID_ARGUMENT,
-      `createHistory: keepLast must be an integer in [1, 64]; got ${keepLast}`,
-    );
+    throw invalidArgument(`createHistory.config.keepLast must be an integer in [1, 64]; got ${keepLast}`);
   }
   return {
     /**
@@ -74,9 +71,7 @@ export function createHistory(config = {}) {
      * @returns {string[]}
      */
     append(freshHash, previousHashes) {
-      if (typeof freshHash !== 'string' || freshHash.length === 0) {
-        throw new PasswordError(ErrorCode.INVALID_ARGUMENT, 'history.append: freshHash is required');
-      }
+      assertNonEmptyString(freshHash, 'history.append.freshHash');
       const prev = Array.isArray(previousHashes) ? previousHashes : [];
       const merged = [freshHash, ...prev.filter(h => h !== freshHash)];
       return merged.slice(0, keepLast);

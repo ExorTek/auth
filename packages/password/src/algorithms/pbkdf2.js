@@ -1,6 +1,7 @@
 import { randomBytes, pbkdf2 as pbkdf2Cb, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { PasswordError, ErrorCode } from '../errors.js';
+import { assertPositiveInt } from '../internal/guards.js';
 import { normalizePassword } from '../internal/normalize.js';
 import { parseHash, serialiseHash } from '../phc.js';
 
@@ -75,9 +76,9 @@ export async function hash(password, options = {}) {
   const iterations = options.iterations ?? HASH_ITERATIONS[hashName];
   const keyLength = options.keyLength ?? DEFAULTS.keyLength;
   const saltLength = options.saltLength ?? DEFAULTS.saltLength;
-  assertPositiveInt(iterations, 'iterations');
-  assertPositiveInt(keyLength, 'keyLength');
-  assertPositiveInt(saltLength, 'saltLength');
+  assertPositiveInt(iterations, 'pbkdf2.options.iterations');
+  assertPositiveInt(keyLength, 'pbkdf2.options.keyLength');
+  assertPositiveInt(saltLength, 'pbkdf2.options.saltLength');
 
   const pwBytes = normalizePassword(password);
   const salt = options.salt ?? randomBytes(saltLength);
@@ -153,8 +154,3 @@ function assertHash(hashName) {
   }
 }
 
-function assertPositiveInt(v, name) {
-  if (!Number.isInteger(v) || v < 1) {
-    throw new PasswordError(ErrorCode.INVALID_ARGUMENT, `pbkdf2: ${name} must be a positive integer; got ${v}`);
-  }
-}
