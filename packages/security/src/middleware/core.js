@@ -4,6 +4,7 @@ import { cors as buildCorsCheck } from '../cors/index.js';
 import { headers as buildHeaders } from '../headers/index.js';
 import { generate as csrfGenerate, verify as csrfVerify } from '../csrf/index.js';
 import { SecurityError, ErrorCode } from '../internal/errors.js';
+import { invalidArgument } from '../internal/guards.js';
 
 /**
  * @typedef {object} CsrfMiddlewareOptions
@@ -47,12 +48,11 @@ const CSRF_DEFAULT_COOKIE_FLAGS = Object.freeze({
 
 function assertCsrfSecret(secret) {
   if (typeof secret !== 'string' && !Buffer.isBuffer(secret)) {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'csrf.secret must be a string or Buffer');
+    throw invalidArgument('csrf.secret must be a string or Buffer');
   }
   const len = Buffer.isBuffer(secret) ? secret.length : Buffer.byteLength(secret, 'utf8');
   if (len < 32) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
+    throw invalidArgument(
       `csrf.secret must be at least 32 bytes; got ${len}. Generate with \`crypto.randomBytes(32).toString('hex')\`.`,
     );
   }
@@ -199,7 +199,7 @@ export function serializeCookie(name, value, opts) {
   try {
     return sharedSerialiseCookie(name, value, opts);
   } catch (err) {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
+    throw invalidArgument(err instanceof Error ? err.message : String(err), { cause: err });
   }
 }
 

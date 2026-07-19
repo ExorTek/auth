@@ -1,4 +1,5 @@
 import { SecurityError, ErrorCode } from '../internal/errors.js';
+import { invalidArgument } from '../internal/guards.js';
 
 /**
  * @typedef {string | RegExp} OriginMatcher
@@ -122,7 +123,7 @@ function assertOptions(options) {
   if (options.optionsSuccessStatus !== undefined) {
     const s = options.optionsSuccessStatus;
     if (!Number.isInteger(s) || s < 200 || s > 299) {
-      throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `cors: optionsSuccessStatus must be a 2xx integer; got ${s}`);
+      throw invalidArgument(`cors.options.optionsSuccessStatus must be a 2xx integer; got ${s}`);
     }
   }
 }

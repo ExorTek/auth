@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { SecurityError, ErrorCode } from '../internal/errors.js';
+import { invalidArgument } from '../internal/guards.js';
 
 /**
  * Extract the real client IP from a request-like object, honouring a
@@ -175,7 +176,7 @@ export function webhookVerify(payload, signatureHeader, secret, options = {}) {
     return false;
   }
   if (!secret || (typeof secret !== 'string' && !Buffer.isBuffer(secret))) {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'webhookVerify: secret is required');
+    throw invalidArgument('webhookVerify.secret must be a non-empty string or Buffer');
   }
   const algorithm = options.algorithm ?? 'sha256';
   const expected = createHmac(algorithm, secret).update(payload).digest();

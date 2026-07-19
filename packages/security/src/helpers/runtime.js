@@ -1,4 +1,5 @@
 import { SecurityError, ErrorCode } from '../internal/errors.js';
+import { invalidArgument } from '../internal/guards.js';
 
 /**
  * Freeze the built-in prototypes to defend against prototype pollution.
@@ -53,7 +54,7 @@ export function freezePrototypes(options = {}) {
  */
 export function timeout(promise, ms, options = {}) {
   if (!Number.isFinite(ms) || ms <= 0) {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `timeout: ms must be a positive number; got ${ms}`);
+    throw invalidArgument(`timeout.ms must be a positive number; got ${ms}`);
   }
   const label = options.label ?? 'operation';
   return new Promise((resolvePromise, rejectPromise) => {
@@ -114,10 +115,7 @@ export function timeout(promise, ms, options = {}) {
  */
 export function bodyLimit(contentLength, maxBytes) {
   if (!Number.isInteger(maxBytes) || maxBytes < 0) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      `bodyLimit: maxBytes must be a non-negative integer; got ${maxBytes}`,
-    );
+    throw invalidArgument(`bodyLimit.maxBytes must be a non-negative integer; got ${maxBytes}`);
   }
   if (contentLength === undefined || contentLength === null || contentLength === '') {
     // No Content-Length is ambiguous — chunked transfer, or a genuinely

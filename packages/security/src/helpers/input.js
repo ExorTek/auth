@@ -1,5 +1,6 @@
 import { resolve, sep } from 'node:path';
 import { SecurityError, ErrorCode } from '../internal/errors.js';
+import { assertNonEmptyString, assertString } from '../internal/guards.js';
 
 /**
  * @typedef {object} SanitizeBodyOptions
@@ -158,13 +159,9 @@ export function sanitizeParams(query, options = {}) {
  * @returns {string}                      Absolute, canonicalized path.
  */
 export function safeJoin(base, ...segments) {
-  if (typeof base !== 'string' || base.length === 0) {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'safeJoin: base must be a non-empty string');
-  }
+  assertNonEmptyString(base, 'safeJoin.base');
   for (const seg of segments) {
-    if (typeof seg !== 'string') {
-      throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'safeJoin: every segment must be a string');
-    }
+    assertString(seg, 'safeJoin.segment');
     if (seg.indexOf('\0') !== -1) {
       // NUL bytes truncate paths in some C-level APIs; refuse outright.
       throw new SecurityError(ErrorCode.PATH_TRAVERSAL, 'safeJoin: NUL byte in segment');

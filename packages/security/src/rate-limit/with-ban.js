@@ -1,4 +1,4 @@
-import { SecurityError, ErrorCode } from '../internal/errors.js';
+import { invalidArgument } from '../internal/guards.js';
 import { parseDuration } from './duration.js';
 
 /**
@@ -32,16 +32,13 @@ import { parseDuration } from './duration.js';
  */
 export function withBan(limiter, options) {
   if (!limiter || typeof limiter.check !== 'function') {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'rateLimit.withBan: limiter must expose a .check() method');
+    throw invalidArgument('rateLimit.withBan.limiter must expose a .check() method');
   }
   if (!options || !options.store || typeof options.store.get !== 'function') {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'rateLimit.withBan: options.store must be a compatible store');
+    throw invalidArgument('rateLimit.withBan.options.store must be a compatible store');
   }
   if (!Number.isInteger(options.threshold) || options.threshold < 1) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      `rateLimit.withBan: threshold must be a positive integer; got ${options.threshold}`,
-    );
+    throw invalidArgument(`rateLimit.withBan.options.threshold must be a positive integer; got ${options.threshold}`);
   }
   const banMs = parseDuration(options.banDuration, 'banDuration');
   const trackingMs = parseDuration(options.trackingWindow ?? options.banDuration, 'trackingWindow');
@@ -50,7 +47,7 @@ export function withBan(limiter, options) {
   return {
     async check(input) {
       if (!input || typeof input.key !== 'string' || input.key.length === 0) {
-        throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'rateLimit.withBan.check: input.key is required');
+        throw invalidArgument('rateLimit.withBan.check.input.key must be a non-empty string');
       }
       const banKey = `bs:b:${input.key}`;
       const banned = await store.get(banKey);

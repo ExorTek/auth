@@ -1,6 +1,7 @@
 import { assertRedisClient } from '@exortek/shared/redis-guard';
 
 import { SecurityError, ErrorCode } from '../../internal/errors.js';
+import { invalidArgument } from '../../internal/guards.js';
 
 const INCR_SCRIPT = `
 local key = KEYS[1]
@@ -107,7 +108,7 @@ return 1
  */
 export function redisStore(client, options = {}) {
   assertRedisClient(client, ['eval', 'get', 'set', 'del'], msg => {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `redisStore: ${msg}`);
+    throw invalidArgument(`redisStore.client: ${msg}`);
   });
 
   const prefix = options.prefix ?? 'rl:';

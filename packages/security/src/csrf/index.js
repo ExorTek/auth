@@ -26,6 +26,7 @@ import { randomBytes, timingSafeEqual } from '../util/bytes.js';
 import { encodeBase64Url } from '../util/base64url.js';
 import { hmacBase64Url } from '../util/hmac.js';
 import { SecurityError, ErrorCode } from '../internal/errors.js';
+import { assertNonEmptyString } from '../internal/guards.js';
 
 const DEFAULT_TOKEN_BYTES = 32;
 
@@ -151,9 +152,7 @@ export function verifyUnsigned(fromCookie, fromForm) {
  * @returns {string}
  */
 export function generateForSession(sessionId, secret) {
-  if (typeof sessionId !== 'string' || sessionId.length === 0) {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'sessionId must be a non-empty string');
-  }
+  assertNonEmptyString(sessionId, 'generateForSession.sessionId');
   assertSecret(secret, 'secret');
   return hmacBase64Url(sessionId, secret);
 }

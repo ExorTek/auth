@@ -6,7 +6,7 @@
  */
 
 import { parseDuration as sharedParseDuration } from '@exortek/shared/duration';
-import { SecurityError, ErrorCode } from '../internal/errors.js';
+import { invalidArgument } from '../internal/guards.js';
 
 /**
  * Parse a duration into milliseconds.
@@ -24,16 +24,14 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
 export function parseDuration(input, field = 'window') {
   if (typeof input === 'number') {
     if (!Number.isFinite(input) || input <= 0 || !Number.isInteger(input)) {
-      throw new SecurityError(
-        ErrorCode.INVALID_ARGUMENT,
+      throw invalidArgument(
         `${field} must be a positive integer of milliseconds or a duration string like '1m' / '15m' / '1h'; got ${input}`,
       );
     }
     return input;
   }
   if (typeof input !== 'string' || input.length === 0) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
+    throw invalidArgument(
       `${field} must be a duration string like '1m' / '15m' / '1h' / '7d' or a positive integer of milliseconds; got ${input === null ? 'null' : typeof input}`,
     );
   }
@@ -41,14 +39,13 @@ export function parseDuration(input, field = 'window') {
   try {
     ms = sharedParseDuration(input);
   } catch (err) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
+    throw invalidArgument(
       `${field} '${input}' is not a valid duration. Use '<number><unit>' where unit is ms | s | m | h | d | w (e.g. '500ms', '30s', '15m', '1h', '7d', '2w')`,
       { cause: err },
     );
   }
   if (ms <= 0) {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `${field} must resolve to at least 1ms; '${input}' → ${ms}ms`);
+    throw invalidArgument(`${field} must resolve to at least 1ms; '${input}' → ${ms}ms`);
   }
   return ms;
 }

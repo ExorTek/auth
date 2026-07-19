@@ -1,4 +1,5 @@
 import { SecurityError, ErrorCode } from '../internal/errors.js';
+import { invalidArgument } from '../internal/guards.js';
 import { timingSafeEqual } from '../util/bytes.js';
 
 /**
@@ -82,10 +83,7 @@ export function safeJsonParse(input, options = {}) {
 
   if (flagged && mode !== 'strip') {
     if (mode === 'throw') {
-      throw new SecurityError(
-        ErrorCode.INVALID_ARGUMENT,
-        'safeJsonParse: parsed payload contained a banned key (prototype-pollution vector)',
-      );
+      throw invalidArgument('safeJsonParse: parsed payload contained a banned key (prototype-pollution vector)');
     }
     return null;
   }
@@ -95,7 +93,7 @@ export function safeJsonParse(input, options = {}) {
   // structure shouldn't be handed one silently.
   if (!withinDepth(parsed, maxDepth)) {
     if (mode === 'throw') {
-      throw new SecurityError(ErrorCode.INVALID_ARGUMENT, `safeJsonParse: parsed value exceeds maxDepth=${maxDepth}`);
+      throw invalidArgument(`safeJsonParse: parsed value exceeds maxDepth=${maxDepth}`);
     }
     return null;
   }

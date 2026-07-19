@@ -1,4 +1,4 @@
-import { SecurityError, ErrorCode } from '../internal/errors.js';
+import { assertObject, invalidArgument } from '../internal/guards.js';
 import { parseDuration } from '../rate-limit/duration.js';
 
 /**
@@ -39,23 +39,15 @@ import { parseDuration } from '../rate-limit/duration.js';
  * }> }}
  */
 export function slowDown(config) {
-  if (!config || typeof config !== 'object') {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'slowDown: config is required');
-  }
+  assertObject(config, 'slowDown.config');
   if (!config.store || typeof config.store.incr !== 'function') {
-    throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'slowDown: store is required');
+    throw invalidArgument('slowDown.config.store is required');
   }
   if (!Number.isInteger(config.delayAfter) || config.delayAfter < 0) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      `slowDown: delayAfter must be a non-negative integer; got ${config.delayAfter}`,
-    );
+    throw invalidArgument(`slowDown.config.delayAfter must be a non-negative integer; got ${config.delayAfter}`);
   }
   if (!Number.isFinite(config.delayMs) || config.delayMs < 0) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      `slowDown: delayMs must be a non-negative number; got ${config.delayMs}`,
-    );
+    throw invalidArgument(`slowDown.config.delayMs must be a non-negative number; got ${config.delayMs}`);
   }
 
   const windowMs = parseDuration(config.window, 'slowDown.window');
@@ -65,7 +57,7 @@ export function slowDown(config) {
   return {
     async check(input) {
       if (!input || typeof input.key !== 'string' || input.key.length === 0) {
-        throw new SecurityError(ErrorCode.INVALID_ARGUMENT, 'slowDown.check: input.key is required');
+        throw invalidArgument('slowDown.check.input.key must be a non-empty string');
       }
       const bucketId = Math.floor(Date.now() / windowMs);
       const storeKey = `sd:${input.key}:${bucketId}`;
