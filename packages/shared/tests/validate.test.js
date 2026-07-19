@@ -128,3 +128,102 @@ test('nested composition — a realistic config schema', () => {
   assert.equal(bad.ok, false);
   assert.match(bad.errors[0], /options\.alg/);
 });
+
+test('int / positiveInt / nonNegativeInt', () => {
+  assert.equal(v.int().parse(5, 'x'), 5);
+  assert.equal(v.int().safeParse(1.5, 'x').ok, false);
+  assert.equal(v.int().safeParse(Number.MAX_SAFE_INTEGER + 1, 'x').ok, false);
+  assert.equal(v.int({ min: 2, max: 4 }).safeParse(5, 'x').ok, false);
+  assert.equal(v.int({ min: 2, max: 4 }).parse(3, 'x'), 3);
+
+  assert.equal(v.positiveInt().parse(1, 'x'), 1);
+  assert.equal(v.positiveInt().safeParse(0, 'x').ok, false);
+
+  assert.equal(v.nonNegativeInt().parse(0, 'x'), 0);
+  assert.equal(v.nonNegativeInt().safeParse(-1, 'x').ok, false);
+});
+
+test('number / string range options', () => {
+  assert.equal(v.number({ min: 0, max: 1 }).parse(0.5, 'x'), 0.5);
+  assert.equal(v.number({ min: 0 }).safeParse(-0.1, 'x').ok, false);
+  assert.equal(v.number({ max: 10 }).safeParse(11, 'x').ok, false);
+
+  assert.equal(v.string({ minLength: 2 }).parse('ab', 'x'), 'ab');
+  assert.equal(v.string({ minLength: 2 }).safeParse('a', 'x').ok, false);
+  assert.equal(v.string({ maxLength: 3 }).safeParse('abcd', 'x').ok, false);
+});
+
+test('bytes: Buffer / Uint8Array only', () => {
+  assert.ok(v.bytes().parse(Buffer.from('hi'), 'x'));
+  assert.ok(v.bytes().parse(new Uint8Array(3), 'x'));
+  assert.equal(v.bytes().safeParse('hi', 'x').ok, false);
+  assert.equal(v.bytes().safeParse(42, 'x').ok, false);
+});
+
+test('bytesOrString: also accepts strings', () => {
+  assert.equal(v.bytesOrString().parse('secret', 'x'), 'secret');
+  assert.ok(v.bytesOrString().parse(Buffer.from('hi'), 'x'));
+  assert.equal(v.bytesOrString().safeParse(42, 'x').ok, false);
+});
+
+test('func: functions only', () => {
+  const fn = () => {};
+  assert.equal(v.func().parse(fn, 'x'), fn);
+  assert.equal(v.func().safeParse({}, 'x').ok, false);
+});
+
+test('literal: exact match via Object.is', () => {
+  assert.equal(v.literal('strict').parse('strict', 'x'), 'strict');
+  assert.equal(v.literal('strict').safeParse('lax', 'x').ok, false);
+  assert.equal(v.literal(NaN).safeParse(NaN, 'x').ok, true);
+});
+
+test('record: string-keyed uniform map', () => {
+  const s = v.record(v.string());
+  const out = s.parse({ a: 'x', b: 'y' }, 'headers');
+  assert.equal(out.a, 'x');
+  assert.equal(out.b, 'y');
+
+  const bad = s.safeParse({ a: 1 }, 'headers');
+  assert.equal(bad.ok, false);
+  assert.match(bad.errors[0], /headers\.a/);
+
+  assert.equal(s.safeParse(['x'], 'headers').ok, false);
+});
+
+test('record: rejects prototype-polluting keys', () => {
+  const s = v.record(v.string());
+  const bad = s.safeParse(JSON.parse('{"__proto__": "x"}'), 'h');
+  assert.equal(bad.ok, false);
+  assert.match(bad.errors[0], /__proto__/);
+});
+
+test('withDefault: undefined becomes the default, present values validate', () => {
+  const s = v.withDefault(v.positiveInt(), 12);
+  assert.equal(s.parse(undefined, 'x'), 12);
+  assert.equal(s.parse(3, 'x'), 3);
+  assert.equal(s.safeParse(0, 'x').ok, false);
+});
+
+test('withDefault composes inside object — schema carries its own defaults', () => {
+  const Opts = v.object({
+    rounds: v.withDefault(v.positiveInt(), 12),
+    mode: v.withDefault(v.oneOf(['prehash', 'strict']), 'prehash'),
+  });
+  assert.deepEqual(Opts.parse({}, 'options'), { rounds: 12, mode: 'prehash' });
+  assert.deepEqual(Opts.parse({ rounds: 10 }, 'options'), { rounds: 10, mode: 'prehash' });
+});
+
+test("object unknownKeys: 'reject' fails on typo'd keys, 'strip' stays default", () => {
+  const shape = { csrf: v.optional(v.any()), cors: v.optional(v.any()) };
+
+  const strict = v.object(shape, { unknownKeys: 'reject' });
+  const bad = strict.safeParse({ csrrf: {} }, 'options');
+  assert.equal(bad.ok, false);
+  assert.match(bad.errors[0], /unknown key "csrrf"/);
+  assert.match(bad.errors[0], /known keys: csrf, cors/);
+  assert.equal(strict.safeParse({ csrf: {} }, 'options').ok, true);
+
+  const lax = v.object(shape);
+  assert.equal(lax.safeParse({ csrrf: {} }, 'options').ok, true);
+});

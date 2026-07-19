@@ -70,22 +70,64 @@ function make(check) {
 
 // primitives
 
-export function string() {
+/**
+ * @param {{ minLength?: number, maxLength?: number }} [opts]
+ */
+export function string(opts) {
   return make((input, path, errors) => {
     if (typeof input !== 'string') {
       errors.push(`${path}: expected string; got ${describe(input)}`);
+      return input;
+    }
+    if (opts?.minLength !== undefined && input.length < opts.minLength) {
+      errors.push(`${path}: expected string of at least ${opts.minLength} characters; got ${input.length}`);
+    }
+    if (opts?.maxLength !== undefined && input.length > opts.maxLength) {
+      errors.push(`${path}: expected string of at most ${opts.maxLength} characters; got ${input.length}`);
     }
     return input;
   });
 }
 
-export function number() {
+/**
+ * @param {{ min?: number, max?: number }} [opts]
+ */
+export function number(opts) {
   return make((input, path, errors) => {
     if (typeof input !== 'number' || !Number.isFinite(input)) {
       errors.push(`${path}: expected finite number; got ${describe(input)}`);
+      return input;
     }
+    rangeCheck(input, path, errors, opts);
     return input;
   });
+}
+
+/**
+ * Safe integer. `positiveInt()` / `nonNegativeInt()` below are the
+ * shortcuts for the two overwhelmingly common ranges.
+ *
+ * @param {{ min?: number, max?: number }} [opts]
+ */
+export function int(opts) {
+  return make((input, path, errors) => {
+    if (!Number.isSafeInteger(input)) {
+      errors.push(`${path}: expected integer; got ${describe(input)}`);
+      return input;
+    }
+    rangeCheck(/** @type {number} */ (input), path, errors, opts);
+    return input;
+  });
+}
+
+/** Strictly positive safe integer (`1, 2, 3, …`). */
+export function positiveInt() {
+  return int({ min: 1 });
+}
+
+/** Non-negative safe integer (`0, 1, 2, …`). */
+export function nonNegativeInt() {
+  return int({ min: 0 });
 }
 
 export function boolean() {
@@ -99,6 +141,51 @@ export function boolean() {
 
 export function any() {
   return make(input => input);
+}
+
+/** `Buffer | Uint8Array` — secrets, keys, salts, ciphertext. */
+export function bytes() {
+  return make((input, path, errors) => {
+    if (!Buffer.isBuffer(input) && !(input instanceof Uint8Array)) {
+      errors.push(`${path}: expected Buffer or Uint8Array; got ${describe(input)}`);
+    }
+    return input;
+  });
+}
+
+/** The secret-input convention: `string | Buffer | Uint8Array`. */
+export function bytesOrString() {
+  return make((input, path, errors) => {
+    if (typeof input !== 'string' && !Buffer.isBuffer(input) && !(input instanceof Uint8Array)) {
+      errors.push(`${path}: expected string, Buffer, or Uint8Array; got ${describe(input)}`);
+    }
+    return input;
+  });
+}
+
+/** Callbacks: `keyGenerator`, `tokenFromRequest`, resolver functions, … */
+export function func() {
+  return make((input, path, errors) => {
+    if (typeof input !== 'function') {
+      errors.push(`${path}: expected function; got ${describe(input)}`);
+    }
+    return input;
+  });
+}
+
+/**
+ * Exactly `value` (compared with `Object.is`). Combine with `union`
+ * for discriminated shapes.
+ *
+ * @param {unknown} value
+ */
+export function literal(value) {
+  return make((input, path, errors) => {
+    if (!Object.is(input, value)) {
+      errors.push(`${path}: expected ${JSON.stringify(value)}; got ${describe(input)}`);
+    }
+    return input;
+  });
 }
 
 export function nullish() {
@@ -125,15 +212,64 @@ export function regexp() {
 
 // combinators
 
-export function object(shape) {
+/**
+ * @param {Record<string, Validator>} shape
+ * @param {{ unknownKeys?: 'strip' | 'reject' }} [opts]
+ *   `'strip'` (default) silently drops keys not in `shape` — the
+ *   historical behaviour. `'reject'` errors on them; use it for
+ *   boot-time config so a typo'd option key fails loudly instead of
+ *   being ignored.
+ */
+export function object(shape, opts) {
+  const unknownKeys = opts?.unknownKeys ?? 'strip';
   return make((input, path, errors) => {
     if (input == null || typeof input !== 'object' || Array.isArray(input)) {
       errors.push(`${path}: expected object; got ${describe(input)}`);
       return input;
     }
+    if (unknownKeys === 'reject') {
+      const extra = Object.keys(input).filter(k => !Object.hasOwn(shape, k));
+      if (extra.length > 0) {
+        errors.push(
+          `${path}: unknown key${extra.length > 1 ? 's' : ''} ${extra.map(k => JSON.stringify(k)).join(', ')} — known keys: ${Object.keys(shape).join(', ')}`,
+        );
+      }
+    }
     const out = {};
     for (const key of Object.keys(shape)) {
       const child = shape[key].safeParse(input[key], `${path}.${key}`);
+      if (child.ok) {
+        out[key] = child.value;
+      } else {
+        errors.push(...child.errors);
+      }
+    }
+    return out;
+  });
+}
+
+/**
+ * String-keyed map with uniformly-typed values (header overrides,
+ * label maps, …). Rejects arrays; prototype-polluting keys
+ * (`__proto__`, `constructor`, `prototype`) are always rejected.
+ *
+ * @param {Validator} valueSchema
+ */
+export function record(valueSchema) {
+  const banned = new Set(['__proto__', 'constructor', 'prototype']);
+  return make((input, path, errors) => {
+    if (input == null || typeof input !== 'object' || Array.isArray(input)) {
+      errors.push(`${path}: expected object; got ${describe(input)}`);
+      return input;
+    }
+    /** @type {Record<string, unknown>} */
+    const out = Object.create(null);
+    for (const key of Object.keys(input)) {
+      if (banned.has(key)) {
+        errors.push(`${path}: key ${JSON.stringify(key)} is not allowed`);
+        continue;
+      }
+      const child = valueSchema.safeParse(input[key], `${path}.${key}`);
       if (child.ok) {
         out[key] = child.value;
       } else {
@@ -202,6 +338,29 @@ export function optional(schema) {
   });
 }
 
+/**
+ * `undefined` → `defaultValue` (returned as-is, not validated);
+ * anything else validates against `schema`. Lets a config schema
+ * carry its own defaults instead of `options.x ?? DEFAULT` ladders at
+ * every call site.
+ *
+ * @param {Validator} schema
+ * @param {unknown} defaultValue
+ */
+export function withDefault(schema, defaultValue) {
+  return make((input, path, errors) => {
+    if (input === undefined) {
+      return defaultValue;
+    }
+    const r = schema.safeParse(input, path);
+    if (r.ok) {
+      return r.value;
+    }
+    errors.push(...r.errors);
+    return input;
+  });
+}
+
 export function nullable(schema) {
   return make((input, path, errors) => {
     if (input === null) {
@@ -250,6 +409,21 @@ export function duration() {
 }
 
 // helpers
+
+/**
+ * @param {number} input
+ * @param {string} path
+ * @param {string[]} errors
+ * @param {{ min?: number, max?: number }} [opts]
+ */
+function rangeCheck(input, path, errors, opts) {
+  if (opts?.min !== undefined && input < opts.min) {
+    errors.push(`${path}: expected ≥ ${opts.min}; got ${input}`);
+  }
+  if (opts?.max !== undefined && input > opts.max) {
+    errors.push(`${path}: expected ≤ ${opts.max}; got ${input}`);
+  }
+}
 
 function describe(value) {
   if (value === null) {
