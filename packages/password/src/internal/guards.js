@@ -6,10 +6,8 @@
  * error class for the whole package.
  */
 
-import { bindAsserts } from '@exortek/shared/asserts';
+import { defineGuards } from '@exortek/shared/asserts';
 import { PasswordError, ErrorCode } from '../errors.js';
-
-const bound = bindAsserts(m => new PasswordError(ErrorCode.INVALID_ARGUMENT, m));
 
 export const {
   invalidArgument,
@@ -20,4 +18,4 @@ export const {
   assertBytesOrString,
   assertFunction,
   assertObject,
-} = bound;
+} = defineGuards(PasswordError, ErrorCode.INVALID_ARGUMENT);

@@ -236,10 +236,7 @@ function _serialise(payload) {
   try {
     s = JSON.stringify(payload);
   } catch (cause) {
-    // Keep the CryptoError shape — this branch carries a cause chain
-    // and the bound `invalidArgument` doesn't (yet) surface `{ cause }`.
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
+    throw invalidArgument(
       'payload is not JSON-serialisable — remove BigInt, cyclic references, or non-plain objects before sealing',
       { cause },
     );
