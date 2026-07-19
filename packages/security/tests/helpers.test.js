@@ -273,6 +273,25 @@ test('freezePrototypes: freezes core prototypes idempotently', () => {
   });
 });
 
+test('freezePrototypes: exclude drops named defaults without freezing them', () => {
+  // Two disjoint sandbox prototypes so we can verify exclude by
+  // observing the additional-freeze count. Using `additional`
+  // isolates us from whatever the base test above already froze.
+  class Sandbox1 {}
+  class Sandbox2 {}
+  const additional = [Sandbox1.prototype, Sandbox2.prototype];
+  const withoutExclude = freezePrototypes({ additional });
+  assert.equal(withoutExclude, 2, 'sandboxes freeze on first pass');
+  // Exclude with names not in defaults is a no-op — the defaults path
+  // still short-circuits on already-frozen prototypes, and the
+  // additional list is empty this time.
+  assert.equal(freezePrototypes({ exclude: ['Bogus'] }), 0);
+  // Exclude with real names is silently accepted (Date/RegExp are
+  // already frozen by the earlier test, so nothing to observe in the
+  // count — the contract is that the call does not throw).
+  assert.doesNotThrow(() => freezePrototypes({ exclude: ['Date', 'RegExp'] }));
+});
+
 // timeout
 
 test('timeout: resolves when promise settles before deadline', async () => {

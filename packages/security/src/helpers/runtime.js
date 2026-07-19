@@ -10,24 +10,38 @@ import { invalidArgument } from '../internal/guards.js';
  *
  * Idempotent — safe to call multiple times.
  *
- * @param {{ additional?: object[] }} [options]
- *   Extra objects to freeze (e.g. custom global classes).
+ * **`options.exclude`** lets callers opt specific defaults out. In
+ * practice `Date.prototype` and `RegExp.prototype` are the ones that
+ * legitimate polyfills (Temporal shims, some ORMs' custom serialisers)
+ * patch after boot, so those are the usual candidates —
+ * `freezePrototypes({ exclude: ['Date', 'RegExp'] })`. Every other
+ * default should stay frozen unless you know why you're loosening it.
+ *
+ * @param {{ additional?: object[], exclude?: string[] }} [options]
+ *   `additional`: extra objects to freeze (e.g. custom global classes).
+ *   `exclude`: constructor names to drop from the default freeze list
+ *              (`'Date'`, `'RegExp'`, …). Silently ignored for names
+ *              not in the defaults.
  * @returns {number}   Count of prototypes frozen.
  */
 export function freezePrototypes(options = {}) {
-  const defaults = [
-    Object.prototype,
-    Array.prototype,
-    Function.prototype,
-    String.prototype,
-    Number.prototype,
-    Boolean.prototype,
-    Map.prototype,
-    Set.prototype,
-    Promise.prototype,
-    Date.prototype,
-    RegExp.prototype,
-  ];
+  const named = /** @type {const} */ ({
+    Object: Object.prototype,
+    Array: Array.prototype,
+    Function: Function.prototype,
+    String: String.prototype,
+    Number: Number.prototype,
+    Boolean: Boolean.prototype,
+    Map: Map.prototype,
+    Set: Set.prototype,
+    Promise: Promise.prototype,
+    Date: Date.prototype,
+    RegExp: RegExp.prototype,
+  });
+  const excluded = new Set(options.exclude ?? []);
+  const defaults = Object.entries(named)
+    .filter(([name]) => !excluded.has(name))
+    .map(([, proto]) => proto);
   const all = [...defaults, ...(options.additional ?? [])];
   let count = 0;
   for (const proto of all) {
