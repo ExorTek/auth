@@ -5,10 +5,18 @@
  * `seal` API's TTL argument), duration strings resolve through
  * `@exortek/shared/duration`, and every result must be a positive
  * number of milliseconds.
+ *
+ * **Bare-numeric strings (`'900'`) are rejected** — the two branches
+ * would otherwise disagree on unit for the same magnitude (`900` →
+ * 900s, `'900'` → 900ms via the shared parser). Callers must pick
+ * one form and stick to it: `900` for a bare integer of seconds, or
+ * `'900s'` for the explicit-unit form.
  */
 
 import { parseDuration as sharedParseDuration } from '@exortek/shared/duration';
 import { invalidArgument } from './guards.js';
+
+const BARE_NUMBER_RE = /^\s*-?\d+(?:\.\d+)?\s*$/;
 
 /**
  * Parse a duration to milliseconds. Accepts:
@@ -28,6 +36,14 @@ export function parseDuration(input, name = 'duration') {
     return input * 1000;
   }
   if (typeof input === 'string') {
+    // Bare-numeric strings are ambiguous with the numeric branch above
+    // (`900` → 900s here, but `'900'` → 900ms if it fell through to
+    // the shared parser). Force the caller to commit to one form.
+    if (BARE_NUMBER_RE.test(input)) {
+      throw invalidArgument(
+        `${name}: bare-numeric string ${JSON.stringify(input)} is ambiguous — pass ${input} (bare integer = seconds) or ${JSON.stringify(input + 's')} (explicit seconds suffix)`,
+      );
+    }
     let ms;
     try {
       ms = sharedParseDuration(input);
