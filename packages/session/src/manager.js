@@ -1,6 +1,7 @@
 import { any, array, boolean, duration, number, object, oneOf, optional } from '@exortek/shared/validate';
 
 import { SessionError, ErrorCode } from './errors.js';
+import { assertNonEmptyString, invalidArgument, parse } from './internal/guards.js';
 import { generateSessionId, encodeToken, decodeToken } from './token.js';
 import { memoryStore } from './stores/memory.js';
 import { parseDuration } from './internal/duration.js';
@@ -132,11 +133,7 @@ const SessionManagerConfigSchema = object({
  * @param {SessionManagerConfig} config
  */
 export function createSessionManager(config) {
-  try {
-    SessionManagerConfigSchema.parse(config, 'createSessionManager.config');
-  } catch (err) {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
-  }
+  parse(SessionManagerConfigSchema, config, 'createSessionManager.config');
   const secret = normaliseSecret(config.secret);
   const ttlMs = parseDuration(config.ttl, 'ttl');
   const idleTtlMs = parseDuration(config.idleTtl, 'idleTtl');
@@ -449,9 +446,7 @@ export function createSessionManager(config) {
    * @returns {Promise<boolean>}   `false` when the sid isn't in the store.
    */
   async function touch(sessionId, options = {}) {
-    if (typeof sessionId !== 'string' || sessionId.length === 0) {
-      throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'touch: sessionId is required');
-    }
+    assertNonEmptyString(sessionId, 'touch.sessionId');
     const now = options.now ?? Date.now();
     const updated = await store.update(sessionId, { lastSeenAt: now });
     return updated !== null;
@@ -593,7 +588,7 @@ export function createSessionManager(config) {
   async function requireFreshAuth(req, options = {}) {
     const maxAgeSeconds = options.maxAgeSeconds;
     if (typeof maxAgeSeconds !== 'number' || !Number.isFinite(maxAgeSeconds) || maxAgeSeconds <= 0) {
-      throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'requireFreshAuth: maxAgeSeconds must be a positive number');
+      throw invalidArgument('requireFreshAuth.options.maxAgeSeconds must be a positive number');
     }
     const now = options.now ?? Date.now();
     const session = await verify(req, { now });
@@ -624,9 +619,7 @@ export function createSessionManager(config) {
         'impersonate: impersonation is disabled — pass `impersonation: true` to createSessionManager',
       );
     }
-    if (typeof targetUserId !== 'string' || targetUserId.length === 0) {
-      throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'impersonate: targetUserId is required');
-    }
+    assertNonEmptyString(targetUserId, 'impersonate.targetUserId');
     const adminSession = await verify(adminReq);
     if (!adminSession || !adminSession.userId) {
       throw new SessionError(ErrorCode.INVALID_TOKEN, 'impersonate: admin session is not valid');
@@ -720,9 +713,7 @@ export function createSessionManager(config) {
    * @returns {Promise<boolean>}
    */
   async function revokeById(sessionId, options = {}) {
-    if (typeof sessionId !== 'string' || sessionId.length === 0) {
-      throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'revokeById: sessionId is required');
-    }
+    assertNonEmptyString(sessionId, 'revokeById.sessionId');
     const revoked = await store.revoke(sessionId, options.reason);
     if (revoked) {
       await fire(events.onRevoke, sessionId, options.reason);
@@ -739,9 +730,7 @@ export function createSessionManager(config) {
    * @returns {Promise<number>}    Count revoked.
    */
   async function revokeAllForUser(userId, options = {}) {
-    if (typeof userId !== 'string' || userId.length === 0) {
-      throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'revokeAllForUser: userId is required');
-    }
+    assertNonEmptyString(userId, 'revokeAllForUser.userId');
     const count = await store.revokeAllForUser(userId, options.reason);
     if (count > 0) {
       await fire(events.onRevoke, `user:${userId}`, options.reason ?? 'revoke-all-for-user');
@@ -777,9 +766,7 @@ export function createSessionManager(config) {
    * @returns {Promise<Session[]>}
    */
   async function listActive(userId) {
-    if (typeof userId !== 'string' || userId.length === 0) {
-      throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'listActive: userId is required');
-    }
+    assertNonEmptyString(userId, 'listActive.userId');
     const records = await store.listByUser(userId);
     return records.map(projectSession);
   }
@@ -801,9 +788,7 @@ export function createSessionManager(config) {
    * @returns {Promise<import('./manager.js').IssueResult>}
    */
   async function upgrade(req, userId, options = {}) {
-    if (typeof userId !== 'string' || userId.length === 0) {
-      throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'upgrade: userId is required');
-    }
+    assertNonEmptyString(userId, 'upgrade.userId');
     const anon = await verify(req, { now: options.now });
     if (!anon) {
       throw new SessionError(ErrorCode.INVALID_TOKEN, 'upgrade: no valid session on the request');
@@ -900,17 +885,16 @@ export function createSessionManager(config) {
 
 function normaliseSecret(input) {
   if (input === undefined || input === null) {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'createSessionManager: secret is required');
+    throw invalidArgument('createSessionManager.config.secret is required');
   }
   const list = Array.isArray(input) ? input : [input];
   if (list.length === 0) {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'createSessionManager: at least one secret is required');
+    throw invalidArgument('createSessionManager.config.secret must include at least one entry');
   }
   for (const s of list) {
     if (typeof s !== 'string' && !Buffer.isBuffer(s) && !(s instanceof Uint8Array)) {
-      throw new SessionError(
-        ErrorCode.INVALID_ARGUMENT,
-        `createSessionManager: secret entries must be string / Buffer / Uint8Array; got ${typeof s}`,
+      throw invalidArgument(
+        `createSessionManager.config.secret entries must be string / Buffer / Uint8Array; got ${typeof s}`,
       );
     }
   }

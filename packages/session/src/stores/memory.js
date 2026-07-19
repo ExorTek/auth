@@ -1,4 +1,4 @@
-import { SessionError, ErrorCode } from '../errors.js';
+import { invalidArgument } from '../internal/guards.js';
 
 /**
  * @typedef {object} SessionRecord
@@ -182,7 +182,7 @@ export function memoryStore(options = {}) {
 
     async put(record) {
       if (!record || typeof record.sid !== 'string') {
-        throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'memoryStore.put: record.sid is required');
+        throw invalidArgument('memoryStore.put.record.sid must be a string');
       }
       const existing = map.get(record.sid);
       if (existing) {

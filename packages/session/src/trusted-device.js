@@ -1,5 +1,6 @@
 import { seal, unseal, CryptoError, ErrorCode as CryptoErrorCode } from '@exortek/crypto';
 import { SessionError, ErrorCode } from './errors.js';
+import { assertNonEmptyString, assertObject, invalidArgument } from './internal/guards.js';
 import { parseCookies, serialiseCookie, serialiseDeleteCookie } from './cookie.js';
 import { parseDuration } from './internal/duration.js';
 
@@ -22,15 +23,15 @@ import { parseDuration } from './internal/duration.js';
  * }} config
  */
 export function createTrustedDeviceCookie(config) {
-  if (!config || typeof config !== 'object') {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'createTrustedDeviceCookie: config is required');
-  }
+  assertObject(config, 'createTrustedDeviceCookie.config');
   const secret = Array.isArray(config.secret) ? config.secret : [config.secret];
   if (
     secret.length === 0 ||
     secret.some(s => typeof s !== 'string' && !Buffer.isBuffer(s) && !(s instanceof Uint8Array))
   ) {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'createTrustedDeviceCookie: secret is required');
+    throw invalidArgument(
+      'createTrustedDeviceCookie.config.secret must be a non-empty string / Buffer / Uint8Array (or an array of those)',
+    );
   }
   const ttlMs = parseDuration(config.ttl, 'ttl');
   const cookieName = config.cookie?.name ?? '__Host-td';
@@ -50,9 +51,7 @@ export function createTrustedDeviceCookie(config) {
      * @returns {string}   Set-Cookie header value.
      */
     issue(userId, options = {}) {
-      if (typeof userId !== 'string' || userId.length === 0) {
-        throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'trustedDevice.issue: userId is required');
-      }
+      assertNonEmptyString(userId, 'trustedDevice.issue.userId');
       const now = options.now ?? Date.now();
       // Reserved fields are written AFTER the extraClaims spread so a
       // caller-supplied (possibly user-influenced) claims object can

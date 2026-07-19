@@ -8,7 +8,7 @@
  */
 
 import { parseDuration as sharedParseDuration } from '@exortek/shared/duration';
-import { SessionError, ErrorCode } from '../errors.js';
+import { invalidArgument } from './guards.js';
 
 /**
  * Parse a duration to milliseconds. Accepts:
@@ -23,10 +23,7 @@ import { SessionError, ErrorCode } from '../errors.js';
 export function parseDuration(input, name = 'duration') {
   if (typeof input === 'number') {
     if (!Number.isFinite(input) || input <= 0 || !Number.isInteger(input)) {
-      throw new SessionError(
-        ErrorCode.INVALID_ARGUMENT,
-        `${name}: numeric duration must be a positive integer of seconds; got ${input}`,
-      );
+      throw invalidArgument(`${name}: numeric duration must be a positive integer of seconds; got ${input}`);
     }
     return input * 1000;
   }
@@ -35,19 +32,15 @@ export function parseDuration(input, name = 'duration') {
     try {
       ms = sharedParseDuration(input);
     } catch (err) {
-      throw new SessionError(
-        ErrorCode.INVALID_ARGUMENT,
+      throw invalidArgument(
         `${name}: duration string ${JSON.stringify(input)} does not parse — use '<number><ms|s|m|h|d|w>'`,
         { cause: err },
       );
     }
     if (ms <= 0) {
-      throw new SessionError(ErrorCode.INVALID_ARGUMENT, `${name}: duration must be positive; got ${input}`);
+      throw invalidArgument(`${name}: duration must be positive; got ${input}`);
     }
     return ms;
   }
-  throw new SessionError(
-    ErrorCode.INVALID_ARGUMENT,
-    `${name}: must be a positive integer of seconds or a duration string (got ${typeof input})`,
-  );
+  throw invalidArgument(`${name}: must be a positive integer of seconds or a duration string (got ${typeof input})`);
 }

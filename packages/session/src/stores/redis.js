@@ -1,6 +1,7 @@
 import { assertRedisClient } from '@exortek/shared/redis-guard';
 
 import { SessionError, ErrorCode } from '../errors.js';
+import { invalidArgument } from '../internal/guards.js';
 
 /**
  * @typedef {import('./memory.js').SessionStore} SessionStore
@@ -53,7 +54,7 @@ import { SessionError, ErrorCode } from '../errors.js';
  */
 export function redisStore(client, options = {}) {
   assertRedisClient(client, ['get', 'set', 'del'], msg => {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, `redisStore: ${msg}`);
+    throw invalidArgument(`redisStore.client: ${msg}`);
   });
   const keyPrefix = options.keyPrefix ?? 'sess:';
   const publishRevocations = options.publishRevocations === true;
@@ -266,7 +267,7 @@ export function redisStore(client, options = {}) {
 
     async put(record) {
       if (!record || typeof record.sid !== 'string') {
-        throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'redisStore.put: record.sid is required');
+        throw invalidArgument('redisStore.put.record.sid must be a string');
       }
       const ttlMs = Math.max(1, record.expiresAt - Date.now());
       await writeRecord(record, ttlMs);

@@ -4,7 +4,7 @@ import {
   serialiseDeleteCookie as sharedSerialiseDeleteCookie,
 } from '@exortek/shared/cookie';
 
-import { SessionError, ErrorCode } from './errors.js';
+import { invalidArgument } from './internal/guards.js';
 
 /**
  * @typedef {import('@exortek/shared/cookie').CookieOptions} CookieOptions
@@ -33,7 +33,7 @@ export function serialiseCookie(name, value, options) {
   try {
     return sharedSerialiseCookie(name, value, options);
   } catch (err) {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
+    throw invalidArgument(err instanceof Error ? err.message : String(err), { cause: err });
   }
 }
 
@@ -49,6 +49,6 @@ export function serialiseDeleteCookie(name, options) {
   try {
     return sharedSerialiseDeleteCookie(name, options);
   } catch (err) {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
+    throw invalidArgument(err instanceof Error ? err.message : String(err), { cause: err });
   }
 }

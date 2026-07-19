@@ -1,6 +1,7 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { SessionError, ErrorCode } from './errors.js';
+import { assertNonEmptyString, invalidArgument } from './internal/guards.js';
 
 // CSRF token derivation from a session ID + a server secret. The token
 // is deterministic given the same session — clients can safely round-trip
@@ -31,20 +32,14 @@ const MIN_SECRET_BYTES = 32;
  * @returns {string}
  */
 export function deriveCsrfToken(sessionId, secret) {
-  if (typeof sessionId !== 'string' || sessionId.length === 0) {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'deriveCsrfToken: sessionId is required');
-  }
+  assertNonEmptyString(sessionId, 'deriveCsrfToken.sessionId');
   if (typeof secret !== 'string' && !Buffer.isBuffer(secret) && !(secret instanceof Uint8Array)) {
-    throw new SessionError(
-      ErrorCode.INVALID_ARGUMENT,
-      'deriveCsrfToken: secret must be a string / Buffer / Uint8Array',
-    );
+    throw invalidArgument('deriveCsrfToken.secret must be a string / Buffer / Uint8Array');
   }
   const key = typeof secret === 'string' ? Buffer.from(secret, 'utf8') : Buffer.from(secret);
   if (key.byteLength < MIN_SECRET_BYTES) {
-    throw new SessionError(
-      ErrorCode.INVALID_ARGUMENT,
-      `deriveCsrfToken: secret must be at least ${MIN_SECRET_BYTES} bytes (got ${key.byteLength})`,
+    throw invalidArgument(
+      `deriveCsrfToken.secret must be at least ${MIN_SECRET_BYTES} bytes (got ${key.byteLength})`,
     );
   }
   return createHmac('sha256', key).update(NAMESPACE).update(sessionId).digest('base64url').slice(0, 32);
@@ -86,9 +81,7 @@ export function verifyCsrfToken(candidate, sessionId, secret) {
  * @returns {string}
  */
 export function maskCsrfToken(token) {
-  if (typeof token !== 'string' || token.length === 0) {
-    throw new SessionError(ErrorCode.INVALID_ARGUMENT, 'maskCsrfToken: token is required');
-  }
+  assertNonEmptyString(token, 'maskCsrfToken.token');
   const t = Buffer.from(token, 'utf8');
   const pad = randomBytes(t.length);
   const masked = Buffer.alloc(t.length);
