@@ -5,12 +5,13 @@
 
 import * as sb from '@exortek/shared/base64url';
 import { JwtError, ErrorCode } from './errors.js';
+import { invalidArgument } from './guards.js';
 
 export function encode(bytes) {
   try {
     return sb.encode(bytes);
   } catch (err) {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, err.message);
+    throw invalidArgument(err.message, { cause: err });
   }
 }
 
@@ -18,7 +19,7 @@ export function encodeString(text) {
   try {
     return sb.encodeString(text);
   } catch (err) {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, err.message);
+    throw invalidArgument(err.message, { cause: err });
   }
 }
 

@@ -11,6 +11,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { JwtError, ErrorCode } from './internal/errors.js';
+import { assertString } from './internal/guards.js';
 import { parseDuration } from './internal/duration.js';
 
 /**
@@ -101,9 +102,7 @@ export async function validateClaims(payload, header, options) {
     );
   }
   if (opts.subject !== undefined) {
-    if (typeof opts.subject !== 'string') {
-      throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'verify: options.subject must be a string');
-    }
+    assertString(opts.subject, 'verify.options.subject');
     if (payload.sub !== opts.subject) {
       throw new JwtError(
         ErrorCode.INVALID_SUBJECT,
@@ -158,9 +157,7 @@ export async function validateClaims(payload, header, options) {
   }
 
   if (opts.nonce !== undefined) {
-    if (typeof opts.nonce !== 'string') {
-      throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'verify: options.nonce must be a string');
-    }
+    assertString(opts.nonce, 'verify.options.nonce');
     if (payload.nonce !== opts.nonce) {
       throw new JwtError(ErrorCode.INVALID_NONCE, 'verify: token `nonce` does not match the caller-supplied value');
     }

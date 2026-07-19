@@ -9,6 +9,7 @@
 import { createMemoryStore } from './internal/memory-store.js';
 import { createRedisStore } from './internal/redis-store.js';
 import { JwtError, ErrorCode } from './internal/errors.js';
+import { invalidArgument } from './internal/guards.js';
 
 /**
  * @typedef {import('./internal/memory-store.js').Store} Store
@@ -54,14 +55,13 @@ export function createStore(kind, options) {
     case 'custom': {
       const cfg = /** @type {CustomConfig} */ (options);
       if (!cfg || typeof cfg.impl !== 'object' || cfg.impl === null) {
-        throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'createStore("custom"): options.impl must be a Store object');
+        throw invalidArgument('createStore("custom").options.impl must be a Store object');
       }
       return cfg.impl;
     }
     default:
-      throw new JwtError(
-        ErrorCode.INVALID_ARGUMENT,
-        `createStore: unknown kind ${JSON.stringify(kind)} — expected 'memory' | 'redis' | 'custom'`,
+      throw invalidArgument(
+        `createStore.kind: unknown kind ${JSON.stringify(kind)} — expected 'memory' | 'redis' | 'custom'`,
       );
   }
 }

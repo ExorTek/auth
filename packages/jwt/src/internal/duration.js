@@ -13,7 +13,7 @@
  */
 
 import { parseDuration as sharedParseDuration } from '@exortek/shared/duration';
-import { JwtError, ErrorCode } from './errors.js';
+import { invalidArgument } from './guards.js';
 
 const BARE_NUMBER_RE = /^\s*(-?\d+(?:\.\d+)?)\s*$/;
 
@@ -24,12 +24,12 @@ const BARE_NUMBER_RE = /^\s*(-?\d+(?:\.\d+)?)\s*$/;
 export function parseDuration(input) {
   if (typeof input === 'number') {
     if (!Number.isFinite(input)) {
-      throw new JwtError(ErrorCode.INVALID_ARGUMENT, `parseDuration: numeric input must be finite; got ${input}`);
+      throw invalidArgument(`parseDuration.input: numeric input must be finite; got ${input}`);
     }
     return input;
   }
   if (typeof input !== 'string') {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, `parseDuration: expected string or number; got ${typeof input}`);
+    throw invalidArgument(`parseDuration.input: expected string or number; got ${typeof input}`);
   }
   const bare = BARE_NUMBER_RE.exec(input);
   if (bare) {
@@ -38,6 +38,6 @@ export function parseDuration(input) {
   try {
     return sharedParseDuration(input) / 1000;
   } catch (err) {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
+    throw invalidArgument(err instanceof Error ? err.message : String(err), { cause: err });
   }
 }

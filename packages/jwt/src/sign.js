@@ -9,6 +9,7 @@
  */
 
 import { JwtError, ErrorCode } from './internal/errors.js';
+import { assertNonEmptyString, assertObject } from './internal/guards.js';
 import { lookup as lookupAlg } from './internal/algorithms.js';
 import { normalizeKey } from './internal/keys.js';
 import { encode as b64uEncode, encodeJson as b64uEncodeJson } from './internal/base64url.js';
@@ -48,17 +49,12 @@ import { injectClaims } from './claims.js';
  * @returns {Promise<string | SignResultMeta>}
  */
 export async function sign(payload, key, options) {
-  if (options == null || typeof options !== 'object') {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'sign: options object is required');
-  }
+  assertObject(options, 'sign.options');
   if (payload == null || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new JwtError(ErrorCode.INVALID_PAYLOAD, 'sign: payload must be a JSON object');
   }
-
+  assertNonEmptyString(options.alg, 'sign.options.alg');
   const alg = options.alg;
-  if (typeof alg !== 'string' || alg.length === 0) {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'sign: `alg` is required and must be a string');
-  }
   if (alg === 'none') {
     throw new JwtError(
       ErrorCode.ALGORITHM_NONE_FORBIDDEN,

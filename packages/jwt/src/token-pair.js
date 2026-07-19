@@ -11,6 +11,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { JwtError, ErrorCode } from './internal/errors.js';
+import { assertNonEmptyString, assertObject, invalidArgument } from './internal/guards.js';
 import { parseDuration } from './internal/duration.js';
 import { resolveHashFn, resolveEncoding, randomBuffer } from './internal/polymorphic.js';
 import { createKeyMutex } from './internal/mutex.js';
@@ -192,8 +193,9 @@ export async function rotate(oldRefreshToken, options) {
  * @returns {Promise<void>}
  */
 export async function revoke(refreshToken, options) {
-  if (options == null || typeof options !== 'object' || options.store == null) {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'revoke: options.store is required');
+  assertObject(options, 'revoke.options');
+  if (options.store == null) {
+    throw invalidArgument('revoke.options.store is required');
   }
   const hashFn = resolveHashFn(options);
   const storeKey = await hashFn(refreshToken);
@@ -206,12 +208,11 @@ export async function revoke(refreshToken, options) {
  * @returns {Promise<number>}   count of revoked records
  */
 export async function revokeAll(familyId, options) {
-  if (options == null || typeof options !== 'object' || options.store == null) {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'revokeAll: options.store is required');
+  assertObject(options, 'revokeAll.options');
+  if (options.store == null) {
+    throw invalidArgument('revokeAll.options.store is required');
   }
-  if (typeof familyId !== 'string' || familyId.length === 0) {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'revokeAll: familyId must be a non-empty string');
-  }
+  assertNonEmptyString(familyId, 'revokeAll.familyId');
   return options.store.deleteAll({ familyId });
 }
 
@@ -224,26 +225,21 @@ export const tokenPair = Object.freeze({ create, rotate, revoke, revokeAll });
  * @param {CreateOptions | RotateOptions} options
  */
 function _assertCreateOptions(options) {
-  if (options == null || typeof options !== 'object') {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'tokenPair: options object is required');
-  }
+  assertObject(options, 'tokenPair.options');
   if (!options.secret || options.secret.access === undefined || options.secret.refresh === undefined) {
-    throw new JwtError(
-      ErrorCode.INVALID_ARGUMENT,
-      'tokenPair: options.secret must be { access, refresh } (both required)',
-    );
+    throw invalidArgument('tokenPair.options.secret must be { access, refresh } (both required)');
   }
   if (!options.access || typeof options.access.alg !== 'string') {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'tokenPair: options.access.alg is required');
+    throw invalidArgument('tokenPair.options.access.alg is required');
   }
   if (!options.refresh || typeof options.refresh.alg !== 'string') {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'tokenPair: options.refresh.alg is required');
+    throw invalidArgument('tokenPair.options.refresh.alg is required');
   }
   if (options.refresh.expiresIn === undefined) {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'tokenPair: options.refresh.expiresIn is required');
+    throw invalidArgument('tokenPair.options.refresh.expiresIn is required');
   }
   if (options.refresh.store == null || typeof options.refresh.store.add !== 'function') {
-    throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'tokenPair: options.refresh.store must implement the Store shape');
+    throw invalidArgument('tokenPair.options.refresh.store must implement the Store shape');
   }
 }
 
@@ -262,7 +258,7 @@ async function _generateRefresh(refresh, payload, secret, expiresAtSec) {
   if (typeof refresh.generate === 'function') {
     const result = await refresh.generate();
     if (result == null || typeof result.plaintext !== 'string' || typeof result.storeKey !== 'string') {
-      throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'refresh.generate: must return { plaintext, storeKey } strings');
+      throw invalidArgument('refresh.generate: must return { plaintext, storeKey } strings');
     }
     return result;
   }
@@ -278,7 +274,7 @@ async function _generateRefresh(refresh, payload, secret, expiresAtSec) {
   } else {
     const size = refresh.tokenSize ?? 32;
     if (typeof size !== 'number' || size < 1 || !Number.isFinite(size)) {
-      throw new JwtError(ErrorCode.INVALID_ARGUMENT, 'refresh.tokenSize must be a positive integer');
+      throw invalidArgument('refresh.tokenSize must be a positive integer');
     }
     const encoder = resolveEncoding(refresh.encoding);
     plaintext = encoder(randomBuffer(size));
