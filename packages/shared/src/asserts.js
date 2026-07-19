@@ -1,22 +1,41 @@
 /**
  * Imperative single-argument guard helpers — the everyday
- * `assertPositiveInt(x, 'options.iterations')` shape used at API
- * boundaries. Companion to the compound schema builder in
+ * `assertPositiveInt(x, 'name')` shape used at API boundaries.
+ * Companion to the compound schema builder in
  * `@exortek/shared/validate`: **schema** for whole options objects,
  * **asserts** for one-liner argument guards at the call site.
  *
- * The consumer-facing surface is {@link bindAsserts}: each package
- * binds the full assert set to its own typed error class once (in
- * `internal/guards.js`), so every argument failure throws that
- * package's class — `err instanceof CryptoError` holds and users see
- * at a glance which package raised the error. The bound `parse`
- * bridges `@exortek/shared/validate` schemas to the same error class.
+ * The consumer surface is {@link defineGuards} (or the raw
+ * {@link bindAsserts} for full control). Each package binds the assert
+ * set to its own typed error class once (in `internal/guards.js`), so
+ * every argument failure throws that package's class —
+ * `err instanceof CryptoError` holds and users see at a glance which
+ * package raised the error. The bound `parse` bridges
+ * `@exortek/shared/validate` schemas to the same error class.
+ *
+ * **Path naming convention** (used as the `name` argument):
+ *
+ *   `<publicFunction>[.options|.config][.<field>]`
+ *
+ *   - `assertString(name, 'createUser.name')`          — top-level arg
+ *   - `assertPositiveInt(n, 'scrypt.options.r')`       — nested option
+ *   - `assertBytesOrString(pwd, 'pepper.wrap.password')` — method arg
+ *
+ * Keep the path short: the emitted error is `"<name> must be <desc>"`,
+ * so a stack-line grep already tells the caller which function fired.
+ * Reserve `hint` for actionable follow-ups ("pass the bytes returned by
+ * encryptSymmetric()"), not for restating the field.
  */
 
 /**
- * @typedef {(message: string) => Error} WrapFn
+ * @typedef {{ cause?: unknown }} WrapExtra
+ *   Extra options forwarded to the wrap function, so `invalidArgument`
+ *   sites that catch an underlying error can preserve the `cause` chain
+ *   without falling back to a raw `new PackageError(...)`.
+ *
+ * @typedef {(message: string, extra?: WrapExtra) => Error} WrapFn
  *   Constructs (never throws) the binding package's error, e.g.
- *   `(m) => new CryptoError(ErrorCode.INVALID_ARGUMENT, m)`.
+ *   `(m, { cause } = {}) => new CryptoError(ErrorCode.INVALID_ARGUMENT, m, { cause })`.
  *
  * @typedef {{ hint?: string }} AssertOptions
  *   `hint` is appended to the message after an em-dash — use it for
@@ -85,13 +104,16 @@ export function bindAsserts(wrap) {
      * Construct (not throw) the bound error with a free-form message —
      * for `throw g.invalidArgument('…')` sites that don't fit the
      * `X must be Y` shape (canonicalisation errors, cross-field
-     * constraint failures).
+     * constraint failures). Pass `{ cause }` when the argument-shape
+     * failure was triggered by an underlying throw whose chain matters
+     * (e.g. `JSON.stringify` on a bigint).
      *
      * @param {string} msg
+     * @param {WrapExtra} [extra]
      * @returns {Error}
      */
-    invalidArgument(msg) {
-      return wrap(msg);
+    invalidArgument(msg, extra) {
+      return wrap(msg, extra);
     },
 
     /**
@@ -263,4 +285,28 @@ export function bindAsserts(wrap) {
       }
     },
   };
+}
+
+/**
+ * One-line sugar over {@link bindAsserts} — the overwhelmingly common
+ * pattern where a package binds every argument-shape failure to its
+ * own error class + `INVALID_ARGUMENT` code. Emits the standard
+ * `new ErrorClass(code, message, { cause })` shape, so the underlying
+ * `BaseError` `{ cause, status, details }` options object is respected.
+ *
+ *   // packages/<pkg>/src/internal/guards.js
+ *   import { defineGuards } from '@exortek/shared/asserts';
+ *   import { PasswordError, ErrorCode } from '../errors.js';
+ *
+ *   export const { assertString, invalidArgument, parse } =
+ *     defineGuards(PasswordError, ErrorCode.INVALID_ARGUMENT);
+ *
+ * Reach for the raw {@link bindAsserts} when you need a different
+ * mapping (an alt code, a decorated message) — it stays available.
+ *
+ * @param {new (code: string, message: string, options?: { cause?: unknown }) => Error} ErrorClass
+ * @param {string} code
+ */
+export function defineGuards(ErrorClass, code) {
+  return bindAsserts((message, extra) => new ErrorClass(code, message, extra));
 }

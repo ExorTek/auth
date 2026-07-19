@@ -1,18 +1,18 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bindAsserts } from '../src/asserts.js';
+import { bindAsserts, defineGuards } from '../src/asserts.js';
 import { object, string, number, optional } from '../src/validate.js';
 
 class FakePackageError extends Error {
-  constructor(message) {
-    super(message);
+  constructor(code, message, options) {
+    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
     this.name = 'FakePackageError';
-    this.code = 'INVALID_ARGUMENT';
+    this.code = code;
   }
 }
 
-const g = bindAsserts(m => new FakePackageError(m));
+const g = bindAsserts((m, extra) => new FakePackageError('INVALID_ARGUMENT', m, extra));
 
 describe('bindAsserts — error identity', () => {
   test('failures throw the bound class, not plain Error', () => {
@@ -36,6 +36,39 @@ describe('bindAsserts — error identity', () => {
     const err = g.invalidArgument('free-form message');
     assert.ok(err instanceof FakePackageError);
     assert.equal(err.message, 'free-form message');
+  });
+
+  test('invalidArgument propagates { cause } to the bound error', () => {
+    const cause = new SyntaxError('bad json');
+    const err = g.invalidArgument('payload is not JSON-serialisable', { cause });
+    assert.ok(err instanceof FakePackageError);
+    assert.equal(err.cause, cause);
+  });
+});
+
+describe('defineGuards — one-line binding sugar', () => {
+  const dg = defineGuards(FakePackageError, 'INVALID_ARGUMENT');
+
+  test('returns the same surface as bindAsserts', () => {
+    assert.equal(typeof dg.assertString, 'function');
+    assert.equal(typeof dg.invalidArgument, 'function');
+    assert.equal(typeof dg.parse, 'function');
+  });
+
+  test('failures throw the bound class with the given code', () => {
+    try {
+      dg.assertString(42, 'x');
+      assert.fail('should have thrown');
+    } catch (err) {
+      assert.ok(err instanceof FakePackageError);
+      assert.equal(err.code, 'INVALID_ARGUMENT');
+    }
+  });
+
+  test('invalidArgument through defineGuards also carries cause', () => {
+    const cause = new Error('root');
+    const err = dg.invalidArgument('wrapping', { cause });
+    assert.equal(err.cause, cause);
   });
 });
 
