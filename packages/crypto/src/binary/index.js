@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
 import { toBuffer } from '../internal/bytes.js';
+import { assertBytes } from '../internal/guards.js';
 
 /**
  * @typedef {string | Buffer | Uint8Array} BytesInput
@@ -71,12 +72,7 @@ export function xor(a, b) {
  * wipe(key)  // hint the GC / signal intent that this is spent
  */
 export function wipe(buf) {
-  if (!Buffer.isBuffer(buf) && !(buf instanceof Uint8Array)) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
-      `wipe target must be a Buffer or Uint8Array (strings are immutable — nothing to wipe); got ${typeof buf}`,
-    );
-  }
+  assertBytes(buf, 'wipe target', { hint: 'strings are immutable — nothing to wipe' });
   buf.fill(0);
 }
 

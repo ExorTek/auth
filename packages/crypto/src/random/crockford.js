@@ -1,6 +1,6 @@
 import { bytes } from './bytes.js';
 import { CROCKFORD } from '../internal/alphabets.js';
-import { assertNonNegativeInt } from '@exortek/shared/asserts';
+import { assertNonNegativeInt } from '../internal/guards.js';
 
 /**
  * Crockford base32 random string (ULID-style).

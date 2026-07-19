@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertEncoding, assertOptionalObject } from '@exortek/shared/asserts';
+import { assertEncoding, assertOptionalObject } from '../internal/guards.js';
 import { assertKeyObject } from '../internal/validate.js';
 
 /**

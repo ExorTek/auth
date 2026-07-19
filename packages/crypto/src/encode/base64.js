@@ -1,5 +1,5 @@
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertString } from '@exortek/shared/asserts';
+import { assertNonNegativeInt, assertString } from '../internal/guards.js';
 import { toBuffer } from '../internal/bytes.js';
 import crypto from 'node:crypto';
 
@@ -52,9 +52,6 @@ export function decode(input) {
 }
 
 export function randomBase64(size) {
-  if (size < 0) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, 'size must be a non-negative integer');
-  }
-
+  assertNonNegativeInt(size, 'size');
   return crypto.randomBytes(size).toString('base64');
 }

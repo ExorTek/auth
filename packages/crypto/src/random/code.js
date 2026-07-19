@@ -1,4 +1,4 @@
-import { assertString } from '@exortek/shared/asserts';
+import { assertString } from '../internal/guards.js';
 import { CryptoError, ErrorCode } from '../errors.js';
 import { biasFreeSample } from '../internal/sample.js';
 import { ALPHANUM, DIGITS, LOWER, UPPER } from '../internal/alphabets.js';

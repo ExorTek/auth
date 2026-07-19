@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertObject, assertOptionalObject } from '@exortek/shared/asserts';
+import { assertBytes, assertBytesOrString, assertObject, assertOptionalObject } from '../internal/guards.js';
 import { toBuffer } from '../internal/bytes.js';
 import { encryptAsymmetric, decryptAsymmetric } from './asymmetric.js';
 
@@ -85,12 +85,9 @@ export function encryptHybrid(data, publicKey, options) {
 export function decryptHybrid(envelope, privateKey, options) {
   assertObject(envelope, 'envelope');
   for (const field of ['encryptedKey', 'iv', 'tag', 'ciphertext']) {
-    if (!(envelope[field] instanceof Uint8Array)) {
-      throw new CryptoError(
-        ErrorCode.INVALID_ARGUMENT,
-        `envelope.${field} must be a Buffer/Uint8Array — pass the same object shape returned by encryptHybrid(): { encryptedKey, iv, tag, ciphertext }`,
-      );
-    }
+    assertBytes(envelope[field], `envelope.${field}`, {
+      hint: 'pass the same object shape returned by encryptHybrid(): { encryptedKey, iv, tag, ciphertext }',
+    });
   }
   assertOptionalObject(options, 'options');
   const algo = options?.algo ?? 'rsa-oaep-256';

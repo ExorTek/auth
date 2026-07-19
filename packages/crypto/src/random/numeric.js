@@ -1,6 +1,6 @@
 import { biasFreeSample } from '../internal/sample.js';
 import { DIGITS } from '../internal/alphabets.js';
-import { assertPositiveInt } from '@exortek/shared/asserts';
+import { assertPositiveInt } from '../internal/guards.js';
 
 /**
  * Bias-free numeric random string.

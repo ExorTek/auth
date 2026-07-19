@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertObject, assertString } from '@exortek/shared/asserts';
+import { assertBytes, assertBytesOrString, assertObject, assertString } from '../internal/guards.js';
 
 import { assertKeyObject } from '../internal/validate.js';
 import { toBuffer } from '../internal/bytes.js';
@@ -107,26 +107,19 @@ export function encryptSymmetric(data, key, options) {
  * decryptSymmetric(ct, key, { iv, tag, aad: `user:${userId}` })
  */
 export function decryptSymmetric(ciphertext, key, options) {
-  if (!(ciphertext instanceof Uint8Array)) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
-      'ciphertext must be a Buffer or Uint8Array — the raw bytes produced by encryptSymmetric().ciphertext. For a base64url string, use decryptFromString() instead.',
-    );
-  }
+  assertBytes(ciphertext, 'ciphertext', {
+    hint: 'the raw bytes produced by encryptSymmetric().ciphertext. For a base64url string, use decryptFromString() instead.',
+  });
   assertKeyObject(key, 'secret', 'symmetric key');
   assertObject(options, 'options');
   const spec = _resolveSymmetric(options);
-  if (!(options.iv instanceof Uint8Array)) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
-      `options.iv is required and must be a Buffer — pass the iv returned from encryptSymmetric() (${spec.spec.ivLength} bytes for ${spec.algo})`,
-    );
-  }
-  if (spec.spec.mode === 'aead' && !(options.tag instanceof Uint8Array)) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
-      `options.tag is required for AEAD mode ${spec.algo} — pass the tag returned from encryptSymmetric() (${spec.spec.tagLength} bytes)`,
-    );
+  assertBytes(options.iv, 'options.iv', {
+    hint: `pass the iv returned from encryptSymmetric() (${spec.spec.ivLength} bytes for ${spec.algo})`,
+  });
+  if (spec.spec.mode === 'aead') {
+    assertBytes(options.tag, 'options.tag', {
+      hint: `required for AEAD mode ${spec.algo} — pass the tag returned from encryptSymmetric() (${spec.spec.tagLength} bytes)`,
+    });
   }
   if (options.aad !== undefined) {
     assertBytesOrString(options.aad, 'options.aad');

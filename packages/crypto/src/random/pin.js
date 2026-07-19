@@ -1,4 +1,4 @@
-import { assertObject, assertPositiveInt } from '@exortek/shared/asserts';
+import { assertObject, assertPositiveInt } from '../internal/guards.js';
 import { numeric } from './numeric.js';
 
 /**

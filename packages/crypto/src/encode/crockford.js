@@ -1,6 +1,6 @@
 import * as sc from '@exortek/shared/crockford';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertString } from '@exortek/shared/asserts';
+import { assertString } from '../internal/guards.js';
 import { toBuffer } from '../internal/bytes.js';
 
 /**

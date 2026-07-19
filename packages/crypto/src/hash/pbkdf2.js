@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertEncoding, assertOptionalObject, assertPositiveInt } from '@exortek/shared/asserts';
+import { assertBytesOrString, assertEncoding, assertOptionalObject, assertPositiveInt } from '../internal/guards.js';
 import { toBuffer } from '../internal/bytes.js';
 
 const pbkdf2Async = promisify(crypto.pbkdf2);

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertString, assertUint48 } from '@exortek/shared/asserts';
+import { assertString, assertUint48 } from '../internal/guards.js';
 import { toBuffer } from '../internal/bytes.js';
 import { hash } from '../hash/hash.js';
 import { decode as hexDecode } from '../encode/hex.js';

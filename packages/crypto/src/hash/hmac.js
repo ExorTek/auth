@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { assertBytesOrString } from '@exortek/shared/asserts';
+import { assertBytesOrString } from '../internal/guards.js';
 import { _resolveOptions } from './hash.js';
 
 /**

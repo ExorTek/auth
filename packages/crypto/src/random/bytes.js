@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { assertNonNegativeInt } from '@exortek/shared/asserts';
+import { assertNonNegativeInt } from '../internal/guards.js';
 
 /**
  * Cryptographically secure random byte sequence.

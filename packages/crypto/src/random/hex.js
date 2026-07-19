@@ -1,5 +1,5 @@
 import { bytes } from './bytes.js';
-import { assertNonNegativeInt } from '@exortek/shared/asserts';
+import { assertNonNegativeInt } from '../internal/guards.js';
 
 /**
  * Hex-encoded random string.

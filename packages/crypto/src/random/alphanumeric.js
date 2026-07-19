@@ -1,4 +1,4 @@
-import { assertPositiveInt } from '@exortek/shared/asserts';
+import { assertPositiveInt } from '../internal/guards.js';
 import { biasFreeSample } from '../internal/sample.js';
 import { ALPHANUM } from '../internal/alphabets.js';
 

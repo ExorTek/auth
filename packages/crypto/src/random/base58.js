@@ -1,6 +1,6 @@
 import { bytes } from './bytes.js';
 import { encode } from '../encode/base58.js';
-import { assertNonNegativeInt } from '@exortek/shared/asserts';
+import { assertNonNegativeInt } from '../internal/guards.js';
 
 /**
  * Bitcoin base58 random string.

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertObject } from '@exortek/shared/asserts';
+import { assertBytes, assertObject } from '../internal/guards.js';
 
 import { assertKeyObject } from '../internal/validate.js';
 import { toBuffer } from '../internal/bytes.js';
@@ -69,12 +69,7 @@ export function encryptAsymmetric(data, publicKey, options) {
  * const plaintext = decryptAsymmetric(enc, privateKey, { algo: 'rsa-oaep-256' })
  */
 export function decryptAsymmetric(ciphertext, privateKey, options) {
-  if (!(ciphertext instanceof Uint8Array)) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
-      'ciphertext must be a Buffer or Uint8Array — pass the exact bytes returned by encryptAsymmetric().',
-    );
-  }
+  assertBytes(ciphertext, 'ciphertext', { hint: 'pass the exact bytes returned by encryptAsymmetric().' });
   assertObject(options, 'options');
   const spec = _resolveAsymmetric(options);
   assertKeyObject(privateKey, 'private', 'privateKey');

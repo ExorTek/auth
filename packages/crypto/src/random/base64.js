@@ -1,5 +1,5 @@
 import { bytes } from './bytes.js';
-import { assertNonNegativeInt } from '@exortek/shared/asserts';
+import { assertNonNegativeInt } from '../internal/guards.js';
 
 /**
  * Standard base64 random string (RFC 4648 §4), with `=` padding.

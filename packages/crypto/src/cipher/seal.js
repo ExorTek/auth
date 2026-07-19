@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertOptionalObject } from '@exortek/shared/asserts';
+import { assertBytesOrString, assertOptionalObject, invalidArgument } from '../internal/guards.js';
 import { hkdf } from '../hash/hkdf.js';
 import { toBuffer } from '../internal/bytes.js';
 
@@ -82,23 +82,18 @@ export function seal(payload, secret, options) {
   assertBytesOrString(secret, 'secret');
   assertOptionalObject(options, 'options');
   if (options === undefined || options.ttl === undefined) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
+    throw invalidArgument(
       "options.ttl is required — pass either a positive integer of seconds or a duration string like '1h' / '15m' / '7d'",
     );
   }
   const ttlMs = _parseTtl(options.ttl);
   const now = options.now ?? Date.now();
   if (!Number.isFinite(now) || now < 0) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
-      `options.now must be a non-negative finite number (ms since epoch); got ${_describe(now)}`,
-    );
+    throw invalidArgument(`options.now must be a non-negative finite number (ms since epoch); got ${_describe(now)}`);
   }
   const expiresAt = now + ttlMs;
   if (!Number.isSafeInteger(expiresAt)) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
+    throw invalidArgument(
       `expiry (now + ttl) exceeds Number.MAX_SAFE_INTEGER — pick a shorter ttl or a smaller now (got ${now} + ${ttlMs})`,
     );
   }
@@ -164,10 +159,7 @@ export function unseal(token, secret, options) {
   }
   const secrets = Array.isArray(secret) ? secret : [secret];
   if (secrets.length === 0) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
-      'secret list is empty — pass at least one key (or an array of keys for rotation)',
-    );
+    throw invalidArgument('secret list is empty — pass at least one key (or an array of keys for rotation)');
   }
   for (const s of secrets) {
     assertBytesOrString(s, 'secret');
@@ -244,6 +236,8 @@ function _serialise(payload) {
   try {
     s = JSON.stringify(payload);
   } catch (cause) {
+    // Keep the CryptoError shape — this branch carries a cause chain
+    // and the bound `invalidArgument` doesn't (yet) surface `{ cause }`.
     throw new CryptoError(
       ErrorCode.INVALID_ARGUMENT,
       'payload is not JSON-serialisable — remove BigInt, cyclic references, or non-plain objects before sealing',
@@ -251,8 +245,7 @@ function _serialise(payload) {
     );
   }
   if (s === undefined) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
+    throw invalidArgument(
       'payload serialises to undefined — the root value is undefined, a function, or a symbol. Wrap it in an object: seal({ value: yourPayload }, secret, { ttl })',
     );
   }
@@ -320,8 +313,7 @@ function _deriveKey(secret) {
 function _parseTtl(ttl) {
   if (typeof ttl === 'number') {
     if (!Number.isFinite(ttl) || ttl <= 0 || !Number.isSafeInteger(ttl)) {
-      throw new CryptoError(
-        ErrorCode.INVALID_ARGUMENT,
+      throw invalidArgument(
         `options.ttl (number) must be a positive integer of seconds; got ${ttl}. For sub-second granularity use a duration string like '500ms'.`,
       );
     }
@@ -330,19 +322,17 @@ function _parseTtl(ttl) {
   if (typeof ttl === 'string') {
     const m = DURATION_RE.exec(ttl);
     if (!m) {
-      throw new CryptoError(
-        ErrorCode.INVALID_ARGUMENT,
+      throw invalidArgument(
         `options.ttl string ${JSON.stringify(ttl)} does not parse — use '<number><ms|s|m|h|d|w>' (e.g. '500ms', '15m', '1h', '24h', '7d', '2w'). No spaces, no fractional numbers, unit is required.`,
       );
     }
     const n = Number(m[1]);
     if (n <= 0) {
-      throw new CryptoError(ErrorCode.INVALID_ARGUMENT, `options.ttl duration must be positive; got ${ttl}`);
+      throw invalidArgument(`options.ttl duration must be positive; got ${ttl}`);
     }
     return n * DURATION_UNITS[m[2]];
   }
-  throw new CryptoError(
-    ErrorCode.INVALID_ARGUMENT,
+  throw invalidArgument(
     `options.ttl must be a positive number of seconds or a duration string ('1h', '24h', '7d'); got ${_describe(ttl)}`,
   );
 }

@@ -1,4 +1,4 @@
-import { CryptoError, ErrorCode } from '../errors.js';
+import { invalidArgument } from './guards.js';
 
 /**
  * Coerce `value` (string / Buffer / Uint8Array) into a `Buffer`, throwing a
@@ -22,7 +22,7 @@ export function toBuffer(value, name) {
   if (value instanceof Uint8Array) {
     return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
   }
-  throw new CryptoError(ErrorCode.INVALID_ARGUMENT, `${name} must be a string or Buffer`);
+  throw invalidArgument(`${name} must be a string or Buffer`);
 }
 
 /**
@@ -46,5 +46,5 @@ export function toBufferWithEncoding(value, name, encoding) {
   if (typeof value === 'string') {
     return Buffer.from(value, encoding);
   }
-  throw new CryptoError(ErrorCode.INVALID_ARGUMENT, `${name} must be a string or Buffer`);
+  throw invalidArgument(`${name} must be a string or Buffer`);
 }

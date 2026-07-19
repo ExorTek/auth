@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { assertUint48 } from '@exortek/shared/asserts';
+import { assertUint48 } from '../internal/guards.js';
 import { CROCKFORD as ALPHABET } from '../internal/alphabets.js';
 
 /** Matches a 26-char ULID, case-insensitive. Character class excludes `I`, `L`, `O`, `U`. */

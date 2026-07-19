@@ -1,4 +1,4 @@
-import { CryptoError, ErrorCode } from '../errors.js';
+import { invalidArgument } from '../internal/guards.js';
 import { hash } from './hash.js';
 
 /**
@@ -62,10 +62,7 @@ function _canonicalize(value, seen, path) {
   }
   if (t === 'number') {
     if (!Number.isFinite(value)) {
-      throw new CryptoError(
-        ErrorCode.INVALID_ARGUMENT,
-        `${path} is a non-finite number (NaN / Infinity); not hashable`,
-      );
+      throw invalidArgument(`${path} is a non-finite number (NaN / Infinity); not hashable`);
     }
     // JSON.stringify emits ECMAScript ToString for numbers, matching RFC 8785.
     return JSON.stringify(value);
@@ -74,26 +71,20 @@ function _canonicalize(value, seen, path) {
     return JSON.stringify(value);
   }
   if (t === 'bigint') {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
-      `${path} is a bigint; JSON has no bigint representation. Convert to string first.`,
-    );
+    throw invalidArgument(`${path} is a bigint; JSON has no bigint representation. Convert to string first.`);
   }
   if (t === 'symbol' || t === 'function' || t === 'undefined') {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, `${path} is a ${t}; not hashable`);
+    throw invalidArgument(`${path} is a ${t}; not hashable`);
   }
   // From here: object-like.
   if (seen.has(value)) {
-    throw new CryptoError(ErrorCode.INVALID_ARGUMENT, `${path} contains a cyclic reference`);
+    throw invalidArgument(`${path} contains a cyclic reference`);
   }
   seen.add(value);
   // Reject bytes before .toJSON — Buffer's .toJSON returns `{ type, data: [...] }`
   // which would silently produce a stable but surprising fingerprint.
   if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
-      `${path} is a Buffer/Uint8Array; encode as base64/hex first for a stable fingerprint`,
-    );
+    throw invalidArgument(`${path} is a Buffer/Uint8Array; encode as base64/hex first for a stable fingerprint`);
   }
   if (typeof value.toJSON === 'function') {
     return _canonicalize(value.toJSON(path), seen, path);

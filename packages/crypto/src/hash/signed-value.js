@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
-import { assertBytesOrString, assertOptionalObject, assertString } from '@exortek/shared/asserts';
+import { assertBytesOrString, assertOptionalObject, assertString } from '../internal/guards.js';
 
 /**
  * @typedef {object} SignedValueOptions
