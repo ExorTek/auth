@@ -9,6 +9,7 @@ export {
   bearer,
   checkOrigin,
   webhookVerify,
+  webhookVerifyStripe,
   sanitizeBody,
   sanitizeParams,
   safeJoin,

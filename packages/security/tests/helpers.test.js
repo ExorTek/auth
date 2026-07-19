@@ -9,6 +9,7 @@ import {
   bearer,
   checkOrigin,
   webhookVerify,
+  webhookVerifyStripe,
   sanitizeBody,
   sanitizeParams,
   safeJoin,
@@ -171,6 +172,93 @@ test('webhookVerify: rejects algorithms outside the allowlist', () => {
       err => err instanceof SecurityError && err.code === ErrorCode.INVALID_ARGUMENT && /sha256.*sha512/.test(err.message),
     );
   }
+});
+
+// webhookVerifyStripe
+
+function stripeSign(payload, secret, t = 1_700_000_000) {
+  const signed = `${t}.${payload}`;
+  const v1 = createHmac('sha256', secret).update(signed).digest('hex');
+  return { t, v1, header: `t=${t},v1=${v1}` };
+}
+
+test('webhookVerifyStripe: accepts a fresh valid envelope', () => {
+  const secret = 'whsec_'.padEnd(40, 'x');
+  const { t, header } = stripeSign('body', secret);
+  assert.equal(webhookVerifyStripe('body', header, secret, { now: t }), true);
+});
+
+test('webhookVerifyStripe: within tolerance window', () => {
+  const secret = 'whsec_'.padEnd(40, 'x');
+  const { t, header } = stripeSign('body', secret);
+  // Default tolerance = 300s; ±299s must pass.
+  assert.equal(webhookVerifyStripe('body', header, secret, { now: t + 299 }), true);
+  assert.equal(webhookVerifyStripe('body', header, secret, { now: t - 299 }), true);
+});
+
+test('webhookVerifyStripe: outside tolerance window fails', () => {
+  const secret = 'whsec_'.padEnd(40, 'x');
+  const { t, header } = stripeSign('body', secret);
+  assert.equal(webhookVerifyStripe('body', header, secret, { now: t + 301 }), false);
+  assert.equal(webhookVerifyStripe('body', header, secret, { now: t - 301 }), false);
+});
+
+test('webhookVerifyStripe: custom tolerance', () => {
+  const secret = 'whsec_'.padEnd(40, 'x');
+  const { t, header } = stripeSign('body', secret);
+  assert.equal(webhookVerifyStripe('body', header, secret, { tolerance: 10, now: t + 5 }), true);
+  assert.equal(webhookVerifyStripe('body', header, secret, { tolerance: 10, now: t + 11 }), false);
+});
+
+test('webhookVerifyStripe: rejects tampered signature', () => {
+  const secret = 'whsec_'.padEnd(40, 'x');
+  const { t, header } = stripeSign('body', secret);
+  const tampered = header.replace(/v1=[0-9a-f]+/, 'v1=' + '0'.repeat(64));
+  assert.equal(webhookVerifyStripe('body', tampered, secret, { now: t }), false);
+});
+
+test('webhookVerifyStripe: rejects tampered payload', () => {
+  const secret = 'whsec_'.padEnd(40, 'x');
+  const { t, header } = stripeSign('body', secret);
+  assert.equal(webhookVerifyStripe('altered', header, secret, { now: t }), false);
+});
+
+test('webhookVerifyStripe: header missing t or v1 fails without throwing', () => {
+  const secret = 'whsec_'.padEnd(40, 'x');
+  const { v1 } = stripeSign('body', secret);
+  assert.equal(webhookVerifyStripe('body', `v1=${v1}`, secret), false);
+  assert.equal(webhookVerifyStripe('body', 't=1700000000', secret), false);
+  assert.equal(webhookVerifyStripe('body', '', secret), false);
+});
+
+test('webhookVerifyStripe: multiple v1 candidates + secret rotation', () => {
+  const [oldSecret, newSecret] = ['old_' + 'x'.repeat(36), 'new_' + 'x'.repeat(36)];
+  const t = 1_700_000_000;
+  const oldV1 = createHmac('sha256', oldSecret).update(`${t}.body`).digest('hex');
+  const newV1 = createHmac('sha256', newSecret).update(`${t}.body`).digest('hex');
+  const header = `t=${t},v1=${oldV1},v1=${newV1}`;
+  // Either secret verifies (rotation).
+  assert.equal(webhookVerifyStripe('body', header, oldSecret, { now: t }), true);
+  assert.equal(webhookVerifyStripe('body', header, newSecret, { now: t }), true);
+  // Array-form secret rotation also verifies.
+  assert.equal(webhookVerifyStripe('body', header, [oldSecret, newSecret], { now: t }), true);
+});
+
+test('webhookVerifyStripe: ignores unknown keys and legacy v0', () => {
+  const secret = 'whsec_'.padEnd(40, 'x');
+  const { t, v1 } = stripeSign('body', secret);
+  const header = `t=${t},v0=deadbeef,v1=${v1},unknown=whatever`;
+  assert.equal(webhookVerifyStripe('body', header, secret, { now: t }), true);
+});
+
+test('webhookVerifyStripe: rejects invalid options', () => {
+  const secret = 'whsec_'.padEnd(40, 'x');
+  const { header } = stripeSign('body', secret);
+  assert.throws(() => webhookVerifyStripe('body', header, secret, { tolerance: 0 }), SecurityError);
+  assert.throws(() => webhookVerifyStripe('body', header, secret, { tolerance: -1 }), SecurityError);
+  assert.throws(() => webhookVerifyStripe('body', header, secret, { tolerance: NaN }), SecurityError);
+  assert.throws(() => webhookVerifyStripe('body', header, []), SecurityError);
+  assert.throws(() => webhookVerifyStripe('body', header, [null]), SecurityError);
 });
 
 // sanitizeBody

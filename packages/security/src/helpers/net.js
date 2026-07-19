@@ -166,11 +166,9 @@ export function checkOrigin(req, options) {
  * comma-separated candidates are accepted, and any candidate that
  * matches wins.
  *
- * **Deliberately NOT covered:** Stripe-style timestamped envelopes
- * (`t=<ts>,v1=<hex>`). Verifying those correctly requires a
- * `tolerance` window against a replay attacker who resubmits the
- * exact envelope, which is a separate feature — this helper's job
- * is the HMAC comparison, not the freshness policy.
+ * For Stripe-style timestamped envelopes (`t=<ts>,v1=<hex>`) use
+ * {@link webhookVerifyStripe} — those need a replay-tolerance window
+ * this helper deliberately does not enforce.
  *
  * @param {string | Buffer} payload    Raw request body — DO NOT stringify JSON first.
  * @param {string} signatureHeader     Value from the incoming signature header.
@@ -222,6 +220,98 @@ export function webhookVerify(payload, signatureHeader, secret, options = {}) {
     }
     if (timingSafeEqual(actual, expected)) {
       return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Verify a Stripe-style timestamped webhook envelope (constant-time
+ * HMAC + replay-tolerance window).
+ *
+ * The header is a comma-separated list of `key=value` pairs:
+ *
+ *   `t=1614265636,v1=<hex>,v0=<hex>`
+ *
+ * where `t` is a Unix timestamp in **seconds**, `v1` is the HMAC-SHA-256
+ * of `${t}.${payload}` (Stripe's current scheme, and what this helper
+ * checks), and `v0` is the legacy scheme (this helper ignores it).
+ * Multiple `v1=<hex>` entries are accepted — Stripe rotates secrets by
+ * signing with several at once.
+ *
+ * The signature check is timing-safe; a stale timestamp fails without
+ * running the HMAC compare (freshness gates freshness, not signature
+ * validity).
+ *
+ * @param {string | Buffer} payload    Raw request body — DO NOT stringify JSON first.
+ * @param {string} signatureHeader     Stripe's `Stripe-Signature` header value.
+ * @param {string | Buffer | Array<string | Buffer>} secret
+ *   Endpoint signing secret (or array of secrets for rotation). Any
+ *   candidate that matches wins.
+ * @param {{ tolerance?: number, now?: number }} [options]
+ *   `tolerance` — allowed clock skew in **seconds**. Default 300s
+ *   (Stripe's own recommendation). Both past and future skew are
+ *   checked so a clock drift on either side rejects the same way.
+ *   `now` — override for tests. Unix seconds.
+ * @returns {boolean}
+ */
+export function webhookVerifyStripe(payload, signatureHeader, secret, options = {}) {
+  if (typeof signatureHeader !== 'string' || signatureHeader.length === 0) {
+    return false;
+  }
+  const secrets = Array.isArray(secret) ? secret : [secret];
+  if (secrets.length === 0) {
+    throw invalidArgument('webhookVerifyStripe.secret must be a non-empty string / Buffer, or a non-empty array');
+  }
+  for (const s of secrets) {
+    if (!s || (typeof s !== 'string' && !Buffer.isBuffer(s))) {
+      throw invalidArgument('webhookVerifyStripe.secret entries must be non-empty strings or Buffers');
+    }
+  }
+  const tolerance = options.tolerance ?? 300;
+  if (typeof tolerance !== 'number' || !Number.isFinite(tolerance) || tolerance <= 0) {
+    throw invalidArgument(`webhookVerifyStripe.options.tolerance must be a positive finite number; got ${tolerance}`);
+  }
+
+  // Parse the envelope. `t` and `v1` are what matter; unknown keys and
+  // legacy `v0` are ignored.
+  let timestamp = null;
+  const signatures = [];
+  for (const raw of signatureHeader.split(',')) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq);
+    const value = trimmed.slice(eq + 1);
+    if (key === 't' && /^\d+$/.test(value)) {
+      timestamp = Number(value);
+    } else if (key === 'v1' && /^[0-9a-fA-F]+$/.test(value)) {
+      signatures.push(value);
+    }
+  }
+  if (timestamp === null || signatures.length === 0) {
+    return false;
+  }
+  const now = options.now ?? Math.floor(Date.now() / 1000);
+  if (Math.abs(now - timestamp) > tolerance) {
+    return false;
+  }
+
+  // Signed payload is `${t}.${body}` — same for every candidate secret.
+  const signedPayload = Buffer.concat([Buffer.from(`${timestamp}.`, 'utf8'), Buffer.isBuffer(payload) ? payload : Buffer.from(payload, 'utf8')]);
+  for (const s of secrets) {
+    const expected = createHmac('sha256', s).update(signedPayload).digest();
+    for (const sig of signatures) {
+      let actual;
+      try {
+        actual = Buffer.from(sig, 'hex');
+      } catch {
+        continue;
+      }
+      if (timingSafeEqual(actual, expected)) {
+        return true;
+      }
     }
   }
   return false;
