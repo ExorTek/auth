@@ -48,6 +48,8 @@ Thumbs.db
 skills-lock.json
 ARCHITECTURE-local.md
 CLAUDE.md
+PLAN.md
+REPORT.md
 /scripts/setup-labels.sh
 /scripts/deprecate.sh
 
