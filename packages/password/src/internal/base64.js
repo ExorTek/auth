@@ -1,13 +1,5 @@
-// PHC strings use unpadded base64 (RFC 7468 §4 without the '=' terminators).
-// Node's Buffer 'base64' encoding always pads on emit — strip it. Decode
-// tolerates padding, so we just accept whatever the input has.
+// PHC strings use unpadded base64 — thin re-export of the shared
+// codec so the same names (`b64Encode` / `b64Decode`) stay usable
+// across the algorithm files (argon2, scrypt, pbkdf2, phc.js).
 
-/** @param {Buffer | Uint8Array} bytes */
-export function b64Encode(bytes) {
-  return Buffer.from(bytes).toString('base64').replace(/=+$/, '');
-}
-
-/** @param {string} s */
-export function b64Decode(s) {
-  return Buffer.from(s, 'base64');
-}
+export { encode as b64Encode, decode as b64Decode } from '@exortek/shared/base64';

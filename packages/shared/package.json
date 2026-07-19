@@ -7,6 +7,7 @@
   "sideEffects": false,
   "exports": {
     "./base32": "./src/base32.js",
+    "./base64": "./src/base64.js",
     "./base64url": "./src/base64url.js",
     "./bytes": "./src/bytes.js",
     "./cookie": "./src/cookie.js",
