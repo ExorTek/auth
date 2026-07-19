@@ -3,13 +3,13 @@ import {
   normalizeUmbrella,
   normalizeCsrf,
   normalizeRateLimit,
-  extractCsrfToken,
-  issueCsrfToken,
-  verifyCsrfPair,
   parseCookies,
-  rateLimitDenialBody,
   buildCorsCheck,
   buildHeaders,
+  runHeaders,
+  runCors,
+  runRateLimit,
+  runCsrf,
 } from './core.js';
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 
@@ -32,111 +32,74 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
  *   })
  */
 
-function attachHeaders(fastify, responseHeaders) {
-  const entries = Object.entries(responseHeaders);
-  fastify.addHook('onSend', async (_req, reply, payload) => {
-    for (const [k, v] of entries) {
-      if (!reply.hasHeader(k)) {
-        reply.header(k, v);
+/**
+ * Build the framework-neutral `AdapterContext` from Fastify's
+ * `(request, reply)`. Runners in `core.js` do the actual work.
+ *
+ * @param {any} request
+ * @param {any} reply
+ * @param {{ hasFastifyCookie?: boolean }} [flags]
+ * @returns {import('./core.js').AdapterContext}
+ */
+function makeFastifyContext(request, reply, flags = {}) {
+  return {
+    method: () => request.method,
+    getHeader: name => {
+      const v = request.headers[name.toLowerCase()];
+      return Array.isArray(v) ? v[0] : v;
+    },
+    cookies: () => request.cookies ?? parseCookies(request.headers.cookie),
+    body: () => request.body,
+    setHeader: (name, value) => reply.header(name, value),
+    setHeaderIfAbsent: (name, value) => {
+      if (!reply.hasHeader(name)) reply.header(name, value);
+    },
+    setCookie: (name, value, opts) => {
+      // @fastify/cookie handles the Set-Cookie stack correctly on Fastify;
+      // fall back to a raw `reply.header('Set-Cookie', ...)` only if
+      // callers went bare. `attachCsrf` asserts the plugin is present, so
+      // in practice we always hit the first branch.
+      if (flags.hasFastifyCookie && typeof reply.setCookie === 'function') {
+        reply.setCookie(name, value, opts);
+      } else {
+        reply.header('Set-Cookie', value); // callers are expected to use @fastify/cookie
       }
-    }
-    return payload;
-  });
+    },
+    json: (status, body, extraHeaders) => {
+      if (extraHeaders) {
+        for (const [k, v] of Object.entries(extraHeaders)) reply.header(k, v);
+      }
+      reply.code(status).send(body);
+      return true;
+    },
+    noContent: (status, extraHeaders) => {
+      if (extraHeaders) {
+        for (const [k, v] of Object.entries(extraHeaders)) reply.header(k, v);
+      }
+      reply.code(status).send();
+      return true;
+    },
+    ip: () => request.ip,
+    rawReq: () => request,
+    rawRes: () => reply,
+    decorate: (key, value) => {
+      request[key] = value;
+    },
+  };
 }
 
-function attachCors(fastify, corsCheck) {
-  fastify.addHook('onRequest', async (req, reply) => {
-    const verdict = corsCheck({
-      method: req.method,
-      origin: req.headers.origin,
-      requestMethod: req.headers['access-control-request-method'],
-      requestHeaders: req.headers['access-control-request-headers'],
-    });
-    const d = verdict && typeof verdict.then === 'function' ? await verdict : verdict;
-    for (const [k, v] of Object.entries(d.headers)) {
-      reply.header(k, v);
-    }
-    if (d.preflight) {
-      reply.code(d.status ?? 204).send();
-      return;
-    }
-    if (!d.allowed && req.headers.origin) {
-      reply.code(403).send({ error: 'ForbiddenOrigin' });
-    }
-  });
-}
-
-function attachRateLimit(fastify, rateLimit) {
-  fastify.addHook('onRequest', async (req, reply) => {
-    const key = rateLimit.keyGenerator ? rateLimit.keyGenerator(req) : req.ip;
-    if (!key) {
-      return;
-    }
-    const result = await rateLimit.limiter.check({ key });
-    const hn = rateLimit.headers;
-    if (hn.retryAfter && result.retryAfter != null) {
-      reply.header(hn.retryAfter, String(result.retryAfter));
-    }
-    if (hn.remaining) {
-      reply.header(hn.remaining, String(result.remaining));
-    }
-    if (hn.reset && result.reset instanceof Date) {
-      reply.header(hn.reset, String(Math.floor(result.reset.getTime() / 1000)));
-    }
-    if (!result.allowed) {
-      if (rateLimit.onDenied) {
-        await rateLimit.onDenied(req, reply, result);
-        return;
-      }
-      reply.code(429).send(rateLimitDenialBody(result));
-    }
-  });
-}
-
-function assertCookiePluginRegistered(fastify) {
-  if (!fastify.hasPlugin('@fastify/cookie')) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      "@exortek/security: csrf requires '@fastify/cookie' to be registered first. Do `await app.register(import('@fastify/cookie'))` before enabling CSRF.",
-    );
-  }
-}
-
-function attachCsrf(fastify, csrf) {
-  assertCookiePluginRegistered(fastify);
-  fastify.addHook('onRequest', async (req, reply) => {
-    const cookies = req.cookies ?? parseCookies(req.headers.cookie);
-    const cookieToken = cookies[csrf.cookieName];
-
-    let pending = null;
-    req.csrfToken = () => {
-      if (!pending) {
-        pending = issueCsrfToken(csrf);
-        reply.setCookie(csrf.cookieName, pending, csrf.cookieOptions);
-      }
-      return pending;
-    };
-
-    if (csrf.ignoreMethods.has(req.method.toUpperCase())) {
-      if (!cookieToken) {
-        const t = issueCsrfToken(csrf);
-        reply.setCookie(csrf.cookieName, t, csrf.cookieOptions);
-        pending = t;
-      }
-      return;
-    }
-
-    const submitted = extractCsrfToken(csrf, req);
-    if (!cookieToken || !submitted || !verifyCsrfPair(csrf, cookieToken, submitted)) {
-      reply.code(403).send({ error: 'CsrfInvalid' });
-    }
+function attachRunner(fastify, runner, hookName = 'onRequest') {
+  fastify.addHook(hookName, async (request, reply) => {
+    const ctx = makeFastifyContext(request, reply, { hasFastifyCookie: fastify.hasPlugin('@fastify/cookie') });
+    await runner(ctx);
   });
 }
 
 /** Only-CORS plugin. */
 export const corsPlugin = fp(
   async function corsPluginImpl(fastify, options) {
-    attachCors(fastify, buildCorsCheck(options));
+    const check = buildCorsCheck(options);
+    attachRunner(fastify, ctx => runCors(check, ctx));
   },
   { name: '@exortek/security/cors', fastify: '>=4' },
 );
@@ -145,9 +108,16 @@ export const corsPlugin = fp(
 export const headersPlugin = fp(
   async function headersPluginImpl(fastify, options) {
     const map = buildHeaders(options ?? {});
-    if (Object.keys(map).length) {
-      attachHeaders(fastify, map);
-    }
+    if (Object.keys(map).length === 0) return;
+    const entries = Object.entries(map);
+    // Headers apply on the way out (onSend) so terminal responses from
+    // other hooks (CORS preflight, CSRF deny) also carry them.
+    fastify.addHook('onSend', async (_req, reply, payload) => {
+      for (const [k, v] of entries) {
+        if (!reply.hasHeader(k)) reply.header(k, v);
+      }
+      return payload;
+    });
   },
   { name: '@exortek/security/headers', fastify: '>=4' },
 );
@@ -155,7 +125,14 @@ export const headersPlugin = fp(
 /** Only-CSRF plugin. Requires `@fastify/cookie`. */
 export const csrfPlugin = fp(
   async function csrfPluginImpl(fastify, options) {
-    attachCsrf(fastify, normalizeCsrf(options));
+    const csrf = normalizeCsrf(options);
+    if (!fastify.hasPlugin('@fastify/cookie')) {
+      throw new SecurityError(
+        ErrorCode.INVALID_ARGUMENT,
+        "@exortek/security: csrf requires '@fastify/cookie' to be registered first. Do `await app.register(import('@fastify/cookie'))` before enabling CSRF.",
+      );
+    }
+    attachRunner(fastify, ctx => runCsrf(csrf, ctx));
   },
   { name: '@exortek/security/csrf', fastify: '>=4' },
 );
@@ -163,7 +140,8 @@ export const csrfPlugin = fp(
 /** Only rate-limit plugin. */
 export const rateLimitPlugin = fp(
   async function rateLimitPluginImpl(fastify, options) {
-    attachRateLimit(fastify, normalizeRateLimit(options));
+    const rl = normalizeRateLimit(options);
+    attachRunner(fastify, ctx => runRateLimit(rl, ctx));
   },
   { name: '@exortek/security/rate-limit', fastify: '>=4' },
 );
@@ -178,19 +156,33 @@ export const rateLimitPlugin = fp(
  */
 async function securityPluginImpl(fastify, options) {
   const cfg = normalizeUmbrella(options);
-  if (cfg.responseHeaders && Object.keys(cfg.responseHeaders).length) {
-    attachHeaders(fastify, cfg.responseHeaders);
+  const headersEntries = cfg.responseHeaders ? Object.entries(cfg.responseHeaders) : null;
+
+  if (headersEntries) {
+    fastify.addHook('onSend', async (_req, reply, payload) => {
+      for (const [k, v] of headersEntries) {
+        if (!reply.hasHeader(k)) reply.header(k, v);
+      }
+      return payload;
+    });
   }
+
   if (cfg.corsCheck) {
-    attachCors(fastify, cfg.corsCheck);
+    attachRunner(fastify, ctx => runCors(cfg.corsCheck, ctx, headersEntries));
   }
   // Rate-limit before CSRF so a firehose of forged tokens gets throttled
   // at the door instead of paying HMAC verification cost per request.
   if (cfg.rateLimit) {
-    attachRateLimit(fastify, cfg.rateLimit);
+    attachRunner(fastify, ctx => runRateLimit(cfg.rateLimit, ctx));
   }
   if (cfg.csrf) {
-    attachCsrf(fastify, cfg.csrf);
+    if (!fastify.hasPlugin('@fastify/cookie')) {
+      throw new SecurityError(
+        ErrorCode.INVALID_ARGUMENT,
+        "@exortek/security: csrf requires '@fastify/cookie' to be registered first. Do `await app.register(import('@fastify/cookie'))` before enabling CSRF.",
+      );
+    }
+    attachRunner(fastify, ctx => runCsrf(cfg.csrf, ctx));
   }
 }
 

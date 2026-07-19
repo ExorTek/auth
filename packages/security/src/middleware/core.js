@@ -215,3 +215,179 @@ export function rateLimitDenialBody(result) {
 
 // Also re-export the raw builders so adapters don't reach around us.
 export { buildCorsCheck, buildHeaders };
+
+// -------------------------------------------------------------------
+// Framework-neutral runners.
+//
+// Each adapter (`express.js`, `fastify.js`, `hono.js`, `elysia.js`)
+// builds a small `AdapterContext` from its native request/response and
+// hands it to these runners. Runners read the request via `ctx.method`
+// / `ctx.getHeader` / `ctx.cookies` and write via `ctx.setHeader` /
+// `ctx.setCookie` / `ctx.json` / `ctx.noContent`. Return values:
+//
+//   - `null | undefined` — the concern did not terminate the response;
+//     the caller should continue the middleware chain.
+//   - anything truthy — the concern terminated (deny / preflight); the
+//     caller should stop the chain (Express: skip `next()`; Hono/Elysia:
+//     return the response object the runner produced).
+// -------------------------------------------------------------------
+
+/**
+ * @typedef {object} AdapterContext
+ * @property {() => string} method  Uppercased HTTP method.
+ * @property {(name: string) => string | undefined} getHeader
+ *   Case-insensitive header lookup on the request.
+ * @property {() => Record<string, string>} cookies
+ *   Parsed request cookies.
+ * @property {() => unknown} body
+ *   Parsed request body (or undefined) — used by the CSRF form-field
+ *   fallback when a token isn't in the header.
+ * @property {(name: string, value: string) => void} setHeader
+ *   Overwrite (or first-write) a response header.
+ * @property {(name: string, value: string) => void} setHeaderIfAbsent
+ *   Set a response header only if it isn't already present.
+ * @property {(cookieName: string, cookieValue: string, cookieOptions: object) => void} setCookie
+ *   Append a `Set-Cookie` header (or use the framework's native cookie
+ *   API where available, e.g. Fastify's `reply.setCookie`).
+ * @property {(status: number, body: unknown, extraHeaders?: Record<string, string>) => unknown} json
+ *   Terminal response with a JSON body. Returns whatever the framework
+ *   expects the middleware to return (Express: undefined, Hono: Response).
+ * @property {(status: number, extraHeaders?: Record<string, string>) => unknown} noContent
+ *   Terminal response with no body.
+ * @property {() => string | undefined} ip
+ *   Best-effort client IP (frameworks resolve this differently).
+ * @property {() => unknown} rawReq
+ *   Escape hatch for user callbacks (`keyGenerator`, `tokenFromRequest`)
+ *   that expect the framework-native request object.
+ * @property {() => unknown} rawRes
+ *   Escape hatch for `onDenied`. `null` on frameworks without a distinct
+ *   response object at this stage (Elysia).
+ * @property {(key: string, value: unknown) => void} decorate
+ *   Attach state to the request/context for later handlers
+ *   (e.g. `req.csrfToken = () => ...`).
+ */
+
+async function _rawExtractCsrf(csrf, ctx) {
+  if (typeof csrf.tokenFromRequest === 'function') {
+    return csrf.tokenFromRequest(ctx.rawReq());
+  }
+  const h = ctx.getHeader(csrf.headerName);
+  if (typeof h === 'string' && h.length > 0) return h;
+  // Body may be sync (Express/Fastify already-parsed) or async (Hono
+  // parseBody on demand). Await either shape uniformly.
+  const body = await ctx.body();
+  if (body && typeof body === 'object') {
+    const v = /** @type {Record<string, unknown>} */ (body)[csrf.cookieName];
+    if (typeof v === 'string' && v.length > 0) return v;
+  }
+  return undefined;
+}
+
+/**
+ * Apply the response-header map. Returns nothing (never terminates).
+ *
+ * @param {ReadonlyArray<[string, string]>} entries  From `Object.entries(buildHeaders(...))`.
+ * @param {AdapterContext} ctx
+ */
+export async function runHeaders(entries, ctx) {
+  for (const [k, v] of entries) {
+    ctx.setHeaderIfAbsent(k, v);
+  }
+}
+
+/**
+ * @param {ReturnType<typeof buildCorsCheck>} corsCheck
+ * @param {AdapterContext} ctx
+ * @param {ReadonlyArray<[string, string]> | null} [staticHeaders]
+ *   Response-header map to fold into a preflight response so a preflight
+ *   also carries the security headers the caller expects on every reply.
+ * @returns {Promise<unknown>}   Response value (truthy → terminated) or null.
+ */
+export async function runCors(corsCheck, ctx, staticHeaders = null) {
+  const verdict = corsCheck({
+    method: ctx.method(),
+    origin: ctx.getHeader('origin'),
+    requestMethod: ctx.getHeader('access-control-request-method'),
+    requestHeaders: ctx.getHeader('access-control-request-headers'),
+  });
+  const d = verdict && typeof verdict.then === 'function' ? await verdict : verdict;
+  if (d.preflight) {
+    const merged = { ...d.headers };
+    if (staticHeaders) {
+      for (const [k, v] of staticHeaders) {
+        merged[k] = merged[k] ?? v;
+      }
+    }
+    return ctx.noContent(d.status ?? 204, merged);
+  }
+  for (const [k, v] of Object.entries(d.headers)) {
+    ctx.setHeader(k, v);
+  }
+  if (!d.allowed && ctx.getHeader('origin')) {
+    return ctx.json(403, { error: 'ForbiddenOrigin' });
+  }
+  return null;
+}
+
+/**
+ * @param {ReturnType<typeof normalizeRateLimit>} rateLimit
+ * @param {AdapterContext} ctx
+ * @returns {Promise<unknown>}
+ */
+export async function runRateLimit(rateLimit, ctx) {
+  const key = rateLimit.keyGenerator ? rateLimit.keyGenerator(ctx.rawReq()) : ctx.ip();
+  if (!key) return null;
+  const result = await rateLimit.limiter.check({ key });
+  const hn = rateLimit.headers;
+  if (hn.retryAfter && result.retryAfter != null) {
+    ctx.setHeader(hn.retryAfter, String(result.retryAfter));
+  }
+  if (hn.remaining) {
+    ctx.setHeader(hn.remaining, String(result.remaining));
+  }
+  if (hn.reset && result.reset instanceof Date) {
+    ctx.setHeader(hn.reset, String(Math.floor(result.reset.getTime() / 1000)));
+  }
+  if (result.allowed) return null;
+  if (rateLimit.onDenied) {
+    return rateLimit.onDenied(ctx.rawReq(), ctx.rawRes(), result);
+  }
+  return ctx.json(429, rateLimitDenialBody(result));
+}
+
+/**
+ * @param {ReturnType<typeof normalizeCsrf>} csrf
+ * @param {AdapterContext} ctx
+ * @returns {Promise<unknown>}
+ */
+export async function runCsrf(csrf, ctx) {
+  const cookies = ctx.cookies();
+  const cookieToken = cookies[csrf.cookieName];
+
+  let pending = null;
+  const scheduleSetCookie = value => {
+    ctx.setCookie(csrf.cookieName, value, csrf.cookieOptions);
+  };
+  ctx.decorate('csrfToken', () => {
+    if (!pending) {
+      pending = issueCsrfToken(csrf);
+      scheduleSetCookie(pending);
+    }
+    return pending;
+  });
+
+  if (csrf.ignoreMethods.has(ctx.method().toUpperCase())) {
+    if (!cookieToken) {
+      const t = issueCsrfToken(csrf);
+      scheduleSetCookie(t);
+      pending = t;
+    }
+    return null;
+  }
+
+  const submitted = await _rawExtractCsrf(csrf, ctx);
+  if (!cookieToken || !submitted || !verifyCsrfPair(csrf, cookieToken, submitted)) {
+    return ctx.json(403, { error: 'CsrfInvalid' });
+  }
+  return null;
+}
