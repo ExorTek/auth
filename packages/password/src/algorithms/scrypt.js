@@ -1,5 +1,6 @@
-import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import { randomBytes, scrypt as scryptCb } from 'node:crypto';
 import { promisify } from 'node:util';
+import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { assertPositiveInt, invalidArgument } from '../internal/guards.js';
 import { normalizePassword } from '../internal/normalize.js';
 import { parseHash, serialiseHash } from '../phc.js';
@@ -135,7 +136,7 @@ export async function verify(password, phcHash, options = {}) {
     p,
     maxmem: options.maxmem ?? autoMaxmem(N, r),
   });
-  return derived.length === record.hash.length && timingSafeEqual(derived, record.hash);
+  return timingSafeEqual(derived, record.hash);
 }
 
 /**

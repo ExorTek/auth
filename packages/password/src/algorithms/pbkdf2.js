@@ -1,5 +1,6 @@
-import { randomBytes, pbkdf2 as pbkdf2Cb, timingSafeEqual } from 'node:crypto';
+import { randomBytes, pbkdf2 as pbkdf2Cb } from 'node:crypto';
 import { promisify } from 'node:util';
+import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { PasswordError, ErrorCode } from '../errors.js';
 import { assertPositiveInt } from '../internal/guards.js';
 import { normalizePassword } from '../internal/normalize.js';
@@ -120,7 +121,7 @@ export async function verify(password, phcHash) {
     return false;
   }
   const derived = await pbkdf2Async(pwBytes, record.salt, iterations, record.hash.length, hashName);
-  return derived.length === record.hash.length && timingSafeEqual(derived, record.hash);
+  return timingSafeEqual(derived, record.hash);
 }
 
 /**

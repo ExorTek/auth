@@ -1,4 +1,5 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac } from 'node:crypto';
+import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { OtpError, ErrorCode } from './internal/errors.js';
 import { invalidArgument } from './internal/guards.js';
 import { truncate } from './internal/digits.js';
@@ -260,11 +261,11 @@ export function resynchronize(secret, codes, options = {}) {
   const t2 = Buffer.from(code2, 'utf8');
   for (let i = 0; i <= maxLookAhead; i++) {
     const c1 = Buffer.from(_hotpFromKey(key, startCounter + i, digits, algorithm), 'utf8');
-    if (c1.length !== t1.length || !timingSafeEqual(t1, c1)) {
+    if (!timingSafeEqual(t1, c1)) {
       continue;
     }
     const c2 = Buffer.from(_hotpFromKey(key, startCounter + i + 1, digits, algorithm), 'utf8');
-    if (c2.length === t2.length && timingSafeEqual(t2, c2)) {
+    if (timingSafeEqual(t2, c2)) {
       return startCounter + i + 2;
     }
   }
