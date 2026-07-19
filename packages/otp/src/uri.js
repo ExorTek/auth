@@ -1,4 +1,5 @@
 import { OtpError, ErrorCode } from './internal/errors.js';
+import { assertNonEmptyString, assertObject, invalidArgument } from './internal/guards.js';
 
 // Google's Key URI Format (the de facto QR standard used by every
 // mainstream 2FA app) only lists SHA1 / SHA256 / SHA512. SHA224 and
@@ -42,21 +43,15 @@ const URI_SUPPORTED_ALGORITHMS = new Set(['SHA1', 'SHA256', 'SHA512']);
  * @returns {string}
  */
 export function provisioningUri(options) {
-  if (!options || typeof options !== 'object') {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, 'provisioningUri: options required');
-  }
+  assertObject(options, 'provisioningUri.options');
   const type = options.type ?? 'totp';
   if (type !== 'totp' && type !== 'hotp') {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, `provisioningUri: type must be 'totp' or 'hotp'; got '${type}'`);
+    throw invalidArgument(`provisioningUri.options.type must be 'totp' or 'hotp'; got '${type}'`);
   }
-  if (typeof options.label !== 'string' || options.label.length === 0) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, 'provisioningUri: label required');
-  }
-  if (typeof options.secret !== 'string' || options.secret.length === 0) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, 'provisioningUri: secret required (base32 string)');
-  }
+  assertNonEmptyString(options.label, 'provisioningUri.options.label');
+  assertNonEmptyString(options.secret, 'provisioningUri.options.secret', { hint: 'base32 string' });
   if (type === 'hotp' && !Number.isInteger(options.counter)) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, 'provisioningUri: counter required (integer) for hotp type');
+    throw invalidArgument('provisioningUri.options.counter must be an integer when type is hotp');
   }
   if (options.algorithm && !URI_SUPPORTED_ALGORITHMS.has(options.algorithm)) {
     throw new OtpError(

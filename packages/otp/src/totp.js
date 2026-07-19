@@ -1,5 +1,6 @@
 import { hotp, _verifyHotpForward } from './hotp.js';
 import { OtpError, ErrorCode } from './internal/errors.js';
+import { invalidArgument } from './internal/guards.js';
 import { createHash } from 'node:crypto';
 
 const DEFAULT_PERIOD = 30;
@@ -61,10 +62,7 @@ const DEFAULT_PERIOD = 30;
 
 function assertPeriod(period) {
   if (!Number.isInteger(period) || period < 1 || period > 3600) {
-    throw new OtpError(
-      ErrorCode.INVALID_ARGUMENT,
-      `TOTP period must be an integer in [1, 3600] seconds; got ${period}`,
-    );
+    throw invalidArgument(`totp.options.period must be an integer in [1, 3600] seconds; got ${period}`);
   }
 }
 
@@ -74,7 +72,7 @@ function counterForTimestamp(timestampMs, period, t0 = 0) {
 
 function assertT0(t0) {
   if (!Number.isFinite(t0)) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, `TOTP t0 must be a finite number of seconds; got ${t0}`);
+    throw invalidArgument(`totp.options.t0 must be a finite number of seconds; got ${t0}`);
   }
 }
 
@@ -138,7 +136,7 @@ export async function verifyTotp(code, secret, options = {}) {
   assertPeriod(period);
   assertT0(t0);
   if (!Number.isInteger(window) || window < 0 || window > 10) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, `TOTP window must be an integer in [0, 10]; got ${window}`);
+    throw invalidArgument(`verifyTotp.options.window must be an integer in [0, 10]; got ${window}`);
   }
 
   if (typeof code !== 'string' || code.length === 0) {

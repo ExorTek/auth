@@ -3,6 +3,7 @@ import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { ALPHABET as CROCKFORD_ALPHABET } from '@exortek/shared/crockford';
 import { number, object, optional, string } from '@exortek/shared/validate';
 import { OtpError, ErrorCode } from './internal/errors.js';
+import { invalidArgument, parse } from './internal/guards.js';
 
 const NSchema = number().refine(v => Number.isInteger(v) && v >= 1 && v <= 100, 'must be an integer in [1, 100]');
 
@@ -86,21 +87,14 @@ export const backupPresets = Object.freeze({
  * @returns {string[]}
  */
 export function backupCodes(n = 10, options = {}) {
-  try {
-    NSchema.parse(n, 'backupCodes.n');
-    BackupCodesOptionsSchema.parse(options, 'backupCodes.options');
-  } catch (err) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
-  }
+  parse(NSchema, n, 'backupCodes.n');
+  parse(BackupCodesOptionsSchema, options, 'backupCodes.options');
   const length = options.length ?? 10;
   const groups = options.groups ?? 2;
   const alphabet = options.alphabet ?? CROCKFORD_ALPHABET;
 
   if (groups > length) {
-    throw new OtpError(
-      ErrorCode.INVALID_ARGUMENT,
-      `backupCodes.options.groups: must be ≤ length (${length}); got ${groups}`,
-    );
+    throw invalidArgument(`backupCodes.options.groups: must be ≤ length (${length}); got ${groups}`);
   }
 
   const groupSize = Math.floor(length / groups);

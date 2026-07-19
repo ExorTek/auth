@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { OtpError, ErrorCode } from './internal/errors.js';
+import { invalidArgument } from './internal/guards.js';
 import { truncate } from './internal/digits.js';
 import { decodeSecret } from './secret.js';
 
@@ -43,13 +44,13 @@ const SUPPORTED_ALGORITHMS = Object.freeze(new Set(['SHA1', 'SHA224', 'SHA256', 
 
 function assertCounter(counter) {
   if (!Number.isInteger(counter) || counter < 0) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, `HOTP counter must be a non-negative integer; got ${counter}`);
+    throw invalidArgument(`hotp.counter must be a non-negative integer; got ${counter}`);
   }
   // JavaScript's max safe integer covers ~2^53 — well beyond any realistic
   // HOTP counter. If someone bumps a counter past this they have bigger
   // problems, but we refuse to overflow silently.
   if (counter > Number.MAX_SAFE_INTEGER) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, 'HOTP counter exceeds Number.MAX_SAFE_INTEGER');
+    throw invalidArgument('hotp.counter exceeds Number.MAX_SAFE_INTEGER');
   }
 }
 
@@ -69,7 +70,7 @@ function assertDigits(digits) {
   // them. Values above 10 would emit non-uniform digits (leading digit
   // always 0/1) and we refuse rather than produce a subtly biased code.
   if (!Number.isInteger(digits) || digits < 6 || digits > 10) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, `digits must be an integer in [6, 10]; got ${digits}`);
+    throw invalidArgument(`hotp.options.digits must be an integer in [6, 10]; got ${digits}`);
   }
 }
 
@@ -137,7 +138,7 @@ export function verifyHotp(code, secret, counter, options = {}) {
   assertAlgorithm(algorithm);
   assertCounter(counter);
   if (!Number.isInteger(window) || window < 0 || window > 10) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, `HOTP window must be an integer in [0, 10]; got ${window}`);
+    throw invalidArgument(`verifyHotp.options.window must be an integer in [0, 10]; got ${window}`);
   }
 
   return _verifyHotpForward(code, secret, counter, window, digits, algorithm);

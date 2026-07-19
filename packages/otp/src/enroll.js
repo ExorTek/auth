@@ -1,7 +1,7 @@
 import { generateSecret } from './secret.js';
 import { provisioningUri } from './uri.js';
 import { backupCodes } from './backup.js';
-import { OtpError, ErrorCode } from './internal/errors.js';
+import { assertNonEmptyString, assertObject } from './internal/guards.js';
 
 /**
  * @typedef {object} EnrollOptions
@@ -51,12 +51,8 @@ import { OtpError, ErrorCode } from './internal/errors.js';
  * @returns {EnrollmentBundle}
  */
 export function enroll(options) {
-  if (!options || typeof options !== 'object') {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, 'enroll: options required');
-  }
-  if (typeof options.label !== 'string' || options.label.length === 0) {
-    throw new OtpError(ErrorCode.INVALID_ARGUMENT, 'enroll: label required');
-  }
+  assertObject(options, 'enroll.options');
+  assertNonEmptyString(options.label, 'enroll.options.label');
   const type = options.type ?? 'totp';
   const backupCodeCount = options.backupCodeCount ?? 10;
 
