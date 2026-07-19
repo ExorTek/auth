@@ -1,6 +1,6 @@
-import { randomBytes } from 'node:crypto';
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { ALPHABET as CROCKFORD_ALPHABET } from '@exortek/shared/crockford';
+import { sampleAlphabet } from '@exortek/shared/sample';
 import { number, object, optional, string } from '@exortek/shared/validate';
 import { OtpError, ErrorCode } from './internal/errors.js';
 import { invalidArgument, parse } from './internal/guards.js';
@@ -102,7 +102,7 @@ export function backupCodes(n = 10, options = {}) {
 
   const out = [];
   for (let i = 0; i < n; i++) {
-    const raw = draw(length, alphabet);
+    const raw = sampleAlphabet(alphabet, length);
     if (groups === 1) {
       out.push(raw);
       continue;
@@ -195,27 +195,3 @@ export function verifyBackupCode(candidate, storedList) {
   return matchIndex;
 }
 
-// Rejection sampling — draw `length` chars uniformly from `alphabet`
-// without introducing modulo bias. For a 32-char alphabet this is
-// exact; for other sizes we retry the rare biased sample.
-function draw(length, alphabet) {
-  const chars = [...alphabet];
-  const modulus = chars.length;
-  const limit = 256 - (256 % modulus);
-  const out = [];
-  const buf = randomBytes(Math.max(64, length * 2));
-  let idx = 0;
-  while (out.length < length) {
-    if (idx >= buf.length) {
-      // Refill on the rare case we chewed through a huge chunk to
-      // dodge bias — keeps the function allocation-frugal.
-      buf.set(randomBytes(buf.length));
-      idx = 0;
-    }
-    const b = buf[idx++];
-    if (b < limit) {
-      out.push(chars[b % modulus]);
-    }
-  }
-  return out.join('');
-}

@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { sampleAlphabet, sampleUint16Indices } from '@exortek/shared/sample';
 import { invalidArgument } from './internal/guards.js';
 
 // Named alphabets — the character sets 99% of "give me a random
@@ -59,26 +59,7 @@ export function generate(options = {}) {
       `generate.options.alphabet must be a string of 2-256 characters (or a named alphabet: ${Object.keys(alphabets).join(', ')}); got ${typeof alphabet === 'string' ? `length ${alphabet.length}` : typeof alphabet}`,
     );
   }
-  // Rejection sampling: read bytes 4× the target length so the rejection
-  // rate rarely forces a second draw. If we run out mid-loop (~1 in
-  // 10^15) fetch a fresh batch.
-  const n = alphabet.length;
-  const acceptCap = Math.floor(256 / n) * n;
-  const out = new Array(length);
-  let i = 0;
-  let buf = randomBytes(length * 4);
-  let cursor = 0;
-  while (i < length) {
-    if (cursor >= buf.length) {
-      buf = randomBytes(length * 4);
-      cursor = 0;
-    }
-    const b = buf[cursor++];
-    if (b < acceptCap) {
-      out[i++] = alphabet[b % n];
-    }
-  }
-  return out.join('');
+  return sampleAlphabet(alphabet, length);
 }
 
 // Diceware short word list — 6-word phrases at 12.9 bits of entropy per
@@ -385,26 +366,10 @@ export function passphrase(options = {}) {
     );
   }
   const capitalize = options.capitalize === true;
-  const words = new Array(count);
-  const n = list.length;
-  const acceptCap = Math.floor(65536 / n) * n;
-  let cursor = 0;
-  let buf = randomBytes(count * 8);
-  let i = 0;
-  while (i < count) {
-    if (cursor + 2 > buf.length) {
-      buf = randomBytes(count * 8);
-      cursor = 0;
-    }
-    const v = buf.readUInt16BE(cursor);
-    cursor += 2;
-    if (v < acceptCap) {
-      let w = list[v % n];
-      if (capitalize) {
-        w = w[0].toUpperCase() + w.slice(1);
-      }
-      words[i++] = w;
-    }
-  }
+  const indices = sampleUint16Indices(list.length, count);
+  const words = indices.map(idx => {
+    const w = list[idx];
+    return capitalize ? w[0].toUpperCase() + w.slice(1) : w;
+  });
   return words.join(separator);
 }
