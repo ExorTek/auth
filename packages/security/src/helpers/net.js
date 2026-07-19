@@ -161,14 +161,23 @@ export function checkOrigin(req, options) {
  * Verify a webhook payload against an HMAC signature (constant-time).
  *
  * `signatureHeader` may be the plain hex digest OR a scheme-prefixed
- * variant like `sha256=<hex>` (GitHub / Stripe convention). Multiple
- * comma-separated candidates are accepted — matches Stripe's rotation
- * envelope `t=<ts>,v1=<hex>`. Any candidate that matches wins.
+ * variant like `sha256=<hex>` (GitHub convention). Multiple
+ * comma-separated candidates are accepted, and any candidate that
+ * matches wins.
+ *
+ * **Deliberately NOT covered:** Stripe-style timestamped envelopes
+ * (`t=<ts>,v1=<hex>`). Verifying those correctly requires a
+ * `tolerance` window against a replay attacker who resubmits the
+ * exact envelope, which is a separate feature — this helper's job
+ * is the HMAC comparison, not the freshness policy.
  *
  * @param {string | Buffer} payload    Raw request body — DO NOT stringify JSON first.
  * @param {string} signatureHeader     Value from the incoming signature header.
  * @param {string | Buffer} secret     Shared secret (32 bytes minimum recommended).
- * @param {{ algorithm?: string, scheme?: string }} [options]
+ * @param {{ algorithm?: 'sha256' | 'sha512' }} [options]
+ *   `algorithm` — HMAC hash. Restricted to `sha256` (default) and
+ *   `sha512`; anything else throws. Weaker hashes (`sha1`) are
+ *   deliberately not accepted even though `node:crypto` supports them.
  * @returns {boolean}
  */
 export function webhookVerify(payload, signatureHeader, secret, options = {}) {
@@ -179,6 +188,11 @@ export function webhookVerify(payload, signatureHeader, secret, options = {}) {
     throw invalidArgument('webhookVerify.secret must be a non-empty string or Buffer');
   }
   const algorithm = options.algorithm ?? 'sha256';
+  if (algorithm !== 'sha256' && algorithm !== 'sha512') {
+    throw invalidArgument(
+      `webhookVerify.options.algorithm must be 'sha256' or 'sha512'; got ${JSON.stringify(algorithm)}. Weaker hashes are deliberately rejected — request a stronger scheme from the webhook provider if you're stuck on one.`,
+    );
+  }
   const expected = createHmac(algorithm, secret).update(payload).digest();
 
   // Collect every plausible candidate. `sha256=<hex>,v1=<hex>` shapes are

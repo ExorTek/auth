@@ -20,6 +20,7 @@ import {
   slowDown,
   rateLimit,
   SecurityError,
+  ErrorCode,
 } from '../src/index.js';
 
 // getClientIp
@@ -153,6 +154,23 @@ test('webhookVerify: rejects malformed input', () => {
   assert.equal(webhookVerify('x', '', secret), false);
   assert.equal(webhookVerify('x', 'not-hex', secret), false);
   assert.throws(() => webhookVerify('x', 'aa', ''), SecurityError);
+});
+
+test('webhookVerify: sha512 works', () => {
+  const secret = 'k'.repeat(32);
+  const payload = 'body';
+  const hex = createHmac('sha512', secret).update(payload).digest('hex');
+  assert.equal(webhookVerify(payload, hex, secret, { algorithm: 'sha512' }), true);
+});
+
+test('webhookVerify: rejects algorithms outside the allowlist', () => {
+  const secret = 'k'.repeat(32);
+  for (const bad of ['sha1', 'md5', 'sha384', 'SHA256', '']) {
+    assert.throws(
+      () => webhookVerify('body', 'aa', secret, { algorithm: bad }),
+      err => err instanceof SecurityError && err.code === ErrorCode.INVALID_ARGUMENT && /sha256.*sha512/.test(err.message),
+    );
+  }
 });
 
 // sanitizeBody
