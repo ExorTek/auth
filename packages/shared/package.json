@@ -21,6 +21,7 @@
     "./normalize-key": "./src/normalize-key.js",
     "./redis-guard": "./src/redis-guard.js",
     "./resolve": "./src/resolve.js",
+    "./sample": "./src/sample.js",
     "./errors": "./src/errors.js",
     "./validate": "./src/validate.js",
     "./algorithms": "./src/algorithms.js",
