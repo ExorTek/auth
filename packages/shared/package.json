@@ -13,7 +13,6 @@
     "./cookie": "./src/cookie.js",
     "./crockford": "./src/crockford.js",
     "./duration": "./src/duration.js",
-    "./hash": "./src/hash.js",
     "./hmac": "./src/hmac.js",
     "./http": "./src/http.js",
     "./random": "./src/random.js",
