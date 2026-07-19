@@ -19,7 +19,7 @@ describe('binary.concat', () => {
   it('rejects non-string, non-buffer parts', () => {
     assert.throws(
       () => concat('ok', 42),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 });
@@ -43,7 +43,7 @@ describe('binary.xor', () => {
   it('rejects mismatched lengths', () => {
     assert.throws(
       () => xor(Buffer.from([1, 2, 3]), Buffer.from([1, 2])),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 });
@@ -65,7 +65,7 @@ describe('binary.wipe', () => {
     for (const bad of [null, undefined, 'x', 42, {}, []]) {
       assert.throws(
         () => wipe(bad),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -89,7 +89,7 @@ describe('binary.equal', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => equal(bad, 'x'),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

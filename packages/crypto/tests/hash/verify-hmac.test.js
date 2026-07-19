@@ -44,7 +44,7 @@ describe('verifyHmac', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => verifyHmac(bad, sigHex, secret),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

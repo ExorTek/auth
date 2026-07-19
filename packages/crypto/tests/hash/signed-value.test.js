@@ -51,7 +51,7 @@ describe('signValue / unsignValue', () => {
   it('rejects a value containing a "."', () => {
     assert.throws(
       () => signValue('a.b', SECRET),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
@@ -59,7 +59,7 @@ describe('signValue / unsignValue', () => {
     for (const bad of [null, undefined, 42, {}, Buffer.from('x')]) {
       assert.throws(
         () => signValue(bad, SECRET),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

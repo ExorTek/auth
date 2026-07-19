@@ -53,7 +53,7 @@ describe('numeric', () => {
   it('rejects length === 0', () => {
     assert.throws(
       () => numeric(0),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
@@ -61,7 +61,7 @@ describe('numeric', () => {
     for (const bad of [-1, 1.5, NaN, Infinity, '6', null, undefined, {}]) {
       assert.throws(
         () => numeric(bad),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

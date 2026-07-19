@@ -52,7 +52,7 @@ describe('hkdf', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => hkdf(bad, { length: 32 }),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -67,7 +67,7 @@ describe('hkdf', () => {
   it('rejects non-positive length', () => {
     assert.throws(
       () => hkdf(ikm, { length: 0 }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 });

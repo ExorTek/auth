@@ -64,7 +64,7 @@ describe('fingerprint', () => {
     for (const bad of [undefined, 1n, Symbol('x'), () => 0]) {
       assert.throws(
         () => fingerprint(bad),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -73,7 +73,7 @@ describe('fingerprint', () => {
     for (const bad of [NaN, Infinity, -Infinity]) {
       assert.throws(
         () => fingerprint(bad),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -82,7 +82,7 @@ describe('fingerprint', () => {
     for (const bad of [Buffer.from('hi'), new Uint8Array([1, 2, 3])]) {
       assert.throws(
         () => fingerprint({ data: bad }),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -92,7 +92,7 @@ describe('fingerprint', () => {
     a.self = a;
     assert.throws(
       () => fingerprint(a),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 

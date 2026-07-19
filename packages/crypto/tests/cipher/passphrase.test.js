@@ -85,7 +85,7 @@ describe('cipher.encryptWithPassphrase / decryptWithPassphrase', () => {
   it('rejects non-string token', async () => {
     await assert.rejects(
       () => decryptWithPassphrase(null, 'pw', FAST),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
@@ -93,7 +93,7 @@ describe('cipher.encryptWithPassphrase / decryptWithPassphrase', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       await assert.rejects(
         () => encryptWithPassphrase(bad, 'pw', FAST),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

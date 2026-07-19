@@ -41,7 +41,7 @@ describe('random.crockford', () => {
     for (const bad of [-1, 1.5, NaN, '16', null, undefined]) {
       assert.throws(
         () => crockford(bad),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

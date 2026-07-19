@@ -52,7 +52,7 @@ describe('random.base64', () => {
     for (const bad of [-1, 1.5, NaN, '16', null, undefined]) {
       assert.throws(
         () => base64(bad),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

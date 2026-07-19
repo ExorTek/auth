@@ -51,6 +51,7 @@ describe('base64url', () => {
       assert.throws(
         () => base64url(bad),
         err => {
+          assert.ok(err instanceof CryptoError);
           assert.equal(err.code, ErrorCode.INVALID_ARGUMENT);
           return true;
         },

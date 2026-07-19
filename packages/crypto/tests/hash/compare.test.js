@@ -62,11 +62,11 @@ describe('compare', () => {
     for (const bad of [null, undefined, 42, {}, []]) {
       assert.throws(
         () => compare(bad, 'x'),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
       assert.throws(
         () => compare('x', bad),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });

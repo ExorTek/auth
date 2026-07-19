@@ -52,7 +52,7 @@ describe('cipher hybrid (RSA-wrapped AES)', () => {
   it('rejects an envelope missing required fields', () => {
     assert.throws(
       () => cipher.decryptHybrid({ iv: Buffer.alloc(12), tag: Buffer.alloc(16) }, privateKey),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 });

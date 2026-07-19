@@ -58,30 +58,30 @@ describe('scrypt', () => {
   it('requires salt', async () => {
     await assert.rejects(
       () => scrypt('pass'),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
     await assert.rejects(
       () => scrypt('pass', {}),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
   it('rejects non-positive keyLength / N / r / p', async () => {
     await assert.rejects(
       () => scrypt('pass', { salt, keyLength: 0 }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
     await assert.rejects(
       () => scrypt('pass', { salt, N: 0 }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
     await assert.rejects(
       () => scrypt('pass', { salt, r: -1 }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
     await assert.rejects(
       () => scrypt('pass', { salt, p: 1.5 }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 

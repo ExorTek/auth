@@ -66,11 +66,11 @@ describe('pbkdf2', () => {
   it('requires salt', async () => {
     await assert.rejects(
       () => pbkdf2('pass'),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
     await assert.rejects(
       () => pbkdf2('pass', {}),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
@@ -84,11 +84,11 @@ describe('pbkdf2', () => {
   it('rejects non-positive iterations and keyLength', async () => {
     await assert.rejects(
       () => pbkdf2('pass', { salt, iterations: 0 }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
     await assert.rejects(
       () => pbkdf2('pass', { salt, keyLength: -1 }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 });

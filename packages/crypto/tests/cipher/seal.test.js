@@ -147,11 +147,11 @@ describe('seal — argument validation', () => {
   it('rejects missing options.ttl', () => {
     assert.throws(
       () => seal({}, SECRET),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
     assert.throws(
       () => seal({}, SECRET, {}),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
@@ -159,7 +159,7 @@ describe('seal — argument validation', () => {
     for (const bad of ['', '15x', '-1h', 'abc', '1 h', '1.5h']) {
       assert.throws(
         () => seal({}, SECRET, { ttl: bad }),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -168,7 +168,7 @@ describe('seal — argument validation', () => {
     for (const bad of [0, -1, 1.5, NaN, Infinity]) {
       assert.throws(
         () => seal({}, SECRET, { ttl: bad }),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -176,7 +176,7 @@ describe('seal — argument validation', () => {
   it('rejects undefined payload (JSON.stringify → undefined)', () => {
     assert.throws(
       () => seal(undefined, SECRET, { ttl: 60 }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
@@ -185,7 +185,7 @@ describe('seal — argument validation', () => {
     a.self = a;
     assert.throws(
       () => seal(a, SECRET, { ttl: 60 }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 });
@@ -223,7 +223,7 @@ describe('unseal — secret rotation', () => {
     const token = seal({ a: 1 }, OLD, { ttl: 60 });
     assert.throws(
       () => unseal(token, []),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 

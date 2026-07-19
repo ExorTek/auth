@@ -34,6 +34,7 @@ describe('hex', () => {
       assert.throws(
         () => hex(bad),
         err => {
+          assert.ok(err instanceof CryptoError);
           assert.equal(err.code, ErrorCode.INVALID_ARGUMENT);
           return true;
         },

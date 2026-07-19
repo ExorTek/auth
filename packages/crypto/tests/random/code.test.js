@@ -56,22 +56,22 @@ describe('code', () => {
   it('rejects a non-string pattern', () => {
     assert.throws(
       () => code(42),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
     assert.throws(
       () => code(null),
-      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
+      err => err instanceof CryptoError,
     );
     assert.throws(
       () => code(undefined),
-      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
+      err => err instanceof CryptoError,
     );
   });
 
   it('rejects an empty pattern', () => {
     assert.throws(
       () => code(''),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 });

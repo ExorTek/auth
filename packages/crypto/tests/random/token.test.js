@@ -41,37 +41,37 @@ describe('token', () => {
   it('rejects a non-string prefix', () => {
     assert.throws(
       () => token(16, { prefix: 123 }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
     assert.throws(
       () => token(16, { prefix: null }),
-      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
+      err => err instanceof CryptoError,
     );
     assert.throws(
       () => token(16, { prefix: {} }),
-      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
+      err => err instanceof CryptoError,
     );
   });
 
   it('rejects a non-string separator', () => {
     assert.throws(
       () => token(16, { prefix: 'usr', separator: 42 }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 
   it('rejects non-object options', () => {
     assert.throws(
       () => token(16, 'usr'),
-      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
+      err => err instanceof CryptoError,
     );
     assert.throws(
       () => token(16, null),
-      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
+      err => err instanceof CryptoError,
     );
     assert.throws(
       () => token(16, 42),
-      err => err.code === 'INVALID_ARGUMENT' || err instanceof CryptoError,
+      err => err instanceof CryptoError,
     );
   });
 
@@ -79,7 +79,7 @@ describe('token', () => {
     for (const bad of [-1, 1.5, NaN, '16', null, undefined]) {
       assert.throws(
         () => token(bad),
-        err => err.code === ErrorCode.INVALID_ARGUMENT,
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
   });
@@ -103,7 +103,7 @@ describe('token', () => {
   it('rejects an empty separator string', () => {
     assert.throws(
       () => token(16, { prefix: 'usr', separator: '' }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 });
@@ -147,7 +147,7 @@ describe('token — encodings', () => {
   it('rejects an unknown encoding', () => {
     assert.throws(
       () => token(16, { encoding: 'base32' }),
-      err => err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 });
