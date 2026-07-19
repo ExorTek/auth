@@ -1,4 +1,5 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac } from 'node:crypto';
+import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 import { invalidArgument } from '../internal/guards.js';
 
@@ -219,7 +220,7 @@ export function webhookVerify(payload, signatureHeader, secret, options = {}) {
     } catch {
       continue;
     }
-    if (actual.length === expected.length && timingSafeEqual(actual, expected)) {
+    if (timingSafeEqual(actual, expected)) {
       return true;
     }
   }
