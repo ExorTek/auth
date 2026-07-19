@@ -11,6 +11,7 @@ import { createPrivateKey, createPublicKey, createSecretKey, X509Certificate } f
 
 import { JwkError, ErrorCode } from './internal/errors.js';
 import { decode as b64uDecode } from './internal/base64url.js';
+import { invalidArgument } from './internal/guards.js';
 import { validate } from './validate.js';
 
 /** @typedef {import('node:crypto').KeyObject} KeyObject */
@@ -67,7 +68,7 @@ export async function importJWK(jwk, _options) {
  */
 export async function importPEM(pemOrDer, format = 'spki') {
   if (typeof pemOrDer !== 'string' && !Buffer.isBuffer(pemOrDer)) {
-    throw new JwkError(ErrorCode.INVALID_ARGUMENT, 'importPEM: expected a PEM string or DER Buffer');
+    throw invalidArgument('importPEM.pemOrDer must be a PEM string or DER Buffer');
   }
   const inputFormat = typeof pemOrDer === 'string' ? 'pem' : 'der';
   try {

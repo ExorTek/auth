@@ -15,6 +15,7 @@
  */
 
 import { JwkError, ErrorCode } from './errors.js';
+import { assertObject } from './guards.js';
 
 /**
  * The lexicographically-sorted required-member set for each kty.
@@ -36,9 +37,7 @@ export const REQUIRED_MEMBERS = Object.freeze({
  * @returns {Buffer} the UTF-8 bytes to feed the digest
  */
 export function canonicalise(jwk) {
-  if (jwk == null || typeof jwk !== 'object') {
-    throw new JwkError(ErrorCode.INVALID_ARGUMENT, 'canonicalise: expected a JWK object');
-  }
+  assertObject(jwk, 'canonicalise.jwk');
   const kty = /** @type {string} */ (jwk.kty);
   const members = REQUIRED_MEMBERS[/** @type {keyof typeof REQUIRED_MEMBERS} */ (kty)];
   if (!members) {

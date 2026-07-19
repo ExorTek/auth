@@ -15,6 +15,7 @@ import { KeyObject } from 'node:crypto';
 import { array, object, oneOf, optional, string } from '@exortek/shared/validate';
 
 import { JwkError, ErrorCode } from './internal/errors.js';
+import { assertObject, invalidArgument, parse } from './internal/guards.js';
 
 const ExportJWKOptionsSchema = object({
   kid: optional(string()),
@@ -42,7 +43,7 @@ const ExportJWKOptionsSchema = object({
  */
 export async function exportJWK(key, options) {
   if (!(key instanceof KeyObject)) {
-    throw new JwkError(ErrorCode.INVALID_ARGUMENT, 'exportJWK: expected a KeyObject');
+    throw invalidArgument('exportJWK.key must be a KeyObject');
   }
   /** @type {Record<string, unknown>} */
   let jwk;
@@ -55,12 +56,7 @@ export async function exportJWK(key, options) {
       { cause: err },
     );
   }
-  let opts;
-  try {
-    opts = /** @type {ExportJWKOptions} */ (ExportJWKOptionsSchema.parse(options || {}, 'exportJWK.options'));
-  } catch (err) {
-    throw new JwkError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
-  }
+  const opts = /** @type {ExportJWKOptions} */ (parse(ExportJWKOptionsSchema, options || {}, 'exportJWK.options'));
   if (opts.kid !== undefined) {
     jwk.kid = opts.kid;
   }
@@ -91,13 +87,10 @@ export async function exportJWK(key, options) {
  */
 export async function exportPEM(key, format) {
   if (!(key instanceof KeyObject)) {
-    throw new JwkError(ErrorCode.INVALID_ARGUMENT, 'exportPEM: expected a KeyObject');
+    throw invalidArgument('exportPEM.key must be a KeyObject');
   }
   if (key.type === 'secret') {
-    throw new JwkError(
-      ErrorCode.INVALID_ARGUMENT,
-      'exportPEM: symmetric (secret) keys have no PEM representation — use exportJWK',
-    );
+    throw invalidArgument('exportPEM.key: symmetric (secret) keys have no PEM representation — use exportJWK');
   }
   const chosen = format ?? (key.type === 'private' ? 'pkcs8' : 'spki');
   if (chosen !== 'spki' && chosen !== 'pkcs8') {
@@ -107,16 +100,15 @@ export async function exportPEM(key, format) {
     );
   }
   if (chosen === 'pkcs8' && key.type !== 'private') {
-    throw new JwkError(ErrorCode.INVALID_ARGUMENT, 'exportPEM: pkcs8 requires a private KeyObject');
+    throw invalidArgument('exportPEM.key: pkcs8 requires a private KeyObject');
   }
   if (chosen === 'spki' && key.type === 'private') {
     // Emitting a public SPKI from a private key would silently reveal
     // only the public projection — allow, but be explicit about intent
     // by refusing here; callers should extract the public key first via
     // `createPublicKey(privateKey)`.
-    throw new JwkError(
-      ErrorCode.INVALID_ARGUMENT,
-      'exportPEM: passing a private KeyObject with format="spki" is ambiguous — extract the public key first with createPublicKey(privateKey)',
+    throw invalidArgument(
+      'exportPEM.key: passing a private KeyObject with format="spki" is ambiguous — extract the public key first with createPublicKey(privateKey)',
     );
   }
   const out = key.export({ format: 'pem', type: chosen });
@@ -134,15 +126,10 @@ export async function exportPEM(key, format) {
  * @returns {object}
  */
 export function toPublic(jwk) {
-  if (jwk == null || typeof jwk !== 'object') {
-    throw new JwkError(ErrorCode.INVALID_ARGUMENT, 'toPublic: expected a JWK object');
-  }
+  assertObject(jwk, 'toPublic.jwk');
   const j = /** @type {Record<string, unknown>} */ (jwk);
   if (j.kty === 'oct') {
-    throw new JwkError(
-      ErrorCode.INVALID_ARGUMENT,
-      'toPublic: `oct` JWKs are symmetric — they have no public projection',
-    );
+    throw invalidArgument('toPublic.jwk: `oct` JWKs are symmetric — they have no public projection');
   }
   const clone = { ...j };
   delete clone.d;
