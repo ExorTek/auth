@@ -10,6 +10,7 @@
  */
 
 import { JwsError, ErrorCode } from './internal/errors.js';
+import { assertNonEmptyString } from './internal/guards.js';
 import { lookup as lookupAlg } from './internal/algorithms.js';
 import { normalizeKey } from './internal/keys.js';
 import { assertSignSide as assertCritSign, assertVerifySide as assertCritVerify } from './internal/crit.js';
@@ -145,10 +146,8 @@ async function _signOne(spec, encPayload, index) {
     );
   }
   const { key, options } = spec;
+  assertNonEmptyString(options.alg, `signJson.signers[${index}].options.alg`);
   const alg = options.alg;
-  if (typeof alg !== 'string' || alg.length === 0) {
-    throw new JwsError(ErrorCode.INVALID_ARGUMENT, `signJson: signer[${index}] requires options.alg`);
-  }
   if (alg === 'none') {
     throw new JwsError(
       ErrorCode.ALGORITHM_NONE_FORBIDDEN,

@@ -5,6 +5,7 @@
 
 import * as sb from '@exortek/shared/base64url';
 import { JwsError, ErrorCode } from './errors.js';
+import { invalidArgument } from './guards.js';
 
 /**
  * Encode a `Buffer` / `Uint8Array` as unpadded base64url.
@@ -16,7 +17,7 @@ export function encode(bytes) {
   try {
     return sb.encode(bytes);
   } catch (err) {
-    throw new JwsError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
+    throw invalidArgument(err instanceof Error ? err.message : String(err), { cause: err });
   }
 }
 
@@ -30,7 +31,7 @@ export function encodeString(text) {
   try {
     return sb.encodeString(text);
   } catch (err) {
-    throw new JwsError(ErrorCode.INVALID_ARGUMENT, err instanceof Error ? err.message : String(err));
+    throw invalidArgument(err instanceof Error ? err.message : String(err), { cause: err });
   }
 }
 

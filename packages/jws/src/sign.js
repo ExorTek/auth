@@ -8,6 +8,7 @@
  */
 
 import { JwsError, ErrorCode } from './internal/errors.js';
+import { assertNonEmptyString, assertObject } from './internal/guards.js';
 import { lookup as lookupAlg } from './internal/algorithms.js';
 import { normalizeKey } from './internal/keys.js';
 import { assertSignSide as assertCritSign } from './internal/crit.js';
@@ -36,13 +37,9 @@ import { encode as b64uEncode, encodeJson as b64uEncodeJson } from './internal/b
  * @returns {Promise<string>}
  */
 export async function sign(payload, key, options) {
-  if (options == null || typeof options !== 'object') {
-    throw new JwsError(ErrorCode.INVALID_ARGUMENT, 'sign: options object is required');
-  }
+  assertObject(options, 'sign.options');
+  assertNonEmptyString(options.alg, 'sign.options.alg');
   const alg = options.alg;
-  if (typeof alg !== 'string' || alg.length === 0) {
-    throw new JwsError(ErrorCode.INVALID_ARGUMENT, 'sign: `alg` is required and must be a string');
-  }
   if (alg === 'none') {
     throw new JwsError(
       ErrorCode.ALGORITHM_NONE_FORBIDDEN,
@@ -88,13 +85,9 @@ export async function signDetached(payload, key, options) {
       'signDetached: payload must be a Buffer or Uint8Array — the caller is responsible for the byte encoding',
     );
   }
-  if (options == null || typeof options !== 'object') {
-    throw new JwsError(ErrorCode.INVALID_ARGUMENT, 'signDetached: options object is required');
-  }
+  assertObject(options, 'signDetached.options');
+  assertNonEmptyString(options.alg, 'signDetached.options.alg');
   const alg = options.alg;
-  if (typeof alg !== 'string' || alg.length === 0) {
-    throw new JwsError(ErrorCode.INVALID_ARGUMENT, 'signDetached: `alg` is required and must be a string');
-  }
   if (alg === 'none') {
     throw new JwsError(
       ErrorCode.ALGORITHM_NONE_FORBIDDEN,
