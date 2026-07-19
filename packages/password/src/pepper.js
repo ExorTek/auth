@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 
+import { toBuffer } from '@exortek/shared/bytes';
 import { array, instanceOf, object, oneOf, optional, string, union } from '@exortek/shared/validate';
 
 import { assertBytesOrString, invalidArgument, parse } from './internal/guards.js';
@@ -66,7 +67,7 @@ export function createPepper(config) {
     throw invalidArgument('createPepper.config.secret: at least one secret is required');
   }
   const secrets = rawSecrets.map((s, i) => {
-    const bytes = typeof s === 'string' ? Buffer.from(s, 'utf8') : Buffer.from(s);
+    const bytes = toBuffer(s, `createPepper.config.secret[${i}]`);
     if (bytes.length < 16) {
       throw invalidArgument(
         `createPepper.config.secret[${i}]: must be at least 16 bytes for meaningful defence; got ${bytes.length}`,
@@ -78,8 +79,7 @@ export function createPepper(config) {
   const encoding = config.encoding ?? 'base64';
 
   const wrapWith = (secretBytes, password) => {
-    const pwBytes = typeof password === 'string' ? Buffer.from(password, 'utf8') : Buffer.from(password);
-    return createHmac(hashName, secretBytes).update(pwBytes).digest(encoding);
+    return createHmac(hashName, secretBytes).update(toBuffer(password, 'password')).digest(encoding);
   };
 
   return {

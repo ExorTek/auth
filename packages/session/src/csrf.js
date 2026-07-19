@@ -1,4 +1,5 @@
 import { createHmac, randomBytes } from 'node:crypto';
+import { toBuffer } from '@exortek/shared/bytes';
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { SessionError, ErrorCode } from './errors.js';
 import { assertNonEmptyString, invalidArgument } from './internal/guards.js';
@@ -33,10 +34,12 @@ const MIN_SECRET_BYTES = 32;
  */
 export function deriveCsrfToken(sessionId, secret) {
   assertNonEmptyString(sessionId, 'deriveCsrfToken.sessionId');
-  if (typeof secret !== 'string' && !Buffer.isBuffer(secret) && !(secret instanceof Uint8Array)) {
-    throw invalidArgument('deriveCsrfToken.secret must be a string / Buffer / Uint8Array');
+  let key;
+  try {
+    key = toBuffer(secret, 'deriveCsrfToken.secret');
+  } catch (err) {
+    throw invalidArgument(err instanceof Error ? err.message : String(err), { cause: err });
   }
-  const key = typeof secret === 'string' ? Buffer.from(secret, 'utf8') : Buffer.from(secret);
   if (key.byteLength < MIN_SECRET_BYTES) {
     throw invalidArgument(
       `deriveCsrfToken.secret must be at least ${MIN_SECRET_BYTES} bytes (got ${key.byteLength})`,

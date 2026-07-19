@@ -1,50 +1,35 @@
+/**
+ * Coerce string / Buffer / Uint8Array into a Buffer. Wraps
+ * `@exortek/shared/bytes` so failures surface as
+ * `CryptoError(INVALID_ARGUMENT)` via the bound `invalidArgument`.
+ */
+
+import * as sb from '@exortek/shared/bytes';
 import { invalidArgument } from './guards.js';
 
 /**
- * Coerce `value` (string / Buffer / Uint8Array) into a `Buffer`, throwing a
- * `CryptoError(INVALID_ARGUMENT)` for anything else.
- *
- * Strings are decoded as UTF-8; Buffers are passed through; Uint8Arrays are
- * wrapped without copying the underlying storage. Centralises the coercion
- * step used by every hash / hmac / encode / cipher input path.
- *
  * @param {unknown} value
  * @param {string}  name
  * @returns {Buffer}
  */
 export function toBuffer(value, name) {
-  if (typeof value === 'string') {
-    return Buffer.from(value, 'utf8');
+  try {
+    return sb.toBuffer(value, name);
+  } catch (err) {
+    throw invalidArgument(err instanceof Error ? err.message : String(err), { cause: err });
   }
-  if (Buffer.isBuffer(value)) {
-    return value;
-  }
-  if (value instanceof Uint8Array) {
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-  }
-  throw invalidArgument(`${name} must be a string or Buffer`);
 }
 
 /**
- * Coerce `value` into a `Buffer`, decoding strings with the given output
- * encoding instead of UTF-8. Used on the receive side of a signature /
- * digest / token verify, where the caller passes an already-encoded blob
- * as a string and we need to reverse the encoding.
- *
  * @param {unknown} value
  * @param {string}  name
  * @param {'hex' | 'base64' | 'base64url'} encoding
  * @returns {Buffer}
  */
 export function toBufferWithEncoding(value, name, encoding) {
-  if (Buffer.isBuffer(value)) {
-    return value;
+  try {
+    return sb.toBufferWithEncoding(value, name, encoding);
+  } catch (err) {
+    throw invalidArgument(err instanceof Error ? err.message : String(err), { cause: err });
   }
-  if (value instanceof Uint8Array) {
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-  }
-  if (typeof value === 'string') {
-    return Buffer.from(value, encoding);
-  }
-  throw invalidArgument(`${name} must be a string or Buffer`);
 }
