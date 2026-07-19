@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { CryptoError, ErrorCode } from '../errors.js';
 import { assertBytesOrString, assertOptionalObject, assertString } from '../internal/guards.js';
 
@@ -104,10 +105,5 @@ export function unsignValue(signed, secret, options) {
   const value = signed.slice(0, i);
   const provided = signed.slice(i + 1);
   const expected = crypto.createHmac(algo, secret).update(value).digest('base64url');
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) {
-    return null;
-  }
-  return crypto.timingSafeEqual(a, b) ? value : null;
+  return timingSafeEqual(Buffer.from(provided), Buffer.from(expected)) ? value : null;
 }

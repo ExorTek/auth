@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { assertBytesOrString, assertEncoding, assertOptionalObject } from '../internal/guards.js';
 import { toBuffer, toBufferWithEncoding } from '../internal/bytes.js';
 import { _resolveOptions } from './hash.js';
@@ -44,11 +45,7 @@ export function verifyHmac(data, expected, secret, options) {
 
   const expectedBuf = _toExpectedBuffer(expected, options);
   const actualBuf = crypto.createHmac(algo, secret).update(toBuffer(data, 'data')).digest();
-
-  if (expectedBuf.length !== actualBuf.length) {
-    return false;
-  }
-  return crypto.timingSafeEqual(expectedBuf, actualBuf);
+  return timingSafeEqual(expectedBuf, actualBuf);
 }
 
 /**

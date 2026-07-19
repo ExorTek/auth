@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { CryptoError, ErrorCode } from '../errors.js';
 import { toBuffer } from '../internal/bytes.js';
 import { assertBytes } from '../internal/guards.js';
@@ -90,10 +91,5 @@ export function wipe(buf) {
  * if (!equal(receivedSig, expectedSig)) throw new Error('bad signature')
  */
 export function equal(a, b) {
-  const bufA = toBuffer(a, 'a');
-  const bufB = toBuffer(b, 'b');
-  if (bufA.length !== bufB.length) {
-    return false;
-  }
-  return crypto.timingSafeEqual(bufA, bufB);
+  return timingSafeEqual(toBuffer(a, 'a'), toBuffer(b, 'b'));
 }

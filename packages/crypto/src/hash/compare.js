@@ -1,4 +1,4 @@
-import crypto from 'node:crypto';
+import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { toBuffer } from '../internal/bytes.js';
 
 /**
@@ -30,10 +30,5 @@ import { toBuffer } from '../internal/bytes.js';
  * if (!compare(receivedSig, hmac(payload, key))) throw new Error('bad signature')
  */
 export function compare(a, b) {
-  const bufA = toBuffer(a, 'a');
-  const bufB = toBuffer(b, 'b');
-  if (bufA.length !== bufB.length) {
-    return false;
-  }
-  return crypto.timingSafeEqual(bufA, bufB);
+  return timingSafeEqual(toBuffer(a, 'a'), toBuffer(b, 'b'));
 }
