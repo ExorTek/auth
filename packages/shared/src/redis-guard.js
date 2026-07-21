@@ -17,6 +17,7 @@
  * @param {(message: string) => never} wrap
  *   Called with a diagnostic message when the check fails; must throw.
  *   The caller's typed error class is emitted from inside this callback.
+ * @returns {void}
  */
 export function assertRedisClient(client, methods, wrap) {
   if (!client || typeof client !== 'object') {

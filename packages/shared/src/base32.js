@@ -31,6 +31,7 @@ for (let i = 0; i < ALPHABET.length; i++) {
  * @param {{ padding?: boolean }} [options]  `padding: true` aligns the
  *   output to a multiple of 8 chars with `=` (RFC-strict form).
  * @returns {string}
+ * @throws {TypeError} if `bytes` is not a Buffer or Uint8Array.
  */
 export function encode(bytes, options) {
   if (bytes == null || (!Buffer.isBuffer(bytes) && !(bytes instanceof Uint8Array))) {
@@ -71,6 +72,8 @@ export function encode(bytes, options) {
  *
  * @param {string} input
  * @returns {Buffer}
+ * @throws {TypeError} if `input` is not a string.
+ * @throws {Error}     on characters outside the Base32 alphabet.
  */
 export function decode(input) {
   if (typeof input !== 'string') {
