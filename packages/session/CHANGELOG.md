@@ -1,5 +1,19 @@
 # @exortek/session
 
+## 1.2.0
+
+### Minor Changes
+
+- **Hono + Elysia adapters removed.** The `@exortek/session/hono` and
+  `@exortek/session/elysia` subpaths (added in `1.0.0`) no longer
+  exist. Positioning is the classic Node stack — Express and Fastify
+  only. Elysia is Bun-native in practice and Hono's edge-runtime pitch
+  is a domain this stack doesn't target. Removed from `exports`,
+  `peerDependencies`, and `peerDependenciesMeta`. `@exortek/session/express`
+  and `@exortek/session/fastify` are unchanged. Consumers on those
+  frameworks need to pin `< 1.2.0` (unmaintained) or write their own
+  adapter — session's public API stays framework-agnostic.
+
 ## 1.1.0
 
 ### Minor Changes
