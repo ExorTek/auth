@@ -156,6 +156,36 @@ packages/<name>/
 - All builds externalise `node:*` plus declared deps / peerDeps via
   `rollup.config.base.js#createConfig`.
 
+### Argument guards — bind once, import from local `internal/guards.js`
+
+Every package binds `@exortek/shared/asserts` to its own typed error class
+exactly once, in `src/internal/guards.js`, and every call site imports the
+bound helpers from that local file — **never from `@exortek/shared/asserts`
+directly**. This keeps `err instanceof <Package>Error` working for every
+argument-shape failure, without every call site paying wrap boilerplate.
+
+```js
+// packages/<pkg>/src/internal/guards.js  — 5 lines
+import { defineGuards } from '@exortek/shared/asserts';
+import { CryptoError, ErrorCode } from '../errors.js';
+export const { assertString, assertPositiveInt, invalidArgument, parse } =
+  defineGuards(CryptoError, ErrorCode.INVALID_ARGUMENT);
+```
+
+Rules:
+
+- Only re-export the assert names the package's own callsites use — the
+  destructure list is not "everything shared exports".
+- `invalidArgument(msg, { cause })` for the `throw invalidArgument('…')` sites
+  that don't fit the `X must be Y` shape (canonicalisation errors,
+  cross-field constraint failures).
+- `parse(schema, input, path)` is the bridge from
+  `@exortek/shared/validate` schemas — same bound error, one call.
+- **Path-naming convention** for the assert `name` argument:
+  `<publicFn>[.options|.config][.<field>]` — e.g. `'createUser.name'`,
+  `'scrypt.options.r'`, `'pepper.wrap.password'`. Keep it short; the stack
+  trace already says which function fired.
+
 ### TypeScript
 
 Pure JavaScript with JSDoc types, not `.ts`. `tsc --emitDeclarationOnly`
