@@ -1,5 +1,13 @@
 # @exortek/jwt
 
+## 1.1.0
+
+### Minor Changes
+
+- `tokenPair`: `refresh.alg` is now optional on the default opaque path (`opaque: true`, the default), where it was
+  previously required but decorative — random bytes never touch it. Still required when `refresh.opaque: false`
+  (signed JWT refresh). Additive change; existing configs continue to work.
+
 ## 1.0.0
 
 ### Major Changes

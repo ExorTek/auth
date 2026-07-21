@@ -128,7 +128,7 @@ const { accessToken, refreshToken, familyId } = await tokenPair.create(
   {
     secret: { access: accessSecret, refresh: refreshSecret },
     access:  { alg: 'ES256', expiresIn: '15m' },
-    refresh: { alg: 'HS256', expiresIn: '7d', store },
+    refresh: { expiresIn: '7d', store },  // opaque by default — random bytes, no alg needed
   },
 )
 
@@ -137,7 +137,7 @@ try {
   const next = await tokenPair.rotate(refreshToken, {
     secret: { access: accessSecret, refresh: refreshSecret },
     access:  { alg: 'ES256', expiresIn: '15m' },
-    refresh: { alg: 'HS256', expiresIn: '7d', store },
+    refresh: { expiresIn: '7d', store },
     detectReuse: true,          // default
     reuseWindow: 5,             // seconds grace for network races
   })
