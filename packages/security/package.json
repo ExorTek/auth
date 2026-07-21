@@ -47,16 +47,6 @@
       "types": "./dist/middleware/express.d.ts",
       "import": "./dist/express.mjs",
       "require": "./dist/express.cjs"
-    },
-    "./hono": {
-      "types": "./dist/middleware/hono.d.ts",
-      "import": "./dist/hono.mjs",
-      "require": "./dist/hono.cjs"
-    },
-    "./elysia": {
-      "types": "./dist/middleware/elysia.d.ts",
-      "import": "./dist/elysia.mjs",
-      "require": "./dist/elysia.cjs"
     }
   },
   "files": [
@@ -78,8 +68,6 @@
     "backend",
     "express",
     "fastify",
-    "elysia",
-    "hono",
     "auth",
     "security",
     "csrf",
@@ -116,22 +104,14 @@
     "fastify-plugin": "^6.0.0"
   },
   "peerDependencies": {
-    "elysia": ">=1",
     "express": ">=4",
-    "fastify": ">=4",
-    "hono": ">=4"
+    "fastify": ">=4"
   },
   "peerDependenciesMeta": {
-    "elysia": {
-      "optional": true
-    },
     "express": {
       "optional": true
     },
     "fastify": {
-      "optional": true
-    },
-    "hono": {
       "optional": true
     }
   },
@@ -139,10 +119,8 @@
     "@fastify/cookie": "^11.1.1",
     "@sinclair/typebox": "^0.34.0",
     "cookie-parser": "^1.4.7",
-    "elysia": "^1.4.29",
     "express": "^5.2.1",
-    "fastify": "^5.10.0",
-    "hono": "^4.12.29"
+    "fastify": "^5.10.0"
   },
   "engines": {
     "node": ">=22.0.0"

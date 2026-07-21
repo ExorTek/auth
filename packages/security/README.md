@@ -75,7 +75,7 @@ Same shape works on Express (`securityMiddleware`), Hono, and Elysia — see the
 | [`cors`](./src/cors)             | origin allowlist with preflight handling and async predicates                                                                                                                                                                                                        |
 | [`redirect`](./src/redirect)     | open-redirect guard + `extractReturnUrl` + `isSameOrigin`                                                                                                                                                                                                            |
 | [`helpers`](./src/helpers)       | `getClientIp` · `bearer` · `checkOrigin` · `webhookVerify` · `sanitizeBody` · `sanitizeParams` · `safeJoin` · `sanitizeFilename` · `freezePrototypes` · `timeout` · `bodyLimit` · `honeypot` · `slowDown` · `safeJsonParse` · `constantTimeEqual` · `parseCspReport` |
-| middleware                       | `fastify` · `express` · `hono` · `elysia` — each with `securityMiddleware` bundle **or** per-concern middleware                                                                                                                                                      |
+| middleware                       | `fastify` · `express` — each with `securityMiddleware` bundle **or** per-concern middleware                                                                                                                                                                          |
 
 ## Import styles
 
@@ -91,8 +91,6 @@ import { safeRedirect } from '@exortek/security/redirect';
 // 3. Framework middleware — one line for the whole stack
 import { securityPlugin } from '@exortek/security/fastify';
 import { securityMiddleware } from '@exortek/security/express';
-import { securityMiddleware } from '@exortek/security/hono';
-import { securityMiddleware } from '@exortek/security/elysia';
 ```
 
 ## Error handling

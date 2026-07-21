@@ -219,7 +219,7 @@ export { buildCorsCheck, buildHeaders };
 // -------------------------------------------------------------------
 // Framework-neutral runners.
 //
-// Each adapter (`express.js`, `fastify.js`, `hono.js`, `elysia.js`)
+// Each adapter (`express.js`, `fastify.js`)
 // builds a small `AdapterContext` from its native request/response and
 // hands it to these runners. Runners read the request via `ctx.method`
 // / `ctx.getHeader` / `ctx.cookies` and write via `ctx.setHeader` /
