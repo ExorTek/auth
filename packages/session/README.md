@@ -56,8 +56,6 @@ Optional peers — install only what you use:
 | **Redis store + pub/sub**   | `yarn add ioredis` **or** `yarn add redis`           |
 | **Fastify adapter**         | `yarn add fastify`                                   |
 | **Express adapter**         | `yarn add express`                                   |
-| **Hono adapter**            | `yarn add hono`                                      |
-| **Elysia adapter**          | `yarn add elysia`                                    |
 
 Requires **Node.js 22 or newer**. Base package requires `@exortek/crypto`.
 
@@ -308,32 +306,6 @@ app.get('/me', (req, res) => {
   if (!req.session) return res.sendStatus(401);
   res.json(req.session);
 });
-```
-
-### Hono
-
-```js
-import { sessionMiddleware } from '@exortek/session/hono';
-
-const { middleware } = sessionMiddleware({ secret, ttl: '7d', idleTtl: '30m' });
-app.use('*', middleware);
-
-app.get('/me', c => {
-  const session = c.get('session');
-  return session ? c.json(session) : c.text('unauthorized', 401);
-});
-```
-
-### Elysia
-
-```js
-import { sessionPlugin } from '@exortek/session/elysia';
-
-const { plugin } = sessionPlugin({ secret, ttl: '7d', idleTtl: '30m' });
-
-const app = new Elysia()
-  .use(plugin)
-  .get('/me', ({ session }) => session ?? { user: null });
 ```
 
 ## Errors

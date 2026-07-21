@@ -212,7 +212,7 @@ Deliberate omissions — these will **not** be added:
 
 ## v1.1 roadmap
 
-Framework middleware (fastify/express/hono/elysia), `bindTo` fingerprint
+Framework middleware (fastify/express), `bindTo` fingerprint
 binding, `extractBearer` helper, secret rotation manager, nested JWT
 (JWS + JWE), introspection helper (RFC 7662), DPoP (RFC 9449), JAR
 (RFC 9101), OpenTelemetry hooks, MongoDB + SQLite store adapters,

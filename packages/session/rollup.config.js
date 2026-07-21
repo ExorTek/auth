@@ -10,7 +10,5 @@ export default createConfig(pkg, {
     'trusted-device': 'src/trusted-device.js',
     fastify: 'src/middleware/fastify.js',
     express: 'src/middleware/express.js',
-    hono: 'src/middleware/hono.js',
-    elysia: 'src/middleware/elysia.js',
   },
 });
