@@ -31,7 +31,7 @@ const _rotateLock = createKeyMutex();
  * @typedef {import('./sign.js').SignOptions} SignOptions
  *
  * @typedef {Object} RefreshOptions
- * @property {string} alg                                                REQUIRED. Alg for signed refresh; unused when opaque:true.
+ * @property {string} [alg]                                              Alg for signed refresh (opaque:false). Ignored — and no longer required — on the opaque default path.
  * @property {string | number} expiresIn                                 REQUIRED.
  * @property {boolean} [opaque]                                          Default true — random string. false → signed JWT refresh.
  * @property {number} [tokenSize]                                        Default 32 bytes.
@@ -232,8 +232,14 @@ function _assertCreateOptions(options) {
   if (!options.access || typeof options.access.alg !== 'string') {
     throw invalidArgument('tokenPair.options.access.alg is required');
   }
-  if (!options.refresh || typeof options.refresh.alg !== 'string') {
-    throw invalidArgument('tokenPair.options.refresh.alg is required');
+  if (!options.refresh) {
+    throw invalidArgument('tokenPair.options.refresh is required');
+  }
+  // `alg` is only consumed on the signed-JWT refresh path (`opaque: false`).
+  // The default opaque path mints random bytes and never touches it — so
+  // requiring `alg` there was decorative, and now optional.
+  if (options.refresh.opaque === false && typeof options.refresh.alg !== 'string') {
+    throw invalidArgument('tokenPair.options.refresh.alg is required when refresh.opaque is false');
   }
   if (options.refresh.expiresIn === undefined) {
     throw invalidArgument('tokenPair.options.refresh.expiresIn is required');

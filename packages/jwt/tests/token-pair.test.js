@@ -51,6 +51,36 @@ test('create: custom tokenSize + encoding hex', async () => {
   options.refresh.store._stop();
 });
 
+test('create: opaque refresh works without refresh.alg', async () => {
+  const store = createStore('memory', { gc: { strategy: 'lazy' } });
+  const pair = await create(
+    { sub: 'u1' },
+    {
+      secret: { access: ACCESS_SECRET, refresh: REFRESH_SECRET },
+      access: { alg: 'HS256', expiresIn: '15m' },
+      refresh: { expiresIn: '7d', store },
+    },
+  );
+  assert.equal(typeof pair.refreshToken, 'string');
+  store._stop();
+});
+
+test('create: refresh.alg required when refresh.opaque is false', async () => {
+  const store = createStore('memory', { gc: { strategy: 'lazy' } });
+  await assert.rejects(
+    create(
+      { sub: 'u1' },
+      {
+        secret: { access: ACCESS_SECRET, refresh: REFRESH_SECRET },
+        access: { alg: 'HS256', expiresIn: '15m' },
+        refresh: { opaque: false, expiresIn: '7d', store },
+      },
+    ),
+    err => err instanceof JwtError && err.code === ErrorCode.INVALID_ARGUMENT,
+  );
+  store._stop();
+});
+
 test('create: custom hashFn wins over hashAlgo', async () => {
   const { options, store } = fresh();
   let called = 0;
