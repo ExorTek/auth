@@ -71,7 +71,7 @@ export function verifyCsrfToken(candidate, sessionId, secret) {
   // The shared compare is length-safe: a length mismatch burns a
   // comparison and returns false instead of short-circuiting, so
   // "wrong length" is not distinguishable from "wrong value".
-  return timingSafeEqual(Buffer.from(expected, 'utf8'), Buffer.from(candidate, 'utf8'));
+  return timingSafeEqual(toBuffer(expected, 'expected'), toBuffer(candidate, 'candidate'));
 }
 
 /**

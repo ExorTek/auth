@@ -1,3 +1,4 @@
+import { toBuffer } from '@exortek/shared/bytes';
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { ALPHABET as CROCKFORD_ALPHABET } from '@exortek/shared/crockford';
 import { sampleAlphabet } from '@exortek/shared/sample';
@@ -157,7 +158,7 @@ export function compareBackupCode(candidate, stored) {
   // The shared compare is length-safe: a mismatch burns a comparison
   // instead of short-circuiting, so "wrong length" is not
   // distinguishable from "wrong value" via timing.
-  return timingSafeEqual(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
+  return timingSafeEqual(toBuffer(a, 'a'), toBuffer(b, 'b'));
 }
 
 /**
