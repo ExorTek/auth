@@ -11,7 +11,7 @@
 
 CSRF, rate limiting, helmet-style headers, CORS, safe redirects, and 17 focused defensive helpers — one install replaces
 `helmet` + `csrf-csrf` + `express-rate-limit` + `express-slow-down` + `cors` + `hpp` + `express-mongo-sanitize`. Adapters
-for **Fastify**, **Express**, **Hono**, and **Elysia**.
+for **Fastify** and **Express**.
 
 📖 **Docs:** [**auth.memet.dev/security**](https://auth.memet.dev/security)
 
@@ -23,8 +23,9 @@ is external). `@exortek/security` ships them once, correctly, framework-agnostic
 
 - **One API surface.** `csrf`, `rateLimit`, `headers`, `cors`, `safeRedirect` + 17 helpers — all pure functions. The
   framework adapters are a thin layer of glue on top.
-- **Framework-agnostic.** Fastify, Express, Hono, Elysia. Each ships a bundle (`securityMiddleware`) **and** per-concern
-  middleware so you can pick just CORS or just rate-limit if that's what you need.
+- **Framework-agnostic.** Fastify and Express, each with a bundle (`securityMiddleware`) **and** per-concern middleware so
+  you can pick just CORS or just rate-limit if that's what you need. Adding a fifth framework is one file — build an
+  `AdapterContext` (see `src/middleware/core.js`) and wire it to `runHeaders` / `runCors` / `runRateLimit` / `runCsrf`.
 - **Small footprint.** Runtime touches `node:crypto`, `node:path`, and — only when you import `/fastify` — a single ~3
   KB dep (`fastify-plugin`). Every framework itself is an **optional peer**.
 - **JSDoc → `.d.ts`.** Pure JavaScript source, TypeScript types emitted at build. IDE hints without a `.ts` in sight.
@@ -63,7 +64,9 @@ await app.register(securityPlugin, {
 });
 ```
 
-Same shape works on Express (`securityMiddleware`), Hono, and Elysia — see the docs.
+Same shape works on Express (`securityMiddleware`) — see the docs, or the runnable demo servers at
+[`examples/express-server.js`](./examples/express-server.js) and
+[`examples/fastify-server.js`](./examples/fastify-server.js).
 
 ## Modules
 
@@ -74,7 +77,7 @@ Same shape works on Express (`securityMiddleware`), Hono, and Elysia — see the
 | [`headers`](./src/headers)       | CSP (+ nonce), HSTS, COOP/COEP/CORP, Referrer, Permissions, frameguard, noSniff, XSS-Protection                                                                                                                                                                      |
 | [`cors`](./src/cors)             | origin allowlist with preflight handling and async predicates                                                                                                                                                                                                        |
 | [`redirect`](./src/redirect)     | open-redirect guard + `extractReturnUrl` + `isSameOrigin`                                                                                                                                                                                                            |
-| [`helpers`](./src/helpers)       | `getClientIp` · `bearer` · `checkOrigin` · `webhookVerify` · `sanitizeBody` · `sanitizeParams` · `safeJoin` · `sanitizeFilename` · `freezePrototypes` · `timeout` · `bodyLimit` · `honeypot` · `slowDown` · `safeJsonParse` · `constantTimeEqual` · `parseCspReport` |
+| [`helpers`](./src/helpers)       | `getClientIp` · `bearer` · `checkOrigin` · `webhookVerify` · `webhookVerifyStripe` · `sanitizeBody` · `sanitizeParams` · `safeJoin` · `sanitizeFilename` · `freezePrototypes` · `timeout` · `bodyLimit` · `honeypot` · `slowDown` · `safeJsonParse` · `constantTimeEqual` · `parseCspReport` |
 | middleware                       | `fastify` · `express` — each with `securityMiddleware` bundle **or** per-concern middleware                                                                                                                                                                          |
 
 ## Import styles
@@ -127,7 +130,11 @@ Codes: `INVALID_ARGUMENT`, `CSRF_MISSING`, `CSRF_MISMATCH`, `CSRF_MALFORMED`, `C
 - **`safeRedirect(next, { allowedHosts })`.** Catches every classic open-redirect vector: `//evil.com`, `javascript:`,
   `data:`, userinfo tricks, backslash tricks, protocol-relative, control chars.
 - **`safeJsonParse(body)`.** JSON parse that refuses `__proto__` payloads — closes the prototype-pollution door at the
-  request boundary. Pair with `freezePrototypes()` for global defence.
+  request boundary. Pair with `freezePrototypes({ exclude: ['Date', 'RegExp'] })` for global defence without breaking
+  polyfills.
+- **`webhookVerifyStripe(payload, header, secret, { tolerance })`.** Parses Stripe's `t=<ts>,v1=<hex>` envelope,
+  verifies the HMAC-SHA-256 over `${t}.${payload}`, and rejects timestamps outside `|now − t| ≤ tolerance` (default
+  300s). Supports secret rotation (`secret: [newest, ...older]`) and multiple `v1=<hex>` candidates in one header.
 
 ## Links
 
