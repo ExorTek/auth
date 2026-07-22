@@ -151,6 +151,7 @@ packages/<name>/
   Current examples:
   - `@exortek/jwk` — `./generate`, `./import`, `./export`, `./thumbprint`, `./validate`
   - `@exortek/jws` — `./sign`, `./verify`, `./decode`, `./json`
+  - `@exortek/jwt` — `./token-pair`, `./stores`
   - `@exortek/oauth2` — `./providers/<name>` (planned)
   - `@exortek/passkey` — `./server` (planned; no `/client`)
 - All builds externalise `node:*` plus declared deps / peerDeps via
