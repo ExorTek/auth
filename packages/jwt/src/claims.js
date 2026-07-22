@@ -1,11 +1,12 @@
 /**
- * Claims validation — RFC 7519 §4 + RFC 8725 (best practice).
+ * Claims layer — RFC 7519 §4 + RFC 8725 (best practice).
  *
- * Phase-3 skeleton: `injectClaims` handles `iat` (auto or
- * `noTimestamp`), `exp` from `expiresIn`, `nbf` from `notBefore`, and
- * copies caller-supplied `iss` / `aud` / `sub` / `nonce` / `jti` onto
- * the payload. Full claims **validation** on the verify side, plus the
- * `jti` random generator, live in the claims-layer commit.
+ * `injectClaims` stamps sign-side timestamps (`iat` / `exp` / `nbf`)
+ * and copies caller-supplied `iss` / `aud` / `sub` / `nonce` / `jti`
+ * onto the payload. `validateClaims` is the verify-side counterpart:
+ * enforces `iss` / `aud` / `sub` / `nonce` / `typ` allowlists,
+ * `maxAge` freshness, and `requiredClaims` / `requiredScopes` presence.
+ * `_resolveJti` generates a random `jti` when the caller opts in.
  */
 
 import { randomBytes } from 'node:crypto';
