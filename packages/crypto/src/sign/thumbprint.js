@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { CryptoError, ErrorCode } from '../errors.js';
 import { assertEncoding, assertOptionalObject } from '../internal/guards.js';
 import { assertKeyObject } from '../internal/validate.js';
+import { isObject } from '@exortek/shared/predicates';
 
 /**
  * @typedef {object} ThumbprintOptions
@@ -49,7 +50,7 @@ import { assertKeyObject } from '../internal/validate.js';
  * thumbprint(kp.publicKey, { encoding: 'hex' }).slice(0, 16)  // '3a7f8b2c...'
  */
 export function thumbprint(key, options) {
-  if (!key || typeof key !== 'object' || (key.type !== 'public' && key.type !== 'private')) {
+  if (!key || !isObject(key) || (key.type !== 'public' && key.type !== 'private')) {
     throw new CryptoError(
       ErrorCode.INVALID_KEY,
       'thumbprint key must be a public or private KeyObject — generate one via await generateSignKeyPair(algo), or import a PEM with crypto.createPublicKey(pem)',

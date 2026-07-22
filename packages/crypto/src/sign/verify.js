@@ -3,6 +3,7 @@ import { assertBytesOrString, assertEncoding, assertObject } from '../internal/g
 import { assertKeyObject } from '../internal/validate.js';
 import { toBuffer, toBufferWithEncoding } from '../internal/bytes.js';
 import { _resolveSpec, _keyInput } from './sign.js';
+import { isString } from '@exortek/shared/predicates';
 
 /**
  * @typedef {import('node:crypto').KeyObject} KeyObject
@@ -46,7 +47,7 @@ export function verify(data, signature, publicKey, options) {
   assertKeyObject(publicKey, 'public', 'publicKey');
 
   const encoding = options.encoding ?? 'base64url';
-  if (typeof signature === 'string') {
+  if (isString(signature)) {
     assertEncoding(encoding, 'options.encoding', { allowBuffer: false });
   }
   const sigBuf = toBufferWithEncoding(signature, 'signature', encoding);

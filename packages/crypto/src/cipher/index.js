@@ -8,6 +8,7 @@ import { seal, unseal } from './seal.js';
 import { SYMMETRIC_ALGOS, ASYMMETRIC_ALGOS, KEY_AGREEMENT_ALGOS } from './algorithms.js';
 import { invalidKey } from '../internal/guards.js';
 import { _keyProblemHint } from '../internal/validate.js';
+import { isObject, isString } from '@exortek/shared/predicates';
 
 /**
  * Polymorphic encrypt — dispatches based on the key type.
@@ -25,7 +26,7 @@ import { _keyProblemHint } from '../internal/validate.js';
  * @returns {ReturnType<typeof encryptSymmetric> | Buffer}
  */
 function encrypt(data, key, options) {
-  if (!key || typeof key !== 'object' || typeof key.type !== 'string') {
+  if (!key || !isObject(key) || !isString(key.type)) {
     throw invalidKey(`key must be a KeyObject; ${_keyProblemHint(key)}`);
   }
   if (key.type === 'secret') {
@@ -53,7 +54,7 @@ function encrypt(data, key, options) {
  * @returns {Buffer}
  */
 function decrypt(ciphertext, key, options) {
-  if (!key || typeof key !== 'object' || typeof key.type !== 'string') {
+  if (!key || !isObject(key) || !isString(key.type)) {
     throw invalidKey(`key must be a KeyObject; ${_keyProblemHint(key)}`);
   }
   if (key.type === 'secret') {

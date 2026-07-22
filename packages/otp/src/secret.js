@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { OtpError, ErrorCode } from './internal/errors.js';
 import * as base32 from './internal/base32.js';
+import { isString } from '@exortek/shared/predicates';
 
 /**
  * @typedef {'base32' | 'base32padded' | 'hex' | 'raw'} SecretEncoding
@@ -88,7 +89,7 @@ export function decodeSecret(secret, options = {}) {
   if (secret instanceof Uint8Array) {
     return Buffer.from(secret.buffer, secret.byteOffset, secret.byteLength);
   }
-  if (typeof secret !== 'string' || secret.length === 0) {
+  if (!isString(secret) || secret.length === 0) {
     throw new OtpError(ErrorCode.INVALID_SECRET, 'secret must be a non-empty string, Buffer, or Uint8Array');
   }
 

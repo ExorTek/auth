@@ -1,5 +1,6 @@
 import { OtpError, ErrorCode } from './internal/errors.js';
 import { assertNonEmptyString, assertObject, invalidArgument } from './internal/guards.js';
+import { isString } from '@exortek/shared/predicates';
 
 // Google's Key URI Format (the de facto QR standard used by every
 // mainstream 2FA app) only lists SHA1 / SHA256 / SHA512. SHA224 and
@@ -119,7 +120,7 @@ export function provisioningUri(options) {
  * @returns {ParsedProvisioning | null}
  */
 export function parseProvisioningUri(input) {
-  if (typeof input !== 'string' || input.length === 0) {
+  if (!isString(input) || input.length === 0) {
     return null;
   }
   let url;

@@ -1,5 +1,6 @@
 import { sampleAlphabet, sampleUint16Indices } from '@exortek/shared/sample';
 import { invalidArgument } from './internal/guards.js';
+import { isArray, isString } from '@exortek/shared/predicates';
 
 // Named alphabets — the character sets 99% of "give me a random
 // password" callers actually want. Custom alphabets stay possible via
@@ -52,11 +53,10 @@ export function generate(options = {}) {
     throw invalidArgument(`generate.options.length must be an integer in [1, 1024]; got ${length}`);
   }
   const alphabetInput = options.alphabet ?? 'crockford';
-  const alphabet =
-    typeof alphabetInput === 'string' && alphabets[alphabetInput] ? alphabets[alphabetInput] : alphabetInput;
-  if (typeof alphabet !== 'string' || alphabet.length < 2 || alphabet.length > 256) {
+  const alphabet = isString(alphabetInput) && alphabets[alphabetInput] ? alphabets[alphabetInput] : alphabetInput;
+  if (!isString(alphabet) || alphabet.length < 2 || alphabet.length > 256) {
     throw invalidArgument(
-      `generate.options.alphabet must be a string of 2-256 characters (or a named alphabet: ${Object.keys(alphabets).join(', ')}); got ${typeof alphabet === 'string' ? `length ${alphabet.length}` : typeof alphabet}`,
+      `generate.options.alphabet must be a string of 2-256 characters (or a named alphabet: ${Object.keys(alphabets).join(', ')}); got ${isString(alphabet) ? `length ${alphabet.length}` : typeof alphabet}`,
     );
   }
   return sampleAlphabet(alphabet, length);
@@ -356,13 +356,13 @@ export function passphrase(options = {}) {
     throw invalidArgument(`passphrase.options.words must be an integer in [1, 64]; got ${count}`);
   }
   const separator = options.separator ?? '-';
-  if (typeof separator !== 'string') {
+  if (!isString(separator)) {
     throw invalidArgument('passphrase.options.separator must be a string');
   }
   const list = options.wordList ?? DEFAULT_WORDS;
-  if (!Array.isArray(list) || list.length < 128) {
+  if (!isArray(list) || list.length < 128) {
     throw invalidArgument(
-      `passphrase.options.wordList must be an array of ≥ 128 words; got ${Array.isArray(list) ? list.length : typeof list}`,
+      `passphrase.options.wordList must be an array of ≥ 128 words; got ${isArray(list) ? list.length : typeof list}`,
     );
   }
   const capitalize = options.capitalize === true;

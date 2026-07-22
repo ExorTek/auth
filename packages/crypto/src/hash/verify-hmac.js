@@ -3,6 +3,7 @@ import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { assertBytesOrString, assertEncoding, assertOptionalObject } from '../internal/guards.js';
 import { toBuffer, toBufferWithEncoding } from '../internal/bytes.js';
 import { _resolveOptions } from './hash.js';
+import { isString } from '@exortek/shared/predicates';
 
 /**
  * One-shot HMAC verification — compute the HMAC of `data` under `secret`
@@ -55,7 +56,7 @@ export function verifyHmac(data, expected, secret, options) {
  */
 function _toExpectedBuffer(value, options) {
   const encoding = options?.encoding ?? 'hex';
-  if (typeof value === 'string') {
+  if (isString(value)) {
     assertEncoding(encoding, 'options.encoding', { allowBuffer: false });
   }
   return toBufferWithEncoding(value, 'expected', encoding);

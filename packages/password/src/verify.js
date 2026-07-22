@@ -4,6 +4,7 @@ import * as scrypt from './algorithms/scrypt.js';
 import * as pbkdf2 from './algorithms/pbkdf2.js';
 import * as argon2 from './algorithms/argon2.js';
 import * as bcrypt from './algorithms/bcrypt.js';
+import { isString } from '@exortek/shared/predicates';
 
 // Static route table — one lookup, no runtime allocations. The bcrypt
 // entry accepts an extra option pass-through for `mode`; the others
@@ -55,7 +56,7 @@ const ROUTES = Object.freeze({
  *                        backend peer is not installed.
  */
 export async function verify(password, storedHash, options = {}) {
-  if (typeof storedHash !== 'string' || storedHash.length === 0) {
+  if (!isString(storedHash) || storedHash.length === 0) {
     return false;
   }
   const record = parseHash(storedHash);

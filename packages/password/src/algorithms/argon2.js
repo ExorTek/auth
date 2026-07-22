@@ -2,6 +2,7 @@ import { PasswordError, ErrorCode } from '../errors.js';
 import { assertPositiveInt } from '../internal/guards.js';
 import { normalizePassword } from '../internal/normalize.js';
 import { parseHash } from '../phc.js';
+import { isString } from '@exortek/shared/predicates';
 
 // OWASP Password Storage Cheat Sheet (2024) Argon2id first-line
 // recommendation: m=19 MiB, t=2, p=1. All three parameters are
@@ -170,7 +171,7 @@ export async function hash(password, options = {}) {
  * @returns {Promise<boolean>}
  */
 export async function verify(password, phcHash) {
-  if (typeof phcHash !== 'string' || !phcHash.startsWith('$argon2')) {
+  if (!isString(phcHash) || !phcHash.startsWith('$argon2')) {
     return false;
   }
   const impl = await loadArgon2();

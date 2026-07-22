@@ -4,6 +4,7 @@ import { OtpError, ErrorCode } from './internal/errors.js';
 import { invalidArgument } from './internal/guards.js';
 import { truncate } from './internal/digits.js';
 import { decodeSecret } from './secret.js';
+import { isString } from '@exortek/shared/predicates';
 
 // RFC 4226 / 6238 nominally specify SHA1, with 6238 explicitly opting
 // SHA256 + SHA512 in. SHA224 + SHA384 aren't in the RFCs but share the
@@ -129,7 +130,7 @@ export function hotp(secret, counter, options = {}) {
  *                          or `null` on no match.
  */
 export function verifyHotp(code, secret, counter, options = {}) {
-  if (typeof code !== 'string' || code.length === 0) {
+  if (!isString(code) || code.length === 0) {
     return null;
   }
   const digits = options.digits ?? 6;
@@ -177,7 +178,7 @@ export function _verifyHotpForward(code, secret, start, span, digits, algorithm)
   assertAlgorithm(algorithm);
   // Reject obviously wrong shapes upfront — but do NOT skip the loop
   // when the shape matches so timing doesn't leak "known length".
-  if (typeof code !== 'string' || code.length !== digits || !/^\d+$/.test(code)) {
+  if (!isString(code) || code.length !== digits || !/^\d+$/.test(code)) {
     return null;
   }
   // Decode once, outside the loop — base32 decoding per candidate would be
@@ -236,7 +237,7 @@ export function resynchronize(secret, codes, options = {}) {
     );
   }
   const [code1, code2] = codes;
-  if (typeof code1 !== 'string' || typeof code2 !== 'string') {
+  if (!isString(code1) || !isString(code2)) {
     return null;
   }
   const digits = options.digits ?? 6;

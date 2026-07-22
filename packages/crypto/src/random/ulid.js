@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { assertUint48 } from '../internal/guards.js';
 import { CROCKFORD as ALPHABET } from '../internal/alphabets.js';
+import { isString } from '@exortek/shared/predicates';
 
 /** Matches a 26-char ULID, case-insensitive. Character class excludes `I`, `L`, `O`, `U`. */
 const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
@@ -139,5 +140,5 @@ export function ulid(time) {
  * isULID('not-a-ulid')                      // false
  */
 export function isULID(value) {
-  return typeof value === 'string' && ULID_RE.test(value);
+  return isString(value) && ULID_RE.test(value);
 }

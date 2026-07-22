@@ -4,6 +4,7 @@ import { ALPHABET as CROCKFORD_ALPHABET } from '@exortek/shared/crockford';
 import { sampleAlphabet } from '@exortek/shared/sample';
 import { number, object, optional, string } from '@exortek/shared/validate';
 import { invalidArgument, parse } from './internal/guards.js';
+import { isString } from '@exortek/shared/predicates';
 
 const NSchema = number().refine(v => Number.isInteger(v) && v >= 1 && v <= 100, 'must be an integer in [1, 100]');
 
@@ -130,7 +131,7 @@ export function backupCodes(n = 10, options = {}) {
  * @returns {string}
  */
 export function normalizeBackupCode(input) {
-  if (typeof input !== 'string') {
+  if (!isString(input) || input.length === 0) {
     return '';
   }
   return input.replace(/[\s-]+/g, '').toUpperCase();

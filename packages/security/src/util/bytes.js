@@ -1,5 +1,6 @@
 import { randomBuffer } from '@exortek/shared/random';
 import { timingSafeEqual as sharedTimingSafeEqual } from '@exortek/shared/timing-safe';
+import { isString } from '@exortek/shared/predicates';
 
 /**
  * Cryptographically secure random bytes.
@@ -20,7 +21,7 @@ export function randomBytes(size) {
  * @returns {boolean}
  */
 export function timingSafeEqual(a, b) {
-  const ba = typeof a === 'string' ? Buffer.from(a) : a;
-  const bb = typeof b === 'string' ? Buffer.from(b) : b;
+  const ba = isString(a) ? Buffer.from(a) : a;
+  const bb = isString(b) ? Buffer.from(b) : b;
   return sharedTimingSafeEqual(ba, bb);
 }

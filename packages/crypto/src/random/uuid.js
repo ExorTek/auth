@@ -4,6 +4,7 @@ import { assertString, assertUint48 } from '../internal/guards.js';
 import { toBuffer } from '../internal/bytes.js';
 import { hash } from '../hash/hash.js';
 import { decode as hexDecode } from '../encode/hex.js';
+import { isString } from '@exortek/shared/predicates';
 
 /** Canonical UUID format matcher (8-4-4-4-12, hex, case-insensitive). Version/variant bits are NOT checked — custom namespace UUIDs may carry any version, and RFC 9562 defines up to v8. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -22,7 +23,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * isUUID('00000000-0000-0000-0000-000000000000')   // true (nil UUID)
  */
 export function isUUID(value) {
-  return typeof value === 'string' && UUID_RE.test(value);
+  return isString(value) && UUID_RE.test(value);
 }
 
 /**

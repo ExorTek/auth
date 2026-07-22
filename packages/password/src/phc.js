@@ -1,6 +1,7 @@
 import { PasswordError, ErrorCode } from './errors.js';
 import { b64Encode, b64Decode } from './internal/base64.js';
 import { assertObject, invalidArgument } from './internal/guards.js';
+import { isString } from '@exortek/shared/predicates';
 
 /**
  * @typedef {'argon2i' | 'argon2d' | 'argon2id' | 'scrypt' | 'pbkdf2-sha256' | 'pbkdf2-sha512' | 'bcrypt'} PasswordAlgorithm
@@ -48,7 +49,7 @@ const BCRYPT_RE = /^\$2[abxy]?\$(\d{2})\$([./A-Za-z0-9]{53})$/;
  * @returns {ParsedHash | null}
  */
 export function parseHash(input) {
-  if (typeof input !== 'string' || input.length === 0) {
+  if (!isString(input) || input.length === 0) {
     return null;
   }
   const bcryptMatch = BCRYPT_RE.exec(input);

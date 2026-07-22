@@ -1,6 +1,7 @@
 import { hotp, _verifyHotpForward } from './hotp.js';
 import { invalidArgument } from './internal/guards.js';
 import { createHash } from 'node:crypto';
+import { isString } from '@exortek/shared/predicates';
 
 const DEFAULT_PERIOD = 30;
 
@@ -138,7 +139,7 @@ export async function verifyTotp(code, secret, options = {}) {
     throw invalidArgument(`verifyTotp.options.window must be an integer in [0, 10]; got ${window}`);
   }
 
-  if (typeof code !== 'string' || code.length === 0) {
+  if (!isString(code) || code.length === 0) {
     return false;
   }
 
@@ -181,7 +182,7 @@ export async function verifyTotp(code, secret, options = {}) {
 // users; the caller's `key` disambiguates them.
 function replayKey(callerKey, secret, counter) {
   const digest = createHash('sha256')
-    .update(typeof secret === 'string' ? secret : Buffer.from(secret))
+    .update(isString(secret) ? secret : Buffer.from(secret))
     .digest('hex')
     .slice(0, 16);
   return `otp:used:${callerKey}:${digest}:${counter}`;

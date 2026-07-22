@@ -1,5 +1,6 @@
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 import { invalidArgument } from '../internal/guards.js';
+import { isArray, isFunction, isNull, isNumber, isString, isUndefined } from '@exortek/shared/predicates';
 
 /**
  * @typedef {string | RegExp} OriginMatcher
@@ -61,13 +62,13 @@ import { invalidArgument } from '../internal/guards.js';
 const DEFAULT_METHODS = ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'];
 
 function toList(v) {
-  if (v === undefined || v === null) {
+  if (isUndefined(v) || isNull(v)) {
     return null;
   }
-  if (Array.isArray(v)) {
+  if (isArray(v)) {
     return v;
   }
-  if (typeof v === 'string') {
+  if (isString(v)) {
     return v
       .split(',')
       .map(s => s.trim())
@@ -77,13 +78,13 @@ function toList(v) {
 }
 
 function compileOriginCheck(origin) {
-  if (origin === undefined || origin === true) {
+  if (isUndefined(origin) || origin === true) {
     return () => true;
   }
   if (origin === false) {
     return () => false;
   }
-  if (typeof origin === 'function') {
+  if (isFunction(origin)) {
     return origin;
   }
   const matchers = Array.isArray(origin) ? origin : [origin];
@@ -92,7 +93,7 @@ function compileOriginCheck(origin) {
       return false;
     }
     for (const m of matchers) {
-      if (typeof m === 'string' && m === incoming) {
+      if (isString(m) && m === incoming) {
         return true;
       }
       if (m instanceof RegExp && m.test(incoming)) {
@@ -202,7 +203,7 @@ export function cors(options = {}) {
             : 'Access-Control-Request-Headers';
         }
       }
-      if (typeof maxAge === 'number') {
+      if (isNumber(maxAge)) {
         headers['Access-Control-Max-Age'] = String(Math.floor(maxAge));
       }
       return { headers, allowed: true, preflight: true, status: preflightStatus };
@@ -215,12 +216,12 @@ export function cors(options = {}) {
 
   return function checkCors(input) {
     const method = (input.method || '').toUpperCase();
-    const preflight = method === 'OPTIONS' && typeof input.requestMethod === 'string';
+    const preflight = method === 'OPTIONS' && isString(input.requestMethod);
     const verdict = isAllowed(input.origin);
     // Detect thenables (native Promise, custom async predicate wrappers).
     // Keeping the sync path allocation-free matters — this is called on
     // every request.
-    if (verdict && typeof verdict.then === 'function') {
+    if (verdict && isFunction(verdict.then)) {
       return verdict.then(ok => buildDecision(Boolean(ok), input, preflight));
     }
     return buildDecision(Boolean(verdict), input, preflight);
