@@ -1,8 +1,6 @@
-import crypto from 'node:crypto';
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
-import { CryptoError, ErrorCode } from '../errors.js';
 import { toBuffer } from '../internal/bytes.js';
-import { assertBytes } from '../internal/guards.js';
+import { assertBytes, invalidArgument } from '../internal/guards.js';
 
 /**
  * @typedef {string | Buffer | Uint8Array} BytesInput
@@ -42,8 +40,7 @@ export function xor(a, b) {
   const bufA = toBuffer(a, 'a');
   const bufB = toBuffer(b, 'b');
   if (bufA.length !== bufB.length) {
-    throw new CryptoError(
-      ErrorCode.INVALID_ARGUMENT,
+    throw invalidArgument(
       `xor operands must have equal length; got a=${bufA.length} bytes, b=${bufB.length} bytes`,
     );
   }
