@@ -25,13 +25,15 @@ now they should submit MFA.* Common solutions are all imperfect:
   surface, extra cleanup.
 - **URL query param `pendingUserId=usr_123`.** Trivially forgeable —
   attacker types in anyone's user id.
-- **A JWT with a short TTL.** Works, but pulls in a whole JOSE stack
-  for something that will never leave your servers.
+- **A JWT with a short TTL.** Works, but overkill for a token that will
+  never leave your servers — you don't need third-party verifiability
+  or an interoperable algorithm registry for a two-hop hand-off.
 
 A challenge is what belongs there: a **short, signed envelope** —
-`chall_v1.<payload>.<hmac>` — carrying the flow context. Attacker
-can't forge it (HMAC), can't replay it (opt-in single-use), can't
-use it from another network (opt-in IP binding).
+`<prefix>.<payload>.<hmac>` (defaults to `chall_v1`, override with
+`prefix: 'server_challenge'` etc.) — carrying the flow context.
+Attacker can't forge it (HMAC), can't replay it (opt-in single-use),
+can't use it from another network (opt-in IP binding).
 
 ## Is it safe to trust?
 

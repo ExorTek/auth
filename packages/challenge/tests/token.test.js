@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 
-import { PREFIX, decode, newJti, sign } from '../src/token.js';
+import { DEFAULT_PREFIX, decode, newJti, sign } from '../src/token.js';
 
 const SECRET = randomBytes(32);
 
@@ -18,7 +18,7 @@ test('sign: produces `chall_v1.<b64u payload>.<b64u tag>` shape', () => {
   const token = sign({ jti: 'abc', iat: 1, exp: 999 }, SECRET);
   const parts = token.split('.');
   assert.equal(parts.length, 3);
-  assert.equal(parts[0], PREFIX);
+  assert.equal(parts[0], DEFAULT_PREFIX);
 });
 
 test('decode: round-trip returns the same payload', () => {
@@ -29,7 +29,7 @@ test('decode: round-trip returns the same payload', () => {
 
 test('decode: wrong prefix → malformed', () => {
   const token = sign({ jti: 'x', iat: 1, exp: 2 }, SECRET);
-  const swapped = token.replace(PREFIX, 'chall_v9');
+  const swapped = token.replace(DEFAULT_PREFIX, 'chall_v9');
   assert.deepEqual(decode(swapped, SECRET), { reason: 'malformed' });
 });
 
@@ -60,4 +60,20 @@ test('decode: payload that decodes to an array → malformed', () => {
   const token = sign([], SECRET);
   const res = decode(token, SECRET);
   assert.deepEqual(res, { reason: 'malformed' });
+});
+
+test('sign/decode: custom prefix round-trips', () => {
+  const payload = { jti: 'x', iat: 1, exp: 999 };
+  const token = sign(payload, SECRET, 'server_challenge');
+  assert.ok(token.startsWith('server_challenge.'));
+  const good = decode(token, SECRET, 'server_challenge');
+  assert.deepEqual(good, { payload });
+});
+
+test('decode: token minted with prefix A cannot be verified under prefix B', () => {
+  const payload = { jti: 'x', iat: 1, exp: 999 };
+  const token = sign(payload, SECRET, 'myapp_v1');
+  // Wrong prefix → treated as malformed (prefix check fails before HMAC).
+  assert.deepEqual(decode(token, SECRET, DEFAULT_PREFIX), { reason: 'malformed' });
+  assert.deepEqual(decode(token, SECRET, 'other_prefix'), { reason: 'malformed' });
 });

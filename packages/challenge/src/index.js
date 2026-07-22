@@ -27,7 +27,7 @@ import {
 
 import { ChallengeError, ErrorCode } from './errors.js';
 import { invalidArgument } from './internal/guards.js';
-import { decode, newJti, sign } from './token.js';
+import { DEFAULT_PREFIX, assertPrefix, decode, newJti, sign } from './token.js';
 
 export { ChallengeError, ErrorCode } from './errors.js';
 
@@ -99,6 +99,12 @@ const KNOWN_METHODS = new Set([
  * @property {boolean} [ipBinding=false]
  *   When true, the caller-supplied `ip` is stamped into the payload and
  *   `verifyChallenge` will reject a request whose `ip` differs.
+ * @property {string} [prefix='chall_v1']
+ *   Wire-format prefix. Defaults to `'chall_v1'` — the value shipped
+ *   with this package. Callers can override to brand the token
+ *   family (e.g. `'server_challenge'`, `'myapp_v1'`); must match
+ *   `/^[A-Za-z0-9_-]{1,32}$/`. The same prefix must be passed at
+ *   verify time or verification returns `reason: 'malformed'`.
  * @property {number} [now]                     Override `Date.now()` for testing.
  */
 
@@ -116,6 +122,10 @@ const KNOWN_METHODS = new Set([
  * @property {string} [ip]
  *   The current request's IP. Required to verify a token that was
  *   created with `ipBinding: true`; ignored otherwise.
+ * @property {string} [prefix='chall_v1']
+ *   Wire-format prefix. Must match the value passed to
+ *   `createChallenge` — a token minted with a different prefix will
+ *   fail with `reason: 'malformed'`.
  * @property {number} [now]                     Override `Date.now()` for testing.
  */
 
@@ -162,6 +172,9 @@ export async function createChallenge(options) {
   if (!isFiniteNumber(ttlMs) || ttlMs <= 0) {
     throw invalidArgument(`createChallenge.options.expiresIn must resolve to a positive duration; got ${ttlMs}ms`);
   }
+  const prefix = isUndefined(options.prefix)
+    ? DEFAULT_PREFIX
+    : assertPrefix(options.prefix, 'createChallenge.options.prefix', invalidArgument);
   _assertStringOrUndef(options.userId, 'createChallenge.options.userId');
   _assertMethod(options.method, 'createChallenge.options.method');
   _assertStringOrUndef(options.step, 'createChallenge.options.step');
@@ -179,7 +192,7 @@ export async function createChallenge(options) {
   if (ipBinding && !isString(options.ip)) {
     throw invalidArgument('createChallenge.options.ip must be a string when ipBinding: true');
   }
-  if (options.metadata !== undefined && !isObject(options.metadata)) {
+  if (!isUndefined(options.metadata) && !isObject(options.metadata)) {
     throw invalidArgument('createChallenge.options.metadata must be a plain object when provided');
   }
 
@@ -210,14 +223,14 @@ export async function createChallenge(options) {
   if (isString(options.ua)) {
     payload.ua = options.ua;
   }
-  if (options.metadata !== undefined) {
+  if (!isUndefined(options.metadata)) {
     payload.meta = options.metadata;
   }
   if (singleUse) {
     payload.su = 1;
   }
 
-  return sign(payload, secret);
+  return sign(payload, secret, prefix);
 }
 
 /**
@@ -250,8 +263,11 @@ export async function verifyChallenge(token, options) {
       'verifyChallenge.options.store is required when consume: true — pass the same store used at create time',
     );
   }
+  const prefix = isUndefined(options.prefix)
+    ? DEFAULT_PREFIX
+    : assertPrefix(options.prefix, 'verifyChallenge.options.prefix', invalidArgument);
 
-  const parsed = decode(token, secret);
+  const parsed = decode(token, secret, prefix);
   if ('reason' in parsed) {
     return { valid: false, reason: parsed.reason };
   }
@@ -266,16 +282,16 @@ export async function verifyChallenge(token, options) {
     // Small clock-skew tolerance (60s) — reject only if clearly future-dated.
     return { valid: false, reason: 'not_yet_valid' };
   }
-  if (options.expectedUserId !== undefined && payload.userId !== options.expectedUserId) {
+  if (!isUndefined(options.expectedUserId) && payload.userId !== options.expectedUserId) {
     return { valid: false, reason: 'user_mismatch' };
   }
-  if (options.expectedMethod !== undefined && payload.method !== options.expectedMethod) {
+  if (!isUndefined(options.expectedMethod) && payload.method !== options.expectedMethod) {
     return { valid: false, reason: 'method_mismatch' };
   }
-  if (options.expectedStep !== undefined && payload.step !== options.expectedStep) {
+  if (!isUndefined(options.expectedStep) && payload.step !== options.expectedStep) {
     return { valid: false, reason: 'step_mismatch' };
   }
-  if (options.expectedNextStep !== undefined && payload.nextStep !== options.expectedNextStep) {
+  if (!isUndefined(options.expectedNextStep) && payload.nextStep !== options.expectedNextStep) {
     return { valid: false, reason: 'next_step_mismatch' };
   }
   if (!isUndefined(payload.ip)) {
@@ -352,5 +368,5 @@ function _isStore(v) {
 }
 
 function _now(override) {
-  return typeof override === 'number' ? override : Date.now();
+  return isNumber(override) ? override : Date.now();
 }

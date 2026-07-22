@@ -22,6 +22,8 @@ verifyChallenge(token, {
   expectedNextStep?: string,
   ip?:               string,                // required if token was IP-bound
 
+  prefix?:           string,                // must match the create-time prefix
+
   now?:              number,
 }): Promise<
   | { valid: true, payload: ChallengePayload }

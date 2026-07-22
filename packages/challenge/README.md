@@ -63,10 +63,12 @@ if (!res.valid) {
 ## Token format
 
 ```
-chall_v1.<base64url(JSON payload)>.<base64url(HMAC-SHA256 tag)>
+<prefix>.<base64url(JSON payload)>.<base64url(HMAC-SHA256 tag)>
 ```
 
-Deliberately **not** a JWT: the `chall_v1` prefix lets a caller cheaply refuse a non-challenge token (or a `chall_v2` when we roll one) before ever running the HMAC. HMAC covers `chall_v1.<b64u payload>` — any change to prefix, version, or payload invalidates the signature.
+The default prefix is `chall_v1`. It's deliberately **not** a JWT: the versioned prefix lets a caller cheaply refuse a non-challenge token (or a future `chall_v2`) before ever running the HMAC. HMAC covers `<prefix>.<b64u payload>` — any change to prefix or payload invalidates the signature.
+
+You can override the prefix at both `createChallenge` and `verifyChallenge` — e.g. `prefix: 'server_challenge'` or `prefix: 'myapp_v1'` — to brand the wire format for your service. The value must match `/^[A-Za-z0-9_-]{1,32}$/` (no `.` since it's the delimiter), and the same prefix must be used on both sides or verification returns `reason: 'malformed'`.
 
 ## API
 
@@ -92,6 +94,9 @@ createChallenge({
   store?:      IncrStore,
   ipBinding?:  boolean,                         // requires `ip`
   ip?:         string,
+
+  // Wire format
+  prefix?:     string,                          // default 'chall_v1'; /^[A-Za-z0-9_-]{1,32}$/
 
   // Testing
   now?:        number,                          // override Date.now()
@@ -128,7 +133,7 @@ verifyChallenge(token, {
 
 Never throws on user-input problems — a wrong or stale token is a normal auth outcome, not an error. Only throws `ChallengeError` on programmer bugs (bad options, wrong secret shape).
 
-The 60-second clock-skew tolerance on `iat` matches every other JOSE library — verify only rejects tokens whose `iat` is clearly future-dated.
+The 60-second clock-skew tolerance on `iat` covers ordinary NTP drift — verify only rejects tokens whose `iat` is clearly future-dated.
 
 ## Single-use enforcement
 

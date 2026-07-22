@@ -199,6 +199,36 @@ test('metadata: attached and returned on verify', async () => {
   assert.deepEqual(res.payload.meta, { redirectTo: '/dashboard', flag: true });
 });
 
+test('custom prefix: create with prefix A, verify with same prefix', async () => {
+  const token = await createChallenge({
+    secret: SECRET,
+    expiresIn: '5m',
+    prefix: 'server_challenge',
+    userId: 'u1',
+  });
+  assert.ok(token.startsWith('server_challenge.'));
+  const res = await verifyChallenge(token, { secret: SECRET, prefix: 'server_challenge' });
+  assert.equal(res.valid, true);
+  assert.equal(res.payload.userId, 'u1');
+});
+
+test('custom prefix: mismatch → malformed (not bad_signature)', async () => {
+  const token = await createChallenge({ secret: SECRET, expiresIn: '5m', prefix: 'myapp_v1' });
+  const res = await verifyChallenge(token, { secret: SECRET });
+  assert.equal(res.valid, false);
+  assert.equal(res.reason, 'malformed');
+});
+
+test('prefix validation: rejects illegal chars / length / shape', async () => {
+  for (const bad of ['', 'has.dot', 'has space', 'x'.repeat(33), 42, null]) {
+    await assert.rejects(
+      createChallenge({ secret: SECRET, expiresIn: '5m', prefix: bad }),
+      err => err instanceof ChallengeError && err.code === ErrorCode.INVALID_ARGUMENT,
+      `prefix=${JSON.stringify(bad)}`,
+    );
+  }
+});
+
 test('store failure inside verify → store_unavailable', async () => {
   const brokenStore = {
     async incr() {

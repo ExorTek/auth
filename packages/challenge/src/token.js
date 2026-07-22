@@ -3,17 +3,19 @@
  *
  * Format:
  *
- *     chall_v1.<base64url(JSON payload)>.<base64url(HMAC-SHA256 tag)>
+ *     <prefix>.<base64url(JSON payload)>.<base64url(HMAC-SHA256 tag)>
  *
- * Not a JWT — deliberately different so the two token families cannot
- * be confused for one another at a call site. The `chall_v1` prefix
- * both versions the format (a hypothetical `chall_v2` can migrate the
- * envelope without breaking existing verifiers) and lets a caller
- * cheaply refuse a non-challenge token before ever running the HMAC.
+ * The default prefix is {@link DEFAULT_PREFIX} (`chall_v1`) — deliberately
+ * unlike a JWT so the two token families cannot be confused at a call
+ * site. Callers may override it (e.g. `'server_challenge'`,
+ * `'myapp_v1'`) to brand the wire format for a specific service; the
+ * same prefix must be used at create and verify time, or verification
+ * returns `reason: 'malformed'`.
  *
- * HMAC covers `chall_v1.<b64u payload>` — the same string the caller
- * received minus the trailing tag. Any change to prefix, version, or
- * payload invalidates the signature.
+ * HMAC covers `<prefix>.<b64u payload>` — the same string the caller
+ * received minus the trailing tag. Any change to prefix or payload
+ * invalidates the signature; a token minted with one prefix cannot be
+ * accepted under another even by the same secret.
  */
 
 import { createHmac, randomBytes } from 'node:crypto';
@@ -21,8 +23,32 @@ import * as b64u from '@exortek/shared/base64url';
 import { isObject, isString } from '@exortek/shared/predicates';
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
 
-export const PREFIX = 'chall_v1';
+export const DEFAULT_PREFIX = 'chall_v1';
 const HMAC_ALG = 'sha256';
+
+// Printable ASCII, no `.` (delimiter), no whitespace. Length capped so a
+// misused prefix can't grow the token unboundedly.
+const PREFIX_RE = /^[A-Za-z0-9_-]{1,32}$/;
+
+/**
+ * Assert a prefix is well-shaped. Throws via the caller's `invalidArg`
+ * function so `createChallenge` / `verifyChallenge` can raise
+ * `ChallengeError` with the right code — this module stays free of the
+ * error class dependency.
+ *
+ * @param {string} prefix
+ * @param {string} name
+ * @param {(msg: string) => Error} invalidArg
+ * @returns {string}
+ */
+export function assertPrefix(prefix, name, invalidArg) {
+  if (!isString(prefix) || !PREFIX_RE.test(prefix)) {
+    throw invalidArg(
+      `${name} must match /^[A-Za-z0-9_-]{1,32}$/ (letters, digits, '_' or '-', 1-32 chars — no '.' since it's the token delimiter); got ${JSON.stringify(prefix)}`,
+    );
+  }
+  return prefix;
+}
 
 /**
  * Random ID for the token's `jti` claim — 128 bits of entropy, encoded
@@ -40,10 +66,11 @@ export function newJti() {
  *
  * @param {object} payload
  * @param {Buffer} secret     32+ raw bytes; caller validates length.
+ * @param {string} [prefix]   Wire prefix; defaults to {@link DEFAULT_PREFIX}.
  * @returns {string}
  */
-export function sign(payload, secret) {
-  const body = `${PREFIX}.${b64u.encodeJson(payload)}`;
+export function sign(payload, secret, prefix = DEFAULT_PREFIX) {
+  const body = `${prefix}.${b64u.encodeJson(payload)}`;
   const tag = createHmac(HMAC_ALG, secret).update(body).digest();
   return `${body}.${b64u.encode(tag)}`;
 }
@@ -55,14 +82,15 @@ export function sign(payload, secret) {
  *
  * @param {string} token
  * @param {Buffer} secret
+ * @param {string} [prefix]   Expected prefix; defaults to {@link DEFAULT_PREFIX}.
  * @returns {{ payload: object } | { reason: 'malformed' | 'bad_signature' }}
  */
-export function decode(token, secret) {
+export function decode(token, secret, prefix = DEFAULT_PREFIX) {
   if (!isString(token) || token.length === 0) {
     return { reason: 'malformed' };
   }
   const parts = token.split('.');
-  if (parts.length !== 3 || parts[0] !== PREFIX) {
+  if (parts.length !== 3 || parts[0] !== prefix) {
     return { reason: 'malformed' };
   }
   const [, encodedPayload, encodedTag] = parts;
@@ -72,7 +100,7 @@ export function decode(token, secret) {
   } catch {
     return { reason: 'malformed' };
   }
-  const expected = createHmac(HMAC_ALG, secret).update(`${PREFIX}.${encodedPayload}`).digest();
+  const expected = createHmac(HMAC_ALG, secret).update(`${prefix}.${encodedPayload}`).digest();
   if (!timingSafeEqual(tag, expected)) {
     return { reason: 'bad_signature' };
   }

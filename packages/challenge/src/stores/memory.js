@@ -14,7 +14,7 @@
  * oldest-inserted entry is dropped when the cap is exceeded.
  */
 
-import { isFunction, isInteger } from '@exortek/shared/predicates';
+import { isFunction, isInteger, isUndefined } from '@exortek/shared/predicates';
 
 import { invalidArgument } from '../internal/guards.js';
 
@@ -79,7 +79,7 @@ export function memoryStore(options = {}) {
       return;
     }
     const oldest = map.keys().next().value;
-    if (oldest !== undefined) {
+    if (!isUndefined(oldest)) {
       map.delete(oldest);
     }
   }

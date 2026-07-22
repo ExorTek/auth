@@ -28,12 +28,15 @@ createChallenge({
   ipBinding?:  boolean,          // requires `ip`
   ip?:         string,
 
+  prefix?:     string,           // default 'chall_v1'; /^[A-Za-z0-9_-]{1,32}$/
+
   now?:        number,           // override Date.now() (tests)
 }): Promise<string>
 ```
 
 Returns the compact token string:
-`chall_v1.<base64url(payload)>.<base64url(hmac)>`
+`<prefix>.<base64url(payload)>.<base64url(hmac)>` — the prefix defaults
+to `chall_v1`.
 
 ## Basic usage
 
@@ -69,6 +72,26 @@ const token = await createChallenge({
 The token is signed and returned even without touching the store —
 enforcement happens on `verifyChallenge` with `consume: true`. The
 store is required at create time to fail fast on misconfiguration.
+
+## Custom wire prefix
+
+```js
+const token = await createChallenge({
+  secret: SECRET,
+  expiresIn: '5m',
+  prefix: 'server_challenge', // instead of the default 'chall_v1'
+});
+// token → 'server_challenge.<payload>.<hmac>'
+```
+
+Use to brand the token family for your service. The value must match
+`/^[A-Za-z0-9_-]{1,32}$/` (no `.` since it's the delimiter). The same
+prefix must be passed to `verifyChallenge` — otherwise verification
+returns `reason: 'malformed'`.
+
+The default `chall_v1` doubles as a wire-format version marker; a
+future envelope change would ship as `chall_v2` and both prefixes can
+coexist during migration.
 
 ## IP binding
 

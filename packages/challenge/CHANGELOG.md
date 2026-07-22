@@ -20,8 +20,12 @@
   per verify) under the `@exortek/challenge/stores` subpath. Any object
   exposing `incr(key, ttlMs) → { count }` also works — e.g.
   `@exortek/security`'s rate-limit stores.
-- **Token format:** `chall_v1.<base64url(payload)>.<base64url(hmac)>`
+- **Token format:** `<prefix>.<base64url(payload)>.<base64url(hmac)>`
   — deliberately not a JWT so the two token families cannot be confused
-  at a call site.
+  at a call site. Prefix defaults to `chall_v1`; callers can override
+  via `options.prefix` (e.g. `'server_challenge'`, `'myapp_v1'`) to
+  brand the wire format for their service. Must match
+  `/^[A-Za-z0-9_-]{1,32}$/`, and the same prefix must be used at create
+  and verify time.
 - **Errors:** stable `ErrorCode.INVALID_ARGUMENT` /
   `ErrorCode.INVALID_SECRET` codes on the `ChallengeError` class.
