@@ -117,8 +117,8 @@
   },
   "devDependencies": {
     "@exortek/shared": "workspace:*",
-    "@fastify/cookie": "^11.1.1",
-    "@sinclair/typebox": "^0.34.0",
+    "@fastify/cookie": "^11.1.2",
+    "@sinclair/typebox": "^0.34.52",
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
     "fastify": "^5.10.0"

@@ -36,14 +36,14 @@
     "verify": "yarn typecheck && yarn lint && yarn format:check && yarn test"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.31.0",
+    "@changesets/cli": "^2.31.1",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^1.0.0",
     "eslint": "^10.7.0",
     "ioredis": "^5.11.1",
-    "prettier": "^3.9.5",
+    "prettier": "^3.9.6",
     "rollup": "^4.62.2",
-    "typescript": "^6.0.3"
+    "typescript": "6.0.3"
   },
   "engines": {
     "node": ">=22.0.0"

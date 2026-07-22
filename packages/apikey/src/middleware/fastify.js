@@ -14,14 +14,24 @@
  *
  *   app.get('/v1/whoami', async req => req.apiKey);
  *
- * Plain plugin (no fastify-plugin wrapper). The preHandler applies
- * within the plugin's scope only — mount under a prefix / register in
- * a scoped route group to control which routes require an API key.
+ * Wrapped with `fastify-plugin` so the `preHandler` hook and the
+ * `req.apiKey` decorator escape encapsulation and apply to routes
+ * registered as siblings in the parent scope. Register the plugin
+ * inside a scoped `app.register(async scope => …)` block to control
+ * which route group needs an API key — the usual Fastify pattern for
+ * "protect only these routes with auth".
+ *
+ * `fastify-plugin` is an **optional peer** — install it with
+ * `npm i fastify fastify-plugin` (or `yarn add`) alongside the fastify
+ * runtime.  Not a hard dependency because Express-only consumers of
+ * `@exortek/apikey` should not have to install it.
  */
+
+import fp from 'fastify-plugin';
 
 import { normalizeOptions, runApiKey } from './core.js';
 
-export async function apiKeyPlugin(app, options) {
+async function apiKeyPluginFn(app, options) {
   const config = normalizeOptions(options);
 
   app.decorateRequest(config.attach, null);
@@ -42,3 +52,8 @@ export async function apiKeyPlugin(app, options) {
     return undefined;
   });
 }
+
+export const apiKeyPlugin = fp(apiKeyPluginFn, {
+  fastify: '4.x || 5.x',
+  name: '@exortek/apikey',
+});

@@ -73,9 +73,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@changesets/cli@npm:^2.31.0":
-  version: 2.31.0
-  resolution: "@changesets/cli@npm:2.31.0"
+"@changesets/cli@npm:^2.31.1":
+  version: 2.31.1
+  resolution: "@changesets/cli@npm:2.31.1"
   dependencies:
     "@changesets/apply-release-plan": "npm:^7.1.1"
     "@changesets/assemble-release-plan": "npm:^6.0.10"
@@ -105,7 +105,7 @@ __metadata:
     term-size: "npm:^2.1.0"
   bin:
     changeset: bin.js
-  checksum: 10c0/3b15f4f5fc7ccaa0b82ca4f9803977ed141b6bed66f83cf8004c2f4ab8e3a00c3a813569b76e4c757d0a8ca5e778bcb6df6e4df91be6c98e0dfaa2cff87c9434
+  checksum: 10c0/375789e85def0bb303ada45d5085c92765010e6b88b8252eb459346ac8a94eba098c9cb8ad416241757796a8828c417fc9e0a23011bd3a74ce33eef013d8311a
   languageName: node
   linkType: hard
 
@@ -349,6 +349,28 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@exortek/apikey@workspace:packages/apikey":
+  version: 0.0.0-use.local
+  resolution: "@exortek/apikey@workspace:packages/apikey"
+  dependencies:
+    "@exortek/shared": "workspace:*"
+    express: "npm:^5.2.1"
+    fastify: "npm:^5.10.0"
+    fastify-plugin: "npm:^6.0.0"
+  peerDependencies:
+    express: ">=4"
+    fastify: ">=4"
+    fastify-plugin: ">=4"
+  peerDependenciesMeta:
+    express:
+      optional: true
+    fastify:
+      optional: true
+    fastify-plugin:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
 "@exortek/challenge@workspace:packages/challenge":
   version: 0.0.0-use.local
   resolution: "@exortek/challenge@workspace:packages/challenge"
@@ -410,7 +432,7 @@ __metadata:
   resolution: "@exortek/password@workspace:packages/password"
   dependencies:
     "@exortek/shared": "workspace:*"
-    argon2: "npm:^0.44.0"
+    argon2: "npm:^0.45.0"
     bcryptjs: "npm:^3.0.3"
   peerDependencies:
     argon2: ">=0.44.0"
@@ -428,8 +450,8 @@ __metadata:
   resolution: "@exortek/security@workspace:packages/security"
   dependencies:
     "@exortek/shared": "workspace:*"
-    "@fastify/cookie": "npm:^11.1.1"
-    "@sinclair/typebox": "npm:^0.34.0"
+    "@fastify/cookie": "npm:^11.1.2"
+    "@sinclair/typebox": "npm:^0.34.52"
     cookie-parser: "npm:^1.4.7"
     express: "npm:^5.2.1"
     fastify: "npm:^5.10.0"
@@ -485,13 +507,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fastify/cookie@npm:^11.1.1":
-  version: 11.1.1
-  resolution: "@fastify/cookie@npm:11.1.1"
+"@fastify/cookie@npm:^11.1.2":
+  version: 11.1.2
+  resolution: "@fastify/cookie@npm:11.1.2"
   dependencies:
     cookie: "npm:^2.0.0"
     fastify-plugin: "npm:^6.0.0"
-  checksum: 10c0/fad3588bc08f727632b42e69cf037cc915fad422f18adfb45b2eed0cbb27266ed60d99db3acca72f2388a1b27ef8d9f9d1a49527282deefdbc0284e59dabe57f
+  checksum: 10c0/6fe2e18ad2387a789e4807678d20baa6926c616bfe237cf32dda0dc5de44d3d558220d445f9870444a81808c34f7599e8843b1e015e85dc761c7d5bb1b7b5235
   languageName: node
   linkType: hard
 
@@ -1742,7 +1764,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@sinclair/typebox@npm:^0.34.0":
+"@sinclair/typebox@npm:^0.34.52":
   version: 0.34.52
   resolution: "@sinclair/typebox@npm:0.34.52"
   checksum: 10c0/03e9be17ffb536ddd6dc35b6131c88eb113b2ce6cbec4fa60b1d5219de99e59b2649fc40ad70a85db561104395faa3406608971dc7b0abef529b80fb001dc821
@@ -1768,21 +1790,21 @@ __metadata:
   linkType: hard
 
 "@tanstack/react-virtual@npm:^3.13.9":
-  version: 3.14.5
-  resolution: "@tanstack/react-virtual@npm:3.14.5"
+  version: 3.14.7
+  resolution: "@tanstack/react-virtual@npm:3.14.7"
   dependencies:
-    "@tanstack/virtual-core": "npm:3.17.3"
+    "@tanstack/virtual-core": "npm:3.17.5"
   peerDependencies:
     react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
     react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-  checksum: 10c0/f3dd2da5e5e0a94756e47f11fa76bfe0485e845da72b8022a4a593e2906aa60b827a5f0d7b6063092c76874fed8ddc69bcbf759298733ced24a66a82e8d58f21
+  checksum: 10c0/b0332de248caedbb3b6da53042da13d36994370359ac12162166b2d89cf4e31049dc909fc1b7d96a28f6b93d3a2397efa099ce232e2d9b451b9d4350800e81cc
   languageName: node
   linkType: hard
 
-"@tanstack/virtual-core@npm:3.17.3":
-  version: 3.17.3
-  resolution: "@tanstack/virtual-core@npm:3.17.3"
-  checksum: 10c0/e6199a0c25d1780e62f57c9f72432342e2cabd5b1197cf66b0f2250c9c0bbecbd0c53e7bb639804c4c7931f9cfa57efa80f6a64fefe6614bf14871f682c17aa3
+"@tanstack/virtual-core@npm:3.17.5":
+  version: 3.17.5
+  resolution: "@tanstack/virtual-core@npm:3.17.5"
+  checksum: 10c0/e6a9f305414ac096f5cc7cfb597aa6b41a52b5e51a2d20ac0ca060abf37c2abc6a0ca357378006f030119da3552dafe8b0472aa000dad58577b5e9163cbec681
   languageName: node
   linkType: hard
 
@@ -2361,16 +2383,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"argon2@npm:^0.44.0":
-  version: 0.44.0
-  resolution: "argon2@npm:0.44.0"
+"argon2@npm:^0.45.0":
+  version: 0.45.0
+  resolution: "argon2@npm:0.45.0"
   dependencies:
     "@phc/format": "npm:^1.0.0"
-    cross-env: "npm:^10.0.0"
-    node-addon-api: "npm:^8.5.0"
+    cross-env: "npm:^10.1.0"
+    node-addon-api: "npm:^8.9.0"
     node-gyp: "npm:latest"
     node-gyp-build: "npm:^4.8.4"
-  checksum: 10c0/e0c4ccdebda659b4e44ed25621ad4cce07ee1d1bc9790ba3ef7145cd57a561b483e448fb8fd585dc28eadcb353918d89d0dcae73da36d9cb95af55e243ce49b9
+  checksum: 10c0/6aa761524012b1be769c340651afa0bda9218f80cdeb4c9d0a09bb42a91e40559e39ab3c64d11c6cc0b3297884a53a6fe3f90be55c61d77d628e1a16b187545a
   languageName: node
   linkType: hard
 
@@ -2444,12 +2466,12 @@ __metadata:
   linkType: hard
 
 "avvio@npm:^9.0.0":
-  version: 9.2.0
-  resolution: "avvio@npm:9.2.0"
+  version: 9.3.0
+  resolution: "avvio@npm:9.3.0"
   dependencies:
     "@fastify/error": "npm:^4.0.0"
     fastq: "npm:^1.17.1"
-  checksum: 10c0/ebeb1613a507d001922a3a2763336191da731bbd9df93f67d51b08fc98549e14499b058e008220d5df3354e0f14316cfa57107198caf09df6c8ba42c94ce9f51
+  checksum: 10c0/faa7bfc0bae70d7c30d56252fbe4671ebbf1e0b8c1bdb3d1febcad6549d3521d7bd0e535f903310d5a6af357447fc9cf6407229c7d46b2f2502d40dca341f625
   languageName: node
   linkType: hard
 
@@ -2468,11 +2490,11 @@ __metadata:
   linkType: hard
 
 "baseline-browser-mapping@npm:^2.9.19":
-  version: 2.10.43
-  resolution: "baseline-browser-mapping@npm:2.10.43"
+  version: 2.11.0
+  resolution: "baseline-browser-mapping@npm:2.11.0"
   bin:
     baseline-browser-mapping: dist/cli.cjs
-  checksum: 10c0/08a9e585fe0b1672a0a41026579d41debbaff2c1ceffc9efe510b47713b9d78296846d7a86f0d74d8f64af0088fdebd715f5ea6cb88d6fe1d57f8fafa686b3b5
+  checksum: 10c0/03176d4d1c85a156971ae328241e9216288d59f46a5195acc95c41f1477b2e791185d0f68128788c311fd0fb0b93b321170d65c1ef7d9bcab096677c844365de
   languageName: node
   linkType: hard
 
@@ -2575,9 +2597,9 @@ __metadata:
   linkType: hard
 
 "caniuse-lite@npm:^1.0.30001579":
-  version: 1.0.30001805
-  resolution: "caniuse-lite@npm:1.0.30001805"
-  checksum: 10c0/5245ea10d6addc9e054da52c622bf7730747b717fb30f01a9ffc8917e101221d90352440da23ff46f686579e7eeaaac6134801e07638c3a388d65d52dc8b17ac
+  version: 1.0.30001806
+  resolution: "caniuse-lite@npm:1.0.30001806"
+  checksum: 10c0/9442c8afff0968e9b2ce0104a7340c1ce4a5c09f469ccb9eef10d25712ea0afe542486e5318c697c70dd502f988cfc04eaa1c9438c92ac3bcf4d708a2a17bee1
   languageName: node
   linkType: hard
 
@@ -2809,7 +2831,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"cross-env@npm:^10.0.0":
+"cross-env@npm:^10.1.0":
   version: 10.1.0
   resolution: "cross-env@npm:10.1.0"
   dependencies:
@@ -3715,14 +3737,14 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "exortek-auth@workspace:."
   dependencies:
-    "@changesets/cli": "npm:^2.31.0"
+    "@changesets/cli": "npm:^2.31.1"
     "@rollup/plugin-node-resolve": "npm:^16.0.3"
     "@rollup/plugin-terser": "npm:^1.0.0"
     eslint: "npm:^10.7.0"
     ioredis: "npm:^5.11.1"
-    prettier: "npm:^3.9.5"
+    prettier: "npm:^3.9.6"
     rollup: "npm:^4.62.2"
-    typescript: "npm:^6.0.3"
+    typescript: "npm:6.0.3"
   languageName: unknown
   linkType: soft
 
@@ -5965,7 +5987,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"node-addon-api@npm:^8.5.0":
+"node-addon-api@npm:^8.9.0":
   version: 8.9.0
   resolution: "node-addon-api@npm:8.9.0"
   dependencies:
@@ -6026,9 +6048,9 @@ __metadata:
   linkType: hard
 
 "npm-to-yarn@npm:^3.0.0":
-  version: 3.0.1
-  resolution: "npm-to-yarn@npm:3.0.1"
-  checksum: 10c0/f0a72bfc0ed2ad50c5995511ff6442520d259aee5a58e1b0914572a33d29c07090a684a1d8ce95d2399dfe9bc51e649e8d029b0118ecf941f40212053693caca
+  version: 3.1.0
+  resolution: "npm-to-yarn@npm:3.1.0"
+  checksum: 10c0/da7d31caf3d96b51e83fe66724cd446149f1347cb3f2e2997305f846236237bc2842b953f9e4558258fc688d6104ad024e33224698480782eb513f762288476e
   languageName: node
   linkType: hard
 
@@ -6181,9 +6203,9 @@ __metadata:
   linkType: hard
 
 "package-manager-detector@npm:^1.3.0":
-  version: 1.7.0
-  resolution: "package-manager-detector@npm:1.7.0"
-  checksum: 10c0/49488e732ef854205b8c58f68f2315c5b1006169bf9b3a34ca3042c2995edf53e805ee720778f214f32bb80cf6e7cc1ac13508423e89decc691c28329ade6a7d
+  version: 1.8.0
+  resolution: "package-manager-detector@npm:1.8.0"
+  checksum: 10c0/4c8e2c47fdc874465d3b3b11934401db9d73470ccbdabeb092e46cb94abbc491d5befc8c271b5ea1ae9c6a881f44c2997e011873365bde9fd6c3dc001221ff7a
   languageName: node
   linkType: hard
 
@@ -6436,12 +6458,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prettier@npm:^3.9.5":
-  version: 3.9.5
-  resolution: "prettier@npm:3.9.5"
+"prettier@npm:^3.9.6":
+  version: 3.9.6
+  resolution: "prettier@npm:3.9.6"
   bin:
     prettier: bin/prettier.cjs
-  checksum: 10c0/0349dd9e6d8010965de6f69e6b6ee2484b8caf78c66675afced6c75ad60ff24c3a2a4f41153fb8adeaee4d8f539641b48cebc71d283cec4d146e9962126c5ceb
+  checksum: 10c0/9f7ddae234035868f3daab3dc34e6de7e54622185afb017378029f0c09a9c023248ccf6f34def0b17a0538e18c47aa1b3188bab72965d1bf735919baa0747e99
   languageName: node
   linkType: hard
 
@@ -7835,7 +7857,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:^6.0.3":
+"typescript@npm:6.0.3":
   version: 6.0.3
   resolution: "typescript@npm:6.0.3"
   bin:
@@ -7845,7 +7867,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@npm%3A^6.0.3#optional!builtin<compat/typescript>":
+"typescript@patch:typescript@npm%3A6.0.3#optional!builtin<compat/typescript>":
   version: 6.0.3
   resolution: "typescript@patch:typescript@npm%3A6.0.3#optional!builtin<compat/typescript>::version=6.0.3&hash=5786d5"
   bin:
@@ -7856,9 +7878,9 @@ __metadata:
   linkType: hard
 
 "undici@npm:^8.4.1":
-  version: 8.7.0
-  resolution: "undici@npm:8.7.0"
-  checksum: 10c0/b7e5ecb4de82fa4f905011a77544fe7ba4da06f27167ff99313a7ae2869f3cb233d676dcd085533bc69f36989bc40871f5ae6ea6e4c9b91db92616b9e91b579d
+  version: 8.8.0
+  resolution: "undici@npm:8.8.0"
+  checksum: 10c0/6ee51e6b814b67e212b19349c38657be988d878ca669ccf2ad33f0ebbb0d83e851aa57554b6ce3c6668a9a4df3010fb6a6af7bd28692ade911083ef376a3a75d
   languageName: node
   linkType: hard
 

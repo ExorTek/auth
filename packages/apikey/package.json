@@ -72,7 +72,8 @@
   },
   "peerDependencies": {
     "express": ">=4",
-    "fastify": ">=4"
+    "fastify": ">=4",
+    "fastify-plugin": ">=4"
   },
   "peerDependenciesMeta": {
     "express": {
@@ -80,12 +81,16 @@
     },
     "fastify": {
       "optional": true
+    },
+    "fastify-plugin": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@exortek/shared": "workspace:*",
     "express": "^5.2.1",
-    "fastify": "^5.10.0"
+    "fastify": "^5.10.0",
+    "fastify-plugin": "^6.0.0"
   },
   "publishConfig": {
     "access": "public"
