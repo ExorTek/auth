@@ -129,7 +129,7 @@ const ok = csrf.verifyForSession(req.headers['x-csrf-token'], req.session.id, SE
 
 Every adapter ships a CSRF-only middleware plus a bundle. See [middleware](/security/middleware).
 
-<Tabs items={['Fastify', 'Express', 'Hono', 'Elysia']}>
+<Tabs items={['Fastify', 'Express']}>
   <Tabs.Tab>
     ```js
     import fastifyCookie from '@fastify/cookie'
@@ -150,18 +150,6 @@ Every adapter ships a CSRF-only middleware plus a bundle. See [middleware](/secu
     app.use(csrfMiddleware({ secret: process.env.CSRF_SECRET }))
     ```
 
-  </Tabs.Tab>
-  <Tabs.Tab>
-    ```js
-    import { csrfMiddleware } from '@exortek/security/hono'
-    app.use('*', csrfMiddleware({ secret: process.env.CSRF_SECRET }))
-    ```
-  </Tabs.Tab>
-  <Tabs.Tab>
-    ```js
-    import { csrfMiddleware } from '@exortek/security/elysia'
-    app.use(csrfMiddleware({ secret: process.env.CSRF_SECRET }))
-    ```
   </Tabs.Tab>
 </Tabs>
 

@@ -12,8 +12,8 @@ redirects, and 17 focused helpers — everything built on `node:crypto`, `node:p
 adapter) `fastify-plugin`.
 
 One install replaces the usual pile: `helmet`, `csrf-csrf`, `express-rate-limit` + `rate-limit-redis`,
-`express-slow-down`, `cors`, `hpp`, `express-mongo-sanitize`. Adapters for **Fastify**, **Express**, **Hono**, and
-**Elysia** ship in the box.
+`express-slow-down`, `cors`, `hpp`, `express-mongo-sanitize`. Adapters for **Fastify** and **Express** ship in the box —
+the classic Node HTTP stack this package targets.
 
 ## What problem does this solve?
 
@@ -21,8 +21,8 @@ The middleware every Node app needs is scattered across a dozen packages with mi
 
 - **helmet has no CSP nonce helper.** Rolling your own nonce + templating it into the `Content-Security-Policy` header
   is a boilerplate everyone rewrites badly.
-- **`csurf` was archived.** The community migrated to `csrf-csrf`, but its API is Express-first — no Fastify / Hono /
-  Elysia story.
+- **`csurf` was archived.** The community migrated to `csrf-csrf`, but its API is Express-first — no first-class
+  Fastify story.
 - **`express-rate-limit` needs an external Redis adapter.** `rate-limit-redis` is a separate package; the wire-up (Lua,
   key namespacing, `EVALSHA` optimisation) is left to you.
 - **Open-redirect defence is folklore.** Everyone knows `//evil.com` is bad; fewer people catch `\evil.com`,
@@ -91,7 +91,7 @@ app.get('/', async () => ({ ok: true }));
 await app.listen({ port: 3000 });
 ```
 
-Same shape on Express, Hono, Elysia — swap `securityPlugin` for `securityMiddleware`. See
+Same shape on Express — swap `securityPlugin` for `securityMiddleware`. See
 [middleware](/security/middleware) for the adapter-specific bits.
 
 ## Setup — ESM, CJS, or TypeScript
@@ -137,8 +137,8 @@ Every module has a dedicated page with full API reference.
 | [**headers**](/security/headers)       | CSP, HSTS, COOP/COEP/CORP, Referrer, Permissions, frameguard, noSniff | `headers` · `cspNonce`                                                                                                                                                                                                                                               |
 | [**cors**](/security/cors)             | origin allowlist + preflight + async predicates                       | `cors`                                                                                                                                                                                                                                                               |
 | [**redirect**](/security/redirect)     | open-redirect guard                                                   | `safeRedirect`                                                                                                                                                                                                                                                       |
-| [**helpers**](/security/helpers)       | 17 defensive utilities                                                | `getClientIp` · `bearer` · `checkOrigin` · `webhookVerify` · `sanitizeBody` · `sanitizeParams` · `safeJoin` · `sanitizeFilename` · `freezePrototypes` · `timeout` · `bodyLimit` · `honeypot` · `slowDown` · `safeJsonParse` · `constantTimeEqual` · `parseCspReport` |
-| [**middleware**](/security/middleware) | Fastify · Express · Hono · Elysia adapters                            | `securityMiddleware` bundle + per-concern middleware                                                                                                                                                                                                                 |
+| [**helpers**](/security/helpers)       | 18 defensive utilities                                                | `getClientIp` · `bearer` · `checkOrigin` · `webhookVerify` · `webhookVerifyStripe` · `sanitizeBody` · `sanitizeParams` · `safeJoin` · `sanitizeFilename` · `freezePrototypes` · `timeout` · `bodyLimit` · `honeypot` · `slowDown` · `safeJsonParse` · `constantTimeEqual` · `parseCspReport` |
+| [**middleware**](/security/middleware) | Fastify · Express adapters                                            | `securityMiddleware` bundle + per-concern middleware                                                                                                                                                                                                                 |
 | [**errors**](/security/errors)         | typed error surface                                                   | `SecurityError` · `ErrorCode`                                                                                                                                                                                                                                        |
 
 ## Common use cases
@@ -182,8 +182,6 @@ Three styles, all supported, all tree-shakable.
     ```js
     import { securityPlugin }     from '@exortek/security/fastify'
     import { securityMiddleware } from '@exortek/security/express'
-    import { securityMiddleware } from '@exortek/security/hono'
-    import { securityMiddleware } from '@exortek/security/elysia'
     ```
     Framework middleware — one install, one line.
   </Tabs.Tab>

@@ -96,76 +96,22 @@ Individual middleware:
 import { headersMiddleware, corsMiddleware, csrfMiddleware, rateLimitMiddleware } from '@exortek/security/express';
 ```
 
-## Hono
+## Bring your own framework
 
-```js
-import { Hono } from 'hono';
-import { securityMiddleware } from '@exortek/security/hono';
-import { rateLimit } from '@exortek/security';
+Under the hood both adapters build an `AdapterContext` from the incoming request/response and hand it to the
+framework-neutral runners in `@exortek/security/middleware/core`. If your stack isn't Express or Fastify, write a ~60-line
+adapter that:
 
-const app = new Hono();
-app.use(
-  '*',
-  securityMiddleware({
-    headers: {},
-    cors: { origin: ['https://app.example.com'], credentials: true },
-    csrf: { secret: process.env.CSRF_SECRET },
-    rateLimit: {
-      limiter: rateLimit.sliding({
-        requests: 100,
-        window: '1m',
-        store: rateLimit.stores.memory(),
-      }),
-      // On non-Node runtimes there's no req.ip — read your platform's IP header:
-      keyGenerator: c => c.req.header('cf-connecting-ip'),
-    },
-  }),
-);
-```
+1. Reads cookies / headers / method / URL off your framework's request object.
+2. Delegates to `runHeaders`, `runCors`, `runCsrf`, `runRateLimit` from `middleware/core.js`.
+3. Writes the resulting `Set-Cookie`, response headers, and status back onto your framework's reply object.
 
-Hono runs on the Web-standard `Request`/`Response` contract, so the middleware works unchanged on **Node**, **Bun**,
-**Cloudflare Workers**, **Deno**, and **Vercel Edge**.
-
-<Callout type="warning">
-  **IP resolution on edge runtimes.** There is no `req.ip` on Workers / Vercel Edge / Deno. By default the Hono / Elysia
-  adapters do **not** trust `X-Forwarded-For` — it is client-controlled, so trusting it without a proxy in front lets an
-  attacker rotate it to mint unlimited rate-limit buckets. Either pass an explicit `keyGenerator` that reads your
-  platform's trusted header (`CF-Connecting-IP`, `Fastly-Client-IP`, …), or set `rateLimit: { trustProxy: true }` when a
-  proxy/CDN in front is guaranteed to overwrite `X-Forwarded-For`. With neither, no key is derived and the request is not
-  rate-limited (Elysia falls back to the real socket peer address).
-</Callout>
-
-## Elysia
-
-```js
-import { Elysia } from 'elysia';
-import { securityMiddleware } from '@exortek/security/elysia';
-import { rateLimit } from '@exortek/security';
-
-const app = new Elysia()
-  .use(
-    securityMiddleware({
-      headers: {},
-      cors: { origin: ['https://app.example.com'], credentials: true },
-      csrf: { secret: process.env.CSRF_SECRET },
-      rateLimit: {
-        limiter: rateLimit.sliding({
-          requests: 100,
-          window: '1m',
-          store: rateLimit.stores.memory(),
-        }),
-      },
-    }),
-  )
-  .get('/', () => ({ ok: true }));
-```
-
-Follows the same named-sub-instance pattern as `@elysiajs/cors`. Preflight is caught via explicit
-`app.options('/', h).options('/*', h)` so it works even for endpoints without a registered OPTIONS handler.
+The `AdapterContext` typedef lives in `packages/security/src/middleware/core.js`. The two shipped adapters
+(`middleware/express.js`, `middleware/fastify.js`) are the reference implementations.
 
 ## Unified options
 
-All four adapters accept the same `securityMiddleware(options)` shape:
+Both adapters accept the same `securityMiddleware(options)` shape:
 
 ```ts
 {
@@ -182,7 +128,7 @@ All four adapters accept the same `securityMiddleware(options)` shape:
   rateLimit?: {
     limiter:       Limiter,
     keyGenerator?: (req) => string | undefined,
-    trustProxy?:   boolean,                        // default false — Hono/Elysia XFF opt-in
+    trustProxy?:   boolean,                        // default false
     onDenied?:     (req, res, result) => unknown,
     headers?:      'legacy' | 'draft' | false | {  // default 'legacy'
       remaining?:  string | false,                 // default 'X-RateLimit-Remaining'
