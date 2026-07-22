@@ -1,5 +1,18 @@
 # @exortek/password
 
+## 1.0.4
+
+### Patch Changes
+
+- `scrypt.verify` and `bcrypt.verify` now cap the cost parameters they read out of the stored PHC / bcrypt string,
+  matching the `MAX_VERIFY_ITERATIONS` pattern already used in `pbkdf2.verify` (1.0.2). A poisoned hash — reachable via
+  account-recovery import, migration tooling, or any attacker-influenced write path — could previously turn every
+  login attempt into a process-wide CPU/memory DoS: `scrypt.verify` accepted `ln` up to 31 (~2 TB allocation),
+  `bcrypt.verify` accepted `rounds` up to 31 (~2^31 synchronous Blowfish key-schedule iterations). Caps are
+  independent of the hash-side ceiling: `scrypt.verify` rejects `ln > 24` and `r`/`p > 32`; `bcrypt.verify` rejects
+  `rounds > 20`. Both return `false` instead of throwing — consistent with the existing verify-side untrusted-input
+  contract. Every legitimate hash produced with OWASP-2024 defaults sits well under the guards.
+
 ## 1.0.3
 
 ### Patch Changes

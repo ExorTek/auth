@@ -8,6 +8,10 @@
   `@exortek/shared/crockford`; timing-safe compare + rejection sampling delegated to shared; `backupCodes`
   options validated through `@exortek/shared/validate`; argument guards bind through `@exortek/shared/asserts`
   via `internal/guards.js`. No public API change.
+- docs: `verifyTotp` README now carries a prominent callout that codes remain replayable within the acceptance
+  window (~90s at defaults) unless `options.replay` is wired. First-time integrators calling
+  `verifyTotp(code, secret)` likely assume single-use semantics they don't actually get without the replay store;
+  the deep-dive "Replay defense" section existed but nothing at the API description pointed there. No behavior change.
 
 ## 1.0.1
 

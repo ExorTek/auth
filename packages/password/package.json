@@ -1,6 +1,6 @@
 {
   "name": "@exortek/password",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Password hashing, verification, strength scoring, generation, policy validation, HIBP breach lookup, peppering and history helpers for Node.js — argon2id, scrypt, bcrypt, pbkdf2 under one coherent API with automatic algorithm routing on verify.",
   "type": "module",
   "sideEffects": false,
