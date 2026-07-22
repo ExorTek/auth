@@ -41,6 +41,7 @@ src/
   key-resolver.js    verify-side polymorphic key resolver
   mutex.js           per-key async mutex
   normalize-key.js   JWK / Buffer / KeyObject → KeyObject factory
+  predicates.js      non-throwing type predicates for dispatch/branch sites
   random.js          CSPRNG randomBuffer(size) with validation
   redis-guard.js     duck-type check for Redis-compatible clients
   resolve.js         resolveOrCall / resolveHashFn / resolveEncoding
@@ -120,6 +121,36 @@ if (bytes.length < 16) throw invalidArgument('secret too short');
   fit `X must be Y`.
 - `parse(schema, input, path?)` — bridge from `@exortek/shared/validate`
   schemas to the bound error class.
+
+## Predicates — `predicates.js`
+
+Non-throwing type predicates, the companion to `asserts`. The two APIs
+carve up type-checking by intent:
+
+- **Throw-guard at a function boundary** → `asserts`. A bad shape
+  should raise the caller's typed error class, so use
+  `assertObject` / `assertString` / … bound through `defineGuards`.
+- **Dispatch / branch / fallback** where the wrong shape is meant to be
+  handled instead of thrown → `predicates`.
+
+```js
+import { isObject, isFunction } from '@exortek/shared/predicates';
+
+// Session middleware accepts either a config object or an already-built manager.
+const sessions =
+  isObject(configOrManager) && isFunction(configOrManager.issue)
+    ? configOrManager
+    : createSessionManager(configOrManager);
+```
+
+Do **not** replace a throw-guard with an `if (!isX(v)) throw new
+PkgError(...)` pattern — that bypasses the package's guards binding
+and duplicates the work `assert*` already handles correctly.
+
+Exports: `isObject`, `isString`, `isNonEmptyString`, `isFunction`,
+`isBytes`. `isObject` rejects `null` and arrays but accepts plain
+objects **and** class instances (Node `KeyObject`, `URL`, user classes)
+— duck-typed, not prototype-restricted.
 
 **Path-naming convention** for the `name` argument: `<publicFn>[.options|.config][.<field>]`
 — e.g. `'createUser.name'`, `'scrypt.options.r'`, `'pepper.wrap.password'`.

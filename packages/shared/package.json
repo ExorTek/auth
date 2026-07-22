@@ -20,6 +20,7 @@
     "./mutex": "./src/mutex.js",
     "./key-resolver": "./src/key-resolver.js",
     "./normalize-key": "./src/normalize-key.js",
+    "./predicates": "./src/predicates.js",
     "./redis-guard": "./src/redis-guard.js",
     "./resolve": "./src/resolve.js",
     "./sample": "./src/sample.js",
