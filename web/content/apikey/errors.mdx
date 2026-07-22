@@ -1,0 +1,43 @@
+---
+title: 'ApiKeyError — @exortek/apikey'
+sidebarTitle: Errors — ApiKeyError
+---
+
+# `ApiKeyError`
+
+Every programmer-error raised by `@exortek/apikey` extends
+`ApiKeyError`. Branch on `err.code`, never on `err.message`.
+
+```js
+import { ApiKeyError, ErrorCode } from '@exortek/apikey';
+
+try {
+  await createApiKey({ /* ... */ });
+} catch (err) {
+  if (err instanceof ApiKeyError) {
+    switch (err.code) {
+      case ErrorCode.INVALID_PREFIX:  /* fix your create call */ break;
+      case ErrorCode.INVALID_PEPPER:  /* env pepper missing */ break;
+      case ErrorCode.INVALID_ARGUMENT: /* misconfig */ break;
+      case ErrorCode.STORE_ERROR:     /* DB outage */ break;
+    }
+  }
+}
+```
+
+## Codes
+
+| Code                | HTTP | Raised when |
+| ------------------- | ---- | ----------- |
+| `INVALID_ARGUMENT`  | 400  | Options object missing / misshapen / violates an invariant. |
+| `INVALID_PREFIX`    | 400  | Prefix doesn't match `/^[a-z][a-z0-9]{0,15}(_[a-z0-9]{1,15}){0,3}$/`. |
+| `INVALID_PEPPER`    | 400  | Pepper missing / under 16 bytes / wrong type. |
+| `STORE_ERROR`       | 500  | `store.put` threw at create time. |
+
+## What is **not** thrown
+
+Every expected verify failure (wrong secret, expired, revoked, missing
+scope, IP mismatch, malformed input) is a `{ valid: false, reason }`
+result, not an exception. See the
+[failure reasons table](/apikey/verify#failure-reasons) —
+the strings are stable API contracts you can `switch` on.

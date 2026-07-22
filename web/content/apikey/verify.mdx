@@ -1,0 +1,87 @@
+---
+title: 'verifyApiKey — @exortek/apikey'
+sidebarTitle: verifyApiKey
+---
+
+# `verifyApiKey(rawKey, options)`
+
+Verify an incoming API key against the store.
+
+```ts
+verifyApiKey(rawKey, {
+  store:            ApiKeyStore,
+  peppers?:         (Buffer | Uint8Array | string)[],
+  requiredScopes?:  string[],
+  expectedPrefix?:  string,
+  updateLastUsed?:  boolean,
+  now?:             number,
+}): Promise<
+  | { valid: true, id, userId, scopes, prefix, name?, environment?, metadata?, needsRehash? }
+  | { valid: false, reason }
+>
+```
+
+**Never throws** on a bad key — a wrong or stale key is a normal auth
+outcome. Only throws `ApiKeyError` on programmer bugs.
+
+## Basic usage
+
+```js
+const res = await verifyApiKey(req.headers.authorization?.slice(7), {
+  store,
+  requiredScopes: ['read'],
+});
+
+if (!res.valid) {
+  return reply.code(401).send({ error: res.reason });
+}
+// res.userId, res.scopes, res.metadata are now trusted.
+```
+
+## Failure reasons
+
+| Reason              | Meaning                                                   |
+| ------------------- | --------------------------------------------------------- |
+| `malformed`         | Wrong shape / wrong length / non-crockford chars.         |
+| `not_found`         | Well-shaped but the id has never been issued or was purged. |
+| `expired`           | `expiresAt` has passed.                                   |
+| `revoked`           | Record carries a `revokedAt` timestamp.                   |
+| `bad_secret`        | HMAC compare failed — wrong secret or wrong pepper.       |
+| `prefix_mismatch`   | `expectedPrefix` differs, or the record's stored prefix differs from what was submitted (someone guessed the id and swapped the prefix). |
+| `missing_scope`     | `requiredScopes` not covered by the record's `scopes`.    |
+| `store_unavailable` | `store.getById` threw.                                    |
+
+## Bump `lastUsedAt`
+
+```js
+await verifyApiKey(raw, { store, updateLastUsed: true });
+```
+
+Adds one store write per successful verify — cost of a “which keys are
+active” report. Failures don't touch the store.
+
+## Pepper rotation with `needsRehash`
+
+```js
+const res = await verifyApiKey(raw, {
+  store,
+  peppers: [newPepper, oldPepper],
+});
+if (res.valid && res.needsRehash) {
+  await rehashApiKey(raw, { store, peppers: [newPepper, oldPepper] });
+}
+```
+
+`needsRehash: true` means the secret matched an older pepper — call
+[`rehashApiKey`](/apikey/create#pepper-rotation) opportunistically to
+migrate the storage hash to the newest pepper. After every key has
+drifted, drop the old pepper.
+
+## Locking a route to one prefix
+
+```js
+await verifyApiKey(raw, { store, expectedPrefix: 'sk_live' });
+```
+
+Handy when the same store issues multiple key families (e.g.
+`sk_live` vs `sk_test`) and one endpoint only accepts one family.

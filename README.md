@@ -1,6 +1,6 @@
 # @exortek/auth
 
-A framework-agnostic authentication toolkit for Node.js — designed as 22 small packages under one scope; **9 are
+A framework-agnostic authentication toolkit for Node.js — designed as 22 small packages under one scope; **10 are
 published today** (see Shipping below), the rest are planned. Pick the one you need. Built on `node:crypto`.
 
 [![license](https://img.shields.io/github/license/ExorTek/auth?color=blue)](./LICENSE)
@@ -20,6 +20,7 @@ published today** (see Shipping below), the rest are planned. Pick the one you n
 | [`@exortek/jws`](./packages/jws) — JSON Web Signature (RFC 7515) — compact + JSON serialisation, detached (§F), unencoded payload (RFC 7797), HS / RS / PS / ES / EdDSA           |      [![npm](https://img.shields.io/npm/v/@exortek/jws.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/jws)      | [auth.memet.dev/jws](https://auth.memet.dev/jws)           |
 | [`@exortek/jwt`](./packages/jwt) — JSON Web Token (RFC 7519 + RFC 8725 + RFC 9068) — `sign` / `verify` / `peek`, `tokenPair` with RFC 6749 §10.4 reuse detection, blacklist stores |      [![npm](https://img.shields.io/npm/v/@exortek/jwt.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/jwt)      | [auth.memet.dev/jwt](https://auth.memet.dev/jwt)           |
 | [`@exortek/challenge`](./packages/challenge) — HMAC-signed multi-step flow tokens (userId · method · step · nextStep · metadata), opt-in single-use + IP binding, memory / Redis stores |      [![npm](https://img.shields.io/npm/v/@exortek/challenge.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/challenge)      | [auth.memet.dev/challenge](https://auth.memet.dev/challenge) |
+| [`@exortek/apikey`](./packages/apikey) — Stripe-style prefixed API keys (`sk_live_id_secret`) with HMAC-SHA256 storage + optional pepper rotation, scope allowlists, memory / Redis stores, Express + Fastify middleware |      [![npm](https://img.shields.io/npm/v/@exortek/apikey.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/apikey)      | [auth.memet.dev/apikey](https://auth.memet.dev/apikey) |
 
 ## The stack
 
@@ -40,7 +41,7 @@ Linked entries are **published on npm**; the rest are **planned** and not yet in
 | 10 | [`@exortek/session`](./packages/session)   | shipped   | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub            |
 | 11 | [`@exortek/security`](./packages/security) | shipped   | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers     |
 | 12 | `@exortek/device`                          | _planned_ | device fingerprinting, trusted-device tokens                                             |
-| 13 | `@exortek/apikey`                          | _planned_ | prefixed API keys (`sk_live_...`), rate-limited by default                               |
+| 13 | [`@exortek/apikey`](./packages/apikey)     | shipped   | Stripe-style prefixed API keys, HMAC-hashed storage, scopes, middleware                  |
 | 14 | `@exortek/magic-link`                      | _planned_ | passwordless email / SMS link tokens                                                     |
 | 15 | `@exortek/passkey`                         | _planned_ | WebAuthn / FIDO2 server verification (browser side via `@simplewebauthn/browser`)        |
 | 16 | `@exortek/opaque`                          | _planned_ | OPAQUE (aPAKE) — zero-knowledge password auth                                            |
@@ -65,6 +66,7 @@ npm install @exortek/jwk
 npm install @exortek/jws
 npm install @exortek/jwt
 npm install @exortek/challenge
+npm install @exortek/apikey             # + optional: ioredis or redis, express or fastify
 ```
 
 Node.js **22 or newer**.

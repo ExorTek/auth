@@ -103,7 +103,7 @@ status lives in [`README.md`](./README.md).
 | 10 | `@exortek/session`     | Sealed-cookie sessions, rotation, revocation, sudo mode, Redis pub/sub              |
 | 11 | `@exortek/security`    | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect, defensive HTTP helpers  |
 | 12 | `@exortek/device`      | Device fingerprinting, trusted-device tokens                                        |
-| 13 | `@exortek/apikey`      | Prefixed API keys (`sk_live_…`) with built-in rate-limit                            |
+| 13 | `@exortek/apikey`      | Prefixed API keys (`sk_live_id_secret`), HMAC-SHA256 storage, scopes, middleware    |
 | 14 | `@exortek/magic-link`  | Passwordless e-mail / SMS link tokens                                               |
 | 15 | `@exortek/passkey`     | WebAuthn / FIDO2 server verification (`/server` only; browser via community lib)    |
 | 16 | `@exortek/opaque`      | OPAQUE aPAKE — zero-knowledge password authentication                               |

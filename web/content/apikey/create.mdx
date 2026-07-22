@@ -1,0 +1,89 @@
+---
+title: 'createApiKey — @exortek/apikey'
+sidebarTitle: createApiKey
+---
+
+import { Callout } from 'nextra/components';
+
+# `createApiKey(options)`
+
+Mint a new API key and persist its record.
+
+```ts
+createApiKey({
+  store:        ApiKeyStore,
+  prefix:       string,              // 'sk_live' / 'pk_test' / 'svc_prod_v2'
+  userId:       string,
+  scopes:       string[],
+
+  name?:        string,
+  environment?: string,              // 'live' / 'test' / caller-defined
+  metadata?:    Record<string, unknown>,
+  expiresIn?:   string | number,     // '1y' | '30d' | ms integer; omit for no expiry
+
+  peppers?:     (Buffer | Uint8Array | string)[],   // Newest first, each ≥16 bytes
+  now?:         number,
+}): Promise<{ key: string, id: string, record: ApiKeyRecord }>
+```
+
+## The `key` return value is one-shot
+
+```js
+const { key, id, record } = await createApiKey({ /* ... */ });
+// key    → SHOW to the user immediately, never persist raw.
+// id     → safe to display / log / render in the "manage keys" UI.
+// record → what was persisted; hash is a fast SHA-256 digest.
+```
+
+Show `key` in a dashboard modal (with a "copy to clipboard" button) or
+email attachment, then discard. The only recoverable half from the DB
+is the storage hash, which cannot be reversed.
+
+## Prefix grammar
+
+```
+sk_live       ✓
+pk_test       ✓
+svc_prod_v2   ✓
+sk__live      ✗ (empty segment)
+sk_live_      ✗ (trailing underscore)
+Sk_Live       ✗ (uppercase)
+```
+
+Regex: `/^[a-z][a-z0-9]{0,15}(_[a-z0-9]{1,15}){0,3}$/`. Multi-segment
+prefixes let you namespace by environment / service / cohort.
+
+## With a pepper
+
+```js
+const peppers = [Buffer.from(process.env.APIKEY_PEPPER, 'base64url')];
+
+await createApiKey({ store, peppers, /* ... */ });
+```
+
+The newest pepper (index 0) is used to HMAC the secret at mint time.
+The record's `pepperVersion: 0` marks which pepper produced the hash
+so you can safely rotate later.
+
+## Expiry
+
+```js
+await createApiKey({ store, expiresIn: '1y', /* ... */ });      // 1 year
+await createApiKey({ store, expiresIn: 30 * 24 * 3600 * 1000 }); // 30 days in ms
+await createApiKey({ store, /* no expiresIn */ });               // never expires
+```
+
+## Errors
+
+Throws [`ApiKeyError`](/apikey/errors):
+
+- `INVALID_PREFIX` — prefix doesn't match the Stripe-style grammar.
+- `INVALID_PEPPER` — pepper is missing / `<16` bytes / wrong type.
+- `INVALID_ARGUMENT` — `userId` / `scopes` missing, `metadata` not a plain object, `expiresIn` non-positive.
+- `STORE_ERROR` — `store.put` threw (unusual — usually a DB outage).
+
+<Callout type="warn">
+  **Save the record's `id` in your DB alongside your own user record**
+  so a "Manage API keys" UI can render `mask(key)`-style hints without
+  ever needing the raw wire key again.
+</Callout>

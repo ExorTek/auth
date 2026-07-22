@@ -1,0 +1,52 @@
+---
+title: 'Scopes — @exortek/apikey'
+sidebarTitle: Scopes
+---
+
+# Scopes
+
+Every key has a `scopes: string[]` at mint time. `verifyApiKey`'s
+`requiredScopes` option (or middleware config) checks the incoming
+key's granted scopes against a set of required scopes with wildcard
+support.
+
+## Matching rules
+
+- **Exact match** — `'read:users'` covers `'read:users'`.
+- **Super wildcard** — `'*'` in the granted list covers every required scope.
+- **Namespace wildcard** — `'read:*'` covers `'read:users'`, `'read:posts'`, `'read:orgs'`; does NOT cover `'write:users'`. The wildcard is only valid as a suffix on a `namespace:` prefix.
+- Wildcards apply only on the **granted** side. `required` values are always concrete — an endpoint declares exactly which scope it needs.
+
+## Helpers
+
+```js
+import { covers, hasAll, hasAny } from '@exortek/apikey';
+
+covers(['read:*'], 'read:users');                            // true
+covers(['*'], 'anything');                                    // true
+covers(['read:users'], 'read:*');                             // false
+
+hasAll(['read:*', 'write:posts'], ['read:users', 'write:posts']); // true
+hasAll(['read:*'], ['read:users', 'write:posts']);            // false
+
+hasAny(['read:users'], ['read:users', 'write:posts']);        // true
+hasAny(['read:users'], ['write:posts']);                      // false
+```
+
+## Suggested scope shape
+
+A `verb:resource` convention scales well:
+
+```
+'read:users'        — read the user list / user detail
+'write:users'       — create / update / delete users
+'read:posts'
+'write:posts'
+'read:*'            — every read
+'admin'             — a role-like scope alongside verb-scoped ones
+'*'                 — never mint one of these to a machine key
+```
+
+Keep resources plural, verbs singular. Reserve `'*'` for a superuser
+key you issue to yourself for one-shot recovery — do NOT issue it to
+end users' machine keys.

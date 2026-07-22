@@ -1,0 +1,91 @@
+---
+title: 'Middleware — @exortek/apikey'
+sidebarTitle: Middleware
+---
+
+# Middleware
+
+Ready-to-mount adapters for Express and Fastify. Both share the same
+options and behaviour — the only difference is how they attach the
+verified caller to the request.
+
+## Express
+
+```js
+import express from 'express';
+import { apiKeyMiddleware } from '@exortek/apikey/middleware/express';
+import { memoryStore } from '@exortek/apikey/stores';
+
+const app = express();
+const store = memoryStore();
+
+app.use('/v1', apiKeyMiddleware({
+  store,
+  requiredScopes: ['read'],
+  updateLastUsed: true,
+}));
+
+app.get('/v1/whoami', (req, res) => res.json(req.apiKey));
+```
+
+## Fastify
+
+```js
+import Fastify from 'fastify';
+import { apiKeyPlugin } from '@exortek/apikey/middleware/fastify';
+import { memoryStore } from '@exortek/apikey/stores';
+
+const app = Fastify();
+await app.register(apiKeyPlugin, {
+  store: memoryStore(),
+  requiredScopes: ['read'],
+  updateLastUsed: true,
+});
+
+app.get('/v1/whoami', async req => req.apiKey);
+```
+
+Plain plugin (no `fastify-plugin` wrapper). The preHandler applies
+within the plugin's scope only — register it in a scoped route group
+to control which routes require an API key.
+
+## Common options
+
+| Option              | Default             | Notes |
+| ------------------- | ------------------- | ----- |
+| `store`             | —                   | Required. |
+| `peppers`           | none                | Newest-first array. |
+| `requiredScopes`    | none                | Enforced by the middleware; endpoints can layer more with `hasAll` on `req.apiKey.scopes`. |
+| `expectedPrefix`    | any                 | Reject a valid key whose prefix differs (lock a route to `sk_live`). |
+| `updateLastUsed`    | `false`             | One extra store write per successful verify. |
+| `headerName`        | `'authorization'`   | Case-insensitive. |
+| `scheme`            | `'bearer'`          | `'bearer'` → `Bearer <key>`; `'raw'` → header value as-is (e.g. `X-API-Key`). |
+| `allowQueryParam`   | `false`             | Fall back to `?api_key=<key>` — discouraged (query strings leak into logs / referer). |
+| `queryParamName`    | `'api_key'`         | |
+| `attach`            | `'apiKey'`          | `req[attach] = { valid, userId, scopes, ... }`. |
+| `tokenFromRequest`  | none                | Override extraction entirely — receives an `AdapterContext`, returns the raw key. |
+
+## Response shape
+
+- **Success:** the `preHandler` / next() runs; `req.apiKey` carries the
+  verify result.
+- **Missing key:** 401 `{ error: 'missing_api_key' }`.
+- **Invalid key:** 401 `{ error: 'invalid_api_key', reason }` — reason
+  is one of the [failure reasons](/apikey/verify#failure-reasons).
+- **Missing scope:** 403 `{ error: 'invalid_api_key', reason: 'missing_scope' }`.
+- **Store failure:** 503 `{ error: 'invalid_api_key', reason: 'store_unavailable' }`.
+
+## Bring your own framework
+
+The framework-neutral core lives at `middleware/core.js`:
+
+```js
+import { normalizeOptions, runApiKey } from '@exortek/apikey/middleware/express';
+// ...actually, in the shipped bundle only extract via node_modules import:
+// import { normalizeOptions, runApiKey } from '@exortek/apikey/dist/middleware/core.mjs';
+```
+
+Feed it an `AdapterContext` (`getHeader(name)`, `method`, `ip`, `query`)
+and it returns either `{ verifyResult }` (attach to request, continue)
+or `{ response: { status, body } }` (send it). Any framework binding
+is a ~20-line adapter.

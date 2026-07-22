@@ -9,5 +9,6 @@ export default {
   jws: '@exortek/jws',
   jwt: '@exortek/jwt',
   challenge: '@exortek/challenge',
+  apikey: '@exortek/apikey',
   compliance: 'Compliance',
 };

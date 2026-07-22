@@ -1,0 +1,74 @@
+---
+title: 'Stores — @exortek/apikey'
+sidebarTitle: Stores
+---
+
+import { Callout } from 'nextra/components';
+
+# Stores
+
+`@exortek/apikey/stores` ships two implementations. Any object matching
+the `ApiKeyStore` interface works — if you already have a keys table
+in your DB, implement the six methods and skip the shipped stores
+entirely.
+
+## The interface
+
+```ts
+interface ApiKeyStore {
+  put(record: ApiKeyRecord): Promise<void>;
+  getById(id: string): Promise<ApiKeyRecord | null>;
+  update(id: string, patch: Partial<ApiKeyRecord>): Promise<ApiKeyRecord | null>;
+  revoke(id: string, reason?: string): Promise<boolean>;
+  revokeAllForUser(userId: string, reason?: string): Promise<number>;
+  listByUser(userId: string): Promise<ApiKeyRecord[]>;
+}
+```
+
+## `memoryStore()`
+
+```js
+import { memoryStore } from '@exortek/apikey/stores';
+const store = memoryStore();
+```
+
+In-process Map keyed by `id` with a reverse-index Map keyed by
+`userId`. Not cluster-safe: every worker has its own state. Fine for
+dev, single-node prod, and tests.
+
+## `redisStore(client, options?)`
+
+```js
+import Redis from 'ioredis';
+import { redisStore } from '@exortek/apikey/stores';
+
+const client = new Redis(process.env.REDIS_URL);
+const store = redisStore(client, { keyPrefix: 'apikey:' });
+```
+
+Layout:
+
+```
+<keyPrefix><id>          — JSON blob of the record (primary lookup)
+<keyPrefix>u:<userId>    — SADD-set of the user's key ids
+```
+
+Cluster-safe. Works with any client exposing `get / set / del / sadd /
+srem / smembers / mget` — verified against `ioredis`,
+`node-redis@4+`, and `@upstash/redis` (HTTP client, runs on Cloudflare
+Workers / Vercel Edge / Deno Deploy).
+
+## Bring your own
+
+Implement the interface against your existing DB (Postgres, SQLite,
+DynamoDB, whatever) and pass it straight to `createApiKey` /
+`verifyApiKey` — no wrapper needed. The record shape is stable across
+releases (new optional fields may be added).
+
+<Callout type="info">
+  **No TTL on the record.** API keys are meant to be long-lived and
+  their `expiresAt` field is authoritative. Revocation is a
+  flip-in-place on the record itself, not a tombstone — `verifyApiKey`
+  re-reads the full record every time and checks `revokedAt` /
+  `expiresAt` explicitly.
+</Callout>

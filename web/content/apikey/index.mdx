@@ -1,0 +1,85 @@
+---
+title: '@exortek/apikey — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/apikey`
+
+Stripe-style prefixed API keys for Node.js 22+. Ships the six things
+every API vendor rebuilds — token format, hashed storage, scopes,
+revocation, per-user list, and middleware — under one coherent API.
+
+## Token format
+
+```
+sk_live_A2X4KJRK5HYFR3E7CBEQZP9WTN_QM5K3EHRSPMY8TDN4GRFB2CGY6VJE1BW7FRXK8ZHDNA9TPY5CV6QM
+   ^^^^^ ^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   type  id (128-bit)               secret (256-bit)
+         plaintext DB lookup key    HMAC-SHA256 storage
+```
+
+Three underscore-separated segments. **id** and **secret** use
+base32-crockford (`[0-9A-HJKMNP-TV-Z]`) — no ambiguous glyphs, no
+separators, URL-safe. **prefix** is Stripe-style: `sk_live`, `pk_test`,
+`svc_prod_v2` — lowercase alpha, digits, underscore-separated segments.
+
+The id is plaintext because it's not a secret — an attacker who
+guesses an id still fails the HMAC compare on the secret half. The
+secret is never stored in the clear.
+
+## Why fast SHA-256 storage?
+
+Password packages use Argon2 / scrypt / bcrypt because passwords are
+low-entropy — brute force is fast unless the KDF is deliberately slow.
+API keys are random 256-bit values. There is no brute-force attack to
+slow down. Fast HMAC-SHA256 is correct here, matches Anthropic /
+Stripe / GitHub, and keeps verify at O(1).
+
+Optional **peppers** (a server-side secret separate from the DB) turn
+a stolen database into a non-crackable artifact. Rotate them via a
+newest-first array; verify tries every pepper, mint uses the newest.
+
+## Quick start
+
+```js
+import { createApiKey, verifyApiKey } from '@exortek/apikey';
+import { memoryStore } from '@exortek/apikey/stores';
+
+const store = memoryStore();
+
+// Issue
+const { key, id } = await createApiKey({
+  store,
+  prefix: 'sk_live',
+  userId: 'usr_123',
+  scopes: ['read', 'write:posts'],
+  name: 'Production Backend',
+  expiresIn: '1y',
+});
+// SHOW `key` ONCE — never persist the raw value.
+
+// Verify
+const res = await verifyApiKey(incomingKey, {
+  store,
+  requiredScopes: ['read'],
+});
+if (!res.valid) return reply.code(401).send({ error: res.reason });
+```
+
+## Where to next
+
+- [`createApiKey`](/apikey/create)
+- [`verifyApiKey`](/apikey/verify)
+- [Scopes](/apikey/scopes) — `covers` / `hasAll` / `hasAny` with wildcard support
+- [Stores](/apikey/stores) — memory + Redis + interface
+- [Middleware](/apikey/middleware) — Express + Fastify
+- [Errors](/apikey/errors) — `ApiKeyError` code catalogue
+
+<Callout type="info">
+  **Choose API keys over JWTs when.** The token never leaves your
+  servers, users manage keys via a dashboard (list / revoke / rename),
+  scopes are your permission model. If you need a third-party-verifiable
+  bearer token, reach for [`@exortek/jwt`](/jwt) instead.
+</Callout>
