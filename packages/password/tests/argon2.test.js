@@ -16,7 +16,9 @@ const FAST = { memoryCost: 8, timeCost: 1, parallelism: 1 };
 
 test('argon2.hash returns argon2id PHC by default', { skip: !available && 'argon2 peer not installed' }, async () => {
   const s = await argon2.hash('pw', FAST);
-  assert.match(s, /^\$argon2id\$v=\d+\$m=\d+,t=\d+,p=\d+\$/);
+  // PHC parameter order isn't fixed by the spec — some argon2 releases
+  // emit `m,t,p`, others `m,p,t`. Match either.
+  assert.match(s, /^\$argon2id\$v=\d+\$m=\d+,(t=\d+,p=\d+|p=\d+,t=\d+)\$/);
 });
 
 test('argon2.verify round-trip', { skip: !available && 'argon2 peer not installed' }, async () => {
