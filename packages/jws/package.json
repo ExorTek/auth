@@ -1,6 +1,6 @@
 {
   "name": "@exortek/jws",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "JSON Web Signature (JWS) — RFC 7515 / RFC 7518 / RFC 7797 / RFC 8037 / RFC 8812 for Node.js 22+. Compact + JSON serialization, detached content, unencoded payload, HS/RS/PS/ES/EdDSA. Alg allowlist mandatory. `none` never accepted. Zero-dependency, built on node:crypto.",
   "type": "module",
   "sideEffects": false,

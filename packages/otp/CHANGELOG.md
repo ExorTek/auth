@@ -1,5 +1,14 @@
 # @exortek/otp
 
+## 1.0.2
+
+### Patch Changes
+
+- Internal refactor: errors + base32 re-export via `@exortek/shared`; backup-code alphabet from
+  `@exortek/shared/crockford`; timing-safe compare + rejection sampling delegated to shared; `backupCodes`
+  options validated through `@exortek/shared/validate`; argument guards bind through `@exortek/shared/asserts`
+  via `internal/guards.js`. No public API change.
+
 ## 1.0.1
 
 ### Patch Changes

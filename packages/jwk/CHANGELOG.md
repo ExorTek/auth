@@ -1,5 +1,13 @@
 # @exortek/jwk
 
+## 1.0.1
+
+### Patch Changes
+
+- Internal refactor: errors extend the shared `BaseError`; base64url delegates to `@exortek/shared/base64url`;
+  argument guards bind through `@exortek/shared/asserts` via `internal/guards.js`; `exportJWK` options validated
+  through `@exortek/shared/validate`. No public API change.
+
 ## 1.0.0
 
 ### Major Changes

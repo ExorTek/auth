@@ -1,6 +1,6 @@
 {
   "name": "@exortek/jwk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "JSON Web Key (JWK) — RFC 7517 / RFC 7638 / RFC 8037 for Node.js. Generate, import, export, thumbprint EC / RSA / OKP / oct keys. Zero-dependency, built on node:crypto.",
   "type": "module",
   "sideEffects": false,

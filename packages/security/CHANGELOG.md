@@ -1,5 +1,30 @@
 # @exortek/security
 
+## 1.2.0
+
+### Minor Changes
+
+- **BREAKING (adapter surfaces).** Hono and Elysia middleware adapters are removed.
+  `@exortek/security/hono` and `@exortek/security/elysia` subpath exports no longer exist; the
+  associated `peerDependencies` / `peerDependenciesMeta` entries are gone; framework keywords
+  are trimmed. The package now targets **Express + Fastify** exclusively — the classic Node
+  stack this repository positions around.
+
+  Migration: pin `@exortek/security@1.1.2` if you depend on either adapter, or lift the
+  handful of ~60-line adapter modules from that release's tarball into your own repo — they
+  compose over the same core primitives that ship in `middleware/core.js`.
+
+- **`webhookVerifyStripe`** — new helper for verifying Stripe-style webhook signatures
+  (`t=<timestamp>,v1=<hex>` envelope) with a configurable replay-tolerance window.
+  Complements the existing generic `webhookVerify`.
+
+- Middleware **adapter kit** — `AdapterContext` interface + framework-neutral runners in
+  `middleware/core.js`. External consumers who want to add a fifth framework can now do so
+  without re-implementing the CSRF / rate-limit / headers / CORS pipeline.
+
+- Internal: argument guards bind through `@exortek/shared/asserts` via `internal/guards.js`;
+  `webhookVerify` timing-safe compare now delegates to `@exortek/shared/timing-safe`.
+
 ## 1.1.2
 
 ### Patch Changes

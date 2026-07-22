@@ -1,5 +1,13 @@
 # @exortek/crypto
 
+## 1.0.7
+
+### Patch Changes
+
+- Internal refactor: argument guards bind through `@exortek/shared/asserts` via `internal/guards.js`;
+  timing-safe compare, byte helpers, Crockford codec, and rejection-sampling primitives now delegate to
+  the shared package. No public API change; all exports behave identically.
+
 ## 1.0.6
 
 ### Patch Changes

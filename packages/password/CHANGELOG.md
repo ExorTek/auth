@@ -1,5 +1,14 @@
 # @exortek/password
 
+## 1.0.3
+
+### Patch Changes
+
+- Internal refactor: errors extend the shared `BaseError`; `createPepper` config validated through
+  `@exortek/shared/validate`; timing-safe compare, byte helpers, RFC 4648 §4 base64 codec, and
+  rejection-sampling primitives delegate to `@exortek/shared`; argument guards bind through
+  `@exortek/shared/asserts` via `internal/guards.js`. No public API change.
+
 ## 1.0.2
 
 ### Patch Changes

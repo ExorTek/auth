@@ -1,6 +1,6 @@
 {
   "name": "@exortek/otp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "TOTP (RFC 6238) and HOTP (RFC 4226) one-time passwords for Node.js — secure defaults, tunable window / algorithm / digits, opt-in replay defense via any @exortek/security store, backup codes with unambiguous alphabet, and Google-Authenticator-compatible provisioning URIs.",
   "type": "module",
   "sideEffects": false,

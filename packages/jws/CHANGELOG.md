@@ -1,5 +1,13 @@
 # @exortek/jws
 
+## 1.0.1
+
+### Patch Changes
+
+- Internal refactor: errors extend the shared `BaseError`; `base64url`, `algorithms`, `crit`, `ecdsa`, `resolver`,
+  and `keys.js` delegate to `@exortek/shared`; argument guards bind through `@exortek/shared/asserts` via
+  `internal/guards.js`. No public API change.
+
 ## 1.0.0
 
 ### Major Changes
