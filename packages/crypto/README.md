@@ -24,7 +24,7 @@ helpers on top of it, badly. `@exortek/crypto` ships them once, correctly:
 
 - **Ergonomic by default.** `random.pin(6)` never returns `'000000'`. `hmac(data, secret)` is timing-safe by
   construction. `cipher.seal(payload, secret, { ttl: '1h' })` mints a tamper-proof token you can put in a URL.
-- **Framework-agnostic.** No Express, Fastify, Hono or Elysia coupling.
+- **Framework-agnostic.** No Express or Fastify coupling.
 - **Zero deps.** `node:crypto` is the only runtime input. `dist` is a few kilobytes per subpath.
 - **JSDoc → `.d.ts`.** Pure JavaScript source, TypeScript types emitted at build. IDE hints work without a `.ts` in
   sight.

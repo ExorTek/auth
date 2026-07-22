@@ -152,8 +152,8 @@ res.redirect(url); // safe or not, url is always safe
 **Adapter errors — propagate to your framework's handler:**
 
 ```js
-// Nothing to do — Fastify / Express / Hono / Elysia all catch async
-// throws and route them to their error handlers.
+// Nothing to do — Fastify and Express both catch async throws and
+// route them to their error handlers.
 app.setErrorHandler((err, req, reply) => {
   if (err instanceof SecurityError) {
     return reply.code(toHttpStatus(err)).send({ error: err.code });

@@ -182,7 +182,7 @@ rateLimitMiddleware({
 Behind a load balancer / reverse proxy, `req.ip` reports the **proxy** address by default — every limiter sees one
 bucket for all clients.
 
-<Tabs items={['Express', 'Fastify', 'Hono / Elysia']}>
+<Tabs items={['Express', 'Fastify']}>
   <Tabs.Tab>
     ```js
     app.set('trust proxy', true)               // trust every proxy hop
@@ -196,21 +196,6 @@ bucket for all clients.
       trustProxy: true,                        // or a subnet list
     })
     ```
-  </Tabs.Tab>
-  <Tabs.Tab>
-    ```js
-    // Hono / Elysia — pass keyGenerator explicitly:
-    import { getClientIp } from '@exortek/security'
-
-    rateLimitMiddleware({
-      limiter,
-      keyGenerator: (c) => getClientIp({
-        headers: Object.fromEntries(c.req.raw.headers),
-        socket: { remoteAddress: c.env?.incoming?.socket?.remoteAddress },
-      }, { trustProxy: true }),
-    })
-    ```
-
   </Tabs.Tab>
 </Tabs>
 

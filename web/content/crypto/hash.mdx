@@ -222,7 +222,7 @@ your webhook provider uses — Stripe is hex, GitHub is hex, Slack is hex, Shopi
 <Callout type="warning">
   **Always sign the *raw* body, not the parsed JSON.** JSON round-trip (`JSON.parse(...)` then `JSON.stringify(...)`)
   reorders keys and drops whitespace — the resulting bytes will not match the signature the provider computed. Every
-  framework has a way to preserve the raw body (Express: `express.raw`, Fastify: `rawBody` plugin, Hono: `c.req.raw`).
+  framework has a way to preserve the raw body (Express: `express.raw`, Fastify: `rawBody` plugin).
 </Callout>
 
 **Errors:**
@@ -549,7 +549,7 @@ for (const event of stream) {
 <Callout type="error">
   **Signing parsed JSON instead of raw bytes.** `JSON.parse` → `JSON.stringify` rearranges keys and drops whitespace —
   the resulting bytes won't match what your webhook provider signed. Preserve the raw body at the framework level
-  (Express: `express.raw`, Fastify: `rawBody`, Hono: `c.req.raw`).
+  (Express: `express.raw`, Fastify: `rawBody`).
 </Callout>
 
 <Callout type="error">

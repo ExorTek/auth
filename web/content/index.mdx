@@ -10,7 +10,7 @@ need, or install the umbrella.
 
 Every package is built on `node:crypto`, with **no required external dependencies** outside the `@exortek/*` scope.
 The heaviest primitives (Argon2id, bcrypt) come from opt-in peer packages you install only if you use them. Pure
-JavaScript with JSDoc → `.d.ts`. Runs under Express, Fastify, Hono, and Elysia.
+JavaScript with JSDoc → `.d.ts`. Ships adapters for Express and Fastify — the classic Node HTTP stack.
 
 ## Shipping
 
@@ -76,7 +76,7 @@ Node.js **22 or newer**.
 
 - **[`@exortek/crypto` reference →](/crypto)** — every export, every option, every edge case.
 - **[`@exortek/security` reference →](/security)** — CSRF, rate-limit, headers, CORS, safe redirects + 17 helpers +
-  adapters for Fastify, Express, Hono, Elysia.
+  adapters for Fastify and Express.
 - **[`@exortek/otp` reference →](/otp)** — RFC 4226 HOTP + RFC 6238 TOTP with secure defaults, backup codes,
   provisioning URIs, opt-in replay defense.
 - **[`@exortek/password` reference →](/password)** — Argon2id, scrypt, bcrypt, PBKDF2 under one API +

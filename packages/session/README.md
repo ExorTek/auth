@@ -2,7 +2,7 @@
 
 > Sealed-cookie session manager for Node.js — rotation, revocation, sudo mode, impersonation, concurrent limits,
 > fingerprint binding, device labels, session events, Redis distributed revocation, CSRF derivation, trusted-device
-> cookies, and adapters for Fastify, Express, Hono, and Elysia. Built on `@exortek/crypto`.
+> cookies, and adapters for Fastify and Express. Built on `@exortek/crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/session.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/session)
 [![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
@@ -13,7 +13,7 @@
 Every session concern a backend needs, in one package: sealed encrypted cookies, rotation, revocation across
 processes via Redis pub/sub, sudo mode for sensitive actions, impersonation with audit trail, concurrent session
 limits, IP/UA fingerprint binding, auto-generated device labels for the settings page, CSRF token derivation, and a
-long-lived "trusted device" cookie for skipping 2FA. Adapters for Fastify, Express, Hono, and Elysia.
+long-lived "trusted device" cookie for skipping 2FA. Adapters for Fastify and Express.
 
 📖 **Docs:** [**auth.memet.dev/session**](https://auth.memet.dev/session)
 
@@ -359,7 +359,7 @@ Codes: `INVALID_ARGUMENT`, `MISSING_TOKEN`, `INVALID_TOKEN`, `EXPIRED`, `IDLE_TI
 - **Redis + tombstones** — revocation lives in its own key, immune to concurrent
   rolling-touch writes overwriting it (the old lost-revoke class of bug)
 - **Redis pub/sub** — cross-worker revocation propagation
-- **Framework adapters** — Fastify, Express (with cookie append), Hono, Elysia
+- **Framework adapters** — Fastify, Express (both with cookie append)
 - **163 unit tests** — token roundtrip, rotation (incl. concurrent-rotate race),
   concurrent-limit convergence, revoke variants, fresh-auth, fingerprint binding
   (both strictness modes), impersonation (TTL, nest-refusal), events, CSRF (masking too),
