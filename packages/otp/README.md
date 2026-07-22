@@ -116,6 +116,12 @@ verifyTotp(code, secret, {
 Returns `true` on match, `false` on any failure. **Never throws** on user-input problems — a wrong code is a normal auth
 outcome, not an error.
 
+> **Codes are replayable within the skew window unless `replay` is wired.** Without `options.replay`, a valid code stays
+> accepted for the entire acceptance window (~90s at `window: 1`, `period: 30`) and can be submitted repeatedly inside
+> that window — sniffed/phished/shoulder-surfed codes are not single-use by default. Wire `options.replay` (see
+> [Replay defense](#replay-defense) below) for any flow where a compromised code shouldn't be reusable — high-value
+> logins, admin actions, funds transfers.
+
 ### `remainingSeconds(period?, timestamp?)`
 
 Seconds until the current TOTP code rolls over. Handy for the countdown ring most 2FA screens show.
