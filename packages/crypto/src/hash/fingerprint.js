@@ -1,3 +1,5 @@
+import { isBigInt, isBoolean, isFunction, isString, isSymbol, isUndefined } from '@exortek/shared/predicates';
+
 import { invalidArgument } from '../internal/guards.js';
 import { hash } from './hash.js';
 
@@ -56,25 +58,28 @@ function _canonicalize(value, seen, path) {
   if (value === null) {
     return 'null';
   }
-  const t = typeof value;
-  if (t === 'boolean') {
+  if (isBoolean(value)) {
     return value ? 'true' : 'false';
   }
-  if (t === 'number') {
+  // `typeof x === 'number'` — not the `isNumber` predicate, which rejects
+  // NaN. We want NaN and Infinity to enter this branch so we can throw a
+  // specific "not hashable" error instead of falling through to WeakSet
+  // (which crashes on NaN with "Invalid value used in weak set").
+  if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
       throw invalidArgument(`${path} is a non-finite number (NaN / Infinity); not hashable`);
     }
     // JSON.stringify emits ECMAScript ToString for numbers, matching RFC 8785.
     return JSON.stringify(value);
   }
-  if (t === 'string') {
+  if (isString(value)) {
     return JSON.stringify(value);
   }
-  if (t === 'bigint') {
+  if (isBigInt(value)) {
     throw invalidArgument(`${path} is a bigint; JSON has no bigint representation. Convert to string first.`);
   }
-  if (t === 'symbol' || t === 'function' || t === 'undefined') {
-    throw invalidArgument(`${path} is a ${t}; not hashable`);
+  if (isSymbol(value) || isFunction(value) || isUndefined(value)) {
+    throw invalidArgument(`${path} is a ${typeof value}; not hashable`);
   }
   // From here: object-like.
   if (seen.has(value)) {
@@ -86,7 +91,7 @@ function _canonicalize(value, seen, path) {
   if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
     throw invalidArgument(`${path} is a Buffer/Uint8Array; encode as base64/hex first for a stable fingerprint`);
   }
-  if (typeof value.toJSON === 'function') {
+  if (isFunction(value.toJSON)) {
     return _canonicalize(value.toJSON(path), seen, path);
   }
   if (Array.isArray(value)) {

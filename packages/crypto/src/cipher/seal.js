@@ -3,6 +3,7 @@ import { CryptoError, ErrorCode } from '../errors.js';
 import { assertBytesOrString, assertOptionalObject, invalidArgument } from '../internal/guards.js';
 import { hkdf } from '../hash/hkdf.js';
 import { toBuffer } from '../internal/bytes.js';
+import { isBoolean, isObject, isString, isUndefined } from '@exortek/shared/predicates';
 
 const VERSION = 0x01;
 const IV_LEN = 12;
@@ -81,7 +82,7 @@ const DURATION_RE = /^(\d+)(ms|s|m|h|d|w)$/;
 export function seal(payload, secret, options) {
   assertBytesOrString(secret, 'secret');
   assertOptionalObject(options, 'options');
-  if (options === undefined || options.ttl === undefined) {
+  if (isUndefined(options) || isUndefined(options.ttl)) {
     throw invalidArgument(
       "options.ttl is required — pass either a positive integer of seconds or a duration string like '1h' / '15m' / '7d'",
     );
@@ -151,7 +152,7 @@ export function seal(payload, secret, options) {
  * const { payload } = unseal(token, [SEAL_SECRET_NEW, SEAL_SECRET_OLD], { clockSkew: 5 })
  */
 export function unseal(token, secret, options) {
-  if (typeof token !== 'string') {
+  if (!isString(token)) {
     throw new CryptoError(
       ErrorCode.TOKEN_MALFORMED,
       `token must be a string (base64url from seal()); got ${_describe(token)}`,
@@ -256,10 +257,13 @@ function _describe(v) {
   if (v === null || v === undefined) {
     return String(v);
   }
-  if (typeof v === 'string') {
+  if (isString(v)) {
     return `a string of length ${v.length}`;
   }
-  if (typeof v === 'number' || typeof v === 'boolean') {
+  // Bare typeof for number: isNumber rejects NaN, but _describe must be
+  // able to name a NaN in a diagnostic ("number NaN") instead of falling
+  // through to the generic constructor-name fallback.
+  if (typeof v === 'number' || isBoolean(v)) {
     return `${typeof v} ${v}`;
   }
   if (Buffer.isBuffer(v)) {
@@ -268,10 +272,11 @@ function _describe(v) {
   if (v instanceof Uint8Array) {
     return `Uint8Array of length ${v.length}`;
   }
-  return typeof v === 'object' ? (v.constructor?.name ?? 'object') : typeof v;
+  return isObject(v) ? (v.constructor?.name ?? 'object') : typeof v;
 }
 
 // HKDF result cache. seal/unseal run on the hot path (every session
+
 // verify), and the secret → key derivation is fully deterministic, so
 // re-deriving per call is pure waste. Only STRING secrets are cached:
 // strings are immutable, whereas a Buffer's contents can be mutated
@@ -282,7 +287,7 @@ const KEY_CACHE_MAX = 8;
 const _keyCache = new Map();
 
 function _deriveKey(secret) {
-  const cacheable = typeof secret === 'string';
+  const cacheable = isString(secret);
   if (cacheable) {
     const hit = _keyCache.get(secret);
     if (hit) {
@@ -308,6 +313,10 @@ function _deriveKey(secret) {
 }
 
 function _parseTtl(ttl) {
+  // Bare typeof: isNumber excludes NaN/Infinity, but the branch below
+  // catches them via `!Number.isFinite` so the specific "got NaN" error
+  // fires instead of falling through to the generic "must be number or
+  // duration string" message.
   if (typeof ttl === 'number') {
     if (!Number.isFinite(ttl) || ttl <= 0 || !Number.isSafeInteger(ttl)) {
       throw invalidArgument(
@@ -316,7 +325,7 @@ function _parseTtl(ttl) {
     }
     return ttl * 1000;
   }
-  if (typeof ttl === 'string') {
+  if (isString(ttl)) {
     const m = DURATION_RE.exec(ttl);
     if (!m) {
       throw invalidArgument(

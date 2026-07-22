@@ -1,4 +1,5 @@
 import { CryptoError, ErrorCode } from '../errors.js';
+import { isFunction, isObject, isString } from '@exortek/shared/predicates';
 
 /**
  * @typedef {import('node:crypto').KeyObject} KeyObject
@@ -18,16 +19,16 @@ function _describeKeyProblem(key) {
   if (key === null || key === undefined) {
     return `got ${key}`;
   }
-  if (typeof key === 'string') {
+  if (isString(key)) {
     return `got a string — wrap raw bytes with crypto.createSecretKey(Buffer.from(...)), or use cipher.encryptWithPassphrase for passphrase-based encryption`;
   }
-  if (typeof key === 'object' && typeof key.then === 'function') {
+  if (isObject(key) && isFunction(key.then)) {
     return `got a Promise — did you forget "await"? e.g. const key = await cipher.generateKey()`;
   }
   if (Buffer.isBuffer(key) || key instanceof Uint8Array) {
     return `got raw bytes — wrap with crypto.createSecretKey(buf) first, or use cipher.encryptWithPassphrase`;
   }
-  if (typeof key === 'object' && typeof key.type !== 'string') {
+  if (isObject(key) && !isString(key.type)) {
     return `got ${key.constructor?.name ?? 'an object'} without a .type field — generate one via await cipher.generateKey() or await cipher.generateKeyPair(...)`;
   }
   return `got a ${typeof key}`;
@@ -43,13 +44,13 @@ function _describeKeyProblem(key) {
  * @returns {asserts key is KeyObject}
  */
 export function assertKeyObject(key, expectedType, name) {
-  if (key && typeof key === 'object' && typeof key.type === 'string' && key.type !== expectedType) {
+  if (key && isObject(key) && isString(key.type) && key.type !== expectedType) {
     throw new CryptoError(
       ErrorCode.INVALID_KEY,
       `${name} must be a ${expectedType} KeyObject; got a ${key.type} KeyObject`,
     );
   }
-  if (!key || typeof key !== 'object' || key.type !== expectedType) {
+  if (!key || !isObject(key) || key.type !== expectedType) {
     throw new CryptoError(
       ErrorCode.INVALID_KEY,
       `${name} must be a ${expectedType} KeyObject; ${_describeKeyProblem(key)}`,
