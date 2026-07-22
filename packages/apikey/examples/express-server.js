@@ -72,13 +72,9 @@ app.get('/v1/whoami', (req, res) => {
 });
 
 // Extra route that demands a second scope.
-app.post(
-  '/v1/admin',
-  apiKeyMiddleware({ store, requiredScopes: ['admin'] }),
-  (req, res) => {
-    res.json({ ok: true });
-  },
-);
+app.post('/v1/admin', apiKeyMiddleware({ store, requiredScopes: ['admin'] }), (req, res) => {
+  res.json({ ok: true });
+});
 
 const port = process.env.PORT ?? 3000;
 app.listen(port, () => {

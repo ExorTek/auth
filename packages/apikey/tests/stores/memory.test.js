@@ -39,8 +39,14 @@ test('update: moving userId reshuffles the reverse index', async () => {
   const store = memoryStore();
   await store.put(record('id1', 'u1'));
   await store.update('id1', { userId: 'u2' });
-  assert.deepEqual((await store.listByUser('u1')).map(r => r.id), []);
-  assert.deepEqual((await store.listByUser('u2')).map(r => r.id), ['id1']);
+  assert.deepEqual(
+    (await store.listByUser('u1')).map(r => r.id),
+    [],
+  );
+  assert.deepEqual(
+    (await store.listByUser('u2')).map(r => r.id),
+    ['id1'],
+  );
 });
 
 test('revoke: flips revokedAt on the stored record', async () => {

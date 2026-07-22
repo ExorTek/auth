@@ -155,15 +155,25 @@ export function parseApiKey(key) {
   // secret use the base32-crockford alphabet which contains no
   // underscores — so the last two '_' cleanly bound them.
   const lastUnderscore = key.lastIndexOf('_');
-  if (lastUnderscore <= 0) {return null;}
+  if (lastUnderscore <= 0) {
+    return null;
+  }
   const prevUnderscore = key.lastIndexOf('_', lastUnderscore - 1);
-  if (prevUnderscore <= 0) {return null;}
+  if (prevUnderscore <= 0) {
+    return null;
+  }
   const prefix = key.slice(0, prevUnderscore);
   const id = key.slice(prevUnderscore + 1, lastUnderscore);
   const secret = key.slice(lastUnderscore + 1);
-  if (!PREFIX_RE.test(prefix)) {return null;}
-  if (id.length !== ID_CHARS || !CROCKFORD_RE.test(id)) {return null;}
-  if (secret.length !== SECRET_CHARS || !CROCKFORD_RE.test(secret)) {return null;}
+  if (!PREFIX_RE.test(prefix)) {
+    return null;
+  }
+  if (id.length !== ID_CHARS || !CROCKFORD_RE.test(id)) {
+    return null;
+  }
+  if (secret.length !== SECRET_CHARS || !CROCKFORD_RE.test(secret)) {
+    return null;
+  }
   return { prefix, id, secret };
 }
 
