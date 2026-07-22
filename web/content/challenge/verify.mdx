@@ -1,0 +1,103 @@
+---
+title: 'verifyChallenge — @exortek/challenge'
+sidebarTitle: verifyChallenge
+---
+
+import { Callout } from 'nextra/components';
+
+# `verifyChallenge(token, options)`
+
+Verify a challenge token, optionally match expected claims, optionally
+consume the token for single-use.
+
+```ts
+verifyChallenge(token, {
+  secret:            string | Buffer | Uint8Array,
+  consume?:          boolean,               // requires `store`
+  store?:            IncrStore,
+
+  expectedUserId?:   string,
+  expectedMethod?:   string,
+  expectedStep?:     string,
+  expectedNextStep?: string,
+  ip?:               string,                // required if token was IP-bound
+
+  now?:              number,
+}): Promise<
+  | { valid: true, payload: ChallengePayload }
+  | { valid: false, reason: VerifyFailureReason }
+>
+```
+
+Returns `{ valid: true, payload }` on success or
+`{ valid: false, reason }` on any expected failure. **Never throws** on
+bad tokens — a wrong or stale token is a normal auth outcome, not an
+exception. Only throws `ChallengeError` on programmer bugs (invalid
+secret shape, `consume: true` without a store).
+
+## Basic usage
+
+```js
+import { verifyChallenge } from '@exortek/challenge';
+
+const res = await verifyChallenge(req.body.c, {
+  secret: process.env.CHALLENGE_SECRET,
+  expectedMethod: 'password',
+  expectedStep: 'pw_verified',
+});
+
+if (!res.valid) {
+  return reply.code(401).send({ error: res.reason });
+}
+// res.payload.userId is the pending user
+```
+
+## Single-use consumption
+
+```js
+const res = await verifyChallenge(token, {
+  secret: SECRET,
+  consume: true,
+  store, // same store used at create time
+});
+```
+
+The first verify with `consume: true` accepts; every subsequent verify
+fails with `reason: 'replay'`. Enforcement is atomic — the store's
+`incr` call is used as compare-and-set, so two concurrent requests
+with the same token cannot both pass.
+
+## Failure reasons
+
+Every non-throw failure surfaces one of these `reason` codes:
+
+| Reason                | Meaning                                                        |
+| --------------------- | -------------------------------------------------------------- |
+| `malformed`           | Not a `chall_v1` token, missing parts, or garbage payload.     |
+| `bad_signature`       | HMAC did not verify — wrong secret or the payload was tampered. |
+| `expired`             | `exp` has passed.                                              |
+| `not_yet_valid`       | `iat` is more than 60 s in the future (clock skew).            |
+| `user_mismatch`       | `expectedUserId` was set and payload.userId differs.           |
+| `method_mismatch`     | `expectedMethod` differs.                                      |
+| `step_mismatch`       | `expectedStep` differs.                                        |
+| `next_step_mismatch`  | `expectedNextStep` differs.                                    |
+| `ip_missing`          | Token was IP-bound but `options.ip` was not supplied.          |
+| `ip_mismatch`         | Token was IP-bound and current IP differs.                     |
+| `replay`              | `consume: true` and store already saw this `jti`.              |
+| `store_unavailable`   | `consume: true` and the store threw (e.g. Redis down).         |
+
+<Callout type="info">
+  Prefer branching on `res.reason` in a `switch` — that gives you one
+  spot to decide what surface message (or telemetry event) each failure
+  mode should produce. The string values are stable across releases.
+</Callout>
+
+## Errors
+
+`verifyChallenge` throws `ChallengeError` only on programmer bugs:
+
+- `ErrorCode.INVALID_SECRET` — secret under 32 bytes.
+- `ErrorCode.INVALID_ARGUMENT` — `consume: true` without `store`, or
+  the options object is missing.
+
+See [`ChallengeError`](/challenge/errors).

@@ -94,7 +94,7 @@ status lives in [`README.md`](./README.md).
 | 01 | `@exortek/crypto`      | Primitives — hash, HMAC, KDFs, cipher, sign, seal, encode, CSPRNG                   |
 | 02 | `@exortek/password`    | Argon2id / scrypt / bcrypt / PBKDF2 + strength / pepper / history / HIBP           |
 | 03 | `@exortek/otp`         | RFC 4226 HOTP + RFC 6238 TOTP, backup codes, `otpauth://` provisioning URI          |
-| 04 | `@exortek/challenge`   | E-mail / SMS one-time code storage + verification                                   |
+| 04 | `@exortek/challenge`   | HMAC-signed multi-step flow tokens (userId · method · step) with opt-in single-use  |
 | 05 | `@exortek/jwk`         | JWK — generate, import, export, thumbprint, per RFC 7517 / 7638 / 8037 / 9278       |
 | 06 | `@exortek/jws`         | JWS — sign / verify / detached / b64:false / JSON serialisation per RFC 7515 / 7797  |
 | 07 | `@exortek/jwt`         | JWT — sign / verify with algorithm allowlists + claims validation per RFC 7519      |

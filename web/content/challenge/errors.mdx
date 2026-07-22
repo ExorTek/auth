@@ -1,0 +1,44 @@
+---
+title: 'ChallengeError — @exortek/challenge'
+sidebarTitle: Errors — ChallengeError
+---
+
+# `ChallengeError`
+
+Every recoverable failure raised by `@exortek/challenge` extends
+`ChallengeError`. Branch on `err.code`, never on `err.message` — the
+message is human-readable, `code` is the stable API.
+
+```js
+import { ChallengeError, ErrorCode } from '@exortek/challenge';
+
+try {
+  await createChallenge({ /* … */ });
+} catch (err) {
+  if (err instanceof ChallengeError) {
+    switch (err.code) {
+      case ErrorCode.INVALID_SECRET:  /* misconfig */ break;
+      case ErrorCode.INVALID_ARGUMENT: /* programmer bug */ break;
+    }
+  }
+}
+```
+
+## Codes
+
+| Code                | HTTP | Raised when |
+| ------------------- | ---- | ----------- |
+| `INVALID_ARGUMENT`  | 400  | Options object is missing, misshapen, or violates an invariant (e.g. `singleUse: true` without a store, non-positive `expiresIn`, non-plain `metadata`). |
+| `INVALID_SECRET`    | 400  | The secret is under 32 raw bytes, or not a string / Buffer / Uint8Array. |
+
+<a id="never-throws"></a>
+## What is **not** thrown
+
+Expected verify failures — wrong token, expired, mismatched claims,
+replay, IP mismatch — do **not** throw. `verifyChallenge` returns
+`{ valid: false, reason }` for those. See the
+[failure reasons table](/challenge/verify#failure-reasons).
+
+The `reason` values are string literals with stable API contracts;
+branch on them in your MFA / redirect logic just like you would on
+`err.code` above.

@@ -26,6 +26,7 @@ body:
         - '@exortek/jwk'
         - '@exortek/jws'
         - '@exortek/jwt'
+        - '@exortek/challenge'
         - 'A new package (please describe below)'
         - 'Repo tooling / docs site'
     validations:

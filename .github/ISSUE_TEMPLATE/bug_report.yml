@@ -27,6 +27,7 @@ body:
         - '@exortek/jwk'
         - '@exortek/jws'
         - '@exortek/jwt'
+        - '@exortek/challenge'
         - 'Repo tooling (build, tests, CI, docs site)'
         - "Other / I don't know"
     validations:

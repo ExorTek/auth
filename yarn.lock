@@ -349,6 +349,14 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@exortek/challenge@workspace:packages/challenge":
+  version: 0.0.0-use.local
+  resolution: "@exortek/challenge@workspace:packages/challenge"
+  dependencies:
+    "@exortek/shared": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
 "@exortek/crypto@workspace:^, @exortek/crypto@workspace:packages/crypto":
   version: 0.0.0-use.local
   resolution: "@exortek/crypto@workspace:packages/crypto"

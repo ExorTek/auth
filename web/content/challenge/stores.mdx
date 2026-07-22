@@ -1,0 +1,72 @@
+---
+title: 'Stores — @exortek/challenge'
+sidebarTitle: Stores
+---
+
+import { Callout } from 'nextra/components';
+
+# Stores
+
+Single-use enforcement needs a place to remember which token IDs (`jti`)
+have already been consumed. `@exortek/challenge/stores` ships two thin
+implementations. Any object exposing `incr(key, ttlMs) → { count }`
+also works — [`@exortek/security`](/security/rate-limit)'s rate-limit
+stores fit exactly.
+
+## `memoryStore(options?)`
+
+In-process Map with LRU eviction and a background TTL sweep.
+
+```js
+import { memoryStore } from '@exortek/challenge/stores';
+
+const store = memoryStore({
+  maxKeys: 10_000,      // default
+  sweepMs: 60_000,      // default
+});
+```
+
+Not cluster-safe: every worker has its own state, so a challenge
+accepted on one worker could still be replayed on another. Fine for
+dev, single-node prod, sticky-session behind an LB, tests.
+
+The `_stop()` method clears the sweep interval — call it on graceful
+shutdown so tests / short-lived processes exit promptly.
+
+## `redisStore(client, options?)`
+
+Cluster-safe. One Lua round-trip per verify (INCR + conditional
+PEXPIRE — atomic single-use enforcement, no TOCTOU).
+
+```js
+import Redis from 'ioredis';
+import { redisStore } from '@exortek/challenge/stores';
+
+const client = new Redis(process.env.REDIS_URL);
+const store = redisStore(client, { keyPrefix: 'chall:' });
+```
+
+Works with any client exposing `eval(script, numKeys, ...args)` —
+verified against `ioredis`, `node-redis@4+`, and `@upstash/redis` (HTTP
+client, runs on Cloudflare Workers / Vercel Edge / Deno Deploy).
+
+## Bring your own
+
+The store contract is minimal:
+
+```ts
+interface IncrStore {
+  incr(key: string, ttlMs: number): Promise<{ count: number }>;
+}
+```
+
+First call for a fresh key returns `{ count: 1 }` and arms a TTL of
+`ttlMs`; subsequent calls before expiry return the incremented count.
+`verifyChallenge` treats any `count > 1` as "already consumed".
+
+<Callout type="info">
+  **Reuse your rate-limit store.** If your app already uses
+  `@exortek/security`'s rate-limit stores, pass one straight into
+  `createChallenge` / `verifyChallenge` — same interface, same TTL
+  contract, no separate infrastructure needed.
+</Callout>

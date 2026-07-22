@@ -1,0 +1,94 @@
+---
+title: '@exortek/challenge — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/challenge`
+
+Signed, single-use challenge tokens for multi-step auth flows on
+Node.js 22+. A challenge fills the awkward middle between an OTP code
+(a single value with no context) and a JWT (interoperability-heavy,
+meant for real auth material) — it carries flow context (**userId,
+method, step, nextStep, metadata**) from one HTTP request to the next
+without a server-side session record.
+
+## What problem does this solve?
+
+A password → MFA login is a two-request flow. Between the two, the
+server needs to remember: *this user cleared the password step, and
+now they should submit MFA.* Common solutions are all imperfect:
+
+- **Server-side session for a pending login.** Wires state through
+  the DB / Redis for a flow that lasts 30 seconds; extra failure
+  surface, extra cleanup.
+- **URL query param `pendingUserId=usr_123`.** Trivially forgeable —
+  attacker types in anyone's user id.
+- **A JWT with a short TTL.** Works, but pulls in a whole JOSE stack
+  for something that will never leave your servers.
+
+A challenge is what belongs there: a **short, signed envelope** —
+`chall_v1.<payload>.<hmac>` — carrying the flow context. Attacker
+can't forge it (HMAC), can't replay it (opt-in single-use), can't
+use it from another network (opt-in IP binding).
+
+## Is it safe to trust?
+
+- **HMAC-SHA256, timing-safe compare.** `verifyChallenge` uses
+  `crypto.timingSafeEqual` on the HMAC tag — no character-by-character
+  short-circuit.
+- **Prefix-versioned format.** `chall_v1.…` — cheap client-side gate;
+  a hypothetical `chall_v2` can migrate the envelope without breaking
+  existing verifiers.
+- **Never throws on user-input problems.** A wrong / stale token is a
+  normal auth outcome, not an exception — `verifyChallenge` returns
+  `{ valid: false, reason }` for every expected failure mode.
+- **Every argument validated at the boundary.** Bad-shape secrets,
+  non-positive TTLs, and missing `store` on `singleUse: true` all
+  raise `ChallengeError` with a stable `code`.
+
+## Quick start
+
+```js
+import { createChallenge, verifyChallenge } from '@exortek/challenge';
+
+const SECRET = process.env.CHALLENGE_SECRET; // ≥ 32 UTF-8 bytes
+
+// After password succeeds — issue a challenge, redirect to /mfa
+const token = await createChallenge({
+  secret: SECRET,
+  userId: 'usr_123',
+  method: 'password',
+  step: 'pw_verified',
+  nextStep: 'mfa',
+  expiresIn: '5m',
+});
+res.redirect(`/mfa?c=${token}`);
+
+// On /mfa POST — verify the challenge, then verify the OTP
+const res = await verifyChallenge(req.body.c, {
+  secret: SECRET,
+  expectedMethod: 'password',
+  expectedStep: 'pw_verified',
+});
+if (!res.valid) return reply.code(401).send({ error: res.reason });
+// res.payload.userId is your pending user
+```
+
+## Where to next
+
+- [`createChallenge`](/challenge/create) — issue a signed token.
+- [`verifyChallenge`](/challenge/verify) — verify, match expectations,
+  optionally consume.
+- [Stores](/challenge/stores) — memory + Redis backends for single-use
+  enforcement.
+- [Errors](/challenge/errors) — `ChallengeError` code catalogue.
+
+<Callout type="info">
+  **Not a JWT.** Deliberately different token format so the two families
+  cannot be confused at a call site. If you need a token that a
+  third-party can verify (OAuth resource server, mobile app talking to
+  your API), use [`@exortek/jwt`](/jwt) instead. Challenge tokens are
+  for state you own on both sides.
+</Callout>

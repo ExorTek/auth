@@ -1,0 +1,102 @@
+---
+title: 'createChallenge — @exortek/challenge'
+sidebarTitle: createChallenge
+---
+
+import { Callout } from 'nextra/components';
+
+# `createChallenge(options)`
+
+Issue an HMAC-signed challenge token carrying flow context.
+
+```ts
+createChallenge({
+  secret:      string | Buffer | Uint8Array,   // ≥ 32 bytes
+  expiresIn:   string | number,                // '5m' | 300_000
+
+  userId?:     string,
+  method?:     'totp' | 'hotp' | 'email_otp' | 'sms_otp' | 'backup_code'
+             | 'passkey' | 'magic_link' | 'password' | 'webauthn'
+             | 'oauth' | 'oidc' | string,
+  step?:       string,
+  nextStep?:   string,
+  ua?:         string,
+  metadata?:   Record<string, unknown>,
+
+  singleUse?:  boolean,          // requires `store`
+  store?:      IncrStore,
+  ipBinding?:  boolean,          // requires `ip`
+  ip?:         string,
+
+  now?:        number,           // override Date.now() (tests)
+}): Promise<string>
+```
+
+Returns the compact token string:
+`chall_v1.<base64url(payload)>.<base64url(hmac)>`
+
+## Basic usage
+
+```js
+import { createChallenge } from '@exortek/challenge';
+
+const token = await createChallenge({
+  secret: process.env.CHALLENGE_SECRET,
+  userId: 'usr_123',
+  method: 'password',
+  step: 'pw_verified',
+  nextStep: 'mfa',
+  expiresIn: '5m',
+});
+```
+
+## Single-use
+
+```js
+import { createChallenge } from '@exortek/challenge';
+import { memoryStore } from '@exortek/challenge/stores';
+
+const store = memoryStore();
+
+const token = await createChallenge({
+  secret: SECRET,
+  expiresIn: '5m',
+  singleUse: true,
+  store,
+});
+```
+
+The token is signed and returned even without touching the store —
+enforcement happens on `verifyChallenge` with `consume: true`. The
+store is required at create time to fail fast on misconfiguration.
+
+## IP binding
+
+```js
+const token = await createChallenge({
+  secret: SECRET,
+  expiresIn: '5m',
+  ipBinding: true,
+  ip: req.ip,
+});
+```
+
+The IP is stamped into the payload; `verifyChallenge` will refuse a
+verify from any other IP. Consider the trust boundary: mobile users on
+cellular networks change IPs frequently — use for high-value flows
+(admin escalation, payment confirmation), not routine login.
+
+## Errors
+
+Throws [`ChallengeError`](/challenge/errors) with:
+
+- `ErrorCode.INVALID_SECRET` — secret shorter than 32 bytes.
+- `ErrorCode.INVALID_ARGUMENT` — malformed options (bad `expiresIn`,
+  `singleUse: true` without a store, `ipBinding: true` without an IP,
+  wrong-typed `metadata`, non-string `userId` / `method` / `step`).
+
+<Callout type="warn">
+  **The secret must be at least 32 raw bytes.** A string is interpreted
+  as UTF-8 — for a hex or base64 secret, decode to a Buffer first.
+  Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`.
+</Callout>
