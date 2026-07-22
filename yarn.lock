@@ -419,6 +419,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@exortek/magic-link@workspace:packages/magic-link":
+  version: 0.0.0-use.local
+  resolution: "@exortek/magic-link@workspace:packages/magic-link"
+  dependencies:
+    "@exortek/shared": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
 "@exortek/otp@workspace:packages/otp":
   version: 0.0.0-use.local
   resolution: "@exortek/otp@workspace:packages/otp"
