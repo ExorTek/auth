@@ -80,3 +80,15 @@ test('bcrypt.hash: invalid rounds rejected', async () => {
   await assert.rejects(bcrypt.hash('pw', { rounds: 2 }));
   await assert.rejects(bcrypt.hash('pw', { rounds: 40 }));
 });
+
+test('bcrypt.verify: rejects poisoned rounds beyond verify ceiling (DoS)', async () => {
+  // A poisoned stored hash claiming rounds=31 would trigger 2^31 Blowfish
+  // key-schedule iterations synchronously in pure-JS bcryptjs, hanging the
+  // process. Verify caps at 20 (well above OWASP-2024 min of 10).
+  const poisoned = '$2b$31$abcdefghijklmnopqrstuuNPfrsSjT/qejjhskGiKvR/aE1V7Nc06e';
+  const t0 = Date.now();
+  const ok = await bcrypt.verify('pw', poisoned);
+  const elapsed = Date.now() - t0;
+  assert.equal(ok, false);
+  assert.ok(elapsed < 100, `poisoned verify should short-circuit, took ${elapsed}ms`);
+});

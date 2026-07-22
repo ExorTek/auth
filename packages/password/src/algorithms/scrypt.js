@@ -117,10 +117,15 @@ export async function verify(password, phcHash, options = {}) {
   const ln = Number(record.params.ln);
   const r = Number(record.params.r);
   const p = Number(record.params.p);
-  if (!Number.isInteger(ln) || ln < 1 || ln > 31) {
+  // Cap `ln` on the verify side to the same ceiling `assertN` enforces on
+  // hash (log2 of `1 << 24`). Without this, a poisoned stored hash claiming
+  // `ln=31` triggers a multi-terabyte scrypt allocation and turns every
+  // login attempt against that row into a process-wide CPU/memory DoS.
+  // Same defensive pattern as `MAX_VERIFY_ITERATIONS` in pbkdf2.js.
+  if (!Number.isInteger(ln) || ln < 1 || ln > 24) {
     return false;
   }
-  if (!Number.isInteger(r) || r < 1 || !Number.isInteger(p) || p < 1) {
+  if (!Number.isInteger(r) || r < 1 || r > 32 || !Number.isInteger(p) || p < 1 || p > 32) {
     return false;
   }
   const N = 1 << ln;

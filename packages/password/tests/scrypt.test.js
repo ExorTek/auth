@@ -67,3 +67,22 @@ test('scrypt: rejects negative / zero params', async () => {
   await assert.rejects(scrypt.hash('pw', { ...FAST, r: 0 }));
   await assert.rejects(scrypt.hash('pw', { ...FAST, keyLength: -1 }));
 });
+
+test('scrypt.verify: rejects poisoned ln beyond hash-side ceiling (DoS)', async () => {
+  // hash-side `assertN` caps at 1<<24 (ln=24). A poisoned stored value
+  // claiming ln=31 would otherwise trigger a multi-terabyte allocation.
+  const poisoned = '$scrypt$ln=31,r=8,p=1$c2FsdHNhbHRzYWx0c2E$aGFzaGhhc2hoYXNoaGFzaGhhc2hoYXNoaGFzaA';
+  const t0 = Date.now();
+  const ok = await scrypt.verify('pw', poisoned);
+  const elapsed = Date.now() - t0;
+  assert.equal(ok, false);
+  assert.ok(elapsed < 100, `poisoned verify should short-circuit, took ${elapsed}ms`);
+});
+
+test('scrypt.verify: rejects poisoned r / p beyond sane ceiling (DoS)', async () => {
+  // 128 × N × r is the scrypt working set — r has to be capped too.
+  const poisonedR = '$scrypt$ln=15,r=99,p=1$c2FsdHNhbHRzYWx0c2E$aGFzaGhhc2hoYXNoaGFzaGhhc2hoYXNoaGFzaA';
+  const poisonedP = '$scrypt$ln=15,r=8,p=99$c2FsdHNhbHRzYWx0c2E$aGFzaGhhc2hoYXNoaGFzaGhhc2hoYXNoaGFzaA';
+  assert.equal(await scrypt.verify('pw', poisonedR), false);
+  assert.equal(await scrypt.verify('pw', poisonedP), false);
+});

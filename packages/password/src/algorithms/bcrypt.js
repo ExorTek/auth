@@ -33,6 +33,7 @@ const DEFAULTS = Object.freeze({
 //                produced by other libraries; do NOT choose this for new
 //                deployments.
 const BCRYPT_MAX_INPUT_BYTES = 72;
+const BCRYPT_MAX_VERIFY_ROUNDS = 20;
 
 /**
  * @typedef {'prehash' | 'strict' | 'truncate'} BcryptMode
@@ -166,6 +167,15 @@ export async function hash(password, options = {}) {
 export async function verify(password, bcryptHash, options = {}) {
   const record = parseHash(bcryptHash);
   if (!record || record.algorithm !== 'bcrypt') {
+    return false;
+  }
+  // Cap `rounds` on the verify side. The bcrypt string format admits
+  // rounds up to 31, meaning 2^31 Blowfish key-schedule iterations
+  // computed synchronously in pure-JS bcryptjs — a single poisoned
+  // stored hash can hang the process indefinitely. 20 is well above
+  // the OWASP-2024 minimum of 10 and the modern default of 12.
+  const gotRounds = Number(record.params.rounds);
+  if (!Number.isInteger(gotRounds) || gotRounds < 4 || gotRounds > BCRYPT_MAX_VERIFY_ROUNDS) {
     return false;
   }
   const mode = options.mode ?? DEFAULTS.mode;
