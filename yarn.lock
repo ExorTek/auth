@@ -352,24 +352,32 @@ __metadata:
 "@exortek/crypto@workspace:^, @exortek/crypto@workspace:packages/crypto":
   version: 0.0.0-use.local
   resolution: "@exortek/crypto@workspace:packages/crypto"
+  dependencies:
+    "@exortek/shared": "workspace:*"
   languageName: unknown
   linkType: soft
 
 "@exortek/jwk@workspace:packages/jwk":
   version: 0.0.0-use.local
   resolution: "@exortek/jwk@workspace:packages/jwk"
+  dependencies:
+    "@exortek/shared": "workspace:*"
   languageName: unknown
   linkType: soft
 
 "@exortek/jws@workspace:packages/jws":
   version: 0.0.0-use.local
   resolution: "@exortek/jws@workspace:packages/jws"
+  dependencies:
+    "@exortek/shared": "workspace:*"
   languageName: unknown
   linkType: soft
 
 "@exortek/jwt@workspace:packages/jwt":
   version: 0.0.0-use.local
   resolution: "@exortek/jwt@workspace:packages/jwt"
+  dependencies:
+    "@exortek/shared": "workspace:*"
   peerDependencies:
     ioredis: ">=5.0.0"
     redis: ">=4.0.0"
@@ -384,6 +392,8 @@ __metadata:
 "@exortek/otp@workspace:packages/otp":
   version: 0.0.0-use.local
   resolution: "@exortek/otp@workspace:packages/otp"
+  dependencies:
+    "@exortek/shared": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -391,6 +401,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@exortek/password@workspace:packages/password"
   dependencies:
+    "@exortek/shared": "workspace:*"
     argon2: "npm:^0.44.0"
     bcryptjs: "npm:^3.0.3"
   peerDependencies:
@@ -408,27 +419,20 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@exortek/security@workspace:packages/security"
   dependencies:
+    "@exortek/shared": "workspace:*"
     "@fastify/cookie": "npm:^11.1.1"
     "@sinclair/typebox": "npm:^0.34.0"
     cookie-parser: "npm:^1.4.7"
-    elysia: "npm:^1.4.29"
     express: "npm:^5.2.1"
     fastify: "npm:^5.10.0"
     fastify-plugin: "npm:^6.0.0"
-    hono: "npm:^4.12.29"
   peerDependencies:
-    elysia: ">=1"
     express: ">=4"
     fastify: ">=4"
-    hono: ">=4"
   peerDependenciesMeta:
-    elysia:
-      optional: true
     express:
       optional: true
     fastify:
-      optional: true
-    hono:
       optional: true
   languageName: unknown
   linkType: soft
@@ -438,21 +442,16 @@ __metadata:
   resolution: "@exortek/session@workspace:packages/session"
   dependencies:
     "@exortek/crypto": "workspace:^"
+    "@exortek/shared": "workspace:*"
   peerDependencies:
-    elysia: ">=1.0.0"
     express: ">=4.0.0"
     fastify: ">=4.0.0"
-    hono: ">=4.0.0"
     ioredis: ">=5.0.0"
     redis: ">=4.0.0"
   peerDependenciesMeta:
-    elysia:
-      optional: true
     express:
       optional: true
     fastify:
-      optional: true
-    hono:
       optional: true
     ioredis:
       optional: true
@@ -461,7 +460,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@exortek/shared@workspace:packages/shared":
+"@exortek/shared@workspace:*, @exortek/shared@workspace:packages/shared":
   version: 0.0.0-use.local
   resolution: "@exortek/shared@workspace:packages/shared"
   languageName: unknown
@@ -2752,7 +2751,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"cookie@npm:^1.0.1, cookie@npm:^1.1.1":
+"cookie@npm:^1.0.1":
   version: 1.1.1
   resolution: "cookie@npm:1.1.1"
   checksum: 10c0/79c4ddc0fcad9c4f045f826f42edf54bcc921a29586a4558b0898277fa89fb47be95bc384c2253f493af7b29500c830da28341274527328f18eba9f58afa112c
@@ -3334,30 +3333,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"elysia@npm:^1.4.29":
-  version: 1.4.29
-  resolution: "elysia@npm:1.4.29"
-  dependencies:
-    cookie: "npm:^1.1.1"
-    exact-mirror: "npm:^0.2.7"
-    fast-decode-uri-component: "npm:^1.0.1"
-    memoirist: "npm:^0.4.0"
-  peerDependencies:
-    "@sinclair/typebox": ">= 0.34.0 < 1"
-    "@types/bun": ">= 1.2.0"
-    exact-mirror: ">= 0.0.9"
-    file-type: ">= 20.0.0"
-    openapi-types: ">= 12.0.0"
-    typescript: ">= 5.0.0"
-  peerDependenciesMeta:
-    "@types/bun":
-      optional: true
-    typescript:
-      optional: true
-  checksum: 10c0/4d79d1aba992c632ef7b24ae4f6a0a9d23c0e49add9ee97f08756200805c9d8214bfc6e430ba9c6dcd0425b597fccac2d3403626086beeea42108794c59c10f5
-  languageName: node
-  linkType: hard
-
 "encodeurl@npm:^2.0.0":
   version: 2.0.0
   resolution: "encodeurl@npm:2.0.0"
@@ -3690,18 +3665,6 @@ __metadata:
   version: 1.8.1
   resolution: "etag@npm:1.8.1"
   checksum: 10c0/12be11ef62fb9817314d790089a0a49fae4e1b50594135dcb8076312b7d7e470884b5100d249b28c18581b7fd52f8b485689ffae22a11ed9ec17377a33a08f84
-  languageName: node
-  linkType: hard
-
-"exact-mirror@npm:^0.2.7":
-  version: 0.2.7
-  resolution: "exact-mirror@npm:0.2.7"
-  peerDependencies:
-    "@sinclair/typebox": ^0.34.15
-  peerDependenciesMeta:
-    "@sinclair/typebox":
-      optional: true
-  checksum: 10c0/d50cadc69367df6fe4f28e5ce2ac4470b8d83eaacc02f8ae46ae1d8352335e5220b69dfa6c7ef6eabbaaa07e273873026d08f0ec6bee6d0dff4782487f301dbe
   languageName: node
   linkType: hard
 
@@ -4415,13 +4378,6 @@ __metadata:
     property-information: "npm:^7.0.0"
     space-separated-tokens: "npm:^2.0.0"
   checksum: 10c0/18dc8064e5c3a7a2ae862978e626b97a254e1c8a67ee9d0c9f06d373bba155ed805fc5b5ce21b990fb7bc174624889e5e1ce1cade264f1b1d58b48f994bc85ce
-  languageName: node
-  linkType: hard
-
-"hono@npm:^4.12.29":
-  version: 4.12.29
-  resolution: "hono@npm:4.12.29"
-  checksum: 10c0/ee56efba993e765088c8e160e3e6fbe28138e0ae84a9f0e810917ef7cbb4dff2c50c947cabad1ec4852a5baf0225354a9e6dc8da9da66af0b0827e842a1870f7
   languageName: node
   linkType: hard
 
@@ -5187,13 +5143,6 @@ __metadata:
   version: 1.1.0
   resolution: "media-typer@npm:1.1.0"
   checksum: 10c0/7b4baa40b25964bb90e2121ee489ec38642127e48d0cc2b6baa442688d3fde6262bfdca86d6bbf6ba708784afcac168c06840c71facac70e390f5f759ac121b9
-  languageName: node
-  linkType: hard
-
-"memoirist@npm:^0.4.0":
-  version: 0.4.0
-  resolution: "memoirist@npm:0.4.0"
-  checksum: 10c0/986426c3474abe7018edeb6a88f11ef22409de652199096565a0c5479a9b91423cb0c8513411e017061b5b8df64cc5e15ccb6e7bac3e83d416753a9698aebe4f
   languageName: node
   linkType: hard
 
