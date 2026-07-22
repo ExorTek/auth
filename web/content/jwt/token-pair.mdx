@@ -42,7 +42,7 @@ const { accessToken, refreshToken, accessExpiresAt, refreshExpiresAt, familyId }
     {
       secret: { access: accessSecret, refresh: refreshSecret },
       access:  { alg: 'ES256', expiresIn: '15m' },
-      refresh: { alg: 'HS256', expiresIn: '7d', store },
+      refresh: { expiresIn: '7d', store },
     },
   )
 ```
@@ -54,7 +54,7 @@ const { accessToken, refreshToken, accessExpiresAt, refreshExpiresAt, familyId }
 | `secret.access`          | `KeyInput`                                       | REQUIRED. Any shape `sign` accepts.                                                        |
 | `secret.refresh`         | `KeyInput`                                       | REQUIRED. Independent from `secret.access`.                                                |
 | `access`                 | `SignOptions`                                    | Same shape as `sign`'s options — `alg` mandatory, `expiresIn` recommended.                 |
-| `refresh.alg`            | `string`                                         | REQUIRED. Unused when `opaque: true` (default) but validated for consistency.              |
+| `refresh.alg`            | `string`                                         | Required only when `opaque: false` (signed-JWT refresh). Ignored on the default opaque path — random bytes never touch it. |
 | `refresh.expiresIn`      | `string \| number`                               | REQUIRED. `'7d'`, `'30d'`, etc.                                                             |
 | `refresh.opaque`         | `boolean`                                        | Default `true` — random string. `false` → signed JWT refresh carrying the family reference. See note below. |
 | `refresh.tokenSize`      | `number`                                         | Default 32 bytes.                                                                          |
@@ -82,7 +82,6 @@ tokenPair.create(payload, {
   secret: { access, refresh },
   access:  { alg: 'ES256', expiresIn: '15m' },
   refresh: {
-    alg: 'HS256',
     expiresIn: '7d',
     store,
     generate: async () => {
@@ -102,7 +101,7 @@ try {
   const next = await tokenPair.rotate(oldRefreshToken, {
     secret: { access, refresh },
     access:  { alg: 'ES256', expiresIn: '15m' },
-    refresh: { alg: 'HS256', expiresIn: '7d', store },
+    refresh: { expiresIn: '7d', store },
     detectReuse: true,          // default
     reuseWindow: 5,             // seconds grace for network races
   })
@@ -146,5 +145,5 @@ everywhere", etc.
 | ------------------- | ------------------------------------------------------------------------------- |
 | `REFRESH_REUSED`    | Second use outside `reuseWindow` — family revoked. Force re-login.               |
 | `REVOKED`           | Refresh not in store — unknown, expired, or already revoked.                     |
-| `INVALID_ARGUMENT`  | Malformed options (missing `secret`, `access.alg`, `refresh.alg`, `store`, …).   |
+| `INVALID_ARGUMENT`  | Malformed options (missing `secret`, `access.alg`, `store`, …).                  |
 | `STORE_ERROR`       | Underlying store failure — inspect `err.cause`.                                   |
