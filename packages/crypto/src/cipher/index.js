@@ -6,7 +6,7 @@ import { deriveSharedSecret } from './derive.js';
 import { encryptWithPassphrase, decryptWithPassphrase } from './passphrase.js';
 import { seal, unseal } from './seal.js';
 import { SYMMETRIC_ALGOS, ASYMMETRIC_ALGOS, KEY_AGREEMENT_ALGOS } from './algorithms.js';
-import { CryptoError, ErrorCode } from '../errors.js';
+import { invalidKey } from '../internal/guards.js';
 import { _keyProblemHint } from '../internal/validate.js';
 
 /**
@@ -26,7 +26,7 @@ import { _keyProblemHint } from '../internal/validate.js';
  */
 function encrypt(data, key, options) {
   if (!key || typeof key !== 'object' || typeof key.type !== 'string') {
-    throw new CryptoError(ErrorCode.INVALID_KEY, `key must be a KeyObject; ${_keyProblemHint(key)}`);
+    throw invalidKey(`key must be a KeyObject; ${_keyProblemHint(key)}`);
   }
   if (key.type === 'secret') {
     return encryptSymmetric(data, key, options);
@@ -36,8 +36,7 @@ function encrypt(data, key, options) {
       algo: options?.algo ?? 'rsa-oaep-256',
     });
   }
-  throw new CryptoError(
-    ErrorCode.INVALID_KEY,
+  throw invalidKey(
     `encrypt requires a secret (symmetric) or public (asymmetric) KeyObject; got a ${key.type} KeyObject`,
   );
 }
@@ -55,7 +54,7 @@ function encrypt(data, key, options) {
  */
 function decrypt(ciphertext, key, options) {
   if (!key || typeof key !== 'object' || typeof key.type !== 'string') {
-    throw new CryptoError(ErrorCode.INVALID_KEY, `key must be a KeyObject; ${_keyProblemHint(key)}`);
+    throw invalidKey(`key must be a KeyObject; ${_keyProblemHint(key)}`);
   }
   if (key.type === 'secret') {
     return decryptSymmetric(ciphertext, key, options);
@@ -65,8 +64,7 @@ function decrypt(ciphertext, key, options) {
       algo: options?.algo ?? 'rsa-oaep-256',
     });
   }
-  throw new CryptoError(
-    ErrorCode.INVALID_KEY,
+  throw invalidKey(
     `decrypt requires a secret (symmetric) or private (asymmetric) KeyObject; got a ${key.type} KeyObject`,
   );
 }
