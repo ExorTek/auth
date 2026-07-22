@@ -1,6 +1,5 @@
 import { createHmac } from 'node:crypto';
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
-import { SecurityError, ErrorCode } from '../internal/errors.js';
 import { invalidArgument } from '../internal/guards.js';
 
 /**
@@ -279,9 +278,13 @@ export function webhookVerifyStripe(payload, signatureHeader, secret, options = 
   const signatures = [];
   for (const raw of signatureHeader.split(',')) {
     const trimmed = raw.trim();
-    if (!trimmed) continue;
+    if (!trimmed) {
+      continue;
+    }
     const eq = trimmed.indexOf('=');
-    if (eq <= 0) continue;
+    if (eq <= 0) {
+      continue;
+    }
     const key = trimmed.slice(0, eq);
     const value = trimmed.slice(eq + 1);
     if (key === 't' && /^\d+$/.test(value)) {
@@ -299,7 +302,10 @@ export function webhookVerifyStripe(payload, signatureHeader, secret, options = 
   }
 
   // Signed payload is `${t}.${body}` — same for every candidate secret.
-  const signedPayload = Buffer.concat([Buffer.from(`${timestamp}.`, 'utf8'), Buffer.isBuffer(payload) ? payload : Buffer.from(payload, 'utf8')]);
+  const signedPayload = Buffer.concat([
+    Buffer.from(`${timestamp}.`, 'utf8'),
+    Buffer.isBuffer(payload) ? payload : Buffer.from(payload, 'utf8'),
+  ]);
   for (const s of secrets) {
     const expected = createHmac('sha256', s).update(signedPayload).digest();
     for (const sig of signatures) {

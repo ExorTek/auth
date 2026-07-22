@@ -1,5 +1,4 @@
 import { seal, unseal, CryptoError, ErrorCode as CryptoErrorCode } from '@exortek/crypto';
-import { SessionError, ErrorCode } from './errors.js';
 import { assertNonEmptyString, assertObject, invalidArgument } from './internal/guards.js';
 import { parseCookies, serialiseCookie, serialiseDeleteCookie } from './cookie.js';
 import { parseDuration } from './internal/duration.js';

@@ -154,4 +154,3 @@ function assertHash(hashName) {
     );
   }
 }
-

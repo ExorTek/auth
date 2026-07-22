@@ -1,7 +1,6 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { toBuffer } from '@exortek/shared/bytes';
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
-import { SessionError, ErrorCode } from './errors.js';
 import { assertNonEmptyString, invalidArgument } from './internal/guards.js';
 
 // CSRF token derivation from a session ID + a server secret. The token
@@ -41,9 +40,7 @@ export function deriveCsrfToken(sessionId, secret) {
     throw invalidArgument(err instanceof Error ? err.message : String(err), { cause: err });
   }
   if (key.byteLength < MIN_SECRET_BYTES) {
-    throw invalidArgument(
-      `deriveCsrfToken.secret must be at least ${MIN_SECRET_BYTES} bytes (got ${key.byteLength})`,
-    );
+    throw invalidArgument(`deriveCsrfToken.secret must be at least ${MIN_SECRET_BYTES} bytes (got ${key.byteLength})`);
   }
   return createHmac('sha256', key).update(NAMESPACE).update(sessionId).digest('base64url').slice(0, 32);
 }

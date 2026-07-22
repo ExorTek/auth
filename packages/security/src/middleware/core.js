@@ -272,13 +272,17 @@ async function _rawExtractCsrf(csrf, ctx) {
     return csrf.tokenFromRequest(ctx.rawReq());
   }
   const h = ctx.getHeader(csrf.headerName);
-  if (typeof h === 'string' && h.length > 0) return h;
+  if (typeof h === 'string' && h.length > 0) {
+    return h;
+  }
   // Body may be sync (Express/Fastify already-parsed) or async (Hono
   // parseBody on demand). Await either shape uniformly.
   const body = await ctx.body();
   if (body && typeof body === 'object') {
     const v = /** @type {Record<string, unknown>} */ (body)[csrf.cookieName];
-    if (typeof v === 'string' && v.length > 0) return v;
+    if (typeof v === 'string' && v.length > 0) {
+      return v;
+    }
   }
   return undefined;
 }
@@ -336,7 +340,9 @@ export async function runCors(corsCheck, ctx, staticHeaders = null) {
  */
 export async function runRateLimit(rateLimit, ctx) {
   const key = rateLimit.keyGenerator ? rateLimit.keyGenerator(ctx.rawReq()) : ctx.ip();
-  if (!key) return null;
+  if (!key) {
+    return null;
+  }
   const result = await rateLimit.limiter.check({ key });
   const hn = rateLimit.headers;
   if (hn.retryAfter && result.retryAfter != null) {
@@ -348,7 +354,9 @@ export async function runRateLimit(rateLimit, ctx) {
   if (hn.reset && result.reset instanceof Date) {
     ctx.setHeader(hn.reset, String(Math.floor(result.reset.getTime() / 1000)));
   }
-  if (result.allowed) return null;
+  if (result.allowed) {
+    return null;
+  }
   if (rateLimit.onDenied) {
     return rateLimit.onDenied(ctx.rawReq(), ctx.rawRes(), result);
   }

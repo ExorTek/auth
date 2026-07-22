@@ -6,7 +6,6 @@ import {
   parseCookies,
   buildCorsCheck,
   buildHeaders,
-  runHeaders,
   runCors,
   runRateLimit,
   runCsrf,
@@ -52,7 +51,9 @@ function makeFastifyContext(request, reply, flags = {}) {
     body: () => request.body,
     setHeader: (name, value) => reply.header(name, value),
     setHeaderIfAbsent: (name, value) => {
-      if (!reply.hasHeader(name)) reply.header(name, value);
+      if (!reply.hasHeader(name)) {
+        reply.header(name, value);
+      }
     },
     setCookie: (name, value, opts) => {
       // @fastify/cookie handles the Set-Cookie stack correctly on Fastify;
@@ -67,14 +68,18 @@ function makeFastifyContext(request, reply, flags = {}) {
     },
     json: (status, body, extraHeaders) => {
       if (extraHeaders) {
-        for (const [k, v] of Object.entries(extraHeaders)) reply.header(k, v);
+        for (const [k, v] of Object.entries(extraHeaders)) {
+          reply.header(k, v);
+        }
       }
       reply.code(status).send(body);
       return true;
     },
     noContent: (status, extraHeaders) => {
       if (extraHeaders) {
-        for (const [k, v] of Object.entries(extraHeaders)) reply.header(k, v);
+        for (const [k, v] of Object.entries(extraHeaders)) {
+          reply.header(k, v);
+        }
       }
       reply.code(status).send();
       return true;
@@ -108,13 +113,17 @@ export const corsPlugin = fp(
 export const headersPlugin = fp(
   async function headersPluginImpl(fastify, options) {
     const map = buildHeaders(options ?? {});
-    if (Object.keys(map).length === 0) return;
+    if (Object.keys(map).length === 0) {
+      return;
+    }
     const entries = Object.entries(map);
     // Headers apply on the way out (onSend) so terminal responses from
     // other hooks (CORS preflight, CSRF deny) also carry them.
     fastify.addHook('onSend', async (_req, reply, payload) => {
       for (const [k, v] of entries) {
-        if (!reply.hasHeader(k)) reply.header(k, v);
+        if (!reply.hasHeader(k)) {
+          reply.header(k, v);
+        }
       }
       return payload;
     });
@@ -161,7 +170,9 @@ async function securityPluginImpl(fastify, options) {
   if (headersEntries) {
     fastify.addHook('onSend', async (_req, reply, payload) => {
       for (const [k, v] of headersEntries) {
-        if (!reply.hasHeader(k)) reply.header(k, v);
+        if (!reply.hasHeader(k)) {
+          reply.header(k, v);
+        }
       }
       return payload;
     });

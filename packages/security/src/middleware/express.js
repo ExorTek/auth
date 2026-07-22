@@ -56,7 +56,9 @@ function makeExpressContext(req, res) {
       res.setHeader(name, value);
     },
     setHeaderIfAbsent: (name, value) => {
-      if (!res.getHeader(name)) res.setHeader(name, value);
+      if (!res.getHeader(name)) {
+        res.setHeader(name, value);
+      }
     },
     setCookie: (name, value, opts) => {
       appendResponseCookie(serializeCookie(name, value, opts));
@@ -64,7 +66,9 @@ function makeExpressContext(req, res) {
     json: (status, body, extraHeaders) => {
       res.statusCode = status;
       if (extraHeaders) {
-        for (const [k, v] of Object.entries(extraHeaders)) res.setHeader(k, v);
+        for (const [k, v] of Object.entries(extraHeaders)) {
+          res.setHeader(k, v);
+        }
       }
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(body));
@@ -73,7 +77,9 @@ function makeExpressContext(req, res) {
     noContent: (status, extraHeaders) => {
       res.statusCode = status;
       if (extraHeaders) {
-        for (const [k, v] of Object.entries(extraHeaders)) res.setHeader(k, v);
+        for (const [k, v] of Object.entries(extraHeaders)) {
+          res.setHeader(k, v);
+        }
       }
       res.end();
       return true;
@@ -92,7 +98,9 @@ function wrap(runner) {
     try {
       const ctx = makeExpressContext(req, res);
       const terminated = await runner(ctx);
-      if (!terminated) next();
+      if (!terminated) {
+        next();
+      }
     } catch (err) {
       next(err);
     }
@@ -140,17 +148,23 @@ export function securityMiddleware(options = {}) {
     }
     if (cfg.corsCheck) {
       const done = await runCors(cfg.corsCheck, ctx, headersEntries);
-      if (done) return done;
+      if (done) {
+        return done;
+      }
     }
     // Rate-limit before CSRF so a firehose of forged tokens gets throttled
     // at the door instead of paying HMAC verification cost per request.
     if (cfg.rateLimit) {
       const done = await runRateLimit(cfg.rateLimit, ctx);
-      if (done) return done;
+      if (done) {
+        return done;
+      }
     }
     if (cfg.csrf) {
       const done = await runCsrf(cfg.csrf, ctx);
-      if (done) return done;
+      if (done) {
+        return done;
+      }
     }
     return null;
   });

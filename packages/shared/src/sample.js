@@ -46,7 +46,9 @@ export function sampleAlphabet(alphabet, length) {
   if (!Number.isSafeInteger(length) || length < 0) {
     throw new Error(`sampleAlphabet: length must be a non-negative safe integer; got ${length}`);
   }
-  if (length === 0) return '';
+  if (length === 0) {
+    return '';
+  }
 
   const alphabetLen = alphabet.length;
   const threshold = 256 - (256 % alphabetLen);
@@ -83,7 +85,9 @@ export function sampleUint16Indices(maxExclusive, count) {
   if (!Number.isSafeInteger(count) || count < 0) {
     throw new Error(`sampleUint16Indices: count must be a non-negative safe integer; got ${count}`);
   }
-  if (count === 0) return [];
+  if (count === 0) {
+    return [];
+  }
 
   const threshold = 65_536 - (65_536 % maxExclusive);
   const out = new Array(count);

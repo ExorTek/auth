@@ -169,7 +169,8 @@ test('webhookVerify: rejects algorithms outside the allowlist', () => {
   for (const bad of ['sha1', 'md5', 'sha384', 'SHA256', '']) {
     assert.throws(
       () => webhookVerify('body', 'aa', secret, { algorithm: bad }),
-      err => err instanceof SecurityError && err.code === ErrorCode.INVALID_ARGUMENT && /sha256.*sha512/.test(err.message),
+      err =>
+        err instanceof SecurityError && err.code === ErrorCode.INVALID_ARGUMENT && /sha256.*sha512/.test(err.message),
     );
   }
 });

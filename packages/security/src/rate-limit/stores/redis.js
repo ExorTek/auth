@@ -1,6 +1,5 @@
 import { assertRedisClient } from '@exortek/shared/redis-guard';
 
-import { SecurityError, ErrorCode } from '../../internal/errors.js';
 import { invalidArgument } from '../../internal/guards.js';
 
 const INCR_SCRIPT = `

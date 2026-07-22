@@ -1,6 +1,5 @@
 import { assertRedisClient } from '@exortek/shared/redis-guard';
 
-import { SessionError, ErrorCode } from '../errors.js';
 import { invalidArgument } from '../internal/guards.js';
 
 /**

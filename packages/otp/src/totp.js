@@ -1,5 +1,4 @@
 import { hotp, _verifyHotpForward } from './hotp.js';
-import { OtpError, ErrorCode } from './internal/errors.js';
 import { invalidArgument } from './internal/guards.js';
 import { createHash } from 'node:crypto';
 

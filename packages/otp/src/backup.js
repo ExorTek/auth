@@ -3,7 +3,6 @@ import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { ALPHABET as CROCKFORD_ALPHABET } from '@exortek/shared/crockford';
 import { sampleAlphabet } from '@exortek/shared/sample';
 import { number, object, optional, string } from '@exortek/shared/validate';
-import { OtpError, ErrorCode } from './internal/errors.js';
 import { invalidArgument, parse } from './internal/guards.js';
 
 const NSchema = number().refine(v => Number.isInteger(v) && v >= 1 && v <= 100, 'must be an integer in [1, 100]');
@@ -195,4 +194,3 @@ export function verifyBackupCode(candidate, storedList) {
   }
   return matchIndex;
 }
-

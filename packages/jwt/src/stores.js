@@ -8,7 +8,6 @@
 
 import { createMemoryStore } from './internal/memory-store.js';
 import { createRedisStore } from './internal/redis-store.js';
-import { JwtError, ErrorCode } from './internal/errors.js';
 import { invalidArgument } from './internal/guards.js';
 
 /**
