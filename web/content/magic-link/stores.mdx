@@ -1,0 +1,65 @@
+---
+title: 'Stores — @exortek/magic-link'
+sidebarTitle: Stores
+---
+
+# Stores
+
+`@exortek/magic-link/stores` ships two implementations. Any object
+matching the `MagicLinkStore` interface works — if your app already
+has an appropriate table, implement the interface and skip the
+shipped stores.
+
+## The interface
+
+```ts
+interface MagicLinkStore {
+  put(record: MagicLinkRecord): Promise<void>;
+  getById(id: string): Promise<MagicLinkRecord | null>;
+  consume(id: string): Promise<boolean>;         // atomic CAS
+  incrRate?(email: string, ttlMs: number): Promise<{ count: number }>;
+  listByEmail?(email: string): Promise<MagicLinkRecord[]>;
+  revokeByEmail?(email: string): Promise<number>;
+}
+```
+
+`incrRate` is required only when the caller sets `maxPerEmail` on
+`createMagicLink`. `listByEmail` / `revokeByEmail` are required
+only for `listPendingForEmail` / `revokeAllForEmail`.
+
+## `memoryStore()`
+
+```js
+import { memoryStore } from '@exortek/magic-link/stores';
+const store = memoryStore();
+```
+
+In-process Map keyed by `id` with a reverse index by email and a
+small counter map for `incrRate`. Uses `structuredClone` on read /
+write so caller mutation cannot retroactively mutate what's stored.
+Not cluster-safe: multi-worker deploys will miss revocations.
+
+## `redisStore(client, options?)`
+
+```js
+import Redis from 'ioredis';
+import { redisStore } from '@exortek/magic-link/stores';
+
+const client = new Redis(process.env.REDIS_URL);
+const store = redisStore(client, { keyPrefix: 'mlink:' });
+```
+
+Layout:
+
+```
+<keyPrefix><id>              — JSON blob of the record (PEXPIRE = record.expiresAt)
+<keyPrefix>e:<email>         — SADD-set of the email's link ids
+<keyPrefix>rate:<email>      — per-email rate-limit counter (INCR + PEXPIRE)
+```
+
+`consume` runs a Lua CAS that flips `consumedAt` in-place — atomic
+across workers, no TOCTOU. `incrRate` runs a Lua INCR + PEXPIRE so
+the TTL is bound to the first hit only, matching every other
+rate-limit store in the ecosystem.
+
+Works with `ioredis`, `node-redis@4+`, and `@upstash/redis`.

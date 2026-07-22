@@ -1,0 +1,74 @@
+---
+title: '@exortek/magic-link — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/magic-link`
+
+Passwordless email-link auth for Node.js 22+. Ships the token — you
+send the email.
+
+## The flow
+
+1. **Mint** — `createMagicLink({ secret, email, baseUrl, expiresIn, store })` returns a compact HMAC-signed token and the URL to embed in the email.
+2. **Email** — your job. The package does not touch a mail driver so you stay in charge of Resend / Sendgrid / SES / SMTP / whatever.
+3. **Verify** — `verifyMagicLink(token, { secret, store })` HMAC-verifies, checks expiry, atomically consumes so a second click is rejected.
+
+## Token format
+
+```
+<prefix>.<base64url(JSON payload)>.<base64url(HMAC-SHA256 tag)>
+```
+
+Default prefix `mlink_v1`. Payload is intentionally minimal —
+`{ id, iat, exp, eh? }`:
+
+- `id` — 128-bit random, store lookup key.
+- `eh` — `SHA-256(secret ‖ email)` when `hashEmail: true` (default). Lets `verifyMagicLink` short-circuit a wrong-email reject without touching the store; also gives you cross-check against a poisoned store row swapping the email under a valid id.
+
+The email itself never appears in the URL — only in the store.
+`redirectTo` (if any) also stays in the store, not the URL, so it
+cannot be tampered with by editing the link.
+
+## Quick start
+
+```js
+import { createMagicLink, verifyMagicLink } from '@exortek/magic-link';
+import { memoryStore } from '@exortek/magic-link/stores';
+
+const SECRET = process.env.MAGIC_LINK_SECRET;
+const store = memoryStore();
+
+// 1) User submits email
+const { url } = await createMagicLink({
+  secret: SECRET,
+  email: 'user@example.com',
+  baseUrl: 'https://myapp.com/auth/verify',
+  expiresIn: '15m',
+  redirectTo: '/dashboard',
+  store,
+});
+await mailer.send('user@example.com', `Sign in: ${url}`); // YOUR job
+
+// 2) User clicks — /auth/verify?token=... hits your route
+const res = await verifyMagicLink(req.query.token, { secret: SECRET, store });
+if (!res.valid) return reply.code(401).send({ error: res.reason });
+// res = { valid: true, id, email, redirectTo?, metadata? }
+```
+
+## Where to next
+
+- [`createMagicLink`](/magic-link/create)
+- [`verifyMagicLink`](/magic-link/verify)
+- [Stores](/magic-link/stores) — memory + Redis + interface
+- [Errors](/magic-link/errors) — `MagicLinkError` code catalogue
+
+<Callout type="info">
+  **Not a JWT.** Deliberately different token format so the two
+  families cannot be confused at a call site. If you need a token that
+  a third-party can verify (OAuth resource server, mobile app hitting
+  your API), reach for [`@exortek/jwt`](/jwt). Magic links are for
+  server-owned state on both sides of the click.
+</Callout>

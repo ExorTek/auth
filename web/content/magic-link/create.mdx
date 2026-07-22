@@ -1,0 +1,107 @@
+---
+title: 'createMagicLink — @exortek/magic-link'
+sidebarTitle: createMagicLink
+---
+
+import { Callout } from 'nextra/components';
+
+# `createMagicLink(options)`
+
+Mint an HMAC-signed short-lived token and the URL to embed in a
+"sign in" email.
+
+```ts
+createMagicLink({
+  secret:      string | Buffer | Uint8Array,   // ≥ 32 bytes
+  email:       string,
+  baseUrl:     string,                          // where /auth/verify lives
+  expiresIn:   string | number,                 // '15m' | '1h' | ms
+
+  redirectTo?: string,
+  metadata?:   Record<string, unknown>,
+
+  hashEmail?:  boolean,                         // default true
+  prefix?:     string,                          // default 'mlink_v1'
+
+  store:       MagicLinkStore,
+  maxPerEmail?: { count: number, window: string | number },
+
+  now?:        number,
+}): Promise<{ token, url, id, expiresAt, record }>
+```
+
+## Basic usage
+
+```js
+import { createMagicLink } from '@exortek/magic-link';
+
+const { url } = await createMagicLink({
+  secret: process.env.MAGIC_LINK_SECRET,
+  email: 'user@example.com',
+  baseUrl: 'https://myapp.com/auth/verify',
+  expiresIn: '15m',
+  redirectTo: '/dashboard',
+  metadata: { source: 'homepage_cta' },
+  store,
+});
+
+await mailer.send('user@example.com', `Sign in: ${url}`);
+```
+
+## The URL construction
+
+`url` is `baseUrl` + `?token=<token>` (or `&token=` when `baseUrl`
+already has a query string). Everything else stays server-side:
+
+- `redirectTo` is saved in the store, not encoded in the URL — an
+  attacker cannot repoint the sign-in to `evil.com` by editing the
+  link.
+- `metadata` is saved in the store too — you get it back on
+  `verifyMagicLink` success but it never appears in the emailed URL.
+
+## Per-email rate limit
+
+```js
+await createMagicLink({
+  /* ... */
+  maxPerEmail: { count: 3, window: '1h' },
+});
+```
+
+The counter lives on the same store's `incrRate` method (memory +
+Redis both ship it). When the count exceeds `count` inside the
+window, `createMagicLink` throws `MagicLinkError` with
+`code: 'RATE_LIMITED'`. Prevents a spammer from burning your mail
+budget without external rate-limit infrastructure.
+
+<Callout type="info">
+  **Verify-side rate limiting is separate.** The 128-bit random +
+  HMAC-gated token can't be brute-forced (2^256 space) so `verify`
+  doesn't need its own limit. If you want DoS protection on
+  `/auth/verify`, put `@exortek/security`'s rate-limit in front of
+  the route.
+</Callout>
+
+## Custom wire prefix
+
+```js
+await createMagicLink({
+  /* ... */
+  prefix: 'login_v1', // instead of 'mlink_v1'
+});
+```
+
+Same rules as challenge/apikey — `/^[A-Za-z0-9_-]{1,32}$/`, no `.`.
+The same prefix must be passed to `verifyMagicLink` or verification
+returns `reason: 'malformed'`.
+
+## Errors
+
+Throws `MagicLinkError`:
+
+- `INVALID_SECRET` — secret under 32 bytes.
+- `INVALID_PREFIX` — `prefix` doesn't match the grammar.
+- `INVALID_ARGUMENT` — bad email shape, missing `baseUrl`, `expiresIn`
+  non-positive, `metadata` not a plain object.
+- `RATE_LIMITED` — `maxPerEmail` cap exceeded.
+- `STORE_ERROR` — `store.put` threw.

@@ -104,7 +104,7 @@ status lives in [`README.md`](./README.md).
 | 11 | `@exortek/security`    | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect, defensive HTTP helpers  |
 | 12 | `@exortek/device`      | Device fingerprinting, trusted-device tokens                                        |
 | 13 | `@exortek/apikey`      | Prefixed API keys (`sk_live_id_secret`), HMAC-SHA256 storage, scopes, middleware    |
-| 14 | `@exortek/magic-link`  | Passwordless e-mail / SMS link tokens                                               |
+| 14 | `@exortek/magic-link`  | Passwordless email-link auth — signed short-lived tokens with single-use consume    |
 | 15 | `@exortek/passkey`     | WebAuthn / FIDO2 server verification (`/server` only; browser via community lib)    |
 | 16 | `@exortek/opaque`      | OPAQUE aPAKE — zero-knowledge password authentication                               |
 | 17 | `@exortek/paseto`      | PASETO v4 (`local` / `public`)                                                     |

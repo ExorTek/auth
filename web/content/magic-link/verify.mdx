@@ -1,0 +1,92 @@
+---
+title: 'verifyMagicLink — @exortek/magic-link'
+sidebarTitle: verifyMagicLink
+---
+
+# `verifyMagicLink(token, options)`
+
+Verify a magic-link token from your `/auth/verify` route.
+
+```ts
+verifyMagicLink(token, {
+  secret:         string | Buffer | Uint8Array,
+  store:          MagicLinkStore,
+  consume?:       boolean,                      // default true
+  expectedEmail?: string,
+  prefix?:        string,                       // must match create-time
+  now?:           number,
+}): Promise<
+  | { valid: true, id, email, redirectTo?, metadata? }
+  | { valid: false, reason }
+>
+```
+
+**Never throws** on a bad link — a wrong, stale, or already-used link
+is a normal auth outcome, not an exception.
+
+## Basic usage
+
+```js
+const res = await verifyMagicLink(req.query.token, {
+  secret: process.env.MAGIC_LINK_SECRET,
+  store,
+});
+
+if (!res.valid) return reply.code(401).send({ error: res.reason });
+// Issue your session cookie / JWT here.
+reply.redirect(res.redirectTo ?? '/');
+```
+
+## Two-phase (preview → confirm)
+
+Sometimes you want the click on the email to open a preview page
+("Sign in as user@example.com?") and only the second click ("Yes,
+sign me in") to actually consume the link. Pass `consume: false` on
+the preview, `true` on the confirm:
+
+```js
+// GET /auth/verify?token=... — preview
+const preview = await verifyMagicLink(token, {
+  secret: SECRET, store, consume: false,
+});
+if (!preview.valid) return reply.code(401).send({ error: preview.reason });
+return reply.view('confirm.html', { email: preview.email, token });
+
+// POST /auth/verify — confirm
+const done = await verifyMagicLink(token, { secret: SECRET, store });
+if (!done.valid) return reply.code(401).send({ error: done.reason });
+// Consume happened here; issue session, redirect.
+```
+
+## Failure reasons
+
+| Reason                    | Meaning                                                        |
+| ------------------------- | -------------------------------------------------------------- |
+| `malformed`               | Wrong shape, wrong length, wrong prefix.                       |
+| `bad_signature`           | HMAC didn't match — wrong secret or the payload was tampered.  |
+| `expired`                 | `exp` passed.                                                  |
+| `not_yet_valid`           | `iat` is more than 60 s in the future (clock skew).            |
+| `not_found`               | Well-shaped but the id is not in the store.                    |
+| `consumed`                | Store already saw a successful consume for this id.            |
+| `email_mismatch`          | `expectedEmail` differs from the payload's `eh` or the record. |
+| `email_binding_mismatch`  | Payload's `eh` disagrees with the stored record's email — a poisoned row was swapped under a valid id. |
+| `store_unavailable`       | `store.getById` / `store.consume` threw.                       |
+
+The strings are stable API contracts you can `switch` on.
+
+## `expectedEmail` — short-circuit reject
+
+When you already know which account is pending (e.g. from a
+half-authenticated session), pass `expectedEmail` and the payload's
+`eh` claim lets `verifyMagicLink` reject a wrong-email link
+**without touching the store**:
+
+```js
+const res = await verifyMagicLink(token, {
+  secret: SECRET, store,
+  expectedEmail: pendingUserSession.email,
+});
+```
+
+Two identical clicks from different accounts on the same device
+can no longer sign the wrong user in.

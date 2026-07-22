@@ -1,0 +1,45 @@
+---
+title: 'MagicLinkError — @exortek/magic-link'
+sidebarTitle: Errors — MagicLinkError
+---
+
+# `MagicLinkError`
+
+Every programmer-error raised by `@exortek/magic-link` extends
+`MagicLinkError`. Branch on `err.code`, never on `err.message`.
+
+```js
+import { MagicLinkError, ErrorCode } from '@exortek/magic-link';
+
+try {
+  await createMagicLink({ /* ... */ });
+} catch (err) {
+  if (err instanceof MagicLinkError) {
+    switch (err.code) {
+      case ErrorCode.INVALID_SECRET:  /* env misconfig */ break;
+      case ErrorCode.INVALID_PREFIX:  /* bad prefix grammar */ break;
+      case ErrorCode.INVALID_ARGUMENT: /* bad options */ break;
+      case ErrorCode.RATE_LIMITED:    /* return 429 */ break;
+      case ErrorCode.STORE_ERROR:     /* DB outage */ break;
+    }
+  }
+}
+```
+
+## Codes
+
+| Code                | HTTP | Raised when |
+| ------------------- | ---- | ----------- |
+| `INVALID_ARGUMENT`  | 400  | Options object missing / misshapen / violates an invariant. |
+| `INVALID_SECRET`    | 400  | Secret under 32 bytes / wrong type. |
+| `INVALID_PREFIX`    | 400  | Prefix doesn't match `/^[A-Za-z0-9_-]{1,32}$/`. |
+| `RATE_LIMITED`      | 429  | `maxPerEmail` cap exceeded. |
+| `STORE_ERROR`       | 500  | `store.put` threw at create time. |
+
+## What is **not** thrown
+
+Every expected verify failure — wrong signature, expired, consumed,
+mismatched email — is a `{ valid: false, reason }` result, not an
+exception. See the
+[failure reasons table](/magic-link/verify#failure-reasons); the
+strings are stable API contracts you can `switch` on.

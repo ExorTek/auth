@@ -10,5 +10,6 @@ export default {
   jwt: '@exortek/jwt',
   challenge: '@exortek/challenge',
   apikey: '@exortek/apikey',
+  'magic-link': '@exortek/magic-link',
   compliance: 'Compliance',
 };
