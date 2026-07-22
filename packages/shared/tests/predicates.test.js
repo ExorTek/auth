@@ -1,7 +1,27 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { isObject, isString, isNonEmptyString, isFunction, isBytes } from '../src/predicates.js';
+import {
+  isObject,
+  isString,
+  isNonEmptyString,
+  isFunction,
+  isBytes,
+  isNumber,
+  isBoolean,
+  isUndefined,
+  isBigInt,
+  isSymbol,
+  isNull,
+  isNullish,
+  isArray,
+  isBuffer,
+  isUint8Array,
+  isTrue,
+  isFalse,
+  isFiniteNumber,
+  isInteger,
+} from '../src/predicates.js';
 
 describe('isObject', () => {
   test('plain objects pass', () => {
@@ -87,5 +107,124 @@ describe('isBytes', () => {
     assert.equal(isBytes(new ArrayBuffer(8)), false);
     assert.equal(isBytes([1, 2, 3]), false);
     assert.equal(isBytes(null), false);
+  });
+});
+
+describe('isNumber', () => {
+  test('finite and infinite numbers pass; NaN is rejected', () => {
+    assert.equal(isNumber(0), true);
+    assert.equal(isNumber(-42), true);
+    assert.equal(isNumber(1.5), true);
+    assert.equal(isNumber(Infinity), true);
+    assert.equal(isNumber(-Infinity), true);
+    assert.equal(isNumber(NaN), false);
+    assert.equal(isNumber('5'), false);
+    assert.equal(isNumber(null), false);
+    assert.equal(isNumber(1n), false);
+  });
+});
+
+describe('isFiniteNumber', () => {
+  test('rejects NaN AND infinities', () => {
+    assert.equal(isFiniteNumber(0), true);
+    assert.equal(isFiniteNumber(-1.5), true);
+    assert.equal(isFiniteNumber(NaN), false);
+    assert.equal(isFiniteNumber(Infinity), false);
+    assert.equal(isFiniteNumber(-Infinity), false);
+    assert.equal(isFiniteNumber('5'), false);
+  });
+});
+
+describe('isInteger', () => {
+  test('safe integers pass; floats / NaN / Infinity / bigints fail', () => {
+    assert.equal(isInteger(0), true);
+    assert.equal(isInteger(-42), true);
+    assert.equal(isInteger(Number.MAX_SAFE_INTEGER), true);
+    assert.equal(isInteger(Number.MAX_SAFE_INTEGER + 1), false);
+    assert.equal(isInteger(1.5), false);
+    assert.equal(isInteger(NaN), false);
+    assert.equal(isInteger(Infinity), false);
+    assert.equal(isInteger(1n), false);
+  });
+});
+
+describe('isBoolean', () => {
+  test('true and false pass; truthy/falsy values do not', () => {
+    assert.equal(isBoolean(true), true);
+    assert.equal(isBoolean(false), true);
+    assert.equal(isBoolean(0), false);
+    assert.equal(isBoolean(1), false);
+    assert.equal(isBoolean(''), false);
+    assert.equal(isBoolean(null), false);
+    assert.equal(isBoolean(undefined), false);
+  });
+});
+
+describe('isTrue / isFalse', () => {
+  test('exact-match — no truthy/falsy coercion', () => {
+    assert.equal(isTrue(true), true);
+    assert.equal(isTrue(1), false);
+    assert.equal(isTrue('true'), false);
+    assert.equal(isFalse(false), true);
+    assert.equal(isFalse(0), false);
+    assert.equal(isFalse(''), false);
+    assert.equal(isFalse(null), false);
+  });
+});
+
+describe('isUndefined / isNull / isNullish', () => {
+  test('isUndefined only matches undefined', () => {
+    assert.equal(isUndefined(undefined), true);
+    assert.equal(isUndefined(null), false);
+    assert.equal(isUndefined(0), false);
+    assert.equal(isUndefined(''), false);
+  });
+  test('isNull only matches null', () => {
+    assert.equal(isNull(null), true);
+    assert.equal(isNull(undefined), false);
+    assert.equal(isNull(0), false);
+  });
+  test('isNullish matches null AND undefined', () => {
+    assert.equal(isNullish(null), true);
+    assert.equal(isNullish(undefined), true);
+    assert.equal(isNullish(0), false);
+    assert.equal(isNullish(''), false);
+    assert.equal(isNullish(false), false);
+  });
+});
+
+describe('isBigInt / isSymbol', () => {
+  test('primitives pass, everything else fails', () => {
+    assert.equal(isBigInt(1n), true);
+    assert.equal(isBigInt(BigInt(0)), true);
+    assert.equal(isBigInt(1), false);
+    assert.equal(isSymbol(Symbol('x')), true);
+    assert.equal(isSymbol(Symbol.iterator), true);
+    assert.equal(isSymbol('sym'), false);
+  });
+});
+
+describe('isArray', () => {
+  test('arrays pass; array-likes and typed arrays fail', () => {
+    assert.equal(isArray([]), true);
+    assert.equal(isArray([1, 2]), true);
+    assert.equal(isArray(new Array(3)), true);
+    assert.equal(isArray(new Uint8Array()), false);
+    assert.equal(isArray({ length: 0 }), false);
+    assert.equal(isArray('abc'), false);
+  });
+});
+
+describe('isBuffer / isUint8Array', () => {
+  test('isBuffer accepts Buffer only, not plain Uint8Array', () => {
+    assert.equal(isBuffer(Buffer.from('x')), true);
+    assert.equal(isBuffer(new Uint8Array([1, 2])), false);
+    assert.equal(isBuffer(''), false);
+  });
+  test('isUint8Array accepts both Buffer and plain Uint8Array', () => {
+    assert.equal(isUint8Array(Buffer.from('x')), true);
+    assert.equal(isUint8Array(new Uint8Array()), true);
+    assert.equal(isUint8Array(new Uint16Array()), false);
+    assert.equal(isUint8Array(new ArrayBuffer(8)), false);
   });
 });

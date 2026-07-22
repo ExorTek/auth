@@ -94,3 +94,160 @@ export function isFunction(value) {
 export function isBytes(value) {
   return Buffer.isBuffer(value) || value instanceof Uint8Array;
 }
+
+/**
+ * `true` when `value` is a number primitive. Rejects `NaN`, which is
+ * technically a number but almost never what the caller intends.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isNumber(value) {
+  return typeof value === 'number' && !Number.isNaN(value);
+}
+
+/**
+ * `true` when `value` is a boolean primitive.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isBoolean(value) {
+  return typeof value === 'boolean';
+}
+
+/**
+ * `true` when `value` is `undefined`.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isUndefined(value) {
+  return typeof value === 'undefined';
+}
+
+/**
+ * `true` when `value` is a `bigint` primitive. Rejects the boxed form
+ * `Object(1n)` because boxed primitives are a footgun almost never used
+ * in server-side code.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isBigInt(value) {
+  return typeof value === 'bigint';
+}
+
+/**
+ * `true` when `value` is a `symbol`. Every `Symbol()` and
+ * `Symbol.for('x')` returns a primitive symbol; boxed symbols are not
+ * accepted.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isSymbol(value) {
+  return typeof value === 'symbol';
+}
+
+/**
+ * `true` for literal `null`. Prefer `!isNullish(x)` over `!isNull(x)`
+ * when the caller might pass `undefined` — see {@link isNullish}.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isNull(value) {
+  return value === null;
+}
+
+/**
+ * `true` for `null` OR `undefined`. Standard "empty slot" check that
+ * mirrors the nullish-coalescing (`??`) operator.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isNullish(value) {
+  return value === null || value === undefined;
+}
+
+/**
+ * `true` for arrays. Thin wrapper over `Array.isArray` so predicates
+ * live under one import; identical behaviour.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isArray(value) {
+  return Array.isArray(value);
+}
+
+/**
+ * `true` when `value` is a Node.js `Buffer`. Uint8Array-only shapes are
+ * refused — use {@link isBytes} when either satisfies the contract.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isBuffer(value) {
+  return Buffer.isBuffer(value);
+}
+
+/**
+ * `true` when `value` is a `Uint8Array` (including `Buffer`, which
+ * extends `Uint8Array`). Distinguishes from other `TypedArray` shapes
+ * — `Uint16Array` and friends fail.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isUint8Array(value) {
+  return value instanceof Uint8Array;
+}
+
+/**
+ * `true` for the literal `true`. Sugar for `x === true`; unlike a bare
+ * `if (x)`, does not match truthy strings, non-zero numbers, or
+ * objects.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isTrue(value) {
+  return value === true;
+}
+
+/**
+ * `true` for the literal `false`. Sugar for `x === false`; unlike a
+ * bare `if (!x)`, does not match `0`, `''`, `null`, or `undefined`.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isFalse(value) {
+  return value === false;
+}
+
+/**
+ * `true` for a finite `number` — `NaN`, `Infinity`, and `-Infinity` all
+ * fail. Use when the caller needs a number they can compute with;
+ * mirrors `Number.isFinite` semantics under a predicate-style name.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+/**
+ * `true` for a safe integer — a finite `number` inside `[MIN_SAFE_INTEGER,
+ * MAX_SAFE_INTEGER]` with no fractional part. Mirrors `Number.isSafeInteger`.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isInteger(value) {
+  return Number.isSafeInteger(value);
+}
