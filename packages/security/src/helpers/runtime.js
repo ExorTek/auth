@@ -1,3 +1,5 @@
+import { isFunction, isString } from '@exortek/shared/predicates';
+
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 import { invalidArgument } from '../internal/guards.js';
 
@@ -80,7 +82,7 @@ export function timeout(promise, ms, options = {}) {
       settled = true;
       rejectPromise(new SecurityError(ErrorCode.REQUEST_TIMEOUT, `${label} timed out after ${ms}ms`));
     }, ms);
-    if (typeof timer.unref === 'function') {
+    if (isFunction(timer.unref)) {
       timer.unref();
     }
     if (options.signal) {
@@ -171,5 +173,5 @@ export function honeypot(body, options = {}) {
   const value = options.caseInsensitive
     ? (body[fieldName] ?? body[fieldName.toLowerCase()] ?? body[fieldName.toUpperCase()])
     : body[fieldName];
-  return typeof value === 'string' && value.length > 0;
+  return isString(value) && value.length > 0;
 }

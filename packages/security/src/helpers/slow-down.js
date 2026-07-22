@@ -1,3 +1,5 @@
+import { isFunction } from '@exortek/shared/predicates';
+
 import { assertObject, invalidArgument } from '../internal/guards.js';
 import { parseDuration } from '../rate-limit/duration.js';
 
@@ -88,7 +90,7 @@ export function slowDown(config) {
 function sleep(ms) {
   return new Promise(r => {
     const t = setTimeout(r, ms);
-    if (typeof t.unref === 'function') {
+    if (isFunction(t.unref)) {
       t.unref();
     }
   });

@@ -8,7 +8,7 @@
  * accepts those options so their integration is additive.
  */
 
-import { isObject } from '@exortek/shared/predicates';
+import { isNumber, isObject, isString } from '@exortek/shared/predicates';
 
 import { JwtError, ErrorCode } from './internal/errors.js';
 import { assertNonEmptyString, assertObject } from './internal/guards.js';
@@ -52,7 +52,7 @@ import { injectClaims } from './claims.js';
  */
 export async function sign(payload, key, options) {
   assertObject(options, 'sign.options');
-  if (payload == null || typeof payload !== 'object' || Array.isArray(payload)) {
+  if (!isObject(payload)) {
     throw new JwtError(ErrorCode.INVALID_PAYLOAD, 'sign: payload must be a JSON object');
   }
   assertNonEmptyString(options.alg, 'sign.options.alg');
@@ -84,16 +84,16 @@ export async function sign(payload, key, options) {
 
   /** @type {SignResultMeta} */
   const result = { token, alg };
-  if (typeof header.kid === 'string') {
+  if (isString(header.kid)) {
     result.kid = header.kid;
   }
-  if (typeof claimSet.jti === 'string') {
+  if (isString(claimSet.jti)) {
     result.jti = claimSet.jti;
   }
-  if (typeof claimSet.exp === 'number') {
+  if (isNumber(claimSet.exp)) {
     result.expiresAt = new Date(claimSet.exp * 1000);
   }
-  if (typeof claimSet.iat === 'number') {
+  if (isNumber(claimSet.iat)) {
     result.issuedAt = new Date(claimSet.iat * 1000);
   }
   return result;

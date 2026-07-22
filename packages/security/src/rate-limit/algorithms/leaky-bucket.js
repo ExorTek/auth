@@ -1,3 +1,5 @@
+import { isFunction } from '@exortek/shared/predicates';
+
 import { assertBucketOptions, assertKey } from '../options.js';
 
 /**
@@ -29,7 +31,7 @@ export function leakyBucket(config) {
   const store = config.store;
   const ttlMs = Math.max(60_000, Math.ceil((capacity / leakRate) * 1000 * 4));
 
-  const hasCas = typeof store.compareAndSet === 'function';
+  const hasCas = isFunction(store.compareAndSet);
   // Same optimistic-concurrency loop as token-bucket — see that module for
   // the progress / fail-closed rationale.
   const MAX_ATTEMPTS = 32;

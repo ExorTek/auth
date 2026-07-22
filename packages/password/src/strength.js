@@ -27,7 +27,7 @@
  *   to enforce a display-length rather than raw byte count.
  */
 
-import { isString } from '@exortek/shared/predicates';
+import { isArray, isString } from '@exortek/shared/predicates';
 
 /**
  * @typedef {object} StrengthOptions
@@ -90,7 +90,7 @@ export function strength(password, options = {}) {
     weaknesses.push('sequential');
   }
 
-  const userInfo = Array.isArray(options.userInfo) ? options.userInfo : [];
+  const userInfo = isArray(options.userInfo) ? options.userInfo : [];
   const lower = normalized.toLowerCase();
   for (const bit of userInfo) {
     if (isString(bit) && bit.length >= 3 && lower.includes(bit.toLowerCase())) {

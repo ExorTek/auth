@@ -5,6 +5,7 @@
  */
 
 import * as sb from '@exortek/shared/base64url';
+import { isString } from '@exortek/shared/predicates';
 
 /**
  * base64url encode — no padding, URL/cookie-safe.
@@ -12,7 +13,7 @@ import * as sb from '@exortek/shared/base64url';
  * @returns {string}
  */
 export function encodeBase64Url(input) {
-  return typeof input === 'string' ? sb.encodeString(input) : sb.encode(input);
+  return isString(input) ? sb.encodeString(input) : sb.encode(input);
 }
 
 /**
@@ -22,7 +23,7 @@ export function encodeBase64Url(input) {
  * @returns {Buffer}
  */
 export function decodeBase64Url(input) {
-  if (typeof input !== 'string') {
+  if (!isString(input)) {
     throw new TypeError('base64url input must be a string');
   }
   return sb.decode(input);

@@ -1,3 +1,5 @@
+import { isFunction } from '@exortek/shared/predicates';
+
 import { assertBucketOptions, assertKey } from '../options.js';
 
 /**
@@ -31,7 +33,7 @@ export function tokenBucket(config) {
   // callers don't lose their history under LRU pressure.
   const ttlMs = Math.max(60_000, Math.ceil((capacity / refillRate) * 1000 * 4));
 
-  const hasCas = typeof store.compareAndSet === 'function';
+  const hasCas = isFunction(store.compareAndSet);
   // Optimistic-concurrency bound. A failed CAS means another request's
   // write landed — so every retry round makes system-wide progress and the
   // loop terminates in at most <contenders> rounds (lock-free). The cap

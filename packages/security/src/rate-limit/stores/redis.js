@@ -1,4 +1,5 @@
 import { assertRedisClient } from '@exortek/shared/redis-guard';
+import { isArray, isFunction } from '@exortek/shared/predicates';
 
 import { invalidArgument } from '../../internal/guards.js';
 
@@ -117,7 +118,7 @@ export function redisStore(client, options = {}) {
   // calls go out as EVALSHA (saves bandwidth + parse cost per request).
   // We namespace the command names to avoid collision if the same client is
   // shared with another library that also calls defineCommand.
-  const useDefined = typeof client.defineCommand === 'function';
+  const useDefined = isFunction(client.defineCommand);
   if (useDefined) {
     if (typeof client.exortekRlIncr !== 'function') {
       client.defineCommand('exortekRlIncr', { numberOfKeys: 1, lua: INCR_SCRIPT });
@@ -178,7 +179,7 @@ export function redisStore(client, options = {}) {
 
   function parsePair(raw) {
     // Response shape: [count, ttl] but Upstash may return strings.
-    const [countRaw, ttlRaw] = Array.isArray(raw) ? raw : [raw, -1];
+    const [countRaw, ttlRaw] = isArray(raw) ? raw : [raw, -1];
     return { count: Number(countRaw), ttl: Number(ttlRaw) };
   }
 
@@ -190,7 +191,7 @@ export function redisStore(client, options = {}) {
     // CAS loop in tokenBucket / leakyBucket keeps working.
     async get(key) {
       const raw = await runRead(k(key));
-      const [countRaw, ttlRaw] = Array.isArray(raw) ? raw : [raw, -1];
+      const [countRaw, ttlRaw] = isArray(raw) ? raw : [raw, -1];
       const ttl = Number(ttlRaw);
       if (countRaw === null || countRaw === undefined || countRaw === false || ttl < 0) {
         return null;

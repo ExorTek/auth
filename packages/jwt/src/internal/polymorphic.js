@@ -15,6 +15,8 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { resolveOrCall, randomBuffer } from '@exortek/shared/resolve';
 import { encode as crockfordEncode } from '@exortek/shared/crockford';
+import { isFunction } from '@exortek/shared/predicates';
+
 import { JwtError, ErrorCode } from './errors.js';
 
 export { resolveOrCall, randomBuffer };
@@ -34,7 +36,7 @@ const HASH_ALGO_BUILTIN = new Set(['sha256', 'sha384', 'sha512']);
  */
 export function resolveHashFn(opts) {
   const cfg = opts || {};
-  if (typeof cfg.hashFn === 'function') {
+  if (isFunction(cfg.hashFn)) {
     const fn = cfg.hashFn;
     return async plaintext => fn(plaintext);
   }

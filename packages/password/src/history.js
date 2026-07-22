@@ -1,3 +1,5 @@
+import { isArray } from '@exortek/shared/predicates';
+
 import { verify as umbrellaVerify } from './verify.js';
 import { assertNonEmptyString, invalidArgument } from './internal/guards.js';
 
@@ -46,7 +48,7 @@ export function createHistory(config = {}) {
      * @returns {Promise<boolean>}
      */
     async isReused(candidate, previousHashes) {
-      if (!Array.isArray(previousHashes) || previousHashes.length === 0) {
+      if (!isArray(previousHashes) || previousHashes.length === 0) {
         return false;
       }
       const slice = previousHashes.slice(0, keepLast);
@@ -72,7 +74,7 @@ export function createHistory(config = {}) {
      */
     append(freshHash, previousHashes) {
       assertNonEmptyString(freshHash, 'history.append.freshHash');
-      const prev = Array.isArray(previousHashes) ? previousHashes : [];
+      const prev = isArray(previousHashes) ? previousHashes : [];
       const merged = [freshHash, ...prev.filter(h => h !== freshHash)];
       return merged.slice(0, keepLast);
     },

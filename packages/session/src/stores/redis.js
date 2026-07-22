@@ -1,4 +1,5 @@
 import { assertRedisClient } from '@exortek/shared/redis-guard';
+import { isArray, isFunction, isString } from '@exortek/shared/predicates';
 
 import { invalidArgument } from '../internal/guards.js';
 
@@ -85,10 +86,10 @@ export function redisStore(client, options = {}) {
     if (keys.length === 0) {
       return [];
     }
-    if (typeof client.mget === 'function') {
+    if (isFunction(client.mget)) {
       return client.mget(...keys);
     }
-    if (typeof client.mGet === 'function') {
+    if (isFunction(client.mGet)) {
       return client.mGet(keys);
     }
     return Promise.all(keys.map(k => client.get(k)));
@@ -99,7 +100,7 @@ export function redisStore(client, options = {}) {
       return null;
     }
     try {
-      return typeof raw === 'string' ? JSON.parse(raw) : raw;
+      return isString(raw) ? JSON.parse(raw) : raw;
     } catch {
       return null;
     }
@@ -111,7 +112,7 @@ export function redisStore(client, options = {}) {
     }
     record.revoked = true;
     const tomb = parseRecord(rawTombstone);
-    if (tomb && typeof tomb.reason === 'string' && record.revokedReason === undefined) {
+    if (tomb && isString(tomb.reason) && record.revokedReason === undefined) {
       record.revokedReason = tomb.reason;
     }
     return record;
@@ -176,9 +177,9 @@ export function redisStore(client, options = {}) {
   }
 
   async function sadd(uid, sid, ttlMs) {
-    if (typeof client.sadd === 'function') {
+    if (isFunction(client.sadd)) {
       await client.sadd(userKey(uid), sid);
-    } else if (typeof client.sAdd === 'function') {
+    } else if (isFunction(client.sAdd)) {
       // node-redis v4 uses camelCase
       await client.sAdd(userKey(uid), sid);
     } else {
@@ -188,9 +189,9 @@ export function redisStore(client, options = {}) {
   }
 
   async function srem(uid, sid) {
-    if (typeof client.srem === 'function') {
+    if (isFunction(client.srem)) {
       await client.srem(userKey(uid), sid);
-    } else if (typeof client.sRem === 'function') {
+    } else if (isFunction(client.sRem)) {
       await client.sRem(userKey(uid), sid);
     }
   }
@@ -223,7 +224,7 @@ export function redisStore(client, options = {}) {
    */
   async function fetchUserRecords(uid) {
     const sids = await smembers(uid);
-    if (!Array.isArray(sids) || sids.length === 0) {
+    if (!isArray(sids) || sids.length === 0) {
       return [];
     }
     const raw = await mget([...sids.map(sidKey), ...sids.map(revKey)]);

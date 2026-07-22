@@ -9,6 +9,8 @@
 
 import { createPrivateKey, createPublicKey, createSecretKey, X509Certificate } from 'node:crypto';
 
+import { isBuffer, isString } from '@exortek/shared/predicates';
+
 import { JwkError, ErrorCode } from './internal/errors.js';
 import { decode as b64uDecode } from './internal/base64url.js';
 import { invalidArgument } from './internal/guards.js';
@@ -67,10 +69,10 @@ export async function importJWK(jwk, _options) {
  * @returns {Promise<KeyObject>}
  */
 export async function importPEM(pemOrDer, format = 'spki') {
-  if (typeof pemOrDer !== 'string' && !Buffer.isBuffer(pemOrDer)) {
+  if (!isString(pemOrDer) && !isBuffer(pemOrDer)) {
     throw invalidArgument('importPEM.pemOrDer must be a PEM string or DER Buffer');
   }
-  const inputFormat = typeof pemOrDer === 'string' ? 'pem' : 'der';
+  const inputFormat = isString(pemOrDer) ? 'pem' : 'der';
   try {
     switch (format) {
       case 'x509': {

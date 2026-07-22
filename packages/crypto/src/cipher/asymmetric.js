@@ -1,4 +1,7 @@
 import crypto from 'node:crypto';
+
+import { isBuffer } from '@exortek/shared/predicates';
+
 import { CryptoError, ErrorCode } from '../errors.js';
 import { assertBytes, assertObject } from '../internal/guards.js';
 
@@ -81,7 +84,7 @@ export function decryptAsymmetric(ciphertext, privateKey, options) {
         padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
         oaepHash: spec.hash,
       },
-      Buffer.isBuffer(ciphertext) ? ciphertext : Buffer.from(ciphertext),
+      isBuffer(ciphertext) ? ciphertext : Buffer.from(ciphertext),
     );
   } catch (err) {
     throw new CryptoError(

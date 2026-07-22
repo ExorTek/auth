@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 
 import { toBuffer } from '@exortek/shared/bytes';
+import { isArray } from '@exortek/shared/predicates';
 import { array, instanceOf, object, oneOf, optional, string, union } from '@exortek/shared/validate';
 
 import { assertBytesOrString, invalidArgument, parse } from './internal/guards.js';
@@ -62,7 +63,7 @@ const PepperConfigSchema = object({
  */
 export function createPepper(config) {
   parse(PepperConfigSchema, config, 'createPepper.config');
-  const rawSecrets = Array.isArray(config.secret) ? config.secret : [config.secret];
+  const rawSecrets = isArray(config.secret) ? config.secret : [config.secret];
   if (rawSecrets.length === 0) {
     throw invalidArgument('createPepper.config.secret: at least one secret is required');
   }

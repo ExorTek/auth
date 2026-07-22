@@ -1,3 +1,5 @@
+import { isFunction } from '@exortek/shared/predicates';
+
 import { parseDuration } from '../duration.js';
 import { assertLimiterOptions, assertKey } from '../options.js';
 
@@ -54,7 +56,7 @@ export function sliding(config) {
         // correct remaining count. Prefer the store's atomic `decr` — the
         // read-modify-write `set` fallback can race a concurrent `incr`
         // and overwrite it, silently under-counting the window.
-        if (typeof store.decr === 'function') {
+        if (isFunction(store.decr)) {
           await store.decr(currentKey);
         } else {
           await store.set(currentKey, current.count - 1, Math.max(1, current.expiresAt - now));

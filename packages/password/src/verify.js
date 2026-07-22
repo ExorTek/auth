@@ -139,7 +139,7 @@ async function ensureDecoy() {
  * @returns {Promise<boolean>}
  */
 export async function constantTimeVerify(input, storedHash, options = {}) {
-  if (typeof storedHash === 'string' && storedHash.length > 0) {
+  if (isString(storedHash) && storedHash.length > 0) {
     return verify(input, storedHash, options);
   }
   // No real hash — run the decoy verify to burn the same time budget.

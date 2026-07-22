@@ -22,6 +22,8 @@
  * expires or is rotated, all outstanding tokens are implicitly invalidated.
  */
 
+import { isBytes, isString } from '@exortek/shared/predicates';
+
 import { randomBytes, timingSafeEqual } from '../util/bytes.js';
 import { encodeBase64Url } from '../util/base64url.js';
 import { hmacBase64Url } from '../util/hmac.js';
@@ -31,13 +33,13 @@ import { assertNonEmptyString } from '../internal/guards.js';
 const DEFAULT_TOKEN_BYTES = 32;
 
 function assertSecret(secret, name) {
-  if (typeof secret !== 'string' && !Buffer.isBuffer(secret) && !(secret instanceof Uint8Array)) {
+  if (!isString(secret) && !isBytes(secret)) {
     throw new SecurityError(
       ErrorCode.INVALID_ARGUMENT,
       `${name} must be a non-empty string or Buffer of at least 32 bytes — got ${secret === null ? 'null' : typeof secret}`,
     );
   }
-  const len = typeof secret === 'string' ? Buffer.byteLength(secret) : secret.length;
+  const len = isString(secret) ? Buffer.byteLength(secret) : secret.length;
   if (len < 32) {
     throw new SecurityError(
       ErrorCode.INVALID_ARGUMENT,

@@ -1,3 +1,5 @@
+import { isArray, isNumber, isString } from '@exortek/shared/predicates';
+
 import { PasswordError, ErrorCode } from './errors.js';
 import { strength } from './strength.js';
 
@@ -74,7 +76,7 @@ export function policy(password, rules = {}) {
     violations.push('too-long');
   }
 
-  if (Array.isArray(rules.requireClasses) && rules.requireClasses.length > 0) {
+  if (isArray(rules.requireClasses) && rules.requireClasses.length > 0) {
     const classChecks = {
       lower: /[a-z]/,
       upper: /[A-Z]/,
@@ -91,24 +93,24 @@ export function policy(password, rules = {}) {
   }
 
   const lower = normalized.toLowerCase();
-  if (Array.isArray(rules.denyList)) {
+  if (isArray(rules.denyList)) {
     for (const bit of rules.denyList) {
-      if (typeof bit === 'string' && bit.length >= 3 && lower.includes(bit.toLowerCase())) {
+      if (isString(bit) && bit.length >= 3 && lower.includes(bit.toLowerCase())) {
         violations.push('in-deny-list');
         break;
       }
     }
   }
-  if (Array.isArray(rules.userInfo)) {
+  if (isArray(rules.userInfo)) {
     for (const bit of rules.userInfo) {
-      if (typeof bit === 'string' && bit.length >= 3 && lower.includes(bit.toLowerCase())) {
+      if (isString(bit) && bit.length >= 3 && lower.includes(bit.toLowerCase())) {
         violations.push('contains-user-info');
         break;
       }
     }
   }
   let strengthResult;
-  if (typeof rules.requireMinScore === 'number') {
+  if (isNumber(rules.requireMinScore)) {
     strengthResult = strength(normalized, { userInfo: rules.userInfo });
     if (strengthResult.score < rules.requireMinScore) {
       violations.push('below-min-strength');

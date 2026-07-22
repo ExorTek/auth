@@ -1,5 +1,5 @@
 import { parseCookies as sharedParseCookies, serialiseCookie as sharedSerialiseCookie } from '@exortek/shared/cookie';
-import { isObject } from '@exortek/shared/predicates';
+import { isBuffer, isFunction, isObject, isString } from '@exortek/shared/predicates';
 
 import { cors as buildCorsCheck } from '../cors/index.js';
 import { headers as buildHeaders } from '../headers/index.js';
@@ -48,10 +48,10 @@ const CSRF_DEFAULT_COOKIE_FLAGS = Object.freeze({
 });
 
 function assertCsrfSecret(secret) {
-  if (typeof secret !== 'string' && !Buffer.isBuffer(secret)) {
+  if (!isString(secret) && !isBuffer(secret)) {
     throw invalidArgument('csrf.secret must be a string or Buffer');
   }
-  const len = Buffer.isBuffer(secret) ? secret.length : Buffer.byteLength(secret, 'utf8');
+  const len = isBuffer(secret) ? secret.length : Buffer.byteLength(secret, 'utf8');
   if (len < 32) {
     throw invalidArgument(
       `csrf.secret must be at least 32 bytes; got ${len}. Generate with \`crypto.randomBytes(32).toString('hex')\`.`,
@@ -121,7 +121,7 @@ function normalizeRateLimitHeaders(input) {
   if (input === false) {
     return { remaining: false, reset: false, retryAfter: false };
   }
-  if (typeof input === 'string') {
+  if (isString(input)) {
     const preset = HEADER_PRESETS[input];
     if (!preset) {
       throw new SecurityError(
@@ -171,17 +171,17 @@ export function normalizeUmbrella(options = {}) {
 // Small helpers used by adapters below.
 
 export function extractCsrfToken(csrfConfig, req) {
-  if (typeof csrfConfig.tokenFromRequest === 'function') {
+  if (isFunction(csrfConfig.tokenFromRequest)) {
     return csrfConfig.tokenFromRequest(req);
   }
   const h = req.headers?.[csrfConfig.headerName];
-  if (typeof h === 'string' && h.length > 0) {
+  if (isString(h) && h.length > 0) {
     return h;
   }
   const body = req.body;
   if (isObject(body)) {
     const v = body[csrfConfig.cookieName];
-    if (typeof v === 'string' && v.length > 0) {
+    if (isString(v) && v.length > 0) {
       return v;
     }
   }
@@ -269,11 +269,11 @@ export { buildCorsCheck, buildHeaders };
  */
 
 async function _rawExtractCsrf(csrf, ctx) {
-  if (typeof csrf.tokenFromRequest === 'function') {
+  if (isFunction(csrf.tokenFromRequest)) {
     return csrf.tokenFromRequest(ctx.rawReq());
   }
   const h = ctx.getHeader(csrf.headerName);
-  if (typeof h === 'string' && h.length > 0) {
+  if (isString(h) && h.length > 0) {
     return h;
   }
   // Body may be sync (Express/Fastify already-parsed) or async (Hono
@@ -281,7 +281,7 @@ async function _rawExtractCsrf(csrf, ctx) {
   const body = await ctx.body();
   if (isObject(body)) {
     const v = /** @type {Record<string, unknown>} */ (body)[csrf.cookieName];
-    if (typeof v === 'string' && v.length > 0) {
+    if (isString(v) && v.length > 0) {
       return v;
     }
   }
@@ -315,7 +315,7 @@ export async function runCors(corsCheck, ctx, staticHeaders = null) {
     requestMethod: ctx.getHeader('access-control-request-method'),
     requestHeaders: ctx.getHeader('access-control-request-headers'),
   });
-  const d = verdict && typeof verdict.then === 'function' ? await verdict : verdict;
+  const d = verdict && isFunction(verdict.then) ? await verdict : verdict;
   if (d.preflight) {
     const merged = { ...d.headers };
     if (staticHeaders) {

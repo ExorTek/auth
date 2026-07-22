@@ -1,4 +1,5 @@
 import { appendSetCookieHeader } from '@exortek/shared/http';
+import { isArray, isFunction } from '@exortek/shared/predicates';
 
 import {
   normalizeUmbrella,
@@ -38,7 +39,7 @@ function makeExpressContext(req, res) {
     // headers don't clobber each other; on Express 4 read the current
     // value and stack via the shared helper so we don't drop a
     // previously-set cookie either.
-    if (typeof res.appendHeader === 'function') {
+    if (isFunction(res.appendHeader)) {
       res.appendHeader('Set-Cookie', value);
     } else {
       res.setHeader('Set-Cookie', appendSetCookieHeader(res.getHeader('Set-Cookie'), value));
@@ -48,7 +49,7 @@ function makeExpressContext(req, res) {
     method: () => req.method,
     getHeader: name => {
       const v = req.headers[name.toLowerCase()];
-      return Array.isArray(v) ? v[0] : v;
+      return isArray(v) ? v[0] : v;
     },
     cookies: () => req.cookies ?? parseCookies(req.headers.cookie),
     body: () => req.body,

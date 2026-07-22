@@ -1,4 +1,4 @@
-import { isObject } from '@exortek/shared/predicates';
+import { isArray, isBuffer, isObject, isString } from '@exortek/shared/predicates';
 
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 import { invalidArgument } from '../internal/guards.js';
@@ -43,8 +43,8 @@ export function safeJsonParse(input, options = {}) {
   const maxBytes = options.maxBytes ?? 1_000_000;
   const banned = options.banned ?? DEFAULT_BANNED;
 
-  const str = Buffer.isBuffer(input) ? input.toString('utf8') : input;
-  if (typeof str !== 'string') {
+  const str = isBuffer(input) ? input.toString('utf8') : input;
+  if (!isString(str)) {
     return null;
   }
   if (str.length > maxBytes) {
@@ -107,7 +107,7 @@ function withinDepth(value, remaining) {
   if (remaining < 0) {
     return false;
   }
-  if (Array.isArray(value)) {
+  if (isArray(value)) {
     for (const v of value) {
       if (!withinDepth(v, remaining - 1)) {
         return false;
@@ -183,7 +183,7 @@ export function constantTimeEqual(a, b) {
  */
 export function parseCspReport(body) {
   let payload = body;
-  if (typeof payload === 'string' || Buffer.isBuffer(payload)) {
+  if (isString(payload) || isBuffer(payload)) {
     payload = safeJsonParse(payload, { mode: 'strip' });
     if (payload === null) {
       return null;
@@ -195,7 +195,7 @@ export function parseCspReport(body) {
 
   // Modern `report-to` may deliver an array of one-or-more reports.
   // Pull out the first CSP violation entry.
-  if (Array.isArray(payload)) {
+  if (isArray(payload)) {
     for (const entry of payload) {
       if (isObject(entry) && entry.type === 'csp-violation' && entry.body) {
         return pick(entry.body);

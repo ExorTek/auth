@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { OtpError, ErrorCode } from './internal/errors.js';
 import * as base32 from './internal/base32.js';
-import { isString } from '@exortek/shared/predicates';
+import { isBuffer, isString } from '@exortek/shared/predicates';
 
 /**
  * @typedef {'base32' | 'base32padded' | 'hex' | 'raw'} SecretEncoding
@@ -83,7 +83,7 @@ export function generateSecret(options = {}) {
  * @returns {Buffer}
  */
 export function decodeSecret(secret, options = {}) {
-  if (Buffer.isBuffer(secret)) {
+  if (isBuffer(secret)) {
     return secret;
   }
   if (secret instanceof Uint8Array) {

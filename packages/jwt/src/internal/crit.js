@@ -13,6 +13,8 @@
  */
 
 import * as sc from '@exortek/shared/crit';
+import { isObject } from '@exortek/shared/predicates';
+
 import { JwtError, ErrorCode } from './errors.js';
 
 /**
@@ -44,7 +46,7 @@ export function assertVerifySide(crit, protectedHeader, extraKnown) {
   try {
     sc.assertVerifySide(crit, protectedHeader, KNOWN_CRIT, extraKnown);
   } catch (err) {
-    const unknownCrit = err !== null && typeof err === 'object' && 'critName' in err;
+    const unknownCrit = isObject(err) && 'critName' in err;
     throw new JwtError(
       unknownCrit ? ErrorCode.CRIT_UNSUPPORTED : ErrorCode.INVALID_HEADER,
       err instanceof Error ? err.message : String(err),

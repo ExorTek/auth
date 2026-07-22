@@ -4,7 +4,7 @@ import { OtpError, ErrorCode } from './internal/errors.js';
 import { invalidArgument } from './internal/guards.js';
 import { truncate } from './internal/digits.js';
 import { decodeSecret } from './secret.js';
-import { isString } from '@exortek/shared/predicates';
+import { isArray, isString } from '@exortek/shared/predicates';
 
 // RFC 4226 / 6238 nominally specify SHA1, with 6238 explicitly opting
 // SHA256 + SHA512 in. SHA224 + SHA384 aren't in the RFCs but share the
@@ -230,7 +230,7 @@ export function _verifyHotpForward(code, secret, start, span, digits, algorithm)
  * @returns {number | null}
  */
 export function resynchronize(secret, codes, options = {}) {
-  if (!Array.isArray(codes) || codes.length !== 2) {
+  if (!isArray(codes) || codes.length !== 2) {
     throw new OtpError(
       ErrorCode.INVALID_ARGUMENT,
       'resynchronize: codes must be an array of exactly two consecutive OTPs',

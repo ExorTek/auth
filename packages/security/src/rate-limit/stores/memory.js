@@ -31,6 +31,8 @@
  * @param {{ maxKeys?: number, sweepMs?: number }} [options]
  * @returns {import('../index.js').RateLimitStore & { _size: () => number, _stop: () => void }}
  */
+import { isFunction, isNumber } from '@exortek/shared/predicates';
+
 export function memoryStore(options = {}) {
   const maxKeys = options.maxKeys ?? 10_000;
   const sweepMs = options.sweepMs ?? 60_000;
@@ -62,7 +64,7 @@ export function memoryStore(options = {}) {
       return;
     }
     timer = setInterval(sweep, sweepMs);
-    if (typeof timer.unref === 'function') {
+    if (isFunction(timer.unref)) {
       timer.unref();
     }
   }
@@ -158,7 +160,7 @@ export function memoryStore(options = {}) {
     // makes the read-modify-write here atomic by construction.
     async decr(key) {
       const entry = peekFresh(key);
-      if (entry && typeof entry.count === 'number' && entry.count > 0) {
+      if (entry && isNumber(entry.count) && entry.count > 0) {
         entry.count -= 1;
       }
     },

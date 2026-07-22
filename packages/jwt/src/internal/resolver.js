@@ -8,6 +8,8 @@
  */
 
 import { createKeyResolver } from '@exortek/shared/key-resolver';
+import { isObject } from '@exortek/shared/predicates';
+
 import { JwtError, ErrorCode } from './errors.js';
 import { normalizeKey } from './keys.js';
 
@@ -29,7 +31,7 @@ export async function resolveKey(keyish, header, alg) {
   try {
     return await _resolveKey(keyish, header, alg);
   } catch (err) {
-    if (err !== null && typeof err === 'object' && 'keyNotFound' in err) {
+    if (isObject(err) && 'keyNotFound' in err) {
       throw new JwtError(ErrorCode.KEY_NOT_FOUND, /** @type {Error} */ (err).message);
     }
     throw err;

@@ -7,6 +7,8 @@
  * no flag can enable it.
  */
 
+import { isArray, isBuffer, isObject, isString } from '@exortek/shared/predicates';
+
 import { JwsError, ErrorCode } from './internal/errors.js';
 import { lookup as lookupAlg } from './internal/algorithms.js';
 import { assertVerifySide as assertCritVerify } from './internal/crit.js';
@@ -81,7 +83,7 @@ export async function verify(token, keyish, options) {
  * @returns {Promise<VerifyResult>}
  */
 export async function verifyDetached(token, detachedPayload, keyish, options) {
-  if (!Buffer.isBuffer(detachedPayload) && !(detachedPayload instanceof Uint8Array)) {
+  if (!isBuffer(detachedPayload) && !(detachedPayload instanceof Uint8Array)) {
     throw new JwsError(
       ErrorCode.INVALID_PAYLOAD,
       'verifyDetached: payload must be a Buffer or Uint8Array supplied by the caller',
@@ -137,7 +139,7 @@ function _requireAllowlist(options) {
     );
   }
   const allow = options.alg;
-  if (!Array.isArray(allow) || allow.length === 0 || allow.some(a => typeof a !== 'string')) {
+  if (!isArray(allow) || allow.length === 0 || allow.some(a => !isString(a))) {
     throw new JwsError(
       ErrorCode.MISSING_ALG_ALLOWLIST,
       'verify: options.alg must be a non-empty array of algorithm identifier strings',
@@ -164,7 +166,7 @@ function _sizeCheck(token, max) {
  * @param {Record<string, unknown>} header
  */
 function _assertHeaderShape(header) {
-  if (header == null || typeof header !== 'object' || Array.isArray(header)) {
+  if (!isObject(header)) {
     throw new JwsError(ErrorCode.INVALID_HEADER, 'verify: protected header must be a JSON object');
   }
   if (typeof header.alg !== 'string') {

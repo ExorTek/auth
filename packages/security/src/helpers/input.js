@@ -1,4 +1,7 @@
 import { resolve, sep } from 'node:path';
+
+import { isArray, isString } from '@exortek/shared/predicates';
+
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 import { assertNonEmptyString, assertString } from '../internal/guards.js';
 
@@ -51,7 +54,7 @@ export function sanitizeBody(input, options = {}) {
         `sanitizeBody: nesting exceeds ${maxDepth} — refusing to walk further`,
       );
     }
-    if (Array.isArray(value)) {
+    if (isArray(value)) {
       return value.map(v => walk(v, depth + 1));
     }
     if (value === null || typeof value !== 'object') {
@@ -133,7 +136,7 @@ export function sanitizeParams(query, options = {}) {
   const out = {};
   for (const key of keys) {
     const v = query[key];
-    if (!Array.isArray(v)) {
+    if (!isArray(v)) {
       out[key] = v;
       continue;
     }
@@ -227,7 +230,7 @@ export function sanitizeFilename(input, options = {}) {
   const maxLength = options.maxLength ?? 255;
   const fallback = options.fallback ?? 'file';
 
-  let name = typeof input === 'string' ? input : String(input ?? '');
+  let name = isString(input) ? input : String(input ?? '');
   // Never treat the input as a path — take the trailing component only.
   const lastSep = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
   if (lastSep >= 0) {

@@ -1,3 +1,5 @@
+import { isFunction, isObject } from '@exortek/shared/predicates';
+
 import { SecurityError, ErrorCode } from '../../internal/errors.js';
 
 /**
@@ -29,7 +31,7 @@ import { SecurityError, ErrorCode } from '../../internal/errors.js';
  * @returns {import('../index.js').RateLimitStore}
  */
 export function customStore(impl) {
-  if (!impl || typeof impl !== 'object') {
+  if (!isObject(impl)) {
     throw new SecurityError(
       ErrorCode.INVALID_ARGUMENT,
       'customStore(impl) requires an object with { get, incr, set, delete } methods',
@@ -38,7 +40,7 @@ export function customStore(impl) {
 
   const required = ['get', 'incr', 'set', 'delete'];
   for (const name of required) {
-    if (typeof impl[name] !== 'function') {
+    if (!isFunction(impl[name])) {
       throw new SecurityError(
         ErrorCode.INVALID_ARGUMENT,
         `customStore: impl.${name} is required and must be a function`,
@@ -48,19 +50,19 @@ export function customStore(impl) {
 
   const store = {
     get: key => Promise.resolve(impl.get(key)),
-    read: key => Promise.resolve(typeof impl.read === 'function' ? impl.read(key) : impl.get(key)),
+    read: key => Promise.resolve(isFunction(impl.read) ? impl.read(key) : impl.get(key)),
     incr: (key, ttlMs) => Promise.resolve(impl.incr(key, ttlMs)),
     set: (key, count, ttlMs) => Promise.resolve(impl.set(key, count, ttlMs)),
     delete: key => Promise.resolve(impl.delete(key)),
-    reset: key => Promise.resolve(typeof impl.reset === 'function' ? impl.reset(key) : impl.delete(key)),
+    reset: key => Promise.resolve(isFunction(impl.reset) ? impl.reset(key) : impl.delete(key)),
   };
   // Pass the atomic extras through ONLY when the impl provides them — the
   // algorithms feature-detect and fall back otherwise. Wrapping a missing
   // method in a stub would advertise atomicity the backend can't deliver.
-  if (typeof impl.decr === 'function') {
+  if (isFunction(impl.decr)) {
     store.decr = key => Promise.resolve(impl.decr(key));
   }
-  if (typeof impl.compareAndSet === 'function') {
+  if (isFunction(impl.compareAndSet)) {
     store.compareAndSet = (key, expected, value, ttlMs) =>
       Promise.resolve(impl.compareAndSet(key, expected, value, ttlMs)).then(Boolean);
   }

@@ -1,4 +1,7 @@
+import { isFunction, isString, isUndefined } from '@exortek/shared/predicates';
+
 import { invalidArgument } from '../internal/guards.js';
+import { ErrorCode, SessionError } from '../errors.js';
 
 /**
  * @typedef {object} SessionRecord
@@ -100,7 +103,7 @@ export function memoryStore(options = {}) {
     }
   };
   const timer = setInterval(sweep, sweepMs);
-  if (typeof timer.unref === 'function') {
+  if (isFunction(timer.unref)) {
     timer.unref();
   }
 
@@ -181,7 +184,7 @@ export function memoryStore(options = {}) {
     },
 
     async put(record) {
-      if (!record || typeof record.sid !== 'string') {
+      if (!record || !isString(record.sid)) {
         throw invalidArgument('memoryStore.put.record.sid must be a string');
       }
       const existing = map.get(record.sid);
@@ -206,7 +209,7 @@ export function memoryStore(options = {}) {
       }
       // Delete-then-set keeps Map iteration order = LRU order, which
       // makes ensureRoom's eviction scan O(1) in the common case.
-      if (patch.lastSeenAt !== undefined) {
+      if (!isUndefined(patch.lastSeenAt)) {
         map.delete(sid);
       }
       map.set(sid, next);

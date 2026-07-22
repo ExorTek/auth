@@ -10,6 +10,8 @@
 
 import { randomBytes } from 'node:crypto';
 
+import { isFunction, isNumber, isString } from '@exortek/shared/predicates';
+
 import { JwtError, ErrorCode } from './internal/errors.js';
 import { assertNonEmptyString, assertObject, invalidArgument } from './internal/guards.js';
 import { parseDuration } from './internal/duration.js';
@@ -103,7 +105,7 @@ export async function create(payload, options) {
   });
 
   return {
-    accessToken: typeof accessToken === 'string' ? accessToken : accessToken.token,
+    accessToken: isString(accessToken) ? accessToken : accessToken.token,
     refreshToken: refreshPlaintext,
     accessExpiresAt: new Date(accessExpiresAtSec * 1000),
     refreshExpiresAt: new Date(refreshExpiresAtSec * 1000),
@@ -150,7 +152,7 @@ export async function rotate(oldRefreshToken, options) {
 
     const meta = record.metadata || {};
     const nowSec = Math.floor(Date.now() / 1000);
-    const isReplay = typeof meta.usedAt === 'number';
+    const isReplay = isNumber(meta.usedAt);
 
     if (isReplay) {
       const ageSec = nowSec - meta.usedAt;
@@ -159,7 +161,7 @@ export async function rotate(oldRefreshToken, options) {
       // ageSec == graceSec is still inside the window.
       const outsideGrace = graceSec === 0 ? true : ageSec > graceSec;
       if (detectReuse && outsideGrace) {
-        if (typeof meta.familyId === 'string') {
+        if (isString(meta.familyId)) {
           await refresh.store.deleteAll({ familyId: meta.familyId });
         } else {
           await refresh.store.delete(storeKey);
@@ -181,7 +183,7 @@ export async function rotate(oldRefreshToken, options) {
     }
 
     const payload = /** @type {Record<string, unknown>} */ (options.payload || meta.payload || {});
-    const familyId = typeof meta.familyId === 'string' ? meta.familyId : undefined;
+    const familyId = isString(meta.familyId) ? meta.familyId : undefined;
 
     return create(payload, { ...options, familyId });
   });
@@ -261,7 +263,7 @@ function _assertCreateOptions(options) {
  * @returns {Promise<{ plaintext: string, storeKey: string }>}
  */
 async function _generateRefresh(refresh, payload, secret, expiresAtSec) {
-  if (typeof refresh.generate === 'function') {
+  if (isFunction(refresh.generate)) {
     const result = await refresh.generate();
     if (result == null || typeof result.plaintext !== 'string' || typeof result.storeKey !== 'string') {
       throw invalidArgument('refresh.generate: must return { plaintext, storeKey } strings');
@@ -276,7 +278,7 @@ async function _generateRefresh(refresh, payload, secret, expiresAtSec) {
       alg: refresh.alg,
       expiresIn: expiresAtSec - Math.floor(Date.now() / 1000),
     });
-    plaintext = typeof signed === 'string' ? signed : signed.token;
+    plaintext = isString(signed) ? signed : signed.token;
   } else {
     const size = refresh.tokenSize ?? 32;
     if (typeof size !== 'number' || size < 1 || !Number.isFinite(size)) {

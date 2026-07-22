@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto';
+
+import { isBuffer } from '@exortek/shared/predicates';
+
 import { PasswordError, ErrorCode } from '../errors.js';
 import { normalizePassword } from '../internal/normalize.js';
 import { parseHash } from '../phc.js';
@@ -143,7 +146,7 @@ export async function hash(password, options = {}) {
   const impl = await loadBcrypt();
   // bcryptjs 3.x expects a string; give it one. `prepared` is either a
   // Buffer (short input) or a base64 string (prehash mode) — normalise.
-  return impl.hash(Buffer.isBuffer(prepared) ? prepared.toString('utf8') : prepared, rounds);
+  return impl.hash(isBuffer(prepared) ? prepared.toString('utf8') : prepared, rounds);
 }
 
 /**
@@ -180,7 +183,7 @@ export async function verify(password, bcryptHash, options = {}) {
   }
   const impl = await loadBcrypt();
   try {
-    return await impl.compare(Buffer.isBuffer(prepared) ? prepared.toString('utf8') : prepared, bcryptHash);
+    return await impl.compare(isBuffer(prepared) ? prepared.toString('utf8') : prepared, bcryptHash);
   } catch {
     return false;
   }

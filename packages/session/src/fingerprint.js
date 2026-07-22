@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 
+import { isArray, isFunction, isString } from '@exortek/shared/predicates';
+
 /**
  * Read the client IP from a request. Honours the "trust proxy" contract
  * of Fastify / Express (`req.ip`); otherwise falls back to the socket
@@ -14,11 +16,11 @@ export function readIp(req) {
   if (!req) {
     return undefined;
   }
-  if (typeof req.ip === 'string' && req.ip.length > 0) {
+  if (isString(req.ip) && req.ip.length > 0) {
     return req.ip;
   }
   const socket = req.socket ?? req.connection;
-  if (socket && typeof socket.remoteAddress === 'string') {
+  if (socket && isString(socket.remoteAddress)) {
     return socket.remoteAddress;
   }
   return undefined;
@@ -36,8 +38,8 @@ export function readUserAgent(req) {
   if (!headers) {
     return undefined;
   }
-  const raw = typeof headers.get === 'function' ? headers.get('user-agent') : headers['user-agent'];
-  if (typeof raw !== 'string' || raw.length === 0) {
+  const raw = isFunction(headers.get) ? headers.get('user-agent') : headers['user-agent'];
+  if (!isString(raw) || raw.length === 0) {
     return undefined;
   }
   // Cap at 512 chars — a UA over that is either a broken client or an
@@ -59,7 +61,7 @@ export function readUserAgent(req) {
  * @returns {string | undefined}    base64url hash, or `undefined` when no bindTo entry resolved.
  */
 export function computeFingerprint(req, bindTo) {
-  if (!Array.isArray(bindTo) || bindTo.length === 0) {
+  if (!isArray(bindTo) || bindTo.length === 0) {
     return undefined;
   }
   const parts = [];

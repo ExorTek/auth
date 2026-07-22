@@ -1,5 +1,8 @@
 import { createHmac } from 'node:crypto';
+
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
+import { isArray, isBuffer, isNumber, isString } from '@exortek/shared/predicates';
+
 import { invalidArgument } from '../internal/guards.js';
 
 /**
@@ -49,15 +52,15 @@ export function getClientIp(req, options = {}) {
   if (trustProxy === false && proxyCount === undefined) {
     return remote || undefined;
   }
-  const trustedSet = Array.isArray(trustProxy) ? new Set(trustProxy) : null;
+  const trustedSet = isArray(trustProxy) ? new Set(trustProxy) : null;
   if (trustedSet && remote && !trustedSet.has(remote) && proxyCount === undefined) {
     return remote || undefined;
   }
 
   for (const name of headerNames) {
     const raw = req.headers?.[name];
-    const value = Array.isArray(raw) ? raw[0] : raw;
-    if (typeof value !== 'string' || value.length === 0) {
+    const value = isArray(raw) ? raw[0] : raw;
+    if (!isString(value) || value.length === 0) {
       continue;
     }
     const parts = value
@@ -68,7 +71,7 @@ export function getClientIp(req, options = {}) {
       continue;
     }
 
-    if (typeof proxyCount === 'number' && proxyCount >= 0) {
+    if (isNumber(proxyCount) && proxyCount >= 0) {
       const idx = parts.length - proxyCount - 1;
       return idx >= 0 ? parts[idx] : parts[0];
     }
@@ -98,7 +101,7 @@ export function getClientIp(req, options = {}) {
  * @returns {string | null}
  */
 export function bearer(headerValue) {
-  if (typeof headerValue !== 'string') {
+  if (!isString(headerValue)) {
     return null;
   }
   const idx = headerValue.indexOf(' ');
@@ -137,7 +140,7 @@ export function checkOrigin(req, options) {
     return true;
   }
   const origin = req.headers?.origin ?? req.headers?.referer;
-  if (typeof origin !== 'string' || origin.length === 0) {
+  if (!isString(origin) || origin.length === 0) {
     return false;
   }
   let compared;
@@ -147,7 +150,7 @@ export function checkOrigin(req, options) {
     return false;
   }
   for (const rule of options.allowedOrigins) {
-    if (typeof rule === 'string' && rule === compared) {
+    if (isString(rule) && rule === compared) {
       return true;
     }
     if (rule instanceof RegExp && rule.test(compared)) {
@@ -179,10 +182,10 @@ export function checkOrigin(req, options) {
  * @returns {boolean}
  */
 export function webhookVerify(payload, signatureHeader, secret, options = {}) {
-  if (typeof signatureHeader !== 'string' || signatureHeader.length === 0) {
+  if (!isString(signatureHeader) || signatureHeader.length === 0) {
     return false;
   }
-  if (!secret || (typeof secret !== 'string' && !Buffer.isBuffer(secret))) {
+  if (!secret || (!isString(secret) && !isBuffer(secret))) {
     throw invalidArgument('webhookVerify.secret must be a non-empty string or Buffer');
   }
   const algorithm = options.algorithm ?? 'sha256';
@@ -255,15 +258,15 @@ export function webhookVerify(payload, signatureHeader, secret, options = {}) {
  * @returns {boolean}
  */
 export function webhookVerifyStripe(payload, signatureHeader, secret, options = {}) {
-  if (typeof signatureHeader !== 'string' || signatureHeader.length === 0) {
+  if (!isString(signatureHeader) || signatureHeader.length === 0) {
     return false;
   }
-  const secrets = Array.isArray(secret) ? secret : [secret];
+  const secrets = isArray(secret) ? secret : [secret];
   if (secrets.length === 0) {
     throw invalidArgument('webhookVerifyStripe.secret must be a non-empty string / Buffer, or a non-empty array');
   }
   for (const s of secrets) {
-    if (!s || (typeof s !== 'string' && !Buffer.isBuffer(s))) {
+    if (!s || (!isString(s) && !isBuffer(s))) {
       throw invalidArgument('webhookVerifyStripe.secret entries must be non-empty strings or Buffers');
     }
   }
@@ -304,7 +307,7 @@ export function webhookVerifyStripe(payload, signatureHeader, secret, options = 
   // Signed payload is `${t}.${body}` — same for every candidate secret.
   const signedPayload = Buffer.concat([
     Buffer.from(`${timestamp}.`, 'utf8'),
-    Buffer.isBuffer(payload) ? payload : Buffer.from(payload, 'utf8'),
+    isBuffer(payload) ? payload : Buffer.from(payload, 'utf8'),
   ]);
   for (const s of secrets) {
     const expected = createHmac('sha256', s).update(signedPayload).digest();

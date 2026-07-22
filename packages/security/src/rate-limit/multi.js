@@ -1,3 +1,5 @@
+import { isArray, isFunction } from '@exortek/shared/predicates';
+
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 
 /**
@@ -13,14 +15,14 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
  * @returns {import('./index.js').Limiter}
  */
 export function multi(config) {
-  if (!config || !Array.isArray(config.limiters) || config.limiters.length === 0) {
+  if (!config || !isArray(config.limiters) || config.limiters.length === 0) {
     throw new SecurityError(
       ErrorCode.INVALID_ARGUMENT,
       'rateLimit.multi: config.limiters must be a non-empty array of limiter objects',
     );
   }
   for (const [i, limiter] of config.limiters.entries()) {
-    if (!limiter || typeof limiter.check !== 'function') {
+    if (!limiter || !isFunction(limiter.check)) {
       throw new SecurityError(
         ErrorCode.INVALID_ARGUMENT,
         `rateLimit.multi: limiters[${i}] is missing a check() method`,

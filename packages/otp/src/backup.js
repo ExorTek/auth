@@ -4,7 +4,7 @@ import { ALPHABET as CROCKFORD_ALPHABET } from '@exortek/shared/crockford';
 import { sampleAlphabet } from '@exortek/shared/sample';
 import { number, object, optional, string } from '@exortek/shared/validate';
 import { invalidArgument, parse } from './internal/guards.js';
-import { isString } from '@exortek/shared/predicates';
+import { isArray, isString } from '@exortek/shared/predicates';
 
 const NSchema = number().refine(v => Number.isInteger(v) && v >= 1 && v <= 100, 'must be an integer in [1, 100]');
 
@@ -183,7 +183,7 @@ export function compareBackupCode(candidate, stored) {
  * @returns {number | null}        Zero-based index of the match, or null.
  */
 export function verifyBackupCode(candidate, storedList) {
-  if (!Array.isArray(storedList) || storedList.length === 0) {
+  if (!isArray(storedList) || storedList.length === 0) {
     return null;
   }
   let matchIndex = null;

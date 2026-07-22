@@ -1,4 +1,5 @@
 import fp from 'fastify-plugin';
+import { isArray, isFunction } from '@exortek/shared/predicates';
 import {
   normalizeUmbrella,
   normalizeCsrf,
@@ -45,7 +46,7 @@ function makeFastifyContext(request, reply, flags = {}) {
     method: () => request.method,
     getHeader: name => {
       const v = request.headers[name.toLowerCase()];
-      return Array.isArray(v) ? v[0] : v;
+      return isArray(v) ? v[0] : v;
     },
     cookies: () => request.cookies ?? parseCookies(request.headers.cookie),
     body: () => request.body,
@@ -60,7 +61,7 @@ function makeFastifyContext(request, reply, flags = {}) {
       // fall back to a raw `reply.header('Set-Cookie', ...)` only if
       // callers went bare. `attachCsrf` asserts the plugin is present, so
       // in practice we always hit the first branch.
-      if (flags.hasFastifyCookie && typeof reply.setCookie === 'function') {
+      if (flags.hasFastifyCookie && isFunction(reply.setCookie)) {
         reply.setCookie(name, value, opts);
       } else {
         reply.header('Set-Cookie', value); // callers are expected to use @fastify/cookie

@@ -10,7 +10,7 @@
 
 import { randomBytes } from 'node:crypto';
 
-import { isObject } from '@exortek/shared/predicates';
+import { isArray, isFunction, isObject, isString } from '@exortek/shared/predicates';
 
 import { JwtError, ErrorCode } from './internal/errors.js';
 import { assertString } from './internal/guards.js';
@@ -88,7 +88,7 @@ export async function validateClaims(payload, header, options) {
   }
 
   if (opts.typ !== undefined) {
-    const expected = Array.isArray(opts.typ) ? opts.typ : [opts.typ];
+    const expected = isArray(opts.typ) ? opts.typ : [opts.typ];
     if (typeof header.typ !== 'string' || !expected.includes(header.typ)) {
       throw new JwtError(
         ErrorCode.INVALID_TYP,
@@ -127,7 +127,7 @@ export async function validateClaims(payload, header, options) {
   }
 
   if (opts.audience !== undefined) {
-    const claimed = Array.isArray(payload.aud)
+    const claimed = isArray(payload.aud)
       ? /** @type {string[]} */ (payload.aud)
       : payload.aud !== undefined
         ? [/** @type {string} */ (payload.aud)]
@@ -199,18 +199,18 @@ export async function validateClaims(payload, header, options) {
  * @returns {Promise<boolean>}
  */
 async function _matchClaim(matcher, value) {
-  if (typeof matcher === 'function') {
+  if (isFunction(matcher)) {
     return Boolean(await matcher(value));
   }
-  if (typeof matcher === 'string') {
+  if (isString(matcher)) {
     return matcher === value;
   }
   if (matcher instanceof RegExp) {
     return matcher.test(value);
   }
-  if (Array.isArray(matcher)) {
+  if (isArray(matcher)) {
     for (const entry of matcher) {
-      if (typeof entry === 'string' && entry === value) {
+      if (isString(entry) && entry === value) {
         return true;
       }
       if (entry instanceof RegExp && entry.test(value)) {
@@ -234,11 +234,11 @@ async function _matchClaim(matcher, value) {
  * @returns {Set<string>}
  */
 function _extractScopes(payload) {
-  if (typeof payload.scope === 'string') {
+  if (isString(payload.scope)) {
     return new Set(payload.scope.split(/\s+/).filter(Boolean));
   }
-  if (Array.isArray(payload.scp)) {
-    return new Set(/** @type {unknown[]} */ (payload.scp).filter(x => typeof x === 'string'));
+  if (isArray(payload.scp)) {
+    return new Set(/** @type {unknown[]} */ (payload.scp).filter(isString));
   }
   return new Set();
 }

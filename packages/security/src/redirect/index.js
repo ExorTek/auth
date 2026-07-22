@@ -1,3 +1,5 @@
+import { isArray, isString } from '@exortek/shared/predicates';
+
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 
 /**
@@ -42,7 +44,7 @@ function normalizeHosts(hosts) {
   if (hosts === undefined || hosts === null) {
     return null;
   }
-  const list = Array.isArray(hosts) ? hosts : [hosts];
+  const list = isArray(hosts) ? hosts : [hosts];
   return list.map(h => {
     if (typeof h !== 'string' || h.length === 0) {
       throw new SecurityError(
@@ -209,18 +211,18 @@ export function extractReturnUrl(req, options = {}) {
   for (const name of queryParams) {
     const value = q[name];
     // Take the first entry when frameworks parse query params as arrays.
-    const scalar = Array.isArray(value) ? value[0] : value;
-    if (typeof scalar === 'string' && scalar.length > 0) {
+    const scalar = isArray(value) ? value[0] : value;
+    if (isString(scalar) && scalar.length > 0) {
       return scalar;
     }
   }
 
   if (options.headerName) {
-    const headerNames = Array.isArray(options.headerName) ? options.headerName : [options.headerName];
+    const headerNames = isArray(options.headerName) ? options.headerName : [options.headerName];
     for (const name of headerNames) {
       const raw = req.headers?.[name.toLowerCase()];
-      const scalar = Array.isArray(raw) ? raw[0] : raw;
-      if (typeof scalar === 'string' && scalar.length > 0) {
+      const scalar = isArray(raw) ? raw[0] : raw;
+      if (isString(scalar) && scalar.length > 0) {
         return scalar;
       }
     }
@@ -228,7 +230,7 @@ export function extractReturnUrl(req, options = {}) {
 
   if (options.cookieName && req.cookies) {
     const c = req.cookies[options.cookieName];
-    if (typeof c === 'string' && c.length > 0) {
+    if (isString(c) && c.length > 0) {
       return c;
     }
   }

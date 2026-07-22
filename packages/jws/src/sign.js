@@ -7,7 +7,7 @@
  * actionable rather than "unsupported algorithm".
  */
 
-import { isObject } from '@exortek/shared/predicates';
+import { isArray, isBuffer, isObject, isString } from '@exortek/shared/predicates';
 
 import { JwsError, ErrorCode } from './internal/errors.js';
 import { assertNonEmptyString, assertObject } from './internal/guards.js';
@@ -81,7 +81,7 @@ export async function sign(payload, key, options) {
  * @returns {Promise<{ token: string, detached: Buffer }>}
  */
 export async function signDetached(payload, key, options) {
-  if (!Buffer.isBuffer(payload) && !(payload instanceof Uint8Array)) {
+  if (!isBuffer(payload) && !(payload instanceof Uint8Array)) {
     throw new JwsError(
       ErrorCode.INVALID_PAYLOAD,
       'signDetached: payload must be a Buffer or Uint8Array — the caller is responsible for the byte encoding',
@@ -143,7 +143,7 @@ function _buildHeader(alg, options) {
     }
   }
   if (options.crit !== undefined) {
-    header.crit = Array.isArray(options.crit) ? [...options.crit] : options.crit;
+    header.crit = isArray(options.crit) ? [...options.crit] : options.crit;
   }
   return header;
 }
@@ -196,13 +196,13 @@ function _prepareCompact(payload, encHeader, b64) {
  * @returns {Buffer}
  */
 function _payloadBytes(payload) {
-  if (Buffer.isBuffer(payload)) {
+  if (isBuffer(payload)) {
     return payload;
   }
   if (payload instanceof Uint8Array) {
     return Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength);
   }
-  if (typeof payload === 'string') {
+  if (isString(payload)) {
     return Buffer.from(payload, 'utf8');
   }
   return Buffer.from(JSON.stringify(payload), 'utf8');
@@ -221,7 +221,7 @@ function _mergeCritForB64False(existing) {
   if (existing === undefined) {
     return ['b64'];
   }
-  if (!Array.isArray(existing)) {
+  if (!isArray(existing)) {
     throw new JwsError(ErrorCode.INVALID_HEADER, 'sign: crit must be a JSON array of strings');
   }
   return existing.includes('b64') ? /** @type {string[]} */ (existing) : [.../** @type {string[]} */ (existing), 'b64'];

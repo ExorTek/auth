@@ -13,6 +13,7 @@
 import { KeyObject } from 'node:crypto';
 
 import { array, object, oneOf, optional, string } from '@exortek/shared/validate';
+import { isString } from '@exortek/shared/predicates';
 
 import { JwkError, ErrorCode } from './internal/errors.js';
 import { assertObject, invalidArgument, parse } from './internal/guards.js';
@@ -112,7 +113,7 @@ export async function exportPEM(key, format) {
     );
   }
   const out = key.export({ format: 'pem', type: chosen });
-  return typeof out === 'string' ? out : out.toString('utf8');
+  return isString(out) ? out : out.toString('utf8');
 }
 
 /**

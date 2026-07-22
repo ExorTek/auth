@@ -9,7 +9,7 @@
  * keys with different algorithms.
  */
 
-import { isObject } from '@exortek/shared/predicates';
+import { isArray, isBuffer, isObject, isString } from '@exortek/shared/predicates';
 
 import { JwsError, ErrorCode } from './internal/errors.js';
 import { assertNonEmptyString } from './internal/guards.js';
@@ -55,7 +55,7 @@ import { resolveKey } from './internal/resolver.js';
  * @returns {Promise<GeneralJws | FlattenedJws>}
  */
 export async function signJson(payload, signers) {
-  if (!Array.isArray(signers) || signers.length === 0) {
+  if (!isArray(signers) || signers.length === 0) {
     throw new JwsError(
       ErrorCode.INVALID_ARGUMENT,
       'signJson: signers must be a non-empty array of { key, options } specs',
@@ -98,7 +98,7 @@ export async function signJson(payload, signers) {
  */
 export async function verifyJson(jwsJson, keyish, options) {
   const allowlist = _requireAllowlist(options);
-  if (jwsJson == null || typeof jwsJson !== 'object' || Array.isArray(jwsJson)) {
+  if (!isObject(jwsJson)) {
     throw new JwsError(ErrorCode.INVALID_TOKEN, 'verifyJson: expected a JWS JSON object (general or flattened)');
   }
   const encPayload = /** @type {any} */ (jwsJson).payload;
@@ -173,7 +173,7 @@ async function _signOne(spec, encPayload, index) {
   };
   const unprotected = /** @type {any} */ (options).unprotected;
   if (unprotected !== undefined) {
-    if (unprotected == null || typeof unprotected !== 'object' || Array.isArray(unprotected)) {
+    if (!isObject(unprotected)) {
       throw new JwsError(
         ErrorCode.INVALID_ARGUMENT,
         `signJson: signer[${index}] unprotected header must be a JSON object`,
@@ -204,7 +204,7 @@ function _buildProtectedHeader(alg, options) {
     }
   }
   if (options.crit !== undefined) {
-    header.crit = Array.isArray(options.crit) ? [...options.crit] : options.crit;
+    header.crit = isArray(options.crit) ? [...options.crit] : options.crit;
   }
   return header;
 }
@@ -217,13 +217,13 @@ function _payloadBytes(payload) {
   if (payload === undefined) {
     throw new JwsError(ErrorCode.INVALID_PAYLOAD, 'signJson: payload is required');
   }
-  if (Buffer.isBuffer(payload)) {
+  if (isBuffer(payload)) {
     return payload;
   }
   if (payload instanceof Uint8Array) {
     return Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength);
   }
-  if (typeof payload === 'string') {
+  if (isString(payload)) {
     return Buffer.from(payload, 'utf8');
   }
   return Buffer.from(JSON.stringify(payload), 'utf8');
@@ -243,7 +243,7 @@ function _requireAllowlist(options) {
     );
   }
   const allow = options.alg;
-  if (!Array.isArray(allow) || allow.length === 0 || allow.some(a => typeof a !== 'string')) {
+  if (!isArray(allow) || allow.length === 0 || allow.some(a => !isString(a))) {
     throw new JwsError(
       ErrorCode.MISSING_ALG_ALLOWLIST,
       'verifyJson: options.alg must be a non-empty array of algorithm identifier strings',
@@ -258,7 +258,7 @@ function _requireAllowlist(options) {
  */
 function _extractSignatures(jwsJson) {
   const asAny = /** @type {any} */ (jwsJson);
-  if (Array.isArray(asAny.signatures)) {
+  if (isArray(asAny.signatures)) {
     for (const [i, s] of asAny.signatures.entries()) {
       if (s == null || typeof s !== 'object') {
         throw new JwsError(ErrorCode.INVALID_TOKEN, `verifyJson: signatures[${i}] must be an object`);
@@ -266,7 +266,7 @@ function _extractSignatures(jwsJson) {
     }
     return /** @type {JsonSignature[]} */ (asAny.signatures);
   }
-  if (typeof asAny.signature === 'string') {
+  if (isString(asAny.signature)) {
     return [
       {
         protected: /** @type {string} */ (asAny.protected),
@@ -297,7 +297,7 @@ async function _verifyOne(sig, encPayload, payloadBytes, keyish, allowlist, opti
     );
   }
   const header = /** @type {Record<string, unknown>} */ (b64uDecodeJson(sig.protected, 'header'));
-  if (header == null || typeof header !== 'object' || Array.isArray(header)) {
+  if (!isObject(header)) {
     throw new JwsError(ErrorCode.INVALID_HEADER, 'verifyJson: protected header must be a JSON object');
   }
   if (typeof header.alg !== 'string') {

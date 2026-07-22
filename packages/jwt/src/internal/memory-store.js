@@ -15,6 +15,8 @@
  *     silently un-revokes tokens whose entry got dropped for capacity.
  */
 
+import { isFunction } from '@exortek/shared/predicates';
+
 import { JwtError, ErrorCode } from './errors.js';
 import { parseDuration } from './duration.js';
 
@@ -85,7 +87,7 @@ export function createMemoryStore(options) {
       expiredSweep();
       enforceCap();
     }, intervalMs);
-    if (typeof timer.unref === 'function') {
+    if (isFunction(timer.unref)) {
       timer.unref();
     }
   }

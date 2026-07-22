@@ -8,6 +8,8 @@
  * for the consistency rule from RFC 7517 §4.3.
  */
 
+import { isArray, isObject } from '@exortek/shared/predicates';
+
 import { JwkError, ErrorCode } from './internal/errors.js';
 import { decodeMember } from './internal/base64url.js';
 import { EC_COORD_BYTES, EC_CURVES, OKP_CURVES, OKP_KEY_BYTES } from './internal/curves.js';
@@ -50,7 +52,7 @@ const KEY_OPS_FOR_USE = Object.freeze({
  * @returns {object} the same JWK, narrowed to a validated shape
  */
 export function validate(jwk, options) {
-  if (jwk == null || typeof jwk !== 'object' || Array.isArray(jwk)) {
+  if (!isObject(jwk)) {
     throw new JwkError(ErrorCode.INVALID_JWK, 'validate: expected a JWK object');
   }
   const j = /** @type {Record<string, unknown>} */ (jwk);
@@ -116,7 +118,7 @@ function _validateCommon(j) {
     throw new JwkError(ErrorCode.INVALID_JWK, 'validate: `alg` must be a string when present');
   }
   if (j.key_ops !== undefined) {
-    if (!Array.isArray(j.key_ops)) {
+    if (!isArray(j.key_ops)) {
       throw new JwkError(ErrorCode.INVALID_JWK, 'validate: `key_ops` must be an array of strings');
     }
     /** @type {Set<string>} */

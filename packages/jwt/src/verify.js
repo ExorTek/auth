@@ -9,6 +9,8 @@
  * logic. Never gate authorisation on `peek`.
  */
 
+import { isArray, isObject, isString } from '@exortek/shared/predicates';
+
 import { JwtError, ErrorCode } from './internal/errors.js';
 import { lookup as lookupAlg } from './internal/algorithms.js';
 import { assertVerifySide as assertCritVerify } from './internal/crit.js';
@@ -97,7 +99,7 @@ async function _verifySignature(token, keyish, options) {
   }
 
   const payload = /** @type {Record<string, unknown>} */ (b64uDecodeJson(encPayload, 'payload'));
-  if (payload == null || typeof payload !== 'object' || Array.isArray(payload)) {
+  if (!isObject(payload)) {
     throw new JwtError(ErrorCode.INVALID_PAYLOAD, 'verify: JWT payload must be a JSON object');
   }
   return { header, payload, kid: /** @type {string | undefined} */ (header.kid) };
@@ -115,7 +117,7 @@ function _requireAllowlist(options) {
     );
   }
   const allow = options.alg;
-  if (!Array.isArray(allow) || allow.length === 0 || allow.some(a => typeof a !== 'string')) {
+  if (!isArray(allow) || allow.length === 0 || allow.some(a => !isString(a))) {
     throw new JwtError(
       ErrorCode.MISSING_ALG_ALLOWLIST,
       'verify: options.alg must be a non-empty array of algorithm identifier strings',
@@ -142,7 +144,7 @@ function _sizeCheck(token, max) {
  * @param {Record<string, unknown>} header
  */
 function _assertHeaderShape(header) {
-  if (header == null || typeof header !== 'object' || Array.isArray(header)) {
+  if (!isObject(header)) {
     throw new JwtError(ErrorCode.INVALID_HEADER, 'verify: protected header must be a JSON object');
   }
   if (typeof header.alg !== 'string') {

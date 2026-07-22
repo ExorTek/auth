@@ -37,7 +37,7 @@ export function sessionPlugin(configOrManager) {
       // value onto it. Multiple Set-Cookie values on one response are
       // legal.
       reply.setSessionCookie = value => {
-        const existing = typeof reply.getHeader === 'function' ? reply.getHeader('set-cookie') : undefined;
+        const existing = isFunction(reply.getHeader) ? reply.getHeader('set-cookie') : undefined;
         reply.header('Set-Cookie', appendSetCookieHeader(existing, value));
       };
       // Returns the promise so callers can `await reply.clearSessionCookie()`
@@ -45,7 +45,7 @@ export function sessionPlugin(configOrManager) {
       // and drop the delete-cookie header on the floor.
       reply.clearSessionCookie = async () => {
         const result = await sessions.revoke(request);
-        const existing = typeof reply.getHeader === 'function' ? reply.getHeader('set-cookie') : undefined;
+        const existing = isFunction(reply.getHeader) ? reply.getHeader('set-cookie') : undefined;
         reply.header('Set-Cookie', appendSetCookieHeader(existing, result.cookie));
         return result;
       };

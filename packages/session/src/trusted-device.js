@@ -1,4 +1,6 @@
 import { seal, unseal, CryptoError, ErrorCode as CryptoErrorCode } from '@exortek/crypto';
+import { isArray, isBytes, isFunction, isString } from '@exortek/shared/predicates';
+
 import { assertNonEmptyString, assertObject, invalidArgument } from './internal/guards.js';
 import { parseCookies, serialiseCookie, serialiseDeleteCookie } from './cookie.js';
 import { parseDuration } from './internal/duration.js';
@@ -23,10 +25,10 @@ import { parseDuration } from './internal/duration.js';
  */
 export function createTrustedDeviceCookie(config) {
   assertObject(config, 'createTrustedDeviceCookie.config');
-  const secret = Array.isArray(config.secret) ? config.secret : [config.secret];
+  const secret = isArray(config.secret) ? config.secret : [config.secret];
   if (
     secret.length === 0 ||
-    secret.some(s => typeof s !== 'string' && !Buffer.isBuffer(s) && !(s instanceof Uint8Array))
+    secret.some(s => !isString(s) && !isBytes(s))
   ) {
     throw invalidArgument(
       'createTrustedDeviceCookie.config.secret must be a non-empty string / Buffer / Uint8Array (or an array of those)',
@@ -89,7 +91,7 @@ export function createTrustedDeviceCookie(config) {
         return false;
       }
       const cookieHeader =
-        typeof headers.get === 'function' ? headers.get('cookie') : (headers.cookie ?? headers.Cookie);
+        isFunction(headers.get) ? headers.get('cookie') : (headers.cookie ?? headers.Cookie);
       if (!cookieHeader) {
         return false;
       }

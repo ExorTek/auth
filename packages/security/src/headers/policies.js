@@ -1,4 +1,4 @@
-import { isObject } from '@exortek/shared/predicates';
+import { isArray, isObject, isString } from '@exortek/shared/predicates';
 
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 
@@ -28,7 +28,7 @@ function kebab(camel) {
 }
 
 function assertDirectiveValue(value, name) {
-  if (!Array.isArray(value)) {
+  if (!isArray(value)) {
     throw new SecurityError(
       ErrorCode.INVALID_ARGUMENT,
       `csp directive '${name}' must be an array of source expressions; got ${typeof value}`,
@@ -126,10 +126,10 @@ function staticHeader(name, defaultValue) {
     if (options === true || options === undefined) {
       return { name, value: defaultValue };
     }
-    if (typeof options === 'string') {
+    if (isString(options)) {
       return { name, value: options };
     }
-    if (isObject(options) && typeof options.value === 'string') {
+    if (isObject(options) && isString(options.value)) {
       return { name, value: options.value };
     }
     throw new SecurityError(
@@ -167,8 +167,8 @@ export function buildFrameguard(options) {
   if (options === true || options === undefined) {
     return { name: 'X-Frame-Options', value: 'DENY' };
   }
-  const action = typeof options === 'string' ? options : options?.action;
-  if (typeof action !== 'string') {
+  const action = isString(options) ? options : options?.action;
+  if (!isString(action)) {
     throw new SecurityError(
       ErrorCode.INVALID_ARGUMENT,
       "frameguard option must be a string or { action: 'DENY' | 'SAMEORIGIN' }",

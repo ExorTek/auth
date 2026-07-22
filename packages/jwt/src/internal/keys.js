@@ -21,6 +21,7 @@
 import { createPrivateKey, createPublicKey, createSecretKey, X509Certificate } from 'node:crypto';
 
 import { createKeyNormalizer } from '@exortek/shared/normalize-key';
+import { isString } from '@exortek/shared/predicates';
 
 import { JwtError, ErrorCode } from './errors.js';
 import { lookup as lookupAlg } from './algorithms.js';
@@ -42,7 +43,7 @@ const shared = createKeyNormalizer({
  * @returns {Promise<import('node:crypto').KeyObject>}
  */
 export async function normalizeKey(key, alg, direction) {
-  if (typeof key === 'string') {
+  if (isString(key)) {
     return _fromString(key, lookupAlg(alg), direction, alg);
   }
   const out = await shared.normalizeCore(key, alg, direction);

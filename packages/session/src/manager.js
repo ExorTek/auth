@@ -1,5 +1,5 @@
 import { any, array, boolean, duration, number, object, oneOf, optional } from '@exortek/shared/validate';
-import { isObject } from '@exortek/shared/predicates';
+import { isArray, isBytes, isFunction, isObject, isString } from '@exortek/shared/predicates';
 
 import { SessionError, ErrorCode } from './errors.js';
 import { assertNonEmptyString, invalidArgument, parse } from './internal/guards.js';
@@ -164,7 +164,7 @@ export function createSessionManager(config) {
     );
   }
   const concurrentLimit = config.concurrentLimit;
-  const bindTo = Array.isArray(config.bindTo) ? Object.freeze([...config.bindTo]) : null;
+  const bindTo = isArray(config.bindTo) ? Object.freeze([...config.bindTo]) : null;
   const bindStrictness = config.bindStrictness ?? 'strict';
   const impersonationEnabled = config.impersonation === true;
   const impersonationTtlMs = impersonationEnabled
@@ -849,7 +849,7 @@ export function createSessionManager(config) {
     if (!headers) {
       return undefined;
     }
-    const cookieHeader = typeof headers.get === 'function' ? headers.get('cookie') : (headers.cookie ?? headers.Cookie);
+    const cookieHeader = isFunction(headers.get) ? headers.get('cookie') : (headers.cookie ?? headers.Cookie);
     if (!cookieHeader) {
       return undefined;
     }
@@ -885,12 +885,12 @@ function normaliseSecret(input) {
   if (input === undefined || input === null) {
     throw invalidArgument('createSessionManager.config.secret is required');
   }
-  const list = Array.isArray(input) ? input : [input];
+  const list = isArray(input) ? input : [input];
   if (list.length === 0) {
     throw invalidArgument('createSessionManager.config.secret must include at least one entry');
   }
   for (const s of list) {
-    if (typeof s !== 'string' && !Buffer.isBuffer(s) && !(s instanceof Uint8Array)) {
+    if (!isString(s) && !isBytes(s)) {
       throw invalidArgument(
         `createSessionManager.config.secret entries must be string / Buffer / Uint8Array; got ${typeof s}`,
       );
