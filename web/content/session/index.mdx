@@ -10,8 +10,8 @@ import { Callout } from 'nextra/components';
 Sealed-cookie session manager for Node.js — rotation, revocation, sudo
 mode, impersonation, concurrent limits, fingerprint binding, device
 labels, session events, Redis distributed revocation, CSRF derivation,
-trusted-device cookies, and adapters for Fastify, Express, Hono, and
-Elysia. Built on `@exortek/crypto`.
+trusted-device cookies, and adapters for Fastify and Express. Built on
+`@exortek/crypto`.
 
 ## Quick tour
 
@@ -57,8 +57,6 @@ res.setHeader('Set-Cookie', bye);
 | `@exortek/session/trusted-device`      | Long-lived "remember this device" cookie for 2FA skip      |
 | `@exortek/session/fastify`             | Fastify plugin                                             |
 | `@exortek/session/express`             | Express middleware                                         |
-| `@exortek/session/hono`                | Hono middleware                                            |
-| `@exortek/session/elysia`              | Elysia plugin                                              |
 
 ## Features (opt-in via config flags)
 

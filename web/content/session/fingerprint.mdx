@@ -79,10 +79,9 @@ const sessions = createSessionManager({
 
 ### `ip`
 
-Captures the peer address `req.ip` (Fastify/Express) or the
-runtime-resolved equivalent (Hono/Elysia). Trust of `req.ip` depends
-on your framework's `trustProxy` setting — see [middleware](/session/middleware)
-for the runtime-specific caveats.
+Captures the peer address `req.ip` (Fastify/Express). Trust of `req.ip`
+depends on your framework's `trustProxy` setting — see
+[middleware](/session/middleware) for the runtime-specific caveats.
 
 - **Strong** against a stolen cookie replayed from a different
   network egress.
@@ -109,10 +108,6 @@ Captures the `User-Agent` request header, capped at 512 bytes.
   session adapter inherits.
 - **Express** — honours `req.ip`, which itself honours the app's
   `'trust proxy'` setting. Same story.
-- **Hono** — reaches into `c.env.incoming?.socket?.remoteAddress`
-  (Node adapter). Edge runtimes without an `incoming` object fall
-  back to UA-only.
-- **Elysia** — calls `context.server?.requestIP(context.request)`.
 
 ## Fingerprint change on rotate
 

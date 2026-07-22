@@ -96,30 +96,6 @@ const { middleware } = sessionMiddleware(config);
 app.use(middleware);
 ```
 
-### Hono
-
-```bash
-yarn add hono
-```
-
-```js
-import { sessionMiddleware } from '@exortek/session/hono';
-const { middleware } = sessionMiddleware(config);
-app.use('*', middleware);
-```
-
-### Elysia
-
-```bash
-yarn add elysia
-```
-
-```js
-import { sessionPlugin } from '@exortek/session/elysia';
-const { plugin } = sessionPlugin(config);
-new Elysia().use(plugin);
-```
-
 ## Requirements
 
 - **Node.js 22 or newer** — session uses `crypto.hkdfSync`, `crypto.timingSafeEqual`, WHATWG `Headers`, and stable
