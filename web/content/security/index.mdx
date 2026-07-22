@@ -151,7 +151,8 @@ Every module has a dedicated page with full API reference.
 | Set the security headers helmet would          | [`headers()`](/security/headers)                                                                                                      |
 | Allow a browser origin cross-site with cookies | [`cors({ origin, credentials: true })`](/security/cors)                                                                               |
 | Safely redirect a user-supplied `?next=`       | [`safeRedirect`](/security/redirect)                                                                                                  |
-| Verify a Stripe / GitHub webhook               | [`webhookVerify`](/security/helpers#webhookverify)                                                                                    |
+| Verify a GitHub / Slack / generic webhook      | [`webhookVerify`](/security/helpers#webhookverify)                                                                                    |
+| Verify a Stripe webhook (with replay window)   | [`webhookVerifyStripe`](/security/helpers#webhookverifystripe)                                                                        |
 | Get the real client IP behind an LB            | [`getClientIp`](/security/helpers#getclientip)                                                                                        |
 | Refuse `__proto__` in a JSON payload           | [`safeJsonParse`](/security/helpers#safejsonparse)                                                                                    |
 | Drop `$where` / dotted keys from a body        | [`sanitizeBody`](/security/helpers#sanitizebody)                                                                                      |

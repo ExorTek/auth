@@ -7,7 +7,7 @@ import { Callout, Tabs } from 'nextra/components';
 
 # `helpers`
 
-Sixteen small, focused defensive utilities that would otherwise be scattered across `hpp`, `express-mongo-sanitize`,
+Seventeen small, focused defensive utilities that would otherwise be scattered across `hpp`, `express-mongo-sanitize`,
 custom sanitizers, one-off `getIP`, `bearer`, `webhook`, `honeypot`, `slow-down` snippets found in every codebase.
 
 All exported from `@exortek/security`.
@@ -16,7 +16,7 @@ All exported from `@exortek/security`.
   <Tabs.Tab>
     ```js
     import {
-      getClientIp, bearer, checkOrigin, webhookVerify,
+      getClientIp, bearer, checkOrigin, webhookVerify, webhookVerifyStripe,
       sanitizeBody, sanitizeParams, safeJoin, sanitizeFilename,
       freezePrototypes, timeout, bodyLimit, honeypot, slowDown,
       safeJsonParse, constantTimeEqual, parseCspReport,
@@ -104,25 +104,67 @@ webhookVerify(
   payload:         string | Buffer,       // RAW body — do not JSON.stringify
   signatureHeader: string,
   secret:          string | Buffer,
-  options?: { algorithm?: string },
+  options?: { algorithm?: 'sha256' | 'sha512' },
 ): boolean
 ```
 
-Timing-safe HMAC verification. Accepts plain hex digests **and** scheme-prefixed forms:
+Timing-safe HMAC verification for the generic-signature webhook shape. Accepts plain hex digests and scheme-prefixed
+forms (`sha256=<hex>`, `v1=<hex>`) — any candidate that matches wins.
 
-- `sha256=<hex>` (GitHub / Slack / generic)
-- `t=<timestamp>,v1=<hex>` (Stripe rotation envelope)
+For **Stripe-style** envelopes (`t=<timestamp>,v1=<hex>`) that need a freshness gate, use `webhookVerifyStripe` below —
+`webhookVerify` deliberately doesn't enforce timestamp tolerance.
 
-Any candidate that matches wins.
+Weak hashes are refused: `algorithm` accepts only `'sha256'` (default) or `'sha512'`. `sha1` throws even though
+`node:crypto` supports it.
 
 ```js
-const ok = webhookVerify(rawBody, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+const ok = webhookVerify(rawBody, req.headers['x-hub-signature-256'], process.env.GITHUB_WEBHOOK_SECRET);
 ```
 
 <Callout type="warning">
   **Pass the RAW body.** If you've already run `JSON.parse` and then `JSON.stringify` on it, the whitespace / key order
   will differ from the bytes the sender hashed. Buffer the raw stream before your JSON middleware runs.
 </Callout>
+
+## `webhookVerifyStripe`
+
+```ts
+webhookVerifyStripe(
+  payload:         string | Buffer,                              // RAW body
+  signatureHeader: string,                                       // `Stripe-Signature` header
+  secret:          string | Buffer | Array<string | Buffer>,     // one or many (rotation)
+  options?: { tolerance?: number, now?: number },
+): boolean
+```
+
+Verify a Stripe-style timestamped envelope with a replay-tolerance window.
+
+The header is a comma-separated list of `key=value` pairs:
+
+```
+t=1614265636,v1=<hex>,v0=<hex>
+```
+
+- `t` — Unix timestamp in **seconds** at which Stripe signed the payload.
+- `v1` — HMAC-SHA-256 of `${t}.${payload}` under the endpoint secret. Multiple `v1=` entries are accepted — Stripe
+  rotates secrets by signing with several at once.
+- `v0` — legacy scheme; ignored.
+
+`tolerance` (default **300s**, Stripe's own recommendation) rejects timestamps that skew past the window on either
+side. A stale timestamp fails **without** running the HMAC compare — freshness gates freshness, not signature validity.
+Both the compare and the parse are constant-time relative to the correct secret.
+
+Pass an array of secrets to rotate the endpoint secret with zero downtime:
+
+```js
+const ok = webhookVerifyStripe(
+  rawBody,
+  req.headers['stripe-signature'],
+  [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_WEBHOOK_SECRET_PREVIOUS],
+);
+```
+
+Same RAW-body warning as `webhookVerify`.
 
 ## `sanitizeBody`
 
