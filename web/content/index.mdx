@@ -8,9 +8,10 @@ sidebarTitle: Introduction
 A framework-agnostic authentication toolkit for Node.js — built as 22 small packages under one scope. Pick the one you
 need, or install the umbrella.
 
-Every package is built on `node:crypto`, with **no required external dependencies** outside the `@exortek/*` scope.
-The heaviest primitives (Argon2id, bcrypt) come from opt-in peer packages you install only if you use them. Pure
-JavaScript with JSDoc → `.d.ts`. Ships adapters for Express and Fastify — the classic Node HTTP stack.
+Every package is built on `node:crypto`. The only required non-`@exortek/*` runtime dependency across the whole stack
+is `fastify-plugin` (~3 kB, pulled in by `@exortek/security` even for Express-only consumers) — moving to an optional
+peer in 2.0. The heaviest primitives (Argon2id, bcrypt) come from opt-in peer packages you install only if you use them.
+Pure JavaScript with JSDoc → `.d.ts`. Ships adapters for Express and Fastify — the classic Node HTTP stack.
 
 ## Shipping
 
