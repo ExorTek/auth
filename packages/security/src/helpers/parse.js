@@ -1,3 +1,5 @@
+import { isObject } from '@exortek/shared/predicates';
+
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 import { invalidArgument } from '../internal/guards.js';
 import { timingSafeEqual } from '../util/bytes.js';
@@ -113,7 +115,7 @@ function withinDepth(value, remaining) {
     }
     return true;
   }
-  if (value !== null && typeof value === 'object') {
+  if (isObject(value)) {
     for (const v of Object.values(value)) {
       if (!withinDepth(v, remaining - 1)) {
         return false;
@@ -195,7 +197,7 @@ export function parseCspReport(body) {
   // Pull out the first CSP violation entry.
   if (Array.isArray(payload)) {
     for (const entry of payload) {
-      if (entry && typeof entry === 'object' && entry.type === 'csp-violation' && entry.body) {
+      if (isObject(entry) && entry.type === 'csp-violation' && entry.body) {
         return pick(entry.body);
       }
     }
@@ -204,7 +206,7 @@ export function parseCspReport(body) {
 
   // Legacy shape: `{ "csp-report": { ... } }`.
   const legacy = payload['csp-report'];
-  if (legacy && typeof legacy === 'object') {
+  if (isObject(legacy)) {
     return pick(legacy);
   }
   // Sometimes the outer object IS the report (server middleware may have

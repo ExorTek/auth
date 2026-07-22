@@ -1,4 +1,5 @@
 import { appendSetCookieHeader } from '@exortek/shared/http';
+import { isObject, isFunction } from '@exortek/shared/predicates';
 
 import { createSessionManager } from '../manager.js';
 
@@ -15,7 +16,7 @@ import { createSessionManager } from '../manager.js';
  */
 export function sessionMiddleware(configOrManager) {
   const sessions =
-    typeof configOrManager === 'object' && typeof configOrManager.issue === 'function'
+    isObject(configOrManager) && isFunction(configOrManager.issue)
       ? configOrManager
       : createSessionManager(configOrManager);
 

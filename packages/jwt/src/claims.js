@@ -10,6 +10,8 @@
 
 import { randomBytes } from 'node:crypto';
 
+import { isObject } from '@exortek/shared/predicates';
+
 import { JwtError, ErrorCode } from './internal/errors.js';
 import { assertString } from './internal/guards.js';
 import { parseDuration } from './internal/duration.js';
@@ -320,7 +322,7 @@ async function _resolveJti(spec) {
     }
     return generated;
   }
-  if (spec && typeof spec === 'object') {
+  if (isObject(spec)) {
     const size = /** @type {any} */ (spec).size ?? 16;
     if (typeof size !== 'number' || size < 1 || !Number.isFinite(size)) {
       throw new JwtError(ErrorCode.INVALID_PAYLOAD, 'sign: jwtId.size must be a positive number');

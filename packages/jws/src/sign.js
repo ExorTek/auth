@@ -7,6 +7,8 @@
  * actionable rather than "unsupported algorithm".
  */
 
+import { isObject } from '@exortek/shared/predicates';
+
 import { JwsError, ErrorCode } from './internal/errors.js';
 import { assertNonEmptyString, assertObject } from './internal/guards.js';
 import { lookup as lookupAlg } from './internal/algorithms.js';
@@ -132,7 +134,7 @@ function _buildHeader(alg, options) {
   if (options.kid !== undefined) {
     header.kid = options.kid;
   }
-  if (options.header && typeof options.header === 'object') {
+  if (isObject(options.header)) {
     for (const [k, v] of Object.entries(options.header)) {
       if (k === 'alg') {
         continue;

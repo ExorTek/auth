@@ -1,3 +1,5 @@
+import { isObject } from '@exortek/shared/predicates';
+
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 
 // Content-Security-Policy
@@ -127,7 +129,7 @@ function staticHeader(name, defaultValue) {
     if (typeof options === 'string') {
       return { name, value: options };
     }
-    if (typeof options === 'object' && typeof options.value === 'string') {
+    if (isObject(options) && typeof options.value === 'string') {
       return { name, value: options.value };
     }
     throw new SecurityError(

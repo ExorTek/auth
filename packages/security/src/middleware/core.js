@@ -1,4 +1,5 @@
 import { parseCookies as sharedParseCookies, serialiseCookie as sharedSerialiseCookie } from '@exortek/shared/cookie';
+import { isObject } from '@exortek/shared/predicates';
 
 import { cors as buildCorsCheck } from '../cors/index.js';
 import { headers as buildHeaders } from '../headers/index.js';
@@ -130,7 +131,7 @@ function normalizeRateLimitHeaders(input) {
     }
     return { ...preset };
   }
-  if (typeof input === 'object' && input !== null) {
+  if (isObject(input)) {
     // Start from the legacy preset and let user-supplied fields override.
     // `false` on any field disables just that header.
     return {
@@ -178,7 +179,7 @@ export function extractCsrfToken(csrfConfig, req) {
     return h;
   }
   const body = req.body;
-  if (body && typeof body === 'object') {
+  if (isObject(body)) {
     const v = body[csrfConfig.cookieName];
     if (typeof v === 'string' && v.length > 0) {
       return v;
@@ -278,7 +279,7 @@ async function _rawExtractCsrf(csrf, ctx) {
   // Body may be sync (Express/Fastify already-parsed) or async (Hono
   // parseBody on demand). Await either shape uniformly.
   const body = await ctx.body();
-  if (body && typeof body === 'object') {
+  if (isObject(body)) {
     const v = /** @type {Record<string, unknown>} */ (body)[csrf.cookieName];
     if (typeof v === 'string' && v.length > 0) {
       return v;

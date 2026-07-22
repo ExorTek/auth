@@ -1,4 +1,5 @@
 import { any, array, boolean, duration, number, object, oneOf, optional } from '@exortek/shared/validate';
+import { isObject } from '@exortek/shared/predicates';
 
 import { SessionError, ErrorCode } from './errors.js';
 import { assertNonEmptyString, invalidArgument, parse } from './internal/guards.js';
@@ -271,7 +272,7 @@ export function createSessionManager(config) {
     }
     const durationMs = options.rememberMe ? ttlMs * 2 : ttlMs;
     const expiresAt = now + durationMs;
-    const claims = options.claims && typeof options.claims === 'object' ? options.claims : {};
+    const claims = isObject(options.claims) ? options.claims : {};
 
     const req = options.req;
     if (bindTo && !req) {
@@ -540,7 +541,7 @@ export function createSessionManager(config) {
     const token = encodeToken(payload, secret[0], { now });
     // Invalidate the per-request cache so a subsequent `verify(req)`
     // sees the new session rather than the pre-rotate one.
-    if (req && typeof req === 'object') {
+    if (isObject(req)) {
       delete req.__exortekSession;
     }
     const session = projectSession(next);
@@ -569,7 +570,7 @@ export function createSessionManager(config) {
       throw new SessionError(ErrorCode.INVALID_TOKEN, 'markFresh: no valid session');
     }
     await store.update(session.id, { freshAt: now });
-    if (req && typeof req === 'object') {
+    if (isObject(req)) {
       // Bust the per-request cache so the caller sees the updated freshAt.
       delete req.__exortekSession;
     }
@@ -699,7 +700,7 @@ export function createSessionManager(config) {
     if (revoked) {
       await fire(events.onRevoke, payload.sid, options.reason);
     }
-    if (req && typeof req === 'object') {
+    if (isObject(req)) {
       req.__exortekSession = null;
     }
     return { cookie: deleteCookie(), revoked };
@@ -799,10 +800,7 @@ export function createSessionManager(config) {
         'upgrade: session is already authenticated — call rotate() or issue() instead',
       );
     }
-    const merged =
-      options.mergeClaims && typeof options.mergeClaims === 'object'
-        ? { ...anon.claims, ...options.mergeClaims }
-        : anon.claims;
+    const merged = isObject(options.mergeClaims) ? { ...anon.claims, ...options.mergeClaims } : anon.claims;
     // Mint the authenticated session FIRST, revoke the anonymous record
     // only once that succeeded — the reverse order would leave the user
     // with no session at all (and a lost cart) if issue() throws on a
@@ -810,7 +808,7 @@ export function createSessionManager(config) {
     const result = await issue({ userId, claims: merged, req, now: options.now });
     await store.revoke(anon.id, 'upgraded');
     await fire(events.onRevoke, anon.id, 'upgraded');
-    if (req && typeof req === 'object') {
+    if (isObject(req)) {
       // Bust the per-request cache — it still holds the anonymous session.
       req.__exortekSession = result.session;
     }
@@ -908,7 +906,7 @@ function normaliseSuspicious(input, events) {
   if (input === true) {
     return { onDetected: events.onSuspicious };
   }
-  if (typeof input === 'object') {
+  if (isObject(input)) {
     return { onDetected: input.onDetected ?? events.onSuspicious };
   }
   return null;
