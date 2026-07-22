@@ -200,15 +200,23 @@ test('listApiKeys: returns records, most-recently-used first', async () => {
   assert.equal(rows[1].name, 'B');
 });
 
-test('invalid prefix → INVALID_ARGUMENT', async () => {
+test('invalid prefix → INVALID_PREFIX (not the generic INVALID_ARGUMENT)', async () => {
   const store = newStore();
   for (const bad of ['SK_LIVE', 'sk_live_', '_live', 'sk__live', '', 'sk-live']) {
     await assert.rejects(
       createApiKey({ store, prefix: bad, userId: 'u', scopes: ['read'] }),
-      err => err instanceof ApiKeyError && err.code === ErrorCode.INVALID_ARGUMENT,
+      err => err instanceof ApiKeyError && err.code === ErrorCode.INVALID_PREFIX,
       `prefix=${JSON.stringify(bad)}`,
     );
   }
+});
+
+test('verify: expectedPrefix invalid → INVALID_PREFIX at boot, not per-request', async () => {
+  const store = newStore();
+  await assert.rejects(
+    verifyApiKey('sk_live_A_B', { store, expectedPrefix: 'not valid!' }),
+    err => err instanceof ApiKeyError && err.code === ErrorCode.INVALID_PREFIX,
+  );
 });
 
 test('pepper < 16 bytes → INVALID_PEPPER', async () => {

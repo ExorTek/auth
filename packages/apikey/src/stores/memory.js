@@ -55,7 +55,10 @@ export function memoryStore() {
       if (!isObject(record) || !isString(record.id)) {
         throw invalidArgument('memoryStore.put.record.id must be a string');
       }
-      byId.set(record.id, record);
+      // Store a shallow copy so a caller mutating the record they
+      // passed in doesn't retroactively mutate what we've stored —
+      // matches the copy-on-read contract of getById / update.
+      byId.set(record.id, { ...record });
       indexUser(record.userId, record.id);
     },
 

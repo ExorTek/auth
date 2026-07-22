@@ -19,6 +19,12 @@ import {
 
 import { ApiKeyError, ErrorCode } from './errors.js';
 import { invalidArgument } from './internal/guards.js';
+
+/** Prefix-specific factory so `assertPrefix` throws `INVALID_PREFIX`,
+ *  not the generic `INVALID_ARGUMENT`. Callers can `catch (err)` and
+ *  branch on `err.code === ErrorCode.INVALID_PREFIX` — a specific
+ *  code beats a generic one for pinpointing config drift. */
+const invalidPrefix = msg => new ApiKeyError(ErrorCode.INVALID_PREFIX, msg);
 import { hasAll } from './scopes.js';
 import {
   assertPrefix,
@@ -128,7 +134,7 @@ export async function createApiKey(options) {
   if (!isObject(options)) {
     throw invalidArgument('createApiKey.options must be an object');
   }
-  const prefix = assertPrefix(options.prefix, 'createApiKey.options.prefix', invalidArgument);
+  const prefix = assertPrefix(options.prefix, 'createApiKey.options.prefix', invalidPrefix);
   const userId = _requireString(options.userId, 'createApiKey.options.userId');
   const scopes = _requireStringArray(options.scopes, 'createApiKey.options.scopes');
   _assertStore(options.store, 'createApiKey.options.store');
@@ -215,7 +221,7 @@ export async function verifyApiKey(rawKey, options) {
     throw invalidArgument('verifyApiKey.options.requiredScopes must be a string[] when provided');
   }
   if (!isUndefined(options.expectedPrefix)) {
-    assertPrefix(options.expectedPrefix, 'verifyApiKey.options.expectedPrefix', invalidArgument);
+    assertPrefix(options.expectedPrefix, 'verifyApiKey.options.expectedPrefix', invalidPrefix);
   }
 
   const parsed = parseKey(rawKey);
