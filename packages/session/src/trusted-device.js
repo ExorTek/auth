@@ -26,10 +26,7 @@ import { parseDuration } from './internal/duration.js';
 export function createTrustedDeviceCookie(config) {
   assertObject(config, 'createTrustedDeviceCookie.config');
   const secret = isArray(config.secret) ? config.secret : [config.secret];
-  if (
-    secret.length === 0 ||
-    secret.some(s => !isString(s) && !isBytes(s))
-  ) {
+  if (secret.length === 0 || secret.some(s => !isString(s) && !isBytes(s))) {
     throw invalidArgument(
       'createTrustedDeviceCookie.config.secret must be a non-empty string / Buffer / Uint8Array (or an array of those)',
     );
@@ -90,8 +87,7 @@ export function createTrustedDeviceCookie(config) {
       if (!headers) {
         return false;
       }
-      const cookieHeader =
-        isFunction(headers.get) ? headers.get('cookie') : (headers.cookie ?? headers.Cookie);
+      const cookieHeader = isFunction(headers.get) ? headers.get('cookie') : (headers.cookie ?? headers.Cookie);
       if (!cookieHeader) {
         return false;
       }

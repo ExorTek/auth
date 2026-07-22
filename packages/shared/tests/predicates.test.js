@@ -76,10 +76,22 @@ describe('isNonEmptyString', () => {
 
 describe('isFunction', () => {
   test('functions of every flavour pass', () => {
-    assert.equal(isFunction(() => {}), true);
-    assert.equal(isFunction(function () {}), true);
-    assert.equal(isFunction(async () => {}), true);
-    assert.equal(isFunction(function* () {}), true);
+    assert.equal(
+      isFunction(() => {}),
+      true,
+    );
+    assert.equal(
+      isFunction(function () {}),
+      true,
+    );
+    assert.equal(
+      isFunction(async () => {}),
+      true,
+    );
+    assert.equal(
+      isFunction(function* () {}),
+      true,
+    );
     assert.equal(isFunction(class Foo {}), true);
     assert.equal(isFunction(Math.max), true);
   });

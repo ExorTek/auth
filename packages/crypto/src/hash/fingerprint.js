@@ -1,4 +1,13 @@
-import { isArray, isBigInt, isBoolean, isBytes, isFunction, isString, isSymbol, isUndefined } from '@exortek/shared/predicates';
+import {
+  isArray,
+  isBigInt,
+  isBoolean,
+  isBytes,
+  isFunction,
+  isString,
+  isSymbol,
+  isUndefined,
+} from '@exortek/shared/predicates';
 
 import { invalidArgument } from '../internal/guards.js';
 import { hash } from './hash.js';

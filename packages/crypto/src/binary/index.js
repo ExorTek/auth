@@ -40,9 +40,7 @@ export function xor(a, b) {
   const bufA = toBuffer(a, 'a');
   const bufB = toBuffer(b, 'b');
   if (bufA.length !== bufB.length) {
-    throw invalidArgument(
-      `xor operands must have equal length; got a=${bufA.length} bytes, b=${bufB.length} bytes`,
-    );
+    throw invalidArgument(`xor operands must have equal length; got a=${bufA.length} bytes, b=${bufB.length} bytes`);
   }
   const out = Buffer.allocUnsafe(bufA.length);
   for (let i = 0; i < bufA.length; i++) {
