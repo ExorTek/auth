@@ -306,7 +306,10 @@ export async function verifyChallenge(token, options) {
     const ttlMs = Math.max(1, payload.exp * 1000 - now);
     let count;
     try {
-      const res = await options.store.incr(`chall:${payload.jti}`, ttlMs);
+      // Namespace lives in the store's own keyPrefix (redisStore defaults
+      // to 'chall:'). verifyChallenge passes the raw jti so a store shared
+      // with other purposes can prefix once — no double 'chall:chall:'.
+      const res = await options.store.incr(payload.jti, ttlMs);
       count = res?.count;
     } catch {
       return { valid: false, reason: 'store_unavailable' };

@@ -185,7 +185,7 @@ Consider the trust boundary: mobile users on cellular networks change IPs freque
 
 `@exortek/challenge/stores` ships two thin implementations:
 
-- **`memoryStore(options?)`** — in-process Map with LRU eviction (`maxKeys`, default 10,000) and a background TTL sweep (`sweepMs`, default 60,000). Not cluster-safe: multi-worker deploys will double-consume. Fine for dev, single-node prod, sticky-session behind an LB, tests.
+- **`memoryStore(options?)`** — in-process Map with true LRU eviction (`maxKeys`, default 10,000; every `incr` refreshes the entry's position so a hot replay-guard tombstone can't be evicted before its TTL) and a background TTL sweep (`sweepMs`, default 60,000). Not cluster-safe: multi-worker deploys will double-consume. Fine for dev, single-node prod, sticky-session behind an LB, tests.
 - **`redisStore(client, options?)`** — one Lua round-trip per verify (`INCR` + conditional `PEXPIRE`). Works with `ioredis`, `node-redis@4+`, `@upstash/redis`. `options.keyPrefix` defaults to `'chall:'`.
 
 Both expose `incr(key, ttlMs)` and nothing else — the surface is intentionally tiny.

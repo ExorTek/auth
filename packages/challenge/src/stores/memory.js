@@ -8,10 +8,22 @@
  * exposing `incr(key, ttlMs) → { count }` (e.g.
  * `@exortek/security`'s rate-limit stores).
  *
+ * Eviction: true LRU (least-recently-used). Every `incr` on an existing
+ * key re-inserts it so it becomes the newest entry;
+ * `map.keys().next().value` is then the least-recently-touched key and
+ * is dropped when `maxKeys` is exceeded. This matters for the
+ * replay-guard tombstone: a repeated verify attempt refreshes the
+ * `count > 1` entry so it stays authoritative until its TTL expires.
+ * FIFO would let an idle tombstone age out prematurely and a third
+ * replay attempt could see a fresh counter.
+ *
+ * Textbook pattern, popularised in the JS community by projects like
+ * `toad-cache` (MIT); no code copied, only the same ES2015
+ * iteration-order guarantee.
+ *
  * Expired entries are pruned lazily on read, plus a `setInterval` sweep
- * (unref'd so it never blocks process exit). A `maxKeys` cap protects
- * against unbounded growth if the caller forgets to clean up — the
- * oldest-inserted entry is dropped when the cap is exceeded.
+ * (unref'd so it never blocks process exit). The `maxKeys` cap
+ * protects against unbounded growth if the caller forgets to clean up.
  */
 
 import { isFunction, isInteger, isUndefined } from '@exortek/shared/predicates';
@@ -90,6 +102,11 @@ export function memoryStore(options = {}) {
       const existing = peekFresh(key);
       if (existing) {
         existing.count += 1;
+        // Refresh LRU position on activity — the replay-guard tombstone
+        // must stay warm until its TTL fires, or a third replay attempt
+        // could see the entry evicted and get a fresh count.
+        map.delete(key);
+        map.set(key, existing);
         return { count: existing.count, expiresAt: existing.expiresAt };
       }
       evictIfFull();

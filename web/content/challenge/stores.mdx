@@ -15,7 +15,9 @@ stores fit exactly.
 
 ## `memoryStore(options?)`
 
-In-process Map with LRU eviction and a background TTL sweep.
+In-process Map with true LRU eviction (position refreshed on every
+`incr` — the replay-guard tombstone stays warm until its TTL expires)
+and a background TTL sweep.
 
 ```js
 import { memoryStore } from '@exortek/challenge/stores';
