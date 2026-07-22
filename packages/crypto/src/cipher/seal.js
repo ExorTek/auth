@@ -3,7 +3,7 @@ import { CryptoError, ErrorCode } from '../errors.js';
 import { assertBytesOrString, assertOptionalObject, invalidArgument } from '../internal/guards.js';
 import { hkdf } from '../hash/hkdf.js';
 import { toBuffer } from '../internal/bytes.js';
-import { isBoolean, isObject, isString, isUndefined } from '@exortek/shared/predicates';
+import { isArray, isBoolean, isBuffer, isObject, isString, isUndefined } from '@exortek/shared/predicates';
 
 const VERSION = 0x01;
 const IV_LEN = 12;
@@ -158,7 +158,7 @@ export function unseal(token, secret, options) {
       `token must be a string (base64url from seal()); got ${_describe(token)}`,
     );
   }
-  const secrets = Array.isArray(secret) ? secret : [secret];
+  const secrets = isArray(secret) ? secret : [secret];
   if (secrets.length === 0) {
     throw invalidArgument('secret list is empty — pass at least one key (or an array of keys for rotation)');
   }
@@ -266,7 +266,7 @@ function _describe(v) {
   if (typeof v === 'number' || isBoolean(v)) {
     return `${typeof v} ${v}`;
   }
-  if (Buffer.isBuffer(v)) {
+  if (isBuffer(v)) {
     return `Buffer of length ${v.length}`;
   }
   if (v instanceof Uint8Array) {

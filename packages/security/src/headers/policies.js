@@ -219,7 +219,7 @@ export function buildPermissionsPolicy(options) {
   }
   const parts = [];
   for (const [feature, allowlist] of Object.entries(features)) {
-    if (!Array.isArray(allowlist)) {
+    if (!isArray(allowlist)) {
       throw new SecurityError(
         ErrorCode.INVALID_ARGUMENT,
         `permissionsPolicy feature '${feature}' allowlist must be an array; got ${typeof allowlist}`,

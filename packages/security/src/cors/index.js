@@ -87,7 +87,7 @@ function compileOriginCheck(origin) {
   if (isFunction(origin)) {
     return origin;
   }
-  const matchers = Array.isArray(origin) ? origin : [origin];
+  const matchers = isArray(origin) ? origin : [origin];
   return incoming => {
     if (!incoming) {
       return false;

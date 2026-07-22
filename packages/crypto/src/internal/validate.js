@@ -1,5 +1,5 @@
 import { CryptoError, ErrorCode } from '../errors.js';
-import { isFunction, isObject, isString } from '@exortek/shared/predicates';
+import { isBytes, isFunction, isObject, isString } from '@exortek/shared/predicates';
 
 /**
  * @typedef {import('node:crypto').KeyObject} KeyObject
@@ -25,7 +25,7 @@ function _describeKeyProblem(key) {
   if (isObject(key) && isFunction(key.then)) {
     return `got a Promise — did you forget "await"? e.g. const key = await cipher.generateKey()`;
   }
-  if (Buffer.isBuffer(key) || key instanceof Uint8Array) {
+  if (isBytes(key)) {
     return `got raw bytes — wrap with crypto.createSecretKey(buf) first, or use cipher.encryptWithPassphrase`;
   }
   if (isObject(key) && !isString(key.type)) {

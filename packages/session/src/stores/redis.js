@@ -197,10 +197,10 @@ export function redisStore(client, options = {}) {
   }
 
   async function smembers(uid) {
-    if (typeof client.smembers === 'function') {
+    if (isFunction(client.smembers)) {
       return client.smembers(userKey(uid));
     }
-    if (typeof client.sMembers === 'function') {
+    if (isFunction(client.sMembers)) {
       return client.sMembers(userKey(uid));
     }
     return [];

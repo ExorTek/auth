@@ -14,6 +14,8 @@
  */
 
 import { parseDuration as sharedParseDuration } from '@exortek/shared/duration';
+import { isString } from '@exortek/shared/predicates';
+
 import { invalidArgument } from './guards.js';
 
 const BARE_NUMBER_RE = /^\s*-?\d+(?:\.\d+)?\s*$/;
@@ -35,7 +37,7 @@ export function parseDuration(input, name = 'duration') {
     }
     return input * 1000;
   }
-  if (typeof input === 'string') {
+  if (isString(input)) {
     // Bare-numeric strings are ambiguous with the numeric branch above
     // (`900` → 900s here, but `'900'` → 900ms if it fell through to
     // the shared parser). Force the caller to commit to one form.

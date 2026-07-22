@@ -315,7 +315,7 @@ async function _resolveJti(spec) {
   if (spec === true) {
     return randomBytes(16).toString('hex');
   }
-  if (typeof spec === 'function') {
+  if (isFunction(spec)) {
     const generated = await /** @type {() => string | Promise<string>} */ (spec)();
     if (typeof generated !== 'string' || generated.length === 0) {
       throw new JwtError(ErrorCode.INVALID_PAYLOAD, 'sign: jwtId function must return a non-empty string');

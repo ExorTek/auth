@@ -1,4 +1,4 @@
-import { isBigInt, isBoolean, isFunction, isString, isSymbol, isUndefined } from '@exortek/shared/predicates';
+import { isArray, isBigInt, isBoolean, isBytes, isFunction, isString, isSymbol, isUndefined } from '@exortek/shared/predicates';
 
 import { invalidArgument } from '../internal/guards.js';
 import { hash } from './hash.js';
@@ -88,13 +88,13 @@ function _canonicalize(value, seen, path) {
   seen.add(value);
   // Reject bytes before .toJSON — Buffer's .toJSON returns `{ type, data: [...] }`
   // which would silently produce a stable but surprising fingerprint.
-  if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
+  if (isBytes(value)) {
     throw invalidArgument(`${path} is a Buffer/Uint8Array; encode as base64/hex first for a stable fingerprint`);
   }
   if (isFunction(value.toJSON)) {
     return _canonicalize(value.toJSON(path), seen, path);
   }
-  if (Array.isArray(value)) {
+  if (isArray(value)) {
     let out = '[';
     for (let i = 0; i < value.length; i++) {
       if (i > 0) {
