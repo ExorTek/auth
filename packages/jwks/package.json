@@ -1,0 +1,78 @@
+{
+  "name": "@exortek/jwks",
+  "version": "0.0.0",
+  "description": "JSON Web Key Set (JWKS) for Node.js — local key set management with zero-downtime rotation, remote JWKS URI fetching with kid-miss refetch, Express/Fastify handler for /.well-known/jwks.json. Zero non-@exortek runtime dependencies.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./local": {
+      "types": "./dist/local.d.ts",
+      "import": "./dist/local.mjs",
+      "require": "./dist/local.cjs"
+    },
+    "./remote": {
+      "types": "./dist/remote.d.ts",
+      "import": "./dist/remote.mjs",
+      "require": "./dist/remote.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "prepack": "cp ../../LICENSE ./LICENSE"
+  },
+  "keywords": [
+    "backend",
+    "security",
+    "jwks",
+    "jose",
+    "rfc-7517",
+    "jwk-set",
+    "key-rotation",
+    "kid",
+    "openid",
+    "node-crypto"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/jwks#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git",
+    "directory": "packages/jwks"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@exortek/jwk": "workspace:^"
+  },
+  "devDependencies": {
+    "@exortek/shared": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
