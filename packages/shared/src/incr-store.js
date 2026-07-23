@@ -26,7 +26,11 @@ import { assertRedisClient } from './redis-guard.js';
  * @returns {{ incr: (key: string, ttlMs: number) => Promise<{ count: number, expiresAt: number }>, _size: () => number, _stop: () => void }}
  */
 export function createMemoryIncrStore(options = {}, wrap) {
-  const fail = wrap ?? (msg => { throw new TypeError(msg); });
+  const fail =
+    wrap ??
+    (msg => {
+      throw new TypeError(msg);
+    });
   const maxKeys = options.maxKeys ?? 10_000;
   const sweepMs = options.sweepMs ?? 60_000;
 
@@ -140,7 +144,14 @@ return { count, pttl }
  * @returns {{ incr: (key: string, ttlMs: number) => Promise<{ count: number, expiresAt: number }> }}
  */
 export function createRedisIncrStore(client, options = {}, wrap) {
-  assertRedisClient(client, ['eval'], wrap ?? (msg => { throw new TypeError(msg); }));
+  assertRedisClient(
+    client,
+    ['eval'],
+    wrap ??
+      (msg => {
+        throw new TypeError(msg);
+      }),
+  );
   const keyPrefix = options.keyPrefix ?? '';
   const k = key => `${keyPrefix}${key}`;
 

@@ -65,7 +65,9 @@ describe('createMemoryIncrStore', () => {
   });
 
   test('custom wrap callback is used for validation errors', () => {
-    const wrap = msg => { throw new RangeError(`CUSTOM: ${msg}`); };
+    const wrap = msg => {
+      throw new RangeError(`CUSTOM: ${msg}`);
+    };
     assert.throws(() => createMemoryIncrStore({ maxKeys: 0 }, wrap), /CUSTOM:/);
   });
 
@@ -79,10 +81,7 @@ describe('createMemoryIncrStore', () => {
 
 describe('createRedisIncrStore', () => {
   test('rejects a client without eval', () => {
-    assert.throws(
-      () => createRedisIncrStore({ get: () => {} }),
-      /eval/,
-    );
+    assert.throws(() => createRedisIncrStore({ get: () => {} }), /eval/);
   });
 
   test('incr calls eval with the Lua script and returns parsed result', async () => {
@@ -136,10 +135,9 @@ describe('createRedisIncrStore', () => {
   });
 
   test('custom wrap callback for client validation', () => {
-    const wrap = msg => { throw new RangeError(`CUSTOM: ${msg}`); };
-    assert.throws(
-      () => createRedisIncrStore({}, {}, wrap),
-      /CUSTOM:/,
-    );
+    const wrap = msg => {
+      throw new RangeError(`CUSTOM: ${msg}`);
+    };
+    assert.throws(() => createRedisIncrStore({}, {}, wrap), /CUSTOM:/);
   });
 });

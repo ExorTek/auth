@@ -105,9 +105,15 @@ function createFakeRedisClient() {
   const data = new Map();
   const sets = new Map();
   return {
-    async get(key) { return data.get(key) ?? null; },
-    async set(key, value) { data.set(key, value); },
-    async del(key) { data.delete(key); },
+    async get(key) {
+      return data.get(key) ?? null;
+    },
+    async set(key, value) {
+      data.set(key, value);
+    },
+    async del(key) {
+      data.delete(key);
+    },
     async sadd(key, member) {
       if (!sets.has(key)) sets.set(key, new Set());
       sets.get(key).add(member);
@@ -116,8 +122,12 @@ function createFakeRedisClient() {
       const s = sets.get(key);
       if (s) s.delete(member);
     },
-    async smembers(key) { return [...(sets.get(key) ?? [])]; },
-    async mget(...keys) { return keys.map(k => data.get(k) ?? null); },
+    async smembers(key) {
+      return [...(sets.get(key) ?? [])];
+    },
+    async mget(...keys) {
+      return keys.map(k => data.get(k) ?? null);
+    },
     _data: data,
     _sets: sets,
   };
@@ -127,7 +137,9 @@ describe('createRedisRecordStore', () => {
   test('put + getById without tombstones', async () => {
     const client = createFakeRedisClient();
     const store = createRedisRecordStore(client, {
-      idField: 'id', indexField: 'userId', keyPrefix: 'ak:',
+      idField: 'id',
+      indexField: 'userId',
+      keyPrefix: 'ak:',
     });
     await store.put({ id: 'k1', userId: 'u1', name: 'Test' });
     const got = await store.getById('k1');
@@ -139,7 +151,9 @@ describe('createRedisRecordStore', () => {
   test('put + getById with tombstones', async () => {
     const client = createFakeRedisClient();
     const store = createRedisRecordStore(client, {
-      idField: 'id', indexField: 'userId', keyPrefix: 'ak:',
+      idField: 'id',
+      indexField: 'userId',
+      keyPrefix: 'ak:',
       tombstones: true,
       applyTombstone(record, tomb) {
         record.revokedAt = tomb.at;
@@ -159,7 +173,9 @@ describe('createRedisRecordStore', () => {
   test('update: merges patch', async () => {
     const client = createFakeRedisClient();
     const store = createRedisRecordStore(client, {
-      idField: 'id', indexField: 'userId', keyPrefix: 'p:',
+      idField: 'id',
+      indexField: 'userId',
+      keyPrefix: 'p:',
     });
     await store.put({ id: 'k1', userId: 'u1', name: 'Old' });
     const updated = await store.update('k1', { name: 'New' });
@@ -169,7 +185,9 @@ describe('createRedisRecordStore', () => {
   test('update: re-indexes when indexField changes', async () => {
     const client = createFakeRedisClient();
     const store = createRedisRecordStore(client, {
-      idField: 'id', indexField: 'userId', keyPrefix: 'p:',
+      idField: 'id',
+      indexField: 'userId',
+      keyPrefix: 'p:',
     });
     await store.put({ id: 'k1', userId: 'u1' });
     await store.update('k1', { userId: 'u2' });
@@ -180,7 +198,9 @@ describe('createRedisRecordStore', () => {
   test('listByIndex: returns records and prunes dead index entries', async () => {
     const client = createFakeRedisClient();
     const store = createRedisRecordStore(client, {
-      idField: 'id', indexField: 'userId', keyPrefix: 'p:',
+      idField: 'id',
+      indexField: 'userId',
+      keyPrefix: 'p:',
     });
     await store.put({ id: 'k1', userId: 'u1' });
     await store.put({ id: 'k2', userId: 'u1' });
@@ -196,7 +216,9 @@ describe('createRedisRecordStore', () => {
   test('fetchIndexRecords: returns id-record pairs', async () => {
     const client = createFakeRedisClient();
     const store = createRedisRecordStore(client, {
-      idField: 'id', indexField: 'userId', keyPrefix: 'p:',
+      idField: 'id',
+      indexField: 'userId',
+      keyPrefix: 'p:',
     });
     await store.put({ id: 'k1', userId: 'u1' });
     const pairs = await store.fetchIndexRecords('u1');
@@ -208,10 +230,16 @@ describe('createRedisRecordStore', () => {
   test('custom indexPrefix and tombstonePrefix', async () => {
     const client = createFakeRedisClient();
     const store = createRedisRecordStore(client, {
-      idField: 'id', indexField: 'email', keyPrefix: 'ml:',
-      indexPrefix: 'e:', tombstonePrefix: 't:',
+      idField: 'id',
+      indexField: 'email',
+      keyPrefix: 'ml:',
+      indexPrefix: 'e:',
+      tombstonePrefix: 't:',
       tombstones: true,
-      applyTombstone(rec, tomb) { rec.dead = true; return rec; },
+      applyTombstone(rec) {
+        rec.dead = true;
+        return rec;
+      },
     });
     await store.put({ id: 'k1', email: 'a@b.com' });
     assert.deepEqual(await client.smembers('ml:e:a@b.com'), ['k1']);

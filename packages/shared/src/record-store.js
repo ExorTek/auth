@@ -161,7 +161,11 @@ export function createMemoryRecordStore(config) {
  * }}
  */
 export function createRedisRecordStore(client, config) {
-  const wrap = config.wrap ?? (msg => { throw new TypeError(msg); });
+  const wrap =
+    config.wrap ??
+    (msg => {
+      throw new TypeError(msg);
+    });
   assertRedisClient(client, ['get', 'set', 'del'], wrap);
 
   const {

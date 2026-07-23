@@ -58,7 +58,9 @@ return 1
  * @returns {import('../index.js').MagicLinkStore}
  */
 export function redisStore(client, options = {}) {
-  const wrap = msg => { throw invalidArgument(`redisStore.client: ${msg}`); };
+  const wrap = msg => {
+    throw invalidArgument(`redisStore.client: ${msg}`);
+  };
   assertRedisClient(client, ['eval', 'get', 'set', 'del'], wrap);
 
   const keyPrefix = options.keyPrefix ?? 'mlink:';

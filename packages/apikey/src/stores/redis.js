@@ -56,7 +56,9 @@ export function redisStore(client, options = {}) {
       }
       return record;
     },
-    wrap: msg => { throw invalidArgument(msg); },
+    wrap: msg => {
+      throw invalidArgument(msg);
+    },
   });
 
   return {
