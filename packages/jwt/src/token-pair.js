@@ -19,12 +19,9 @@ import { resolveHashFn, resolveEncoding, randomBuffer } from './internal/polymor
 import { createKeyMutex } from './internal/mutex.js';
 import { sign } from './sign.js';
 
-// Per-storeKey mutex serialises concurrent rotate calls for the same
-// refresh token. In-process only — the mutex protects the get→check→
-// add sequence from being interleaved by a second rotate for the same
-// key. Cross-process atomicity (multi-node deployments hitting a
-// shared Redis) is a separate concern and is not covered by this
-// primitive; see the rotate() docstring.
+// Fallback for stores without atomic markUsed — serialises the
+// get→check→add sequence in-process so two concurrent rotate calls
+// for the same key don't both observe usedAt:null.
 const _rotateLock = createKeyMutex();
 
 /**
@@ -120,13 +117,11 @@ export async function create(payload, options) {
  * the entire family (every refresh with the same `familyId`) is
  * revoked and `REFRESH_REUSED` raised.
  *
- * Concurrent rotations of the *same* refresh token are serialised by
- * an in-process per-key mutex so the get→check→add sequence cannot
- * be interleaved — without this guard, two parallel rotates would
- * both observe `usedAt: null` and both succeed, defeating reuse
- * detection. The mutex is in-process only; multi-node deployments
- * sharing a Redis-backed store still need a cross-process primitive
- * (SET NX / WATCH+MULTI / Lua) — that is a documented 1.1 target.
+ * Concurrent rotations of the *same* refresh token are serialised.
+ * Built-in stores (memory + redis) expose an atomic `markUsed()`
+ * that stamps `usedAt` via compare-and-swap (Lua script on Redis),
+ * making this safe across processes. Custom stores without `markUsed`
+ * fall back to the in-process per-key mutex.
  *
  * @param {string} oldRefreshToken
  * @param {RotateOptions} options
@@ -141,24 +136,42 @@ export async function rotate(oldRefreshToken, options) {
   const hashFn = resolveHashFn(refresh);
   const storeKey = await hashFn(oldRefreshToken);
 
-  return _rotateLock.withLock(storeKey, async () => {
-    const record = await refresh.store.get(storeKey);
-    if (!record) {
-      throw new JwtError(
-        ErrorCode.REVOKED,
-        'rotate: refresh token is unknown or already revoked (family may have been invalidated)',
-      );
+  const hasAtomicMarkUsed = isFunction(refresh.store.markUsed);
+
+  const doRotate = async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    let record;
+    let isReplay;
+
+    if (hasAtomicMarkUsed) {
+      const cas = await refresh.store.markUsed(storeKey, nowSec);
+      if (!cas) {
+        throw new JwtError(
+          ErrorCode.REVOKED,
+          'rotate: refresh token is unknown or already revoked (family may have been invalidated)',
+        );
+      }
+      record = cas.record;
+      isReplay = !cas.swapped;
+    } else {
+      record = await refresh.store.get(storeKey);
+      if (!record) {
+        throw new JwtError(
+          ErrorCode.REVOKED,
+          'rotate: refresh token is unknown or already revoked (family may have been invalidated)',
+        );
+      }
+      const meta = record.metadata || {};
+      isReplay = isNumber(meta.usedAt);
+      if (!isReplay) {
+        await refresh.store.add(storeKey, record.expiresAt, { ...meta, usedAt: nowSec });
+      }
     }
 
     const meta = record.metadata || {};
-    const nowSec = Math.floor(Date.now() / 1000);
-    const isReplay = isNumber(meta.usedAt);
 
     if (isReplay) {
       const ageSec = nowSec - meta.usedAt;
-      // reuseWindow=0 (the default) means "no grace at all" — every
-      // second use is reuse. For reuseWindow>0, a replay at exactly
-      // ageSec == graceSec is still inside the window.
       const outsideGrace = graceSec === 0 ? true : ageSec > graceSec;
       if (detectReuse && outsideGrace) {
         if (isString(meta.familyId)) {
@@ -171,22 +184,20 @@ export async function rotate(oldRefreshToken, options) {
           `rotate: refresh token reuse detected (used ${ageSec}s ago, outside ${graceSec}s grace) — family revoked (RFC 6749 §10.4)`,
         );
       }
-      // Inside grace window — treat as a network-race replay. Issue a
-      // fresh pair, but do NOT re-stamp usedAt: re-stamping would slide
-      // the reuse-detection window forward on every replay and let an
-      // attacker keep rotating indefinitely while reuseWindow > 0.
-    } else {
-      // First use — mark the old refresh as consumed but keep it in
-      // the store until its native TTL runs out so a later reuse
-      // attempt can still be detected.
-      await refresh.store.add(storeKey, record.expiresAt, { ...meta, usedAt: nowSec });
     }
 
     const payload = /** @type {Record<string, unknown>} */ (options.payload || meta.payload || {});
     const familyId = isString(meta.familyId) ? meta.familyId : undefined;
 
     return create(payload, { ...options, familyId });
-  });
+  };
+
+  // Stores with atomic markUsed don't need the in-process mutex — the
+  // CAS itself serialises. Legacy/custom stores still rely on it.
+  if (hasAtomicMarkUsed) {
+    return doRotate();
+  }
+  return _rotateLock.withLock(storeKey, doRotate);
 }
 
 /**
