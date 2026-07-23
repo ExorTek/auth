@@ -1,5 +1,6 @@
+import { isArray, isString } from '@exortek/shared/predicates';
 import { assertRedisClient } from '@exortek/shared/redis-guard';
-import { isArray, isFunction, isString } from '@exortek/shared/predicates';
+import { createRedisHelpers } from '@exortek/shared/redis-helpers';
 
 import { invalidArgument } from '../internal/guards.js';
 
@@ -64,54 +65,14 @@ export function redisStore(client, options = {}) {
   const revKey = sid => `${keyPrefix}rev:${sid}`;
   const userKey = uid => `${keyPrefix}u:${uid}`;
 
-  async function setKey(key, value, ttlMs) {
-    const px = Math.max(1, Math.ceil(ttlMs));
-    // ioredis uses `set(key, value, 'PX', ms)`; node-redis v4+ uses
-    // `set(key, value, { PX: ms })`. Try the string-args form first
-    // (works on both — node-redis's compatibility layer accepts it) and
-    // fall through to the options-object form.
-    try {
-      await client.set(key, value, 'PX', px);
-    } catch {
-      await client.set(key, value, { PX: px });
-    }
-  }
-
-  /**
-   * Batch-GET. Uses the client's MGET when available (ioredis `mget`,
-   * node-redis `mGet`, Upstash `mget`), otherwise falls back to
-   * parallel single GETs.
-   */
-  async function mget(keys) {
-    if (keys.length === 0) {
-      return [];
-    }
-    if (isFunction(client.mget)) {
-      return client.mget(...keys);
-    }
-    if (isFunction(client.mGet)) {
-      return client.mGet(keys);
-    }
-    return Promise.all(keys.map(k => client.get(k)));
-  }
-
-  function parseRecord(raw) {
-    if (!raw) {
-      return null;
-    }
-    try {
-      return isString(raw) ? JSON.parse(raw) : raw;
-    } catch {
-      return null;
-    }
-  }
+  const helpers = createRedisHelpers(client);
 
   function applyTombstone(record, rawTombstone) {
     if (!record || !rawTombstone) {
       return record;
     }
     record.revoked = true;
-    const tomb = parseRecord(rawTombstone);
+    const tomb = helpers.parseRecord(rawTombstone);
     if (tomb && isString(tomb.reason) && record.revokedReason === undefined) {
       record.revokedReason = tomb.reason;
     }
@@ -119,22 +80,17 @@ export function redisStore(client, options = {}) {
   }
 
   async function readRecord(sid) {
-    const [rawRecord, rawTombstone] = await mget([sidKey(sid), revKey(sid)]);
-    const record = parseRecord(rawRecord);
+    const [rawRecord, rawTombstone] = await helpers.mget([sidKey(sid), revKey(sid)]);
+    const record = helpers.parseRecord(rawRecord);
     return record ? applyTombstone(record, rawTombstone) : null;
   }
 
   async function writeRecord(record, ttlMs) {
-    await setKey(sidKey(record.sid), JSON.stringify(record), ttlMs);
+    await helpers.setWithTTL(sidKey(record.sid), JSON.stringify(record), ttlMs);
   }
 
-  /**
-   * Write the revocation tombstone — the authoritative revocation
-   * marker. Lives exactly as long as the record could still verify, so
-   * it expires together with the session itself.
-   */
   async function writeTombstone(sid, reason, ttlMs) {
-    await setKey(revKey(sid), JSON.stringify({ reason: reason ?? null, at: Date.now() }), ttlMs);
+    await helpers.setWithTTL(revKey(sid), JSON.stringify({ reason: reason ?? null, at: Date.now() }), ttlMs);
   }
 
   /**
@@ -156,9 +112,6 @@ export function redisStore(client, options = {}) {
       if (applied === 1 || applied === true) {
         return;
       }
-      // GT returned 0: the key either has a longer TTL already (fine) or
-      // has NO TTL at all — Redis treats a persistent key as infinite,
-      // so GT never stamps it. Stamp the fresh index unconditionally.
       if (pttl && (await pttl(key)) === -1) {
         await pexpire(key, px);
       }
@@ -176,34 +129,13 @@ export function redisStore(client, options = {}) {
     }
   }
 
-  async function sadd(uid, sid, ttlMs) {
-    if (isFunction(client.sadd)) {
-      await client.sadd(userKey(uid), sid);
-    } else if (isFunction(client.sAdd)) {
-      // node-redis v4 uses camelCase
-      await client.sAdd(userKey(uid), sid);
-    } else {
-      return;
-    }
+  async function indexAdd(uid, sid, ttlMs) {
+    await helpers.sadd(userKey(uid), sid);
     await bumpIndexTtl(uid, ttlMs);
   }
 
-  async function srem(uid, sid) {
-    if (isFunction(client.srem)) {
-      await client.srem(userKey(uid), sid);
-    } else if (isFunction(client.sRem)) {
-      await client.sRem(userKey(uid), sid);
-    }
-  }
-
-  async function smembers(uid) {
-    if (isFunction(client.smembers)) {
-      return client.smembers(userKey(uid));
-    }
-    if (isFunction(client.sMembers)) {
-      return client.sMembers(userKey(uid));
-    }
-    return [];
+  async function indexRemove(uid, sid) {
+    await helpers.srem(userKey(uid), sid);
   }
 
   async function publish(sid, reason) {
@@ -217,24 +149,18 @@ export function redisStore(client, options = {}) {
     }
   }
 
-  /**
-   * Fetch every record for `uid` in one round-trip (records + tombstones
-   * via a single MGET), overlay tombstones, prune dead index entries.
-   * Returns `[sid, record|null]` pairs.
-   */
   async function fetchUserRecords(uid) {
-    const sids = await smembers(uid);
+    const sids = await helpers.smembers(userKey(uid));
     if (!isArray(sids) || sids.length === 0) {
       return [];
     }
-    const raw = await mget([...sids.map(sidKey), ...sids.map(revKey)]);
+    const raw = await helpers.mget([...sids.map(sidKey), ...sids.map(revKey)]);
     const out = [];
     const pruneOps = [];
     for (let i = 0; i < sids.length; i++) {
-      const record = parseRecord(raw[i]);
+      const record = helpers.parseRecord(raw[i]);
       if (!record) {
-        // Prune dead reference — key expired but the set kept the sid.
-        pruneOps.push(srem(uid, sids[i]));
+        pruneOps.push(indexRemove(uid, sids[i]));
         out.push([sids[i], null]);
         continue;
       }
@@ -246,9 +172,6 @@ export function redisStore(client, options = {}) {
 
   async function revokeRecord(record, reason) {
     const ttlMs = Math.max(1, record.expiresAt - Date.now());
-    // Tombstone FIRST — it is the authoritative marker. Even if the
-    // record write below loses a race against a concurrent update(),
-    // get() re-applies the tombstone and the session stays dead.
     await writeTombstone(record.sid, reason, ttlMs);
     record.revoked = true;
     if (reason) {
@@ -272,7 +195,7 @@ export function redisStore(client, options = {}) {
       const ttlMs = Math.max(1, record.expiresAt - Date.now());
       await writeRecord(record, ttlMs);
       if (record.uid != null) {
-        await sadd(record.uid, record.sid, ttlMs);
+        await indexAdd(record.uid, record.sid, ttlMs);
       }
     },
 
@@ -285,10 +208,10 @@ export function redisStore(client, options = {}) {
       const ttlMs = Math.max(1, next.expiresAt - Date.now());
       if (patch.uid !== undefined && patch.uid !== existing.uid) {
         if (existing.uid != null) {
-          await srem(existing.uid, sid);
+          await indexRemove(existing.uid, sid);
         }
         if (next.uid != null) {
-          await sadd(next.uid, sid, ttlMs);
+          await indexAdd(next.uid, sid, ttlMs);
         }
       }
       await writeRecord(next, ttlMs);
