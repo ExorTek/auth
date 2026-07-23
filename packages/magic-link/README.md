@@ -38,7 +38,7 @@ Default prefix `mlink_v1`. Payload is intentionally minimal:
 - `iat` / `exp` — seconds since epoch.
 - `eh`  — `SHA-256(secret ‖ email)` when `hashEmail: true` (default).
 
-The email never appears in the URL — only in the store. `redirectTo` (if any) also stays in the store, so it cannot be tampered with by editing the link.
+The email never appears in the URL — only in the store. `redirectTo` (if any) also stays in the store, so it cannot be tampered with by editing the link. If your `/request-magic-link` endpoint accepts `redirectTo` from user input, validate it before passing it to `createMagicLink` — treat it like any redirect target (e.g. with `@exortek/security`'s `safeRedirect`).
 
 ## Quick start
 
