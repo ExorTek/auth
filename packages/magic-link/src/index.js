@@ -9,15 +9,7 @@
  */
 
 import { parseDuration } from '@exortek/shared/duration';
-import {
-  isBytes,
-  isBuffer,
-  isFunction,
-  isNumber,
-  isObject,
-  isString,
-  isUndefined,
-} from '@exortek/shared/predicates';
+import { isBytes, isBuffer, isFunction, isNumber, isObject, isString, isUndefined } from '@exortek/shared/predicates';
 
 import { MagicLinkError, ErrorCode } from './errors.js';
 import { invalidArgument } from './internal/guards.js';
@@ -193,8 +185,12 @@ export async function createMagicLink(options) {
     createdAt: now,
     expiresAt: now + ttlMs,
   };
-  if (!isUndefined(options.redirectTo)) {record.redirectTo = options.redirectTo;}
-  if (!isUndefined(options.metadata)) {record.metadata = { ...options.metadata };}
+  if (!isUndefined(options.redirectTo)) {
+    record.redirectTo = options.redirectTo;
+  }
+  if (!isUndefined(options.metadata)) {
+    record.metadata = { ...options.metadata };
+  }
 
   try {
     await options.store.put(record);
@@ -293,8 +289,12 @@ export async function verifyMagicLink(token, options) {
 
   /** @type {VerifyMagicLinkResult} */
   const result = { valid: true, id: record.id, email: record.email };
-  if (record.redirectTo) {result.redirectTo = record.redirectTo;}
-  if (record.metadata) {result.metadata = record.metadata;}
+  if (record.redirectTo) {
+    result.redirectTo = record.redirectTo;
+  }
+  if (record.metadata) {
+    result.metadata = record.metadata;
+  }
   return result;
 }
 
@@ -417,7 +417,9 @@ async function _applyRateLimit(config, email, store, name) {
   }
   const windowMs = _requireDuration(config.window, `${name}.window`);
   if (!isFunction(store.incrRate)) {
-    throw invalidArgument('createMagicLink.options.store must implement incrRate(email, ttlMs) when maxPerEmail is set');
+    throw invalidArgument(
+      'createMagicLink.options.store must implement incrRate(email, ttlMs) when maxPerEmail is set',
+    );
   }
   const res = await store.incrRate(email, windowMs);
   if (!isObject(res) || !isNumber(res.count)) {
@@ -433,6 +435,8 @@ async function _applyRateLimit(config, email, store, name) {
 }
 
 function _appendTokenParam(baseUrl, token) {
-  const sep = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${sep}token=${encodeURIComponent(token)}`;
+  const hashIdx = baseUrl.indexOf('#');
+  const base = hashIdx === -1 ? baseUrl : baseUrl.slice(0, hashIdx);
+  const sep = base.includes('?') ? '&' : '?';
+  return `${base}${sep}token=${encodeURIComponent(token)}`;
 }
