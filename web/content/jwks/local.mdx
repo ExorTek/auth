@@ -1,0 +1,116 @@
+---
+title: 'local — key set management'
+sidebarTitle: 'local — key set management'
+---
+
+# `createLocalKeySet`
+
+```js
+import { createLocalKeySet } from '@exortek/jwks/local';
+```
+
+Create and manage a local JWK Set for signing, with zero-downtime rotation and a ready-made
+HTTP handler for `/.well-known/jwks.json`.
+
+## `createLocalKeySet(specs, options?)`
+
+```ts
+createLocalKeySet(
+  specs: KeySpec[],
+  options?: { gracePeriod?: string | number },
+): Promise<LocalKeySet>
+```
+
+**`specs`** — one or more key specifications:
+
+| Field | Type | Description |
+|---|---|---|
+| `alg` | `string` | Algorithm identifier (required) |
+| `kid` | `string?` | Explicit kid — auto-generated if omitted |
+| `use` | `string?` | JWK `use` parameter (default `'sig'`) |
+| `curve` | `string?` | EC/OKP curve override |
+| `modulusLength` | `number?` | RSA modulus length (default 2048) |
+
+**`options.gracePeriod`** — how long a rotated key stays in the set for verification (default `'24h'`).
+Accepts a duration string (`'1h'`, `'30m'`) or milliseconds.
+
+Supported algorithms: `ES256`, `ES384`, `ES512`, `RS256`, `RS384`, `RS512`, `PS256`, `PS384`,
+`PS512`, `EdDSA`.
+
+## LocalKeySet API
+
+### `toJSON()`
+
+Returns the public JWK Set document `{ keys: [...] }`. Private key material (`d`, `p`, `q`, etc.)
+is never included. Includes retired keys still within the grace period.
+
+### `getSigningKey(alg?)`
+
+Returns the most recently added non-retired key entry matching `alg`, or `null`. Without `alg`,
+returns the newest active key.
+
+### `kids` / `size`
+
+All kid values (active + grace-period retired) and their count. Both sweep expired retired keys
+on access.
+
+### `rotate(options)`
+
+```ts
+rotate({
+  alg: string,
+  kid?: string,
+  curve?: string,
+  modulusLength?: number,
+}): Promise<KeyEntry>
+```
+
+Retires all active keys for the given algorithm and generates a fresh replacement. The retired
+keys stay in `toJSON()` and `resolve()` during the grace period.
+
+### `addKey(privateJwk)`
+
+Import an existing key pair. The JWK must have `kid` and `alg` properties. Throws on duplicate
+`kid`.
+
+### `handler(options?)`
+
+```ts
+handler({
+  cacheControl?: string,  // default 'public, max-age=300'
+}): (req, res) => void
+```
+
+Returns an HTTP handler using the Node.js `http.ServerResponse` API (`writeHead` + `end`).
+Works on raw Node, Express, and Fastify.
+
+### `resolve(header)`
+
+```ts
+resolve({
+  kid: string,
+  alg?: string,
+}): Promise<KeyObject>
+```
+
+Resolver function compatible with `jwt.verify(token, resolver)`. Looks up by `kid`, validates
+`alg` if provided. Throws `JwksError` with `KID_NOT_FOUND` on miss or alg mismatch.
+
+## Example — full rotation flow
+
+```js
+const ks = await createLocalKeySet([{ alg: 'ES256' }]);
+
+// Sign tokens with the active key
+const sigKey = ks.getSigningKey('ES256');
+const token = await sign({ sub: 'usr_123' }, sigKey.privateJwk, {
+  kid: sigKey.kid,
+  alg: sigKey.alg,
+});
+
+// Later — rotate (old key verifies for 24h)
+const newKey = await ks.rotate({ alg: 'ES256' });
+
+// The JWKS endpoint now serves both keys
+app.get('/.well-known/jwks.json', ks.handler());
+```

@@ -11,5 +11,6 @@ export default {
   challenge: '@exortek/challenge',
   apikey: '@exortek/apikey',
   'magic-link': '@exortek/magic-link',
+  jwks: '@exortek/jwks',
   compliance: 'Compliance',
 };

@@ -1,0 +1,118 @@
+---
+title: '@exortek/jwks — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/jwks`
+
+JSON Web Key Set for Node.js 22+ — **RFC 7517 §5** (JWK Set). Zero non-`@exortek/*`
+runtime dependencies. Built on `node:crypto` and `@exortek/jwk`.
+
+Two complementary halves:
+
+- **Local key set** — generate keys, sign, rotate with grace period, serve the public JWKS
+  at `/.well-known/jwks.json`.
+- **Remote JWKS** — fetch, cache, auto-refetch on kid miss, resolve `(header) → KeyObject`
+  for `@exortek/jwt` and `@exortek/jws` verify.
+
+## Install
+
+```bash
+npm install @exortek/jwks
+```
+
+## Quick start
+
+### Signing side (local key set)
+
+```js
+import { createLocalKeySet } from '@exortek/jwks/local';
+
+const ks = await createLocalKeySet([
+  { alg: 'ES256', kid: 'sig-2024' },
+]);
+
+// Get the active signing key
+const { kid, alg, privateJwk } = ks.getSigningKey('ES256');
+
+// Serve /.well-known/jwks.json
+app.get('/.well-known/jwks.json', ks.handler());
+
+// Zero-downtime rotation — old key stays for 24h (default)
+await ks.rotate({ alg: 'ES256' });
+```
+
+### Verifying side (remote JWKS)
+
+```js
+import { createRemoteJWKS } from '@exortek/jwks/remote';
+import { verify } from '@exortek/jwt';
+
+const resolver = createRemoteJWKS(
+  'https://auth.example.com/.well-known/jwks.json',
+);
+
+const { payload } = await verify(token, resolver);
+```
+
+## Subpath exports
+
+| Export | What it provides |
+|---|---|
+| `@exortek/jwks` | Barrel — `jwks` namespace + named exports |
+| `@exortek/jwks/local` | `createLocalKeySet` |
+| `@exortek/jwks/remote` | `createRemoteJWKS` |
+
+## Features
+
+### Local key set
+
+- **10 algorithms** — ES256, ES384, ES512, RS256, RS384, RS512, PS256, PS384, PS512, EdDSA.
+- **Zero-downtime rotation** — retired keys stay in the JWKS during a configurable grace period
+  so in-flight tokens can still verify.
+- **HTTP handler** — `writeHead`/`end` API works on raw Node, Express, and Fastify. Configurable
+  `Cache-Control`.
+- **`addKey()`** — import existing key pairs (e.g. from persistent storage) with duplicate-kid guard.
+- **`resolve(header)`** — `async ({ kid, alg? }) → KeyObject`, compatible with `jwt.verify`.
+- **`toJSON()`** — public JWK Set document, safe for `JSON.stringify`.
+
+### Remote JWKS
+
+- **URI protocol whitelist** — rejects non-http(s), requires https by default (SSRF defense).
+- **Automatic caching** — configurable TTL (default 10m).
+- **Kid-miss refetch** — on unknown `kid`, re-fetches once (rate-limited by cooldown) to pick up
+  provider-side key rotations.
+- **Concurrent coalescing** — multiple callers waiting on the same fetch share a single request.
+- **`staleWhileError`** — serve stale cached keys when refetch fails.
+- **`AbortSignal` passthrough** — caller-provided signal forwarded to fetch.
+- **`onInvalidKey` callback** — fires on kid-not-found or alg mismatch for logging/metrics.
+- **LRU eviction** — `KeyObject` cache uses LRU, not FIFO.
+- **`reload()`** / **`cachedKids()`** — manual cache control.
+
+### Both
+
+- **Alg cross-check** — if the JWT/JWS header carries `alg`, it must match the key's algorithm.
+- **Resolver pattern** — `async (header) => KeyObject` signature compatible with `@exortek/jwt`
+  verify and `@exortek/jws` verify.
+
+<Callout type="info">
+  `@exortek/jwks` is stateless — there is no store interface. Local keys live in memory (persist
+  them yourself if needed); remote keys are fetched and cached automatically.
+</Callout>
+
+## Error codes
+
+| Code | HTTP | When |
+|---|---|---|
+| `INVALID_ARGUMENT` | 400 | Bad options (wrong type, missing required field) |
+| `FETCH_FAILED` | 502 | Network/response error fetching the remote JWKS |
+| `KID_NOT_FOUND` | 401 | No key matching the requested `kid` (or alg mismatch) |
+
+```js
+import { JwksError, ErrorCode } from '@exortek/jwks';
+
+// Branch on err.code, never on the message
+if (err.code === ErrorCode.KID_NOT_FOUND) { /* … */ }
+```

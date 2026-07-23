@@ -1,0 +1,49 @@
+---
+title: 'errors — JwksError'
+sidebarTitle: 'errors — JwksError'
+---
+
+# Errors
+
+```js
+import { JwksError, ErrorCode } from '@exortek/jwks';
+```
+
+`JwksError` extends `BaseError` from `@exortek/shared`. Every error carries a machine-readable
+`code` and an HTTP `status`.
+
+## Error codes
+
+| Code | HTTP Status | When |
+|---|---|---|
+| `INVALID_ARGUMENT` | 400 | Bad options — wrong type, missing required field, unsupported algorithm |
+| `FETCH_FAILED` | 502 | Remote JWKS fetch failed — network error, non-ok response, invalid body, timeout |
+| `KID_NOT_FOUND` | 401 | No key with the requested `kid` in the JWKS, or `alg` mismatch |
+
+## Usage
+
+```js
+try {
+  const key = await resolver({ kid: 'unknown' });
+} catch (err) {
+  if (err instanceof JwksError) {
+    switch (err.code) {
+      case ErrorCode.KID_NOT_FOUND:
+        // Token references a key we don't have
+        break;
+      case ErrorCode.FETCH_FAILED:
+        // Remote endpoint is unreachable
+        break;
+    }
+  }
+}
+```
+
+Branch on `err.code`, never on the message string — messages may change across versions.
+
+## Verify failures vs. errors
+
+`createLocalKeySet`'s `resolve()` and the remote resolver both **throw** on key-not-found.
+This is intentional — unlike `@exortek/challenge` or `@exortek/apikey` where a bad token is a
+normal auth outcome (returned as `{ valid: false, reason }`), a missing JWKS key is an
+infrastructure problem that the caller must handle.

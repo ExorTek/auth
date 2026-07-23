@@ -1,0 +1,94 @@
+---
+title: 'remote — JWKS URI resolver'
+sidebarTitle: 'remote — JWKS URI resolver'
+---
+
+# `createRemoteJWKS`
+
+```js
+import { createRemoteJWKS } from '@exortek/jwks/remote';
+```
+
+Fetch, cache, and resolve keys from a remote `/.well-known/jwks.json` endpoint. Returns a
+resolver function compatible with `jwt.verify(token, resolver)`.
+
+## `createRemoteJWKS(uri, options?)`
+
+```ts
+createRemoteJWKS(
+  uri: string,
+  options?: RemoteJWKSOptions,
+): Resolver & { reload, cachedKids }
+```
+
+**`uri`** must use `https://` by default. Pass `allowInsecure: true` for `http://` (dev/test only).
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `cacheTtl` | `string \| number` | `'10m'` | Cache lifetime |
+| `maxCacheKeys` | `number` | `100` | Max cached KeyObjects (LRU eviction) |
+| `cooldownMs` | `number` | `10000` | Min ms between refetches on kid-miss |
+| `timeout` | `number` | `5000` | Fetch timeout in ms |
+| `allowInsecure` | `boolean` | `false` | Allow `http://` URIs |
+| `staleWhileError` | `boolean` | `false` | Serve stale cache when refetch fails |
+| `signal` | `AbortSignal` | — | Forwarded to the internal fetch |
+| `headers` | `Record<string, string>` | — | Extra headers on the fetch request |
+| `onInvalidKey` | `(header, error) => void` | — | Called on kid-not-found or alg mismatch |
+
+## Resolver
+
+The returned function has the signature `async ({ kid, alg? }) => KeyObject`.
+
+```js
+const resolver = createRemoteJWKS('https://auth.example.com/.well-known/jwks.json');
+
+// Use with @exortek/jwt
+const { payload } = await verify(token, resolver);
+```
+
+### `resolver.reload()`
+
+Force-clear the cache and re-fetch. Useful when you know the provider rotated keys.
+
+### `resolver.cachedKids()`
+
+Returns the `kid` values currently held in cache. Empty before the first fetch.
+
+## Caching behaviour
+
+1. **First call** — fetches the JWKS and populates the cache.
+2. **Subsequent calls** — served from cache until `cacheTtl` expires.
+3. **Unknown `kid`** — re-fetches once (rate-limited by `cooldownMs`) to pick up provider-side
+   rotations without waiting for full TTL expiry.
+4. **Concurrent callers** — coalesce onto a single in-flight fetch.
+5. **Failed fetch** — old cache survives; `lastFetchAt` updates so cooldown applies to both
+   success and failure paths.
+
+## Stale-while-error
+
+When `staleWhileError: true`, a failed refetch silently falls back to the previous successful
+cache instead of throwing. First-time failures (no cache at all) still throw.
+
+```js
+const resolver = createRemoteJWKS('https://auth.example.com/jwks', {
+  staleWhileError: true,
+  cacheTtl: '5m',
+});
+// If the provider goes down, cached keys keep working
+```
+
+## Observability
+
+The `onInvalidKey` callback fires whenever a key resolution fails — useful for logging or
+metrics dashboards:
+
+```js
+const resolver = createRemoteJWKS('https://auth.example.com/jwks', {
+  onInvalidKey(header, error) {
+    logger.warn({ kid: header.kid, alg: header.alg, code: error.code },
+      'JWKS key resolution failed');
+  },
+});
+```
