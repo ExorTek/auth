@@ -1,6 +1,6 @@
 {
   "name": "@exortek/apikey",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Stripe-style prefixed API keys for Node.js — 3-segment tokens (prefix_id_secret), HMAC-SHA256 storage hash with pepper rotation, scope allowlists with wildcard match, opt-in lastUsedAt tracking, memory + Redis stores, Express + Fastify middleware. Server-only. Zero non-@exortek runtime dependencies.",
   "type": "module",
   "sideEffects": false,
@@ -32,6 +32,7 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {

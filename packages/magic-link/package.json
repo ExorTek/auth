@@ -1,6 +1,6 @@
 {
   "name": "@exortek/magic-link",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Passwordless email-link auth for Node.js — HMAC-signed short-lived tokens (mlink_v1.<payload>.<hmac>), single-use enforcement, opt-in per-email rate limiting, hashed email in payload by default (SHA-256), configurable prefix, memory + Redis stores. Ships the token — you send the email.",
   "type": "module",
   "sideEffects": false,
@@ -22,6 +22,7 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
