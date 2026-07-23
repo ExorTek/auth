@@ -7,90 +7,48 @@
  * DB-backed store.
  *
  * Two indexes: `byId` (Map of id → record) is the primary lookup;
- * `byEmail` (Map of email → Set&lt;id&gt;) powers `listByEmail` and
- * `revokeByEmail`. A tiny separate map holds `incrRate` counters with
- * TTL, pruned lazily on read.
+ * `byEmail` (Map of email → Set<id>) powers `listByEmail` and
+ * `revokeByEmail`. Rate-limit counters delegate to the shared
+ * IncrStore from `@exortek/shared/incr-store`.
  */
 
-import { isFunction, isString } from '@exortek/shared/predicates';
+import { createMemoryRecordStore } from '@exortek/shared/record-store';
+import { createMemoryIncrStore } from '@exortek/shared/incr-store';
 
 /**
  * @returns {import('../index.js').MagicLinkStore & { _size: () => number, _stop: () => void }}
  */
 export function memoryStore() {
-  /** @type {Map<string, import('../index.js').MagicLinkRecord>} */
-  const byId = new Map();
-  /** @type {Map<string, Set<string>>} */
-  const byEmail = new Map();
-  /** @type {Map<string, { count: number, expiresAt: number }>} */
-  const rate = new Map();
-  let sweeper = null;
-
-  function scheduleSweeper() {
-    if (sweeper) {return;}
-    sweeper = setInterval(() => {
-      const t = Date.now();
-      for (const [k, v] of rate) {
-        if (v.expiresAt <= t) {rate.delete(k);}
-      }
-    }, 60_000);
-    if (isFunction(sweeper.unref)) {sweeper.unref();}
-  }
-
-  function indexEmail(email, id) {
-    let set = byEmail.get(email);
-    if (!set) {
-      set = new Set();
-      byEmail.set(email, set);
-    }
-    set.add(id);
-  }
+  const store = createMemoryRecordStore({
+    idField: 'id',
+    indexField: 'email',
+    copyStrategy: 'deep',
+  });
+  const incrStore = createMemoryIncrStore();
 
   return {
-    async put(record) {
-      // structuredClone gives us a deep copy so a caller mutating a
-      // nested metadata object after put() cannot retroactively mutate
-      // what we've stored. Same reason getById returns a clone.
-      byId.set(record.id, structuredClone(record));
-      if (isString(record.email)) {
-        indexEmail(record.email, record.id);
-      }
-    },
-
-    async getById(id) {
-      const record = byId.get(id);
-      return record ? structuredClone(record) : null;
-    },
+    put: record => store.put(record),
+    getById: id => store.getById(id),
+    listByEmail: email => store.listByIndex(email),
 
     async consume(id) {
-      const existing = byId.get(id);
-      if (!existing || existing.consumedAt) {return false;}
+      const existing = store.byId.get(id);
+      if (!existing || existing.consumedAt) {
+        return false;
+      }
       existing.consumedAt = Date.now();
       return true;
     },
 
-    async listByEmail(email) {
-      const set = byEmail.get(email);
-      if (!set) {
-        return [];
-      }
-      const out = [];
-      for (const id of set) {
-        const record = byId.get(id);
-        if (record) {
-          out.push(structuredClone(record));
-        }
-      }
-      return out;
-    },
-
     async revokeByEmail(email) {
-      const set = byEmail.get(email);
-      if (!set) {return 0;}
+      const set = store.byIndex.get(email);
+      if (!set) {
+        return 0;
+      }
       const now = Date.now();
       let count = 0;
       for (const id of set) {
-        const record = byId.get(id);
+        const record = store.byId.get(id);
         if (record && !record.consumedAt) {
           record.consumedAt = now;
           count += 1;
@@ -100,27 +58,10 @@ export function memoryStore() {
     },
 
     async incrRate(email, ttlMs) {
-      scheduleSweeper();
-      const now = Date.now();
-      const existing = rate.get(email);
-      if (existing && existing.expiresAt > now) {
-        existing.count += 1;
-        // Refresh LRU position on activity.
-        rate.delete(email);
-        rate.set(email, existing);
-        return { count: existing.count, expiresAt: existing.expiresAt };
-      }
-      const entry = { count: 1, expiresAt: now + ttlMs };
-      rate.set(email, entry);
-      return { count: 1, expiresAt: entry.expiresAt };
+      return incrStore.incr(email, ttlMs);
     },
 
-    _size: () => byId.size,
-    _stop: () => {
-      if (sweeper) {
-        clearInterval(sweeper);
-        sweeper = null;
-      }
-    },
+    _size: () => store._size(),
+    _stop: () => incrStore._stop(),
   };
 }
