@@ -234,6 +234,31 @@ test('rotate: grace-window replay does not slide the window forward', async () =
   store._stop();
 });
 
+// markUsed CAS path
+test('rotate: uses atomic markUsed when store provides it (no mutex)', async () => {
+  const { options, store } = fresh();
+  let markUsedCalls = 0;
+  const origMarkUsed = store.markUsed.bind(store);
+  store.markUsed = async (key, nowSec) => {
+    markUsedCalls++;
+    return origMarkUsed(key, nowSec);
+  };
+  const pair = await create({ userId: 1 }, options);
+  await rotate(pair.refreshToken, options);
+  assert.equal(markUsedCalls, 1);
+  store._stop();
+});
+
+test('rotate: falls back to get+add when markUsed is absent', async () => {
+  const { options, store } = fresh();
+  delete store.markUsed;
+  const pair = await create({ userId: 1 }, options);
+  const rotated = await rotate(pair.refreshToken, options);
+  assert.ok(rotated.refreshToken);
+  assert.equal(rotated.familyId, pair.familyId);
+  store._stop();
+});
+
 // namespace
 test('tokenPair namespace exposes create/rotate/revoke/revokeAll', () => {
   assert.equal(tokenPair.create, create);

@@ -191,3 +191,49 @@ test('redis: missing client raises STORE_ERROR', () => {
     err => err instanceof JwtError && err.code === ErrorCode.STORE_ERROR,
   );
 });
+
+// markUsed — memory store
+test('memory: markUsed stamps usedAt atomically on first call', async () => {
+  const store = createStore('memory');
+  await store.add('r1', NOW() + 60, { familyId: 'F1', usedAt: null });
+  const result = await store.markUsed('r1', 1000);
+  assert.ok(result);
+  assert.equal(result.swapped, true);
+  assert.equal(result.record.metadata.usedAt, 1000);
+  store._stop();
+});
+
+test('memory: markUsed returns swapped:false when already used', async () => {
+  const store = createStore('memory');
+  await store.add('r1', NOW() + 60, { familyId: 'F1', usedAt: 500 });
+  const result = await store.markUsed('r1', 1000);
+  assert.ok(result);
+  assert.equal(result.swapped, false);
+  assert.equal(result.record.metadata.usedAt, 500);
+  store._stop();
+});
+
+test('memory: markUsed returns null for missing key', async () => {
+  const store = createStore('memory');
+  const result = await store.markUsed('missing', 1000);
+  assert.equal(result, null);
+  store._stop();
+});
+
+test('memory: markUsed returns null for expired key', async () => {
+  const store = createStore('memory', { gc: { strategy: 'lazy' } });
+  await store.add('r1', NOW() - 1, { usedAt: null });
+  const result = await store.markUsed('r1', 1000);
+  assert.equal(result, null);
+  store._stop();
+});
+
+test('memory: markUsed with no prior metadata still works', async () => {
+  const store = createStore('memory');
+  await store.add('r1', NOW() + 60);
+  const result = await store.markUsed('r1', 1000);
+  assert.ok(result);
+  assert.equal(result.swapped, true);
+  assert.equal(result.record.metadata.usedAt, 1000);
+  store._stop();
+});
