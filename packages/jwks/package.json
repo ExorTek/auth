@@ -1,6 +1,6 @@
 {
   "name": "@exortek/jwks",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "JSON Web Key Set (JWKS) for Node.js — local key set management with zero-downtime rotation, remote JWKS URI fetching with kid-miss refetch, Express/Fastify handler for /.well-known/jwks.json. Zero non-@exortek runtime dependencies.",
   "type": "module",
   "sideEffects": false,
