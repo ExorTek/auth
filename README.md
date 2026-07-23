@@ -1,6 +1,6 @@
 # @exortek/auth
 
-A framework-agnostic authentication toolkit for Node.js — designed as 22 small packages under one scope; **11 are
+A framework-agnostic authentication toolkit for Node.js — designed as 22 small packages under one scope; **12 are
 published today** (see Shipping below), the rest are planned. Pick the one you need. Built on `node:crypto`.
 
 [![license](https://img.shields.io/github/license/ExorTek/auth?color=blue)](./LICENSE)
@@ -22,6 +22,7 @@ published today** (see Shipping below), the rest are planned. Pick the one you n
 | [`@exortek/challenge`](./packages/challenge) — HMAC-signed multi-step flow tokens (userId · method · step · nextStep · metadata), opt-in single-use + IP binding, memory / Redis stores |      [![npm](https://img.shields.io/npm/v/@exortek/challenge.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/challenge)      | [auth.memet.dev/challenge](https://auth.memet.dev/challenge) |
 | [`@exortek/apikey`](./packages/apikey) — Stripe-style prefixed API keys (`sk_live_id_secret`) with HMAC-SHA256 storage + optional pepper rotation, scope allowlists, memory / Redis stores, Express + Fastify middleware |      [![npm](https://img.shields.io/npm/v/@exortek/apikey.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/apikey)      | [auth.memet.dev/apikey](https://auth.memet.dev/apikey) |
 | [`@exortek/magic-link`](./packages/magic-link) — passwordless email-link auth — HMAC-signed short-lived tokens, single-use consume, opt-in per-email rate limit, memory / Redis stores; you send the email |      [![npm](https://img.shields.io/npm/v/@exortek/magic-link.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/magic-link)      | [auth.memet.dev/magic-link](https://auth.memet.dev/magic-link) |
+| [`@exortek/jwks`](./packages/jwks) — JWK Set (RFC 7517 §5) — local key set with zero-downtime rotation + remote JWKS URI fetching with kid-miss refetch, `/.well-known/jwks.json` handler |      [![npm](https://img.shields.io/npm/v/@exortek/jwks.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/jwks)      | [auth.memet.dev/jwks](https://auth.memet.dev/jwks) |
 
 ## The stack
 
@@ -38,7 +39,7 @@ Linked entries are **published on npm**; the rest are **planned** and not yet in
 | 06 | [`@exortek/jws`](./packages/jws)           | shipped   | JWS compact + JSON, detached, `b64:false`, HS / RS / PS / ES / EdDSA + secp256k1          |
 | 07 | [`@exortek/jwt`](./packages/jwt)           | shipped   | JWT sign / verify / peek, tokenPair with RFC 6749 §10.4 reuse detection, blacklist stores |
 | 08 | `@exortek/jwe`                             | _planned_ | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                           |
-| 09 | `@exortek/jwks`                            | _planned_ | JWKS URI fetching, caching, `kid` rotation                                               |
+| 09 | [`@exortek/jwks`](./packages/jwks)         | shipped   | JWKS local key set + remote URI fetching, caching, zero-downtime `kid` rotation          |
 | 10 | [`@exortek/session`](./packages/session)   | shipped   | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub            |
 | 11 | [`@exortek/security`](./packages/security) | shipped   | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers     |
 | 12 | `@exortek/device`                          | _planned_ | device fingerprinting, trusted-device tokens                                             |
@@ -69,6 +70,7 @@ npm install @exortek/jwt
 npm install @exortek/challenge
 npm install @exortek/apikey             # + optional: ioredis or redis, express or fastify
 npm install @exortek/magic-link         # + optional: ioredis or redis
+npm install @exortek/jwks
 ```
 
 Node.js **22 or newer**.

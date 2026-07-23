@@ -18,6 +18,7 @@ lines are not patched unless the project has an explicit LTS commitment (none do
 | `@exortek/challenge`| `1.x` — current |
 | `@exortek/apikey`   | `1.x` — current |
 | `@exortek/magic-link` | `1.x` — current |
+| `@exortek/jwks`     | `1.x` — current |
 
 Everything else in the roadmap is **not yet published** — file bug reports through the usual template once a version is
 out.
