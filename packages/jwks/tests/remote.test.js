@@ -226,10 +226,7 @@ describe('resolver — coalescing', () => {
 
     const resolver = createRemoteJWKS('https://example.com/jwks');
 
-    const [k1, k2] = await Promise.all([
-      resolver({ kid: 'k1' }),
-      resolver({ kid: 'k1' }),
-    ]);
+    const [k1, k2] = await Promise.all([resolver({ kid: 'k1' }), resolver({ kid: 'k1' })]);
 
     assert.equal(k1.type, 'public');
     assert.equal(k2.type, 'public');
