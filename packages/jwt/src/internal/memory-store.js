@@ -25,12 +25,17 @@ import { parseDuration } from './duration.js';
  * @property {number} expiresAt
  * @property {Record<string, unknown>} [metadata]
  *
+ * @typedef {Object} MarkUsedResult
+ * @property {boolean} swapped       true if this call stamped usedAt (was null before)
+ * @property {StoreRecord} record    the record after the operation
+ *
  * @typedef {Object} Store
  * @property {(key: string, expiresAt: number, metadata?: Record<string, unknown>) => Promise<void>} add
  * @property {(key: string) => Promise<boolean>} has
  * @property {(key: string) => Promise<StoreRecord | null>} get
  * @property {(key: string) => Promise<void>} delete
  * @property {(filter: Record<string, unknown>) => Promise<number>} deleteAll
+ * @property {(key: string, nowSec: number) => Promise<MarkUsedResult | null>} [markUsed]
  * @property {() => number} size
  * @property {() => void} _stop
  *
@@ -158,6 +163,20 @@ export function createMemoryStore(options) {
         }
       }
       return count;
+    },
+    async markUsed(key, nowSec) {
+      const record = map.get(key);
+      if (!record || record.expiresAt <= now()) {
+        if (record) map.delete(key);
+        return null;
+      }
+      const meta = record.metadata || {};
+      if (meta.usedAt != null) {
+        return { swapped: false, record };
+      }
+      const updated = { ...record, metadata: { ...meta, usedAt: nowSec } };
+      map.set(key, updated);
+      return { swapped: true, record: updated };
     },
     size() {
       return map.size;

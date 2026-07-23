@@ -16,6 +16,29 @@
 
 import { JwtError, ErrorCode } from './errors.js';
 
+// Atomically stamp metadata.usedAt if it is currently null/absent.
+// Returns [swapped(0|1), json] or nil when the key doesn't exist.
+const MARK_USED_LUA = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return nil end
+local data = cjson.decode(raw)
+local meta = data['metadata']
+if not meta then meta = {} end
+if meta['usedAt'] ~= nil and meta['usedAt'] ~= cjson.null then
+  return {0, raw}
+end
+meta['usedAt'] = tonumber(ARGV[1])
+data['metadata'] = meta
+local encoded = cjson.encode(data)
+local ttl = redis.call('TTL', KEYS[1])
+if ttl > 0 then
+  redis.call('SET', KEYS[1], encoded, 'EX', ttl)
+else
+  redis.call('SET', KEYS[1], encoded)
+end
+return {1, encoded}
+`;
+
 /**
  * @typedef {import('./memory-store.js').Store} Store
  * @typedef {import('./memory-store.js').StoreRecord} StoreRecord
@@ -171,6 +194,28 @@ export function createRedisStore(options) {
         );
       }
       return count;
+    },
+    async markUsed(key, nowSec) {
+      try {
+        const result = await client.eval(MARK_USED_LUA, 1, build(key), String(nowSec));
+        if (result == null) return null;
+        const [swapped, json] = result;
+        const parsed = JSON.parse(json);
+        return {
+          swapped: Number(swapped) === 1,
+          record: {
+            expiresAt: parsed.expiresAt,
+            ...(parsed.metadata ? { metadata: parsed.metadata } : {}),
+          },
+        };
+      } catch (err) {
+        if (err instanceof JwtError) throw err;
+        throw new JwtError(
+          ErrorCode.STORE_ERROR,
+          `redis-store.markUsed: EVAL failed — ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err },
+        );
+      }
     },
     size() {
       throw new JwtError(
