@@ -29,7 +29,10 @@
     "./algorithms": "./src/algorithms.js",
     "./asserts": "./src/asserts.js",
     "./crit": "./src/crit.js",
-    "./ecdsa": "./src/ecdsa.js"
+    "./ecdsa": "./src/ecdsa.js",
+    "./incr-store": "./src/incr-store.js",
+    "./redis-helpers": "./src/redis-helpers.js",
+    "./record-store": "./src/record-store.js"
   },
   "scripts": {
     "build": "echo 'shared has no build step — source consumed via bundler inline'",
