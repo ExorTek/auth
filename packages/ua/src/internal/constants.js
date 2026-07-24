@@ -1,11 +1,8 @@
 export const UA_MAX_LENGTH = 500;
 
-export const EMPTY = '';
-
 // Result property names
 export const NAME = 'name';
 export const VERSION = 'version';
-export const MAJOR = 'major';
 export const TYPE = 'type';
 export const MODEL = 'model';
 export const VENDOR = 'vendor';
@@ -14,7 +11,6 @@ export const ARCHITECTURE = 'architecture';
 // Device types
 export const MOBILE = 'mobile';
 export const TABLET = 'tablet';
-export const DESKTOP = 'desktop';
 export const SMARTTV = 'smarttv';
 export const CONSOLE = 'console';
 export const WEARABLE = 'wearable';
@@ -89,15 +85,6 @@ export const BLACKBERRY = 'BlackBerry';
 export const NVIDIA = 'Nvidia';
 export const SHARP = 'Sharp';
 export const HONOR = 'Honor';
-export const ZEBRA = 'Zebra';
 export const FACEBOOK = 'Facebook';
 export const HTC = 'HTC';
 export const VALVE = 'Valve';
-
-// Browser names
-export const CHROME = 'Chrome';
-export const FIREFOX = 'Firefox';
-export const SAFARI = 'Safari';
-export const EDGE = 'Edge';
-export const OPERA = 'Opera';
-export const IE = 'IE';
