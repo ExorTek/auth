@@ -22,7 +22,7 @@ import { assertNonEmptyString, invalidArgument } from './internal/guards.js';
  * @example
  * const history = createHistory({ keepLast: 5 })
  * if (await history.isReused(newPw, user.previousHashes)) {
- *   throw new PasswordError(ErrorCode.REUSED_PASSWORD, 'cannot reuse a recent password')
+ *   throw new Error('cannot reuse a recent password')
  * }
  * const newHash = await password.scrypt.hash(newPw)
  * await db.users.update(user.id, {

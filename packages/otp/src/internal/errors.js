@@ -7,9 +7,6 @@ import { BaseError } from '@exortek/shared/errors';
 export const ErrorCode = Object.freeze({
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   INVALID_SECRET: 'INVALID_SECRET',
-  INVALID_CODE: 'INVALID_CODE',
-  THROTTLED: 'THROTTLED',
-  REPLAY_DETECTED: 'REPLAY_DETECTED',
   UNSUPPORTED_ALGORITHM: 'UNSUPPORTED_ALGORITHM',
 });
 
@@ -23,9 +20,6 @@ export class OtpError extends BaseError {
     [ErrorCode.INVALID_ARGUMENT]: 400,
     [ErrorCode.UNSUPPORTED_ALGORITHM]: 400,
     [ErrorCode.INVALID_SECRET]: 401,
-    [ErrorCode.INVALID_CODE]: 401,
-    [ErrorCode.REPLAY_DETECTED]: 403,
-    [ErrorCode.THROTTLED]: 429,
   };
   static defaultStatus = 500;
 }

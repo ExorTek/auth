@@ -14,8 +14,7 @@ test('SessionError carries code + message + status', () => {
 test('SessionError.status defaults per code', () => {
   assert.equal(new SessionError(ErrorCode.INVALID_ARGUMENT, '').status, 400);
   assert.equal(new SessionError(ErrorCode.EXPIRED, '').status, 401);
-  assert.equal(new SessionError(ErrorCode.IMPERSONATION_INVALID, '').status, 403);
-  assert.equal(new SessionError(ErrorCode.MISSING_PEER_DEP, '').status, 500);
+  assert.equal(new SessionError(ErrorCode.SESSION_NOT_FOUND, '').status, 401);
 });
 
 test('SessionError.status overridable', () => {
@@ -24,7 +23,7 @@ test('SessionError.status overridable', () => {
 });
 
 test('SessionError carries details', () => {
-  const err = new SessionError(ErrorCode.CONCURRENT_LIMIT_EXCEEDED, '', {
+  const err = new SessionError(ErrorCode.INVALID_TOKEN, '', {
     details: { userId: '42', limit: 3 },
   });
   assert.deepEqual(err.details, { userId: '42', limit: 3 });

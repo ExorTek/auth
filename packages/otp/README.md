@@ -181,7 +181,7 @@ try {
 }
 ```
 
-Codes: `INVALID_ARGUMENT`, `INVALID_SECRET`, `INVALID_CODE`, `THROTTLED`, `REPLAY_DETECTED`, `UNSUPPORTED_ALGORITHM`.
+Codes: `INVALID_ARGUMENT`, `INVALID_SECRET`, `UNSUPPORTED_ALGORITHM`.
 
 ## Authenticator app compatibility
 
@@ -241,7 +241,7 @@ async function verify(userId, code, secret) {
 
 Internally: on a successful verify, the matched counter is written to the store with a TTL that covers the remaining
 acceptance window. Subsequent verifies inside that window with the same code will fail silently — the caller sees a
-boolean `false`, no separate reason. Use `REPLAY_DETECTED` in your own logs if you want to distinguish.
+boolean `false`, no separate reason.
 
 **Redis for cluster deployments.** For high-security flows across multiple workers / regions, back the replay store with
 Redis so a code accepted on one worker can't be replayed on another.
@@ -262,7 +262,7 @@ const throttle = rateLimit.sliding({
 
 async function verify(userId, code, secret) {
   const rl = await throttle.check({ key: `otp:${userId}` });
-  if (!rl.allowed) throw new OtpError(ErrorCode.THROTTLED, `retry in ${rl.retryAfter}s`);
+  if (!rl.allowed) throw new Error(`retry in ${rl.retryAfter}s`);
   return verifyTotp(code, secret, {
     window: 1,
     replay: { store: throttle.store, key: `user:${userId}` },

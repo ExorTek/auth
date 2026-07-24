@@ -12,9 +12,8 @@ test('PasswordError carries code + message', () => {
 
 test('PasswordError.status defaults from code', () => {
   assert.equal(new PasswordError(ErrorCode.INVALID_ARGUMENT, '').status, 400);
-  assert.equal(new PasswordError(ErrorCode.INVALID_PASSWORD, '').status, 401);
   assert.equal(new PasswordError(ErrorCode.MISSING_PEER_DEP, '').status, 500);
-  assert.equal(new PasswordError(ErrorCode.BREACHED_PASSWORD, '').status, 422);
+  assert.equal(new PasswordError(ErrorCode.HIBP_UNAVAILABLE, '').status, 500);
 });
 
 test('PasswordError.status can be overridden', () => {
