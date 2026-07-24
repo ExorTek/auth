@@ -101,9 +101,6 @@
   "bugs": {
     "url": "https://github.com/ExorTek/auth/issues"
   },
-  "dependencies": {
-    "fastify-plugin": "^6.0.0"
-  },
   "peerDependencies": {
     "express": ">=4",
     "fastify": ">=4"

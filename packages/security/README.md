@@ -26,8 +26,8 @@ is external). `@exortek/security` ships them once, correctly, framework-agnostic
 - **Framework-agnostic.** Fastify and Express, each with a bundle (`securityMiddleware`) **and** per-concern middleware so
   you can pick just CORS or just rate-limit if that's what you need. Adding a fifth framework is one file — build an
   `AdapterContext` (see `src/middleware/core.js`) and wire it to `runHeaders` / `runCors` / `runRateLimit` / `runCsrf`.
-- **Small footprint.** Runtime touches `node:crypto`, `node:path`, and — only when you import `/fastify` — a single ~3
-  KB dep (`fastify-plugin`). Every framework itself is an **optional peer**.
+- **Small footprint.** Runtime touches `node:crypto` and `node:path` — zero npm dependencies. Every framework itself is
+  an **optional peer**.
 - **JSDoc → `.d.ts`.** Pure JavaScript source, TypeScript types emitted at build. IDE hints without a `.ts` in sight.
 
 ## Install
