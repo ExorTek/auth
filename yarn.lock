@@ -355,13 +355,10 @@ __metadata:
   peerDependencies:
     express: ">=4"
     fastify: ">=4"
-    fastify-plugin: ">=4"
   peerDependenciesMeta:
     express:
       optional: true
     fastify:
-      optional: true
-    fastify-plugin:
       optional: true
   languageName: unknown
   linkType: soft
@@ -3734,7 +3731,6 @@ __metadata:
     eslint: "npm:^10.7.0"
     express: "npm:^5.2.1"
     fastify: "npm:^5.10.0"
-    fastify-plugin: "npm:^6.0.0"
     ioredis: "npm:^5.11.1"
     prettier: "npm:^3.9.6"
     rollup: "npm:^4.62.2"

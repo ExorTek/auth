@@ -73,17 +73,13 @@
   },
   "peerDependencies": {
     "express": ">=4",
-    "fastify": ">=4",
-    "fastify-plugin": ">=4"
+    "fastify": ">=4"
   },
   "peerDependenciesMeta": {
     "express": {
       "optional": true
     },
     "fastify": {
-      "optional": true
-    },
-    "fastify-plugin": {
       "optional": true
     }
   },

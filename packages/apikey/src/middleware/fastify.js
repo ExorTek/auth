@@ -14,20 +14,12 @@
  *
  *   app.get('/v1/whoami', async req => req.apiKey);
  *
- * Wrapped with `fastify-plugin` so the `preHandler` hook and the
- * `req.apiKey` decorator escape encapsulation and apply to routes
- * registered as siblings in the parent scope. Register the plugin
- * inside a scoped `app.register(async scope => …)` block to control
- * which route group needs an API key — the usual Fastify pattern for
- * "protect only these routes with auth".
- *
- * `fastify-plugin` is an **optional peer** — install it with
- * `npm i fastify fastify-plugin` (or `yarn add`) alongside the fastify
- * runtime.  Not a hard dependency because Express-only consumers of
- * `@exortek/apikey` should not have to install it.
+ * The plugin sets `Symbol.for('skip-override')` so the `preHandler`
+ * hook and the `req.apiKey` decorator escape encapsulation and apply
+ * to routes registered as siblings in the parent scope. Register the
+ * plugin inside a scoped `app.register(async scope => …)` block to
+ * control which route group needs an API key.
  */
-
-import fp from 'fastify-plugin';
 
 import { normalizeOptions, runApiKey } from './core.js';
 
@@ -53,7 +45,7 @@ async function apiKeyPluginFn(app, options) {
   });
 }
 
-export const apiKeyPlugin = fp(apiKeyPluginFn, {
-  fastify: '4.x || 5.x',
-  name: '@exortek/apikey',
-});
+apiKeyPluginFn[Symbol.for('skip-override')] = true;
+apiKeyPluginFn[Symbol.for('fastify.display-name')] = '@exortek/apikey';
+
+export const apiKeyPlugin = apiKeyPluginFn;
