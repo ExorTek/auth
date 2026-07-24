@@ -43,8 +43,6 @@ Thumbs.db
 # npm pack output (yarn npm pack, yarn pack)
 *.tgz
 
-# Publish-time backup files (strip-workspace-devdeps.js)
-*.prepublish
 
 # Claude Code / personal working notes
 /.claude

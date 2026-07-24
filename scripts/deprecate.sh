@@ -19,12 +19,7 @@ set -euo pipefail
 # Ranges are cumulative — each new release supersedes every prior version.
 # When bumping, replace the range (don't stack multiple entries per package).
 ENTRIES=(
-  "@exortek/jwt|<1.2.0|Upgrade to @exortek/jwt@^1.2.0 — atomic CAS for token rotation, Redis dialect override."
-  "@exortek/jwks|<1.0.1|Upgrade to @exortek/jwks@^1.0.1 — cache:false fix, SSRF hardening, abort-listener leak."
-  "@exortek/password|<1.1.0|Upgrade to @exortek/password@^1.1.0 — constant-time history check, verify cost cap."
-  "@exortek/otp|<1.1.0|Upgrade to @exortek/otp@^1.1.0 — dead ErrorCode cleanup."
-  "@exortek/session|<1.3.0|Upgrade to @exortek/session@^1.3.0 — fingerprint binding bypass fix, fail-closed verify."
-  "@exortek/security|<1.3.0|Upgrade to @exortek/security@^1.3.0 — CSRF form-field fix, dead fallback removal, XFF walk."
+#  "@exortek/jwt|<1.2.0|Upgrade to @exortek/jwt@^1.2.0 — atomic CAS for token rotation, Redis dialect override."
 )
 
 MODE="${1:-dry}"

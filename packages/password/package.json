@@ -121,10 +121,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "devDependencies": {
-    "@exortek/shared": "workspace:*",
-    "argon2": "^0.45.1",
-    "bcryptjs": "^3.0.3"
   }
 }

@@ -105,9 +105,6 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "devDependencies": {
-    "@exortek/shared": "workspace:*"
-  },
   "publishConfig": {
     "access": "public"
   }
