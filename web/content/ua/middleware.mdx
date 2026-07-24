@@ -1,0 +1,139 @@
+---
+title: 'middleware — Express & Fastify'
+sidebarTitle: middleware
+---
+
+import { Callout } from 'nextra/components';
+
+# Middleware
+
+Ready-to-mount adapters for Express and Fastify. Both parse the
+User-Agent, apply Client Hints, detect bots, and attach the result
+to the request — one line of setup.
+
+## Express
+
+```js
+import express from 'express';
+import { uaMiddleware } from '@exortek/ua/middleware/express';
+
+const app = express();
+app.use(uaMiddleware());
+
+app.get('/', (req, res) => {
+  res.json({
+    browser: req.ua.browser.name,
+    os: req.ua.os.name,
+    isBot: !!req.ua.bot,
+  });
+});
+```
+
+## Fastify
+
+```js
+import Fastify from 'fastify';
+import { uaPlugin } from '@exortek/ua/middleware/fastify';
+
+const app = Fastify();
+await app.register(uaPlugin);
+
+app.get('/', async (request) => {
+  return {
+    browser: request.ua.browser.name,
+    os: request.ua.os.name,
+    isBot: !!request.ua.bot,
+  };
+});
+```
+
+## Options
+
+| Option         | Default   | Notes |
+| -------------- | --------- | ----- |
+| `clientHints`  | `true`    | Apply Client Hints overrides from request headers. |
+| `sendAcceptCH` | `true`    | Auto-set `Accept-CH` + `Vary` response headers. |
+| `detectBots`   | `true`    | Run `detectBot()` and attach as `req.ua.bot`. |
+| `property`     | `'ua'`    | `req[property]` receives the result. |
+| `onBot`        | —         | `(bot, req) => boolean \| void` — return `true` to block with 403. |
+| `onParsed`     | —         | `(result, req) => void` — fire-and-forget notification after parse. |
+| `onUnknown`    | —         | `(ua: string) => void` — called when no browser is identified. |
+
+## Hooks
+
+### `onBot` — block or observe bots
+
+Called when a bot is detected. Return `true` to block the request with
+a 403 JSON response. Return `undefined` to let the request through.
+
+```js
+app.use(uaMiddleware({
+  onBot(bot, req) {
+    if (bot.category === 'ai-training') {
+      return true; // 403 { error: 'bot_denied', category: 'ai-training' }
+    }
+    console.log(`Bot visit: ${bot.name}`);
+  },
+}));
+```
+
+For more sophisticated category-based filtering, use the dedicated
+[bot-guard middleware](/ua/bot-guard).
+
+### `onParsed` — logging / analytics
+
+Fire-and-forget notification after parse + bot detection, before
+`next()`. Use it for analytics or request logging.
+
+```js
+app.use(uaMiddleware({
+  onParsed(result, req) {
+    analytics.track('page_view', {
+      browser: result.browser.name,
+      os: result.os.name,
+      device: result.device.type || 'desktop',
+    });
+  },
+}));
+```
+
+### `onUnknown` — unrecognized UAs
+
+Called when the parser couldn't identify the browser name. Useful for
+discovering missing regex patterns.
+
+```js
+app.use(uaMiddleware({
+  onUnknown(ua) {
+    logger.warn('Unrecognized UA', { ua });
+  },
+}));
+```
+
+## Result shape
+
+`req.ua` carries the full parse result plus the bot field:
+
+```ts
+interface UAResult {
+  ua: string;
+  browser: { name?: string; version?: string; major?: string; type?: string };
+  os: { name?: string; version?: string };
+  device: { type?: string; vendor?: string; model?: string };
+  engine: { name?: string; version?: string };
+  cpu: { architecture?: string };
+  bot: BotInfo | null;
+}
+```
+
+## Cache isolation
+
+Each request gets a shallow copy of the cached parse result — the
+middleware never mutates the shared cache. Two requests with the same
+UA string get independent `req.ua` objects.
+
+<Callout type="info">
+  Both adapters set `Accept-CH` and `Vary` automatically. You do not
+  need to manage Client Hints headers manually when using the
+  middleware.
+</Callout>

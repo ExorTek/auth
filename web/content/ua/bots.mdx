@@ -1,0 +1,88 @@
+---
+title: 'bots — detection & taxonomy'
+sidebarTitle: bots
+---
+
+import { Callout } from 'nextra/components';
+
+# Bot detection
+
+Detect bots, AI crawlers, search engines, and automated agents from
+their User-Agent string. Ships 100+ built-in signatures across 8
+categories.
+
+```js
+import { detectBot, isBot, isAICrawler } from '@exortek/ua/bots';
+
+const bot = detectBot(req.headers['user-agent']);
+if (bot) {
+  console.log(bot.name);      // 'Googlebot'
+  console.log(bot.category);  // 'search'
+  console.log(bot.url);       // 'http://www.google.com/bot.html'
+}
+```
+
+## Quick predicates
+
+```js
+import { isBot, isAICrawler, isSearchBot, isSocialPreview, isSEOBot, isAIAssistant } from '@exortek/ua/bots';
+
+isBot(ua);           // true for any known bot
+isAICrawler(ua);     // GPTBot, ClaudeBot, Google-Extended, etc.
+isAIAssistant(ua);   // ChatGPT-User, PerplexityBot (real-time)
+isSearchBot(ua);     // Googlebot, Bingbot, DuckDuckBot
+isSocialPreview(ua); // Twitterbot, WhatsApp, Slack, Telegram
+isSEOBot(ua);        // AhrefsBot, SemrushBot, MajesticBot
+```
+
+## Categories
+
+| Category         | Description | Examples |
+| ---------------- | ----------- | -------- |
+| `search`         | Search engine crawlers | Googlebot, Bingbot, YandexBot |
+| `ai-training`    | AI model training scrapers | GPTBot, ClaudeBot, Google-Extended |
+| `ai-assistant`   | Real-time AI assistants | ChatGPT-User, PerplexityBot |
+| `ai-agent`       | Autonomous AI agents | Amazon Nova Act |
+| `social-preview` | Link-preview fetchers | Twitterbot, WhatsApp, Slack |
+| `seo`            | SEO analysis bots | AhrefsBot, SemrushBot |
+| `monitoring`     | Uptime / health checks | UptimeRobot, Pingdom, Datadog |
+| `security`       | Security scanners | Nessus, Qualys |
+| `advertising`    | Ad verification | DoubleVerify, IAS |
+| `archiving`      | Web archives | Internet Archive, Wayback Machine |
+| `feed`           | Feed readers / aggregators | Feedly |
+| `generic`        | Unclassified bots | Generic crawlers |
+| `library`        | HTTP client libraries | axios, node-fetch |
+| `cli`            | CLI HTTP tools | curl, wget, HTTPie |
+
+## Custom patterns
+
+Extend the built-in set with `createBotDetector()`:
+
+```js
+import { createBotDetector } from '@exortek/ua/bots';
+
+const detect = createBotDetector([
+  { pattern: /my-internal-bot/i, name: 'InternalBot', category: 'monitoring' },
+  { pattern: /partner-scraper/i, name: 'PartnerBot', category: 'generic' },
+]);
+
+const bot = detect(ua);
+// Custom patterns are tried first; falls through to built-in set
+```
+
+## `detectBot()` return shape
+
+```ts
+interface BotInfo {
+  name: string;       // 'Googlebot'
+  category: string;   // 'search'
+  url?: string;       // bot's info page URL, if known
+}
+// Returns null for non-bot UAs
+```
+
+<Callout type="info">
+  The middleware (`@exortek/ua/middleware/express`) runs `detectBot()`
+  automatically and attaches the result as `req.ua.bot`. For
+  category-based blocking, see [bot-guard](/ua/bot-guard).
+</Callout>

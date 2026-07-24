@@ -1,0 +1,97 @@
+---
+title: 'fingerprint — request hashing'
+sidebarTitle: fingerprint
+---
+
+import { Callout } from 'nextra/components';
+
+# Fingerprinting
+
+Generate a deterministic hash from a parsed User-Agent result — useful
+for session binding, bot detection, and analytics deduplication.
+
+```js
+import { parse } from '@exortek/ua';
+import { createFingerprint, fingerprintRequest } from '@exortek/ua/fingerprint';
+
+// From a parse result
+const fp = createFingerprint(parse(ua));
+// fp_a1b2c3d4e5f6...
+
+// From an HTTP request (extracts UA + IP automatically)
+const fp2 = fingerprintRequest(req);
+```
+
+## Layers
+
+The fingerprint is built from three layers of increasing specificity:
+
+### Stable layer (always included)
+
+- Browser name (`Chrome`, not `Mobile Chrome` — normalized)
+- OS name
+- Device type
+- CPU architecture
+
+### Semi-stable layer (`strict: true`, the default)
+
+- Browser major version
+- OS version
+- `Accept-Language` header
+
+### Network layer (opt-in)
+
+- `subnet: true` — includes the /24 (IPv4) or /64 (IPv6) subnet
+- `includeIP: true` — includes the full IP address
+
+## Options
+
+```js
+const fp = createFingerprint(result, {
+  strict: true,       // include semi-stable layer (default: true)
+  subnet: false,      // include network subnet (default: false)
+  includeIP: false,   // include full IP (default: false)
+  ip: req.ip,         // IP address (required for subnet/includeIP)
+  acceptLanguage: req.headers['accept-language'],
+});
+```
+
+| Option           | Default | Notes |
+| ---------------- | ------- | ----- |
+| `strict`         | `true`  | Include browser major, OS version, Accept-Language. |
+| `subnet`         | `false` | Hash the /24 (v4) or /64 (v6) subnet. |
+| `includeIP`      | `false` | Hash the full IP. Overrides `subnet`. |
+| `ip`             | —       | Required when `subnet` or `includeIP` is set. |
+| `acceptLanguage` | —       | Optional; only used when `strict` is true. |
+
+## `fingerprintRequest(req)`
+
+Convenience wrapper that extracts the UA, IP, and `Accept-Language`
+from a standard Node.js / Express / Fastify request:
+
+```js
+import { fingerprintRequest } from '@exortek/ua/fingerprint';
+
+app.use((req, res, next) => {
+  req.fingerprint = fingerprintRequest(req, { subnet: true });
+  next();
+});
+```
+
+## IPv6 normalization
+
+IPv6 addresses with `::` compressed notation are fully expanded before
+subnet slicing, so `2001:db8::1` and `2001:0db8:0000:0000:0000:0000:0000:0001`
+produce the same /64 fingerprint.
+
+## Use with `@exortek/session`
+
+The session package has its own fingerprint binding via `bindTo: ['ip', 'ua']`.
+Use `@exortek/ua/fingerprint` when you need standalone fingerprints
+outside the session flow — analytics, rate limiting by device class,
+or bot-vs-human disambiguation.
+
+<Callout type="info">
+  Fingerprints are one-way SHA-256 hashes prefixed with `fp_`. They
+  cannot be reversed to recover the original User-Agent or IP address.
+</Callout>

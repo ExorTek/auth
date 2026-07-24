@@ -1,0 +1,118 @@
+---
+title: 'satisfies — version targeting'
+sidebarTitle: satisfies
+---
+
+import { Callout } from 'nextra/components';
+
+# `satisfies()`
+
+Browserslist-style version matching against a parse result. Use it
+for feature flags, polyfill injection, or analytics bucketing.
+
+```js
+import { parse, satisfies } from '@exortek/ua';
+
+const result = parse(ua);
+
+// Basic version check
+satisfies(result, { chrome: '>=120' });
+
+// Multiple browsers (OR logic — true if any match)
+satisfies(result, { chrome: '>=120', firefox: '>=115', safari: '>=17' });
+
+// Device-scoped
+satisfies(result, { mobile: { chrome: '>=120' } });
+satisfies(result, { desktop: { firefox: '>=115' } });
+```
+
+## Operators
+
+| Operator | Example            | Matches |
+| -------- | ------------------ | ------- |
+| `>=`     | `chrome: '>=120'`  | Chrome 120, 121, 126, ... |
+| `>`      | `chrome: '>120'`   | Chrome 121, 126, ... |
+| `<=`     | `chrome: '<=120'`  | Chrome 120, 119, 100, ... |
+| `<`      | `chrome: '<120'`   | Chrome 119, 100, ... |
+| `=`      | `chrome: '=126'`   | Chrome 126 only |
+| `!=`     | `chrome: '!=126'`  | Any Chrome except 126 |
+
+## Browser aliases
+
+The condition key is matched against the browser name case-insensitively,
+with alias resolution:
+
+- `chrome` matches Chrome, Mobile Chrome, Chrome WebView, Chrome Headless
+- `safari` matches Safari, Mobile Safari
+- `firefox` matches Firefox, Mobile Firefox
+- `edge` matches Edge, Edge Mobile
+
+## Device-scoped conditions
+
+Wrap browser conditions in a device scope to target specific form
+factors:
+
+```js
+// Only match mobile Chrome
+satisfies(result, { mobile: { chrome: '>=120' } });
+
+// Only match desktop Firefox
+satisfies(result, { desktop: { firefox: '>=115' } });
+
+// Only match tablet Safari
+satisfies(result, { tablet: { safari: '>=17' } });
+```
+
+When `device.type` is undefined (standard desktop/laptop), it matches
+the `desktop` scope.
+
+## OR logic
+
+Multiple browser keys at the same level are OR'd — the condition
+passes if **any** browser matches:
+
+```js
+// True if Chrome >= 120 OR Firefox >= 115
+satisfies(result, { chrome: '>=120', firefox: '>=115' });
+```
+
+## Example: feature flag
+
+```js
+import { parse, satisfies } from '@exortek/ua';
+import { uaMiddleware } from '@exortek/ua/middleware/express';
+
+app.use(uaMiddleware());
+
+app.get('/', (req, res) => {
+  const supportsWebGPU = satisfies(req.ua, {
+    chrome: '>=113',
+    edge: '>=113',
+  });
+
+  res.render('index', {
+    useWebGPU: supportsWebGPU && !req.ua.bot,
+  });
+});
+```
+
+## Example: polyfill injection
+
+```js
+const needsPolyfill = !satisfies(result, {
+  chrome: '>=90',
+  firefox: '>=90',
+  safari: '>=15',
+  edge: '>=90',
+});
+
+if (needsPolyfill) {
+  scripts.push('/polyfills/structured-clone.js');
+}
+```
+
+<Callout type="warning">
+  Version comparison uses the **major** version only. `chrome: '>=126'`
+  matches Chrome 126.0.0.0 as well as Chrome 126.0.6478.71 — the
+  minor/patch/build segments are not compared.
+</Callout>

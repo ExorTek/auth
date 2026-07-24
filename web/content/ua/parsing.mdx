@@ -1,0 +1,113 @@
+---
+title: 'parse — browser / OS / device'
+sidebarTitle: parse
+---
+
+import { Callout } from 'nextra/components';
+
+# `parse()`
+
+The main entry point. Parses a User-Agent string and returns a structured
+result with browser, OS, device, engine, and CPU information.
+
+```js
+import { parse } from '@exortek/ua';
+
+const r = parse('Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...');
+
+r.browser;  // { name, version, major, type? }
+r.os;       // { name, version }
+r.device;   // { type?, vendor?, model? }
+r.engine;   // { name, version }
+r.cpu;      // { architecture? }
+r.ua;       // the (truncated) input string
+```
+
+## Options
+
+```js
+const r = parse(uaString, {
+  headers: req.headers,    // Client Hints headers (default: none)
+  clientHints: true,       // apply CH overrides (default: true)
+});
+```
+
+| Option         | Default | Notes |
+| -------------- | ------- | ----- |
+| `headers`      | none    | Pass `req.headers` to enable Client Hints. |
+| `clientHints`  | `true`  | Set `false` to skip Client Hints even if headers are present. |
+
+## Per-section parsers
+
+When you only need one section, skip the full parse:
+
+```js
+import { parseBrowser, parseOS, parseDevice, parseEngine, parseCPU } from '@exortek/ua';
+
+parseBrowser(ua);  // { name, version, major, type? }
+parseOS(ua);       // { name, version }
+parseDevice(ua);   // { type?, vendor?, model? }
+parseEngine(ua);   // { name, version }
+parseCPU(ua);      // { architecture? }
+```
+
+Per-section parsers do not go through the LRU cache and do not apply
+Client Hints — they parse the raw UA string only.
+
+## Device types
+
+| Type                   | Example devices |
+| ---------------------- | --------------- |
+| `mobile`               | iPhone, Pixel, Galaxy S |
+| `tablet`               | iPad, Galaxy Tab, Fire HD |
+| `smarttv`              | Samsung Tizen, LG webOS, Roku, Apple TV, Fire TV |
+| `console`              | PlayStation 5, Xbox Series X, Steam Deck, Nintendo Switch |
+| `xr`                   | Meta Quest, Apple Vision Pro, Valve Index, HoloLens |
+| `vehicle`              | Tesla, Mercedes-Benz MBUX, Audi MMI, Rivian |
+| `wearable`             | Apple Watch, Galaxy Watch |
+| `embedded`             | Raspberry Pi, Arduino |
+| `smart-speaker`        | Echo Show (speaker mode) |
+| `smart-display`        | Echo Show, Nest Hub |
+| `camera`               | GoPro |
+| `portable-media-player`| iPod |
+
+When `device.type` is `undefined`, the device is a standard desktop
+or laptop — the parser doesn't assign a type to the default form factor.
+
+## Browser types
+
+Some UA strings identify non-browser clients. The parser sets
+`browser.type` for these:
+
+| Type           | Examples |
+| -------------- | -------- |
+| `email`        | Thunderbird, Outlook, Apple Mail |
+| `mediaplayer`  | VLC, iTunes, Winamp, foobar2000 |
+| `inapp`        | VS Code (Electron), TikTok, Instagram |
+| `crawler`      | Googlebot, Bingbot |
+| `fetcher`      | Axios, node-fetch, Puppeteer |
+| `feedreader`   | Feedly |
+| `cli`          | curl, Wget, HTTPie |
+
+## Input sanitization
+
+UA strings are truncated to 500 characters before parsing — both for
+performance (shorter regex passes) and security (prevents cache key
+inflation). The `r.ua` field reflects the truncated value.
+
+## Caching
+
+`parse()` maintains an internal LRU cache keyed on the UA string +
+Client Hints header values. Call `clearCache()` to reset it:
+
+```js
+import { clearCache } from '@exortek/ua';
+
+clearCache();
+```
+
+<Callout type="info">
+  The per-section parsers (`parseBrowser`, `parseOS`, etc.) bypass the
+  cache entirely. If you're parsing the same UA repeatedly, prefer the
+  full `parse()` function for its cache benefits.
+</Callout>

@@ -12,5 +12,6 @@ export default {
   apikey: '@exortek/apikey',
   'magic-link': '@exortek/magic-link',
   jwks: '@exortek/jwks',
+  ua: '@exortek/ua',
   compliance: 'Compliance',
 };

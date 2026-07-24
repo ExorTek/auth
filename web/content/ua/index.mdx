@@ -1,0 +1,82 @@
+---
+title: '@exortek/ua — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/ua`
+
+High-performance User-Agent parser for Node.js 22+. Detects browsers,
+operating systems, devices, engines, CPUs, and bots — with Client Hints
+support, request fingerprinting, and middleware for Express and Fastify.
+
+## Quick start
+
+```js
+import { parse } from '@exortek/ua';
+
+const result = parse(req.headers['user-agent']);
+
+result.browser;  // { name: 'Chrome', version: '126.0.0.0', major: '126' }
+result.os;       // { name: 'Windows', version: '10' }
+result.device;   // { type: 'mobile', vendor: 'Apple', model: 'iPhone' }
+result.engine;   // { name: 'Blink', version: '126.0.0.0' }
+result.cpu;      // { architecture: 'amd64' }
+```
+
+## With middleware (recommended)
+
+The middleware auto-negotiates Client Hints headers, detects bots, and
+attaches the parsed result to every request.
+
+```js
+import express from 'express';
+import { uaMiddleware } from '@exortek/ua/middleware/express';
+
+const app = express();
+app.use(uaMiddleware());
+
+app.get('/', (req, res) => {
+  const { browser, os, device, bot } = req.ua;
+  res.json({ browser: browser.name, os: os.name, isBot: !!bot });
+});
+```
+
+## Package layout
+
+| Subpath                            | What it exports                                            |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `@exortek/ua`                      | `parse`, `parseBrowser`, `parseOS`, `parseDevice`, `parseEngine`, `parseCPU`, `satisfies`, `isFrozenUA`, `clearCache`, `ACCEPT_CH` |
+| `@exortek/ua/bots`                 | `detectBot`, `isBot`, `isAICrawler`, `isSearchBot`, `isSocialPreview`, `isSEOBot`, `createBotDetector` |
+| `@exortek/ua/fingerprint`          | `createFingerprint`, `fingerprintRequest`                  |
+| `@exortek/ua/middleware/express`    | `uaMiddleware` — Express adapter                           |
+| `@exortek/ua/middleware/fastify`    | `uaPlugin` — Fastify adapter                               |
+| `@exortek/ua/middleware/bot-guard`  | `botGuard` — Express bot filter                            |
+| `@exortek/ua/middleware/bot-guard/fastify` | `botGuardPlugin` — Fastify bot filter               |
+
+## Coverage
+
+The parser ships with built-in regex sets covering:
+
+- **60+ browsers** — Chrome, Firefox, Safari, Edge, Opera, Brave, Samsung Internet, UC Browser, Vivaldi, Arc, and many more (including in-app, email clients, media players)
+- **30+ operating systems** — Windows, macOS, Linux, Android, iOS, ChromeOS, HarmonyOS, and more
+- **8 device categories** — mobile, tablet, smarttv, console, xr, vehicle, wearable, embedded
+- **100+ bot signatures** — search, AI training, AI assistant, social preview, SEO, monitoring, CLI, library
+
+## Where to next
+
+- [Parsing](/ua/parsing) — `parse()` and per-section parsers
+- [Bot detection](/ua/bots) — `detectBot()`, taxonomy, custom patterns
+- [Fingerprinting](/ua/fingerprint) — `createFingerprint()` for session binding
+- [Client Hints](/ua/client-hints) — automatic high-entropy header negotiation
+- [Middleware](/ua/middleware) — Express and Fastify adapters with hooks
+- [Bot guard](/ua/bot-guard) — category-based allow/deny filtering
+- [Version targeting](/ua/satisfies) — `satisfies()` for browserslist-style queries
+
+<Callout type="info">
+  The middleware is the recommended entry point — it handles `Accept-CH` /
+  `Vary` headers, Client Hints parsing, bot detection, and LRU caching
+  automatically. Use the standalone `parse()` function only when you don't
+  have a request/response cycle (CLI tools, log processing, etc.).
+</Callout>

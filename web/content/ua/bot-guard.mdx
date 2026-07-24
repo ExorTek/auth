@@ -1,0 +1,113 @@
+---
+title: 'bot-guard — category filtering'
+sidebarTitle: bot-guard
+---
+
+import { Callout } from 'nextra/components';
+
+# Bot guard
+
+Composable middleware that blocks bots by category. Use it alongside
+the main UA middleware, or standalone — it runs its own `detectBot()`
+call internally.
+
+## Express
+
+```js
+import { botGuard } from '@exortek/ua/middleware/bot-guard';
+
+// Block AI training crawlers
+app.use(botGuard({ deny: ['ai-training'] }));
+
+// Block everything except search engines
+app.use(botGuard({ denyAll: true, allow: ['search'] }));
+
+// Block with custom status + callback
+app.use(botGuard({
+  deny: ['ai-training', 'seo'],
+  status: 429,
+  onBlocked(bot, req) {
+    logger.info(`Blocked ${bot.name} (${bot.category})`);
+  },
+}));
+```
+
+## Fastify
+
+```js
+import { botGuardPlugin } from '@exortek/ua/middleware/bot-guard/fastify';
+
+await app.register(botGuardPlugin, {
+  deny: ['ai-training'],
+  onBlocked(bot, request) {
+    request.log.info(`Blocked ${bot.name}`);
+  },
+});
+```
+
+## Options
+
+| Option       | Default | Notes |
+| ------------ | ------- | ----- |
+| `allow`      | —       | Category array — always allowed (overrides `deny` and `denyAll`). |
+| `deny`       | —       | Category array — blocked unless in `allow`. |
+| `denyAll`    | `false` | Block all detected bots. `allow` still overrides. |
+| `status`     | `403`   | HTTP status code for blocked responses. |
+| `onBlocked`  | —       | `(bot, req) => void` — called when a bot is blocked. |
+| `onAllowed`  | —       | `(bot, req) => void` — called when a bot passes through. |
+
+## Filtering logic
+
+```
+Request arrives
+  └─ detectBot(ua)
+       ├─ null → not a bot → next()
+       └─ bot detected
+            ├─ denyAll?
+            │    ├─ allow has category? → next() + onAllowed
+            │    └─ no → block + onBlocked
+            └─ deny has category?
+                 ├─ allow has category? → next() + onAllowed
+                 └─ no → block + onBlocked
+```
+
+## Block response
+
+Blocked requests receive a JSON response:
+
+```json
+{ "error": "bot_denied", "category": "ai-training" }
+```
+
+The status code defaults to `403` but can be overridden (e.g. `429`
+for rate-limit semantics).
+
+## Composition with UA middleware
+
+Bot guard is independent of the UA middleware — it doesn't require
+`req.ua` to exist. You can use them together or separately:
+
+```js
+import { uaMiddleware } from '@exortek/ua/middleware/express';
+import { botGuard } from '@exortek/ua/middleware/bot-guard';
+
+// Block AI crawlers first, then parse UA for the rest
+app.use(botGuard({ deny: ['ai-training'] }));
+app.use(uaMiddleware());
+```
+
+## Available categories
+
+See the [bot detection categories table](/ua/bots#categories) for the
+full list. Common deny-list entries:
+
+- `ai-training` — GPTBot, ClaudeBot, Google-Extended, CCBot
+- `seo` — AhrefsBot, SemrushBot, MajesticBot
+- `monitoring` — UptimeRobot, Pingdom (usually you want to _allow_ these)
+- `social-preview` — Twitterbot, WhatsApp (usually you want to _allow_ these)
+
+<Callout type="info">
+  For simple one-off bot blocking, the main UA middleware's `onBot`
+  hook may be enough — return `true` to block. Bot guard is designed
+  for declarative category policies that compose across route groups.
+</Callout>

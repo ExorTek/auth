@@ -1,0 +1,101 @@
+---
+title: 'Client Hints — high-entropy headers'
+sidebarTitle: Client Hints
+---
+
+import { Callout } from 'nextra/components';
+
+# Client Hints
+
+Modern Chromium browsers freeze the User-Agent string, reducing it to
+a generic template. The real information moves to **Client Hints** —
+opt-in HTTP headers the browser sends only when the server asks for
+them via `Accept-CH`.
+
+`@exortek/ua` handles Client Hints transparently when you use the
+middleware. For standalone usage, pass the request headers to `parse()`.
+
+## How it works
+
+1. **Server sends `Accept-CH`** listing the headers it wants.
+2. **Browser responds** with those headers on subsequent requests.
+3. **Parser applies** CH values as high-fidelity overrides on top of
+   the frozen UA string.
+
+## Middleware (automatic)
+
+The middleware sets `Accept-CH` and `Vary` headers automatically:
+
+```js
+import { uaMiddleware } from '@exortek/ua/middleware/express';
+
+// That's it — CH negotiation is built in
+app.use(uaMiddleware());
+
+app.get('/', (req, res) => {
+  // First request: UA-string-only parse
+  // Second request: CH-enriched parse (browser sends hints)
+  res.json(req.ua);
+});
+```
+
+## Standalone usage
+
+Pass `headers` to `parse()` to apply Client Hints manually:
+
+```js
+import { parse } from '@exortek/ua';
+
+const result = parse(req.headers['user-agent'], {
+  headers: req.headers,
+});
+```
+
+To skip Client Hints even when headers are available:
+
+```js
+const result = parse(ua, {
+  headers: req.headers,
+  clientHints: false,
+});
+```
+
+## Headers requested
+
+The middleware requests these high-entropy headers via `Accept-CH`:
+
+| Header                         | What it provides |
+| ------------------------------ | ---------------- |
+| `sec-ch-ua`                    | Browser brand + major version list |
+| `sec-ch-ua-full-version-list`  | Full version numbers |
+| `sec-ch-ua-platform`           | OS name |
+| `sec-ch-ua-platform-version`   | OS version |
+| `sec-ch-ua-arch`               | CPU architecture |
+| `sec-ch-ua-bitness`            | 32/64-bit |
+| `sec-ch-ua-model`              | Device model |
+| `sec-ch-ua-mobile`             | Mobile flag |
+| `sec-ch-ua-form-factors`       | Form factor (Automotive, VR, etc.) |
+
+## `Vary` header
+
+The middleware auto-sets `Vary` alongside `Accept-CH` so that CDN /
+proxy caches correctly distinguish responses for different CH
+combinations. Without `Vary`, a CDN might serve a cached response
+from one browser to another.
+
+## Frozen UA detection
+
+```js
+import { isFrozenUA } from '@exortek/ua';
+
+if (isFrozenUA(ua)) {
+  // This is a reduced/frozen Chrome UA — real data is in CH headers
+}
+```
+
+<Callout type="warning">
+  Client Hints are **Chromium-only** as of mid-2025. Firefox and Safari
+  do not send them. The parser falls back to standard UA parsing for
+  non-Chromium browsers — you always get a result, just at lower
+  fidelity.
+</Callout>
