@@ -1,5 +1,5 @@
 import { isString, isArray } from '@exortek/shared/predicates';
-import { EMPTY, UA_MAX_LENGTH } from './constants.js';
+import { UA_MAX_LENGTH } from './constants.js';
 
 /**
  * @param {string} str

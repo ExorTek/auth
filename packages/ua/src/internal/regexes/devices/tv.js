@@ -1,18 +1,4 @@
-import {
-  MODEL,
-  VENDOR,
-  TYPE,
-  SMARTTV,
-  SAMSUNG,
-  APPLE,
-  GOOGLE,
-  SONY,
-  AMAZON,
-  LG,
-  NVIDIA,
-  XIAOMI,
-  SHARP,
-} from '../../constants.js';
+import { MODEL, VENDOR, TYPE, SMARTTV, SAMSUNG, GOOGLE, SONY, AMAZON, LG, NVIDIA, XIAOMI } from '../../constants.js';
 
 export const tvRules = [
   // SAMSUNG
