@@ -45,7 +45,7 @@ opt out of the checks that matter.
 4. **Blacklist store** — memory + Redis + custom, with 3 GC strategies.
 5. **Custom-fn escape hatch on every knob** — `hashFn`, `generate`,
    `issuer` / `audience` predicates, encoding.
-6. **`typ` enforcement + RFC 9068 preset.** `at+jwt` supported.
+6. **`typ` enforcement** with `at+jwt` allowlisting (RFC 9068).
 7. **`maxAge` — iat freshness policy** for leaked-token mitigation.
 8. **`scope` validation first-class** (`requiredScopes: ['read:users']`).
 9. **`peek`** — signature-verified inspection without claim checks.

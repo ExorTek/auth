@@ -3,11 +3,11 @@
  *
  * **Wire format:**
  *
- *     <prefix>_<base64url(16 random bytes)>_<base64url(32 random bytes)>
- *     ^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
- *     type     id (128-bit — plaintext DB key)   secret (256-bit — HMAC'd)
+ *     <prefix>_<crockford-base32(16 random bytes)>_<crockford-base32(32 random bytes)>
+ *     ^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ *     type     id (128-bit, 26 chars)                secret (256-bit, 52 chars)
  *
- *   sk_live_QVI0RExDX01Fbg_pTk9UX0FfUkVBTF9LRVlfNDJfQVJUSVNBTkFMX1BJWk
+ *   sk_live_<id-26-chars>_<secret-52-chars>
  *
  * Stripe / GitHub / Anthropic all use this three-segment shape. The
  * split matters:
@@ -112,9 +112,9 @@ export function hashSecret(secretBytes, pepper) {
 
 /**
  * Timing-safe compare of a candidate hash against a stored hash. Both
- * inputs are base64url strings of equal length — a length mismatch is
- * treated as a mismatch after a fixed decode step, so an outside
- * observer cannot learn the stored hash's length via timing.
+ * inputs are base64url strings. A length mismatch early-returns `false`
+ * — all stored hashes are fixed-length (43-char SHA-256 digests), so
+ * the length check leaks no information about the stored value.
  *
  * @param {string} candidate
  * @param {string} stored

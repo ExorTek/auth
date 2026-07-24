@@ -68,7 +68,7 @@ const invalidPrefix = msg => new MagicLinkError(ErrorCode.INVALID_PREFIX, msg);
  * @property {Record<string, unknown>} [metadata]
  * @property {boolean} [hashEmail=true]
  *   When true (default), the token's payload carries
- *   `eh = SHA-256(secret ‖ email)` so `verifyMagicLink` can
+ *   `eh = HMAC-SHA256(secret, email)` so `verifyMagicLink` can
  *   short-circuit a wrong-email reject before touching the store.
  *   Turn off only when you need a shorter payload and are OK with
  *   the extra store hit + slightly larger surface for token

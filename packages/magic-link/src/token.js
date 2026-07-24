@@ -11,8 +11,8 @@
  *   single-use enforcement. Not a secret on its own; the HMAC gates
  *   authenticity.
  * - `iat` / `exp` — seconds since epoch. Enforced on verify.
- * - `eh`  — optional SHA-256 of the email + a salt derived from the
- *   HMAC secret. Present when `hashEmail: true` (default). Lets
+ * - `eh`  — optional HMAC-SHA256 of the email, keyed by the link
+ *   secret. Present when `hashEmail: true` (default). Lets
  *   `verifyMagicLink` short-circuit a wrong-email reject before ever
  *   touching the store; also gives us cross-check against a poisoned
  *   store row.
@@ -65,11 +65,11 @@ export function newId() {
 }
 
 /**
- * Compute the `eh` (email hash) claim: `SHA-256(secret ‖ email)` in
- * base64url. Not a KDF — email is a low-entropy identifier and the
+ * Compute the `eh` (email hash) claim: `HMAC-SHA256(secret, email)`
+ * in base64url. Not a KDF — email is a low-entropy identifier and the
  * whole payload is HMAC-signed, so a fast hash is enough. The
- * secret-derived namespacing keeps two apps' hashes distinct even
- * for the same email address.
+ * secret keying keeps two apps' hashes distinct even for the same
+ * email address.
  *
  * @param {Buffer} secret
  * @param {string} email

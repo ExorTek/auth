@@ -3,7 +3,7 @@
  * built-in backends (`memory`, `redis`) and a `custom` factory that
  * accepts the caller's own implementation of the {@link Store} shape.
  *
- * Subpath entry (`@exortek/jwt/stores`). Scaffold stub.
+ * Subpath entry (`@exortek/jwt/stores`).
  */
 
 import { createMemoryStore } from './internal/memory-store.js';
