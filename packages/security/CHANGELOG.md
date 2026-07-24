@@ -1,29 +1,42 @@
 # @exortek/security
 
+## 1.3.0
+
+### Minor Changes
+
+- 48f1b5e: Remove 28 `ErrorCode` enum members that were defined but never thrown by any code path. These were
+  speculative reservations — the actual failure modes use boolean returns or plain objects by design. READMEs updated to
+  match.
+
+### Patch Changes
+
+- d28fbfb: Add `formField` option to CSRF middleware, decoupling the form `<input name="…">` from the cookie name.
+  Defaults to `cookieName` for backwards compatibility.
+- 48f1b5e: Remove dead Fastify CSRF cookie fallback that would have emitted a malformed `Set-Cookie` header if the
+  unreachable code path were ever reached.
+
 ## 1.2.0
 
 ### Minor Changes
 
-- **BREAKING (adapter surfaces).** Hono and Elysia middleware adapters are removed.
-  `@exortek/security/hono` and `@exortek/security/elysia` subpath exports no longer exist; the
-  associated `peerDependencies` / `peerDependenciesMeta` entries are gone; framework keywords
-  are trimmed. The package now targets **Express + Fastify** exclusively — the classic Node
-  stack this repository positions around.
+- **BREAKING (adapter surfaces).** Hono and Elysia middleware adapters are removed. `@exortek/security/hono` and
+  `@exortek/security/elysia` subpath exports no longer exist; the associated `peerDependencies` / `peerDependenciesMeta`
+  entries are gone; framework keywords are trimmed. The package now targets **Express + Fastify** exclusively — the
+  classic Node stack this repository positions around.
 
-  Migration: pin `@exortek/security@1.1.2` if you depend on either adapter, or lift the
-  handful of ~60-line adapter modules from that release's tarball into your own repo — they
-  compose over the same core primitives that ship in `middleware/core.js`.
+  Migration: pin `@exortek/security@1.1.2` if you depend on either adapter, or lift the handful of ~60-line adapter
+  modules from that release's tarball into your own repo — they compose over the same core primitives that ship in
+  `middleware/core.js`.
 
-- **`webhookVerifyStripe`** — new helper for verifying Stripe-style webhook signatures
-  (`t=<timestamp>,v1=<hex>` envelope) with a configurable replay-tolerance window.
-  Complements the existing generic `webhookVerify`.
+- **`webhookVerifyStripe`** — new helper for verifying Stripe-style webhook signatures (`t=<timestamp>,v1=<hex>`
+  envelope) with a configurable replay-tolerance window. Complements the existing generic `webhookVerify`.
 
-- Middleware **adapter kit** — `AdapterContext` interface + framework-neutral runners in
-  `middleware/core.js`. External consumers who want to add a fifth framework can now do so
-  without re-implementing the CSRF / rate-limit / headers / CORS pipeline.
+- Middleware **adapter kit** — `AdapterContext` interface + framework-neutral runners in `middleware/core.js`. External
+  consumers who want to add a fifth framework can now do so without re-implementing the CSRF / rate-limit / headers /
+  CORS pipeline.
 
-- Internal: argument guards bind through `@exortek/shared/asserts` via `internal/guards.js`;
-  `webhookVerify` timing-safe compare now delegates to `@exortek/shared/timing-safe`.
+- Internal: argument guards bind through `@exortek/shared/asserts` via `internal/guards.js`; `webhookVerify` timing-safe
+  compare now delegates to `@exortek/shared/timing-safe`.
 
 ## 1.1.2
 

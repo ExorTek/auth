@@ -1,5 +1,22 @@
 # @exortek/session
 
+## 2.0.0
+
+### Major Changes
+
+- 48f1b5e: **Breaking:** `verify()` now rejects tokens missing `fp` when `bindTo` is configured (fail-closed).
+  Previously, tokens without a fingerprint silently bypassed binding checks. `impersonate()` now sets `fp` from the
+  admin request, matching `issue()` and `rotate()`.
+
+  Existing sessions issued before `bindTo` was enabled will be rejected on next verify — users will need to
+  re-authenticate.
+
+### Minor Changes
+
+- 48f1b5e: Remove 10 dead `ErrorCode` members that were never thrown (MISSING_TOKEN, IDLE_TIMEOUT, REVOKED,
+  TOKEN_ROTATION_REQUIRED, FINGERPRINT_MISMATCH, SUSPICIOUS_ACTIVITY, CONCURRENT_LIMIT_EXCEEDED, FRESH_AUTH_REQUIRED,
+  IMPERSONATION_INVALID, MISSING_PEER_DEP).
+
 ## 1.2.1
 
 ### Patch Changes

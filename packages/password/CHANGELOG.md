@@ -1,26 +1,39 @@
 # @exortek/password
 
+## 1.1.0
+
+### Minor Changes
+
+- 48f1b5e: Remove 28 `ErrorCode` enum members that were defined but never thrown by any code path. These were
+  speculative reservations — the actual failure modes use boolean returns or plain objects by design. READMEs updated to
+  match.
+
+### Patch Changes
+
+- d28fbfb: Make `history.isReused()` constant-time — always walks all `keepLast` hashes regardless of match position,
+  removing the early-return timing side-channel.
+
 ## 1.0.4
 
 ### Patch Changes
 
 - `scrypt.verify` and `bcrypt.verify` now cap the cost parameters they read out of the stored PHC / bcrypt string,
   matching the `MAX_VERIFY_ITERATIONS` pattern already used in `pbkdf2.verify` (1.0.2). A poisoned hash — reachable via
-  account-recovery import, migration tooling, or any attacker-influenced write path — could previously turn every
-  login attempt into a process-wide CPU/memory DoS: `scrypt.verify` accepted `ln` up to 31 (~2 TB allocation),
-  `bcrypt.verify` accepted `rounds` up to 31 (~2^31 synchronous Blowfish key-schedule iterations). Caps are
-  independent of the hash-side ceiling: `scrypt.verify` rejects `ln > 24` and `r`/`p > 32`; `bcrypt.verify` rejects
-  `rounds > 20`. Both return `false` instead of throwing — consistent with the existing verify-side untrusted-input
-  contract. Every legitimate hash produced with OWASP-2024 defaults sits well under the guards.
+  account-recovery import, migration tooling, or any attacker-influenced write path — could previously turn every login
+  attempt into a process-wide CPU/memory DoS: `scrypt.verify` accepted `ln` up to 31 (~2 TB allocation), `bcrypt.verify`
+  accepted `rounds` up to 31 (~2^31 synchronous Blowfish key-schedule iterations). Caps are independent of the hash-side
+  ceiling: `scrypt.verify` rejects `ln > 24` and `r`/`p > 32`; `bcrypt.verify` rejects `rounds > 20`. Both return
+  `false` instead of throwing — consistent with the existing verify-side untrusted-input contract. Every legitimate hash
+  produced with OWASP-2024 defaults sits well under the guards.
 
 ## 1.0.3
 
 ### Patch Changes
 
 - Internal refactor: errors extend the shared `BaseError`; `createPepper` config validated through
-  `@exortek/shared/validate`; timing-safe compare, byte helpers, RFC 4648 §4 base64 codec, and
-  rejection-sampling primitives delegate to `@exortek/shared`; argument guards bind through
-  `@exortek/shared/asserts` via `internal/guards.js`. No public API change.
+  `@exortek/shared/validate`; timing-safe compare, byte helpers, RFC 4648 §4 base64 codec, and rejection-sampling
+  primitives delegate to `@exortek/shared`; argument guards bind through `@exortek/shared/asserts` via
+  `internal/guards.js`. No public API change.
 
 ## 1.0.2
 

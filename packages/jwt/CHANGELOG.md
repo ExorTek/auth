@@ -1,12 +1,24 @@
 # @exortek/jwt
 
+## 1.2.0
+
+### Minor Changes
+
+- 48f1b5e: Add atomic `markUsed()` to memory and redis stores (Lua CAS on Redis). `tokenPair.rotate()` now uses it for
+  cross-process safe reuse detection. Custom stores without `markUsed` fall back to the existing in-process mutex.
+
+### Patch Changes
+
+- d28fbfb: Add `options.dialect` (`'ioredis' | 'node-redis'`) to `createRedisStore` so wrapped/proxied Redis clients can
+  bypass constructor-name auto-detection.
+
 ## 1.1.0
 
 ### Minor Changes
 
 - `tokenPair`: `refresh.alg` is now optional on the default opaque path (`opaque: true`, the default), where it was
-  previously required but decorative — random bytes never touch it. Still required when `refresh.opaque: false`
-  (signed JWT refresh). Additive change; existing configs continue to work.
+  previously required but decorative — random bytes never touch it. Still required when `refresh.opaque: false` (signed
+  JWT refresh). Additive change; existing configs continue to work.
 
 ## 1.0.0
 
