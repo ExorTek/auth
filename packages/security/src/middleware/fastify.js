@@ -1,5 +1,5 @@
 import fp from 'fastify-plugin';
-import { isArray, isFunction } from '@exortek/shared/predicates';
+import { isArray } from '@exortek/shared/predicates';
 import {
   normalizeUmbrella,
   normalizeCsrf,
@@ -38,10 +38,9 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
  *
  * @param {any} request
  * @param {any} reply
- * @param {{ hasFastifyCookie?: boolean }} [flags]
  * @returns {import('./core.js').AdapterContext}
  */
-function makeFastifyContext(request, reply, flags = {}) {
+function makeFastifyContext(request, reply) {
   return {
     method: () => request.method,
     getHeader: name => {
@@ -57,15 +56,7 @@ function makeFastifyContext(request, reply, flags = {}) {
       }
     },
     setCookie: (name, value, opts) => {
-      // @fastify/cookie handles the Set-Cookie stack correctly on Fastify;
-      // fall back to a raw `reply.header('Set-Cookie', ...)` only if
-      // callers went bare. `attachCsrf` asserts the plugin is present, so
-      // in practice we always hit the first branch.
-      if (flags.hasFastifyCookie && isFunction(reply.setCookie)) {
-        reply.setCookie(name, value, opts);
-      } else {
-        reply.header('Set-Cookie', value); // callers are expected to use @fastify/cookie
-      }
+      reply.setCookie(name, value, opts);
     },
     json: (status, body, extraHeaders) => {
       if (extraHeaders) {
@@ -96,7 +87,7 @@ function makeFastifyContext(request, reply, flags = {}) {
 
 function attachRunner(fastify, runner, hookName = 'onRequest') {
   fastify.addHook(hookName, async (request, reply) => {
-    const ctx = makeFastifyContext(request, reply, { hasFastifyCookie: fastify.hasPlugin('@fastify/cookie') });
+    const ctx = makeFastifyContext(request, reply);
     await runner(ctx);
   });
 }
