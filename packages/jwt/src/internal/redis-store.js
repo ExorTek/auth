@@ -46,6 +46,9 @@ return {1, encoded}
  * @typedef {Object} RedisConfig
  * @property {any} client        ioredis or redis@4 client
  * @property {string} [keyPrefix]
+ * @property {'ioredis' | 'node-redis'} [dialect]
+ *   Override auto-detection for wrapped/proxied clients whose
+ *   `constructor.name` doesn't match the underlying driver.
  */
 
 /**
@@ -61,7 +64,7 @@ export function createRedisStore(options) {
   }
   const client = options.client;
   const keyPrefix = options.keyPrefix || 'jwt:bl:';
-  const dialect = _detectDialect(client);
+  const dialect = options.dialect ?? _detectDialect(client);
 
   const build = key => `${keyPrefix}${key}`;
 
