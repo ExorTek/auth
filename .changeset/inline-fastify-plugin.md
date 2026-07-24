@@ -1,6 +1,7 @@
 ---
 '@exortek/apikey': patch
 '@exortek/security': patch
+'@exortek/session': patch
 ---
 
-Drop `fastify-plugin` peer dependency — the two symbols it sets (`skip-override`, `fastify.display-name`) are now inlined. Users no longer need to `npm i fastify-plugin` alongside fastify.
+Replace `fastify-plugin` npm dependency with `@exortek/shared/fastify-plugin` — a built-in drop-in that covers skip-override, display-name, plugin-meta, version constraints, and encapsulate. Users no longer need to `npm i fastify-plugin` alongside fastify.
