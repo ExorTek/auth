@@ -32,7 +32,8 @@
     "./ecdsa": "./src/ecdsa.js",
     "./incr-store": "./src/incr-store.js",
     "./redis-helpers": "./src/redis-helpers.js",
-    "./record-store": "./src/record-store.js"
+    "./record-store": "./src/record-store.js",
+    "./fastify-plugin": "./src/fastify-plugin.js"
   },
   "scripts": {
     "build": "echo 'shared has no build step — source consumed via bundler inline'",

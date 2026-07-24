@@ -1,4 +1,5 @@
 import { isArray } from '@exortek/shared/predicates';
+import { fastifyPlugin } from '@exortek/shared/fastify-plugin';
 import {
   normalizeUmbrella,
   normalizeCsrf,
@@ -15,9 +16,8 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
 /*
  * Fastify adapter. Each concern is exposed both as its own plugin
  * (`headersPlugin`, `corsPlugin`, `csrfPlugin`, `rateLimitPlugin`) and as
- * part of the umbrella `securityPlugin(options)`. All set
- * `Symbol.for('skip-override')` so their hooks apply globally
- * (bypassing per-plugin encapsulation).
+ * part of the umbrella `securityPlugin(options)`. All bypass Fastify's
+ * per-plugin encapsulation via `skip-override`.
  *
  * Usage:
  *   import { securityPlugin, corsPlugin } from '@exortek/security/fastify'
@@ -30,12 +30,6 @@ import { SecurityError, ErrorCode } from '../internal/errors.js';
  *     headers: {...}, cors: {...}, csrf: { secret }, rateLimit: { limiter },
  *   })
  */
-
-function markAsPlugin(fn, name) {
-  fn[Symbol.for('skip-override')] = true;
-  fn[Symbol.for('fastify.display-name')] = name;
-  return fn;
-}
 
 /**
  * Build the framework-neutral `AdapterContext` from Fastify's
@@ -98,45 +92,57 @@ function attachRunner(fastify, runner, hookName = 'onRequest') {
 }
 
 /** Only-CORS plugin. */
-export const corsPlugin = markAsPlugin(async function corsPluginImpl(fastify, options) {
-  const check = buildCorsCheck(options);
-  attachRunner(fastify, ctx => runCors(check, ctx));
-}, '@exortek/security/cors');
+export const corsPlugin = fastifyPlugin(
+  async function corsPluginImpl(fastify, options) {
+    const check = buildCorsCheck(options);
+    attachRunner(fastify, ctx => runCors(check, ctx));
+  },
+  { name: '@exortek/security/cors', fastify: '>=4' },
+);
 
 /** Only-headers plugin. */
-export const headersPlugin = markAsPlugin(async function headersPluginImpl(fastify, options) {
-  const map = buildHeaders(options ?? {});
-  if (Object.keys(map).length === 0) {
-    return;
-  }
-  const entries = Object.entries(map);
-  fastify.addHook('onSend', async (_req, reply, payload) => {
-    for (const [k, v] of entries) {
-      if (!reply.hasHeader(k)) {
-        reply.header(k, v);
-      }
+export const headersPlugin = fastifyPlugin(
+  async function headersPluginImpl(fastify, options) {
+    const map = buildHeaders(options ?? {});
+    if (Object.keys(map).length === 0) {
+      return;
     }
-    return payload;
-  });
-}, '@exortek/security/headers');
+    const entries = Object.entries(map);
+    fastify.addHook('onSend', async (_req, reply, payload) => {
+      for (const [k, v] of entries) {
+        if (!reply.hasHeader(k)) {
+          reply.header(k, v);
+        }
+      }
+      return payload;
+    });
+  },
+  { name: '@exortek/security/headers', fastify: '>=4' },
+);
 
 /** Only-CSRF plugin. Requires `@fastify/cookie`. */
-export const csrfPlugin = markAsPlugin(async function csrfPluginImpl(fastify, options) {
-  const csrf = normalizeCsrf(options);
-  if (!fastify.hasPlugin('@fastify/cookie')) {
-    throw new SecurityError(
-      ErrorCode.INVALID_ARGUMENT,
-      "@exortek/security: csrf requires '@fastify/cookie' to be registered first. Do `await app.register(import('@fastify/cookie'))` before enabling CSRF.",
-    );
-  }
-  attachRunner(fastify, ctx => runCsrf(csrf, ctx));
-}, '@exortek/security/csrf');
+export const csrfPlugin = fastifyPlugin(
+  async function csrfPluginImpl(fastify, options) {
+    const csrf = normalizeCsrf(options);
+    if (!fastify.hasPlugin('@fastify/cookie')) {
+      throw new SecurityError(
+        ErrorCode.INVALID_ARGUMENT,
+        "@exortek/security: csrf requires '@fastify/cookie' to be registered first. Do `await app.register(import('@fastify/cookie'))` before enabling CSRF.",
+      );
+    }
+    attachRunner(fastify, ctx => runCsrf(csrf, ctx));
+  },
+  { name: '@exortek/security/csrf', fastify: '>=4' },
+);
 
 /** Only rate-limit plugin. */
-export const rateLimitPlugin = markAsPlugin(async function rateLimitPluginImpl(fastify, options) {
-  const rl = normalizeRateLimit(options);
-  attachRunner(fastify, ctx => runRateLimit(rl, ctx));
-}, '@exortek/security/rate-limit');
+export const rateLimitPlugin = fastifyPlugin(
+  async function rateLimitPluginImpl(fastify, options) {
+    const rl = normalizeRateLimit(options);
+    attachRunner(fastify, ctx => runRateLimit(rl, ctx));
+  },
+  { name: '@exortek/security/rate-limit', fastify: '>=4' },
+);
 
 /**
  * Umbrella plugin — headers + cors + csrf + rate-limit in one register.
@@ -146,38 +152,39 @@ export const rateLimitPlugin = markAsPlugin(async function rateLimitPluginImpl(f
  * @param {import('fastify').FastifyInstance} fastify
  * @param {import('./core.js').SecurityMiddlewareOptions} options
  */
-async function securityPluginImpl(fastify, options) {
-  const cfg = normalizeUmbrella(options);
-  const headersEntries = cfg.responseHeaders ? Object.entries(cfg.responseHeaders) : null;
+export const securityPlugin = fastifyPlugin(
+  async function securityPluginImpl(fastify, options) {
+    const cfg = normalizeUmbrella(options);
+    const headersEntries = cfg.responseHeaders ? Object.entries(cfg.responseHeaders) : null;
 
-  if (headersEntries) {
-    fastify.addHook('onSend', async (_req, reply, payload) => {
-      for (const [k, v] of headersEntries) {
-        if (!reply.hasHeader(k)) {
-          reply.header(k, v);
+    if (headersEntries) {
+      fastify.addHook('onSend', async (_req, reply, payload) => {
+        for (const [k, v] of headersEntries) {
+          if (!reply.hasHeader(k)) {
+            reply.header(k, v);
+          }
         }
-      }
-      return payload;
-    });
-  }
-
-  if (cfg.corsCheck) {
-    attachRunner(fastify, ctx => runCors(cfg.corsCheck, ctx, headersEntries));
-  }
-  if (cfg.rateLimit) {
-    attachRunner(fastify, ctx => runRateLimit(cfg.rateLimit, ctx));
-  }
-  if (cfg.csrf) {
-    if (!fastify.hasPlugin('@fastify/cookie')) {
-      throw new SecurityError(
-        ErrorCode.INVALID_ARGUMENT,
-        "@exortek/security: csrf requires '@fastify/cookie' to be registered first. Do `await app.register(import('@fastify/cookie'))` before enabling CSRF.",
-      );
+        return payload;
+      });
     }
-    attachRunner(fastify, ctx => runCsrf(cfg.csrf, ctx));
-  }
-}
 
-export const securityPlugin = markAsPlugin(securityPluginImpl, '@exortek/security');
+    if (cfg.corsCheck) {
+      attachRunner(fastify, ctx => runCors(cfg.corsCheck, ctx, headersEntries));
+    }
+    if (cfg.rateLimit) {
+      attachRunner(fastify, ctx => runRateLimit(cfg.rateLimit, ctx));
+    }
+    if (cfg.csrf) {
+      if (!fastify.hasPlugin('@fastify/cookie')) {
+        throw new SecurityError(
+          ErrorCode.INVALID_ARGUMENT,
+          "@exortek/security: csrf requires '@fastify/cookie' to be registered first. Do `await app.register(import('@fastify/cookie'))` before enabling CSRF.",
+        );
+      }
+      attachRunner(fastify, ctx => runCsrf(cfg.csrf, ctx));
+    }
+  },
+  { name: '@exortek/security', fastify: '>=4' },
+);
 
 export default securityPlugin;

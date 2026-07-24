@@ -1,5 +1,6 @@
 import { appendSetCookieHeader } from '@exortek/shared/http';
 import { isObject, isFunction } from '@exortek/shared/predicates';
+import { fastifyPlugin } from '@exortek/shared/fastify-plugin';
 
 import { createSessionManager } from '../manager.js';
 
@@ -22,37 +23,39 @@ export function sessionPlugin(configOrManager) {
       ? configOrManager
       : createSessionManager(configOrManager);
 
-  const plugin = async function (fastify) {
-    fastify.decorateRequest('session', null);
-    fastify.decorateRequest('sessions', null);
-    fastify.decorateReply('setSessionCookie', null);
-    fastify.decorateReply('clearSessionCookie', null);
+  const plugin = fastifyPlugin(
+    async function sessionPluginFn(fastify) {
+      fastify.decorateRequest('session', null);
+      fastify.decorateRequest('sessions', null);
+      fastify.decorateReply('setSessionCookie', null);
+      fastify.decorateReply('clearSessionCookie', null);
 
-    fastify.addHook('preHandler', async (request, reply) => {
-      request.sessions = sessions;
-      request.session = await sessions.verify(request);
-      // `reply.header('Set-Cookie', v)` REPLACES the current value on
-      // Fastify — there's no implicit append. Read whatever the
-      // response already has, then let the shared helper stack the new
-      // value onto it. Multiple Set-Cookie values on one response are
-      // legal.
-      reply.setSessionCookie = value => {
-        const existing = isFunction(reply.getHeader) ? reply.getHeader('set-cookie') : undefined;
-        reply.header('Set-Cookie', appendSetCookieHeader(existing, value));
-      };
-      // Returns the promise so callers can `await reply.clearSessionCookie()`
-      // before `reply.send()`. Fire-and-forget would race the response
-      // and drop the delete-cookie header on the floor.
-      reply.clearSessionCookie = async () => {
-        const result = await sessions.revoke(request);
-        const existing = isFunction(reply.getHeader) ? reply.getHeader('set-cookie') : undefined;
-        reply.header('Set-Cookie', appendSetCookieHeader(existing, result.cookie));
-        return result;
-      };
-    });
-  };
+      fastify.addHook('preHandler', async (request, reply) => {
+        request.sessions = sessions;
+        request.session = await sessions.verify(request);
+        // `reply.header('Set-Cookie', v)` REPLACES the current value on
+        // Fastify — there's no implicit append. Read whatever the
+        // response already has, then let the shared helper stack the new
+        // value onto it. Multiple Set-Cookie values on one response are
+        // legal.
+        reply.setSessionCookie = value => {
+          const existing = isFunction(reply.getHeader) ? reply.getHeader('set-cookie') : undefined;
+          reply.header('Set-Cookie', appendSetCookieHeader(existing, value));
+        };
+        // Returns the promise so callers can `await reply.clearSessionCookie()`
+        // before `reply.send()`. Fire-and-forget would race the response
+        // and drop the delete-cookie header on the floor.
+        reply.clearSessionCookie = async () => {
+          const result = await sessions.revoke(request);
+          const existing = isFunction(reply.getHeader) ? reply.getHeader('set-cookie') : undefined;
+          reply.header('Set-Cookie', appendSetCookieHeader(existing, result.cookie));
+          return result;
+        };
+      });
+    },
+    { name: '@exortek/session' },
+  );
 
-  plugin[Symbol.for('skip-override')] = true;
   return {
     manager: sessions,
     plugin,
