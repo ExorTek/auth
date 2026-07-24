@@ -102,7 +102,7 @@ status lives in [`README.md`](./README.md).
 | 09 | `@exortek/jwks`        | JWKS URI fetching, caching, `kid` rotation per RFC 7517 §5                           |
 | 10 | `@exortek/session`     | Sealed-cookie sessions, rotation, revocation, sudo mode, Redis pub/sub              |
 | 11 | `@exortek/security`    | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect, defensive HTTP helpers  |
-| 12 | `@exortek/device`      | Device fingerprinting, trusted-device tokens                                        |
+| 12 | `@exortek/ua`          | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting      |
 | 13 | `@exortek/apikey`      | Prefixed API keys (`sk_live_id_secret`), HMAC-SHA256 storage, scopes, middleware    |
 | 14 | `@exortek/magic-link`  | Passwordless email-link auth — signed short-lived tokens with single-use consume    |
 | 15 | `@exortek/passkey`     | WebAuthn / FIDO2 server verification (`/server` only; browser via community lib)    |

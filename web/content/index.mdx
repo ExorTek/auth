@@ -8,10 +8,9 @@ sidebarTitle: Introduction
 A framework-agnostic authentication toolkit for Node.js — built as 22 small packages under one scope. Pick the one you
 need, or install the umbrella.
 
-Every package is built on `node:crypto`. The only required non-`@exortek/*` runtime dependency across the whole stack
-is `fastify-plugin` (~3 kB, pulled in by `@exortek/security` even for Express-only consumers) — moving to an optional
-peer in 2.0. The heaviest primitives (Argon2id, bcrypt) come from opt-in peer packages you install only if you use them.
-Pure JavaScript with JSDoc → `.d.ts`. Ships adapters for Express and Fastify — the classic Node HTTP stack.
+Every package is built on `node:crypto` with zero required non-`@exortek/*` runtime dependencies. The heaviest primitives
+(Argon2id, bcrypt) come from opt-in peer packages you install only if you use them. Pure JavaScript with JSDoc → `.d.ts`.
+Ships adapters for Express and Fastify — the classic Node HTTP stack.
 
 ## Shipping
 
@@ -48,7 +47,7 @@ time.
 | 09 | [`@exortek/jwks`](/jwks)         | JWKS local key set + remote URI fetching, caching, zero-downtime `kid` rotation      |
 | 10 | [`@exortek/session`](/session)   | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub        |
 | 11 | [`@exortek/security`](/security) | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers |
-| 12 | `@exortek/device`                | device fingerprinting, trusted-device tokens                                         |
+| 12 | `@exortek/ua`                    | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting       |
 | 13 | [`@exortek/apikey`](/apikey)     | Stripe-style prefixed API keys with HMAC-hashed storage, scopes, and middleware      |
 | 14 | [`@exortek/magic-link`](/magic-link) | passwordless email-link auth — HMAC-signed short-lived tokens with single-use consume |
 | 15 | `@exortek/passkey`               | WebAuthn / FIDO2 server verification (browser side via `@simplewebauthn/browser`)    |

@@ -42,7 +42,7 @@ Linked entries are **published on npm**; the rest are **planned** and not yet in
 | 09 | [`@exortek/jwks`](./packages/jwks)         | shipped   | JWKS local key set + remote URI fetching, caching, zero-downtime `kid` rotation          |
 | 10 | [`@exortek/session`](./packages/session)   | shipped   | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub            |
 | 11 | [`@exortek/security`](./packages/security) | shipped   | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers     |
-| 12 | `@exortek/device`                          | _planned_ | device fingerprinting, trusted-device tokens                                             |
+| 12 | [`@exortek/ua`](./packages/ua)             | shipped   | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting           |
 | 13 | [`@exortek/apikey`](./packages/apikey)     | shipped   | Stripe-style prefixed API keys, HMAC-hashed storage, scopes, middleware                  |
 | 14 | [`@exortek/magic-link`](./packages/magic-link) | shipped   | passwordless email-link auth — HMAC-signed short-lived tokens with single-use consume    |
 | 15 | `@exortek/passkey`                         | _planned_ | WebAuthn / FIDO2 server verification (browser side via `@simplewebauthn/browser`)        |
