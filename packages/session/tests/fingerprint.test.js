@@ -120,6 +120,58 @@ test('explicit deviceLabel overrides auto', async () => {
   sessions.store._stop();
 });
 
+test('bindTo: verify rejects token without fp when bindTo is set (fail-closed)', async () => {
+  const sessions = createSessionManager({
+    secret: SECRET,
+    ttl: '7d',
+    idleTtl: '30m',
+    bindTo: ['ip', 'ua'],
+  });
+  // Issue without bindTo active by using a manager without it, then verify
+  // with the bindTo manager — simulates a token issued before bindTo was enabled.
+  const plain = createSessionManager({ secret: SECRET, ttl: '7d', idleTtl: '30m' });
+  const { token } = await plain.issue({ userId: 'u1' });
+
+  const verifyReq = mkReq({
+    cookie: `__Host-sid=${encodeURIComponent(token)}`,
+    ip: '10.0.0.1',
+    ua: 'MyBrowser/1.0',
+  });
+  assert.equal(await sessions.verify(verifyReq), null);
+  sessions.store._stop();
+  plain.store._stop();
+});
+
+test('bindTo: impersonate sets fp from adminReq', async () => {
+  const sessions = createSessionManager({
+    secret: SECRET,
+    ttl: '7d',
+    idleTtl: '30m',
+    bindTo: ['ip'],
+    impersonation: true,
+  });
+  const adminReq = mkReq({ ip: '10.0.0.1', ua: 'Admin/1.0' });
+  const { token: adminToken } = await sessions.issue({ userId: 'admin1', req: adminReq });
+  adminReq.headers.cookie = `__Host-sid=${encodeURIComponent(adminToken)}`;
+  const { token: impToken } = await sessions.impersonate(adminReq, 'target-user');
+
+  // Verify from same IP → OK
+  const sameIpReq = mkReq({
+    cookie: `__Host-sid=${encodeURIComponent(impToken)}`,
+    ip: '10.0.0.1',
+  });
+  const result = await sessions.verify(sameIpReq);
+  assert.ok(result);
+
+  // Verify from different IP → rejected
+  const diffIpReq = mkReq({
+    cookie: `__Host-sid=${encodeURIComponent(impToken)}`,
+    ip: '10.0.0.99',
+  });
+  assert.equal(await sessions.verify(diffIpReq), null);
+  sessions.store._stop();
+});
+
 test('bindTo: issue without req throws INVALID_ARGUMENT (fail-closed, not silent skip)', async () => {
   const sessions = createSessionManager({
     secret: SECRET,

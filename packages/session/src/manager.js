@@ -398,29 +398,47 @@ export function createSessionManager(config) {
       await fire(events.onRevoke, payload.sid, 'idle-timeout');
       return null;
     }
-    // Fingerprint binding — payload carries the hash captured at issue.
-    if (bindTo && payload.fp) {
-      const current = computeFingerprint(req, bindTo);
-      if (current !== payload.fp) {
+    // Fingerprint binding — fail closed: reject tokens missing fp when
+    // bindTo is configured, so no code path can silently skip binding.
+    if (bindTo) {
+      if (!payload.fp) {
         if (bindStrictness === 'soft') {
-          // Soft mode: don't kill the session, but always emit a
-          // suspicious-activity signal so the app can react (email the
-          // user, force re-auth, whatever). Verify proceeds.
           if (suspiciousActivity) {
             await fire(suspiciousActivity.onDetected, {
               userId: record.uid,
               sessionId: record.sid,
-              reason: 'fingerprint-mismatch',
-              previous: { fp: payload.fp },
-              current: { fp: current ?? null },
+              reason: 'fingerprint-missing',
+              previous: { fp: null },
+              current: { fp: null },
             });
           }
         } else {
-          await store.revoke(payload.sid, 'fingerprint-mismatch');
+          await store.revoke(payload.sid, 'fingerprint-missing');
           req.__exortekSession = null;
-          await fire(events.onDeny, 'fingerprint-mismatch', req);
-          await fire(events.onRevoke, payload.sid, 'fingerprint-mismatch');
+          await fire(events.onDeny, 'fingerprint-missing', req);
+          await fire(events.onRevoke, payload.sid, 'fingerprint-missing');
           return null;
+        }
+      } else {
+        const current = computeFingerprint(req, bindTo);
+        if (current !== payload.fp) {
+          if (bindStrictness === 'soft') {
+            if (suspiciousActivity) {
+              await fire(suspiciousActivity.onDetected, {
+                userId: record.uid,
+                sessionId: record.sid,
+                reason: 'fingerprint-mismatch',
+                previous: { fp: payload.fp },
+                current: { fp: current ?? null },
+              });
+            }
+          } else {
+            await store.revoke(payload.sid, 'fingerprint-mismatch');
+            req.__exortekSession = null;
+            await fire(events.onDeny, 'fingerprint-mismatch', req);
+            await fire(events.onRevoke, payload.sid, 'fingerprint-mismatch');
+            return null;
+          }
         }
       }
     }
@@ -665,6 +683,10 @@ export function createSessionManager(config) {
       exp: record.expiresAt,
       imp: adminSession.userId,
     };
+    if (bindTo) {
+      const fp = computeFingerprint(adminReq, bindTo);
+      if (fp) payload.fp = fp;
+    }
     const token = encodeToken(payload, secret[0], { now });
     const session = projectSession(record);
     await fire(events.onIssue, session);
