@@ -17,6 +17,16 @@ function fakeJwksResponse(keys = [SAMPLE_EC_JWK]) {
   return { keys };
 }
 
+function okResponse(body) {
+  const json = JSON.stringify(body);
+  return {
+    ok: true,
+    status: 200,
+    headers: new Map([['content-length', String(json.length)]]),
+    text: async () => json,
+  };
+}
+
 function mockFetch(impl) {
   return mock.method(globalThis, 'fetch', impl);
 }
@@ -49,7 +59,7 @@ describe('resolver — fetch and cache', () => {
   afterEach(() => mock.restoreAll());
 
   test('initial resolve fetches and returns key', async () => {
-    const fn = mockFetch(async () => ({ ok: true, json: async () => fakeJwksResponse() }));
+    const fn = mockFetch(async () => okResponse(fakeJwksResponse()));
     const resolver = createRemoteJWKS('https://example.com/jwks');
     const key = await resolver({ kid: 'k1', alg: 'ES256' });
     assert.equal(key.type, 'public');
@@ -57,15 +67,26 @@ describe('resolver — fetch and cache', () => {
   });
 
   test('second resolve uses cache (no second fetch)', async () => {
-    const fn = mockFetch(async () => ({ ok: true, json: async () => fakeJwksResponse() }));
+    const fn = mockFetch(async () => okResponse(fakeJwksResponse()));
     const resolver = createRemoteJWKS('https://example.com/jwks');
     await resolver({ kid: 'k1' });
     await resolver({ kid: 'k1' });
     assert.equal(fn.mock.callCount(), 1);
   });
 
+  test('cache:false triggers refetch on every resolve', async () => {
+    const fn = mockFetch(async () => okResponse(fakeJwksResponse()));
+    const resolver = createRemoteJWKS('https://example.com/jwks', {
+      cache: false,
+      cooldownMs: 0,
+    });
+    await resolver({ kid: 'k1' });
+    await resolver({ kid: 'k1' });
+    assert.equal(fn.mock.callCount(), 2);
+  });
+
   test('stale cache triggers refetch', async () => {
-    const fn = mockFetch(async () => ({ ok: true, json: async () => fakeJwksResponse() }));
+    const fn = mockFetch(async () => okResponse(fakeJwksResponse()));
     const resolver = createRemoteJWKS('https://example.com/jwks', {
       cacheTtl: 1,
       cooldownMs: 0,
@@ -82,7 +103,7 @@ describe('resolver — kid-miss refetch', () => {
 
   test('refetches on unknown kid when cooldown allows', async () => {
     let keys = [SAMPLE_EC_JWK];
-    const fn = mockFetch(async () => ({ ok: true, json: async () => ({ keys }) }));
+    const fn = mockFetch(async () => okResponse({ keys }));
 
     const resolver = createRemoteJWKS('https://example.com/jwks', { cooldownMs: 0 });
 
@@ -97,7 +118,7 @@ describe('resolver — kid-miss refetch', () => {
   });
 
   test('cooldown prevents rapid refetches', async () => {
-    const fn = mockFetch(async () => ({ ok: true, json: async () => fakeJwksResponse() }));
+    const fn = mockFetch(async () => okResponse(fakeJwksResponse()));
 
     const resolver = createRemoteJWKS('https://example.com/jwks', { cooldownMs: 60_000 });
 
@@ -115,7 +136,7 @@ describe('resolver — error handling', () => {
   afterEach(() => mock.restoreAll());
 
   test('throws KID_NOT_FOUND for missing kid header', async () => {
-    mockFetch(async () => ({ ok: true, json: async () => fakeJwksResponse() }));
+    mockFetch(async () => okResponse(fakeJwksResponse()));
     const resolver = createRemoteJWKS('https://example.com/jwks');
     const err = await resolver({}).catch(e => e);
     assert.ok(err instanceof JwksError);
@@ -123,15 +144,45 @@ describe('resolver — error handling', () => {
   });
 
   test('throws FETCH_FAILED on non-ok response', async () => {
-    mockFetch(async () => ({ ok: false, status: 500, json: async () => ({}) }));
+    mockFetch(async () => ({
+      ok: false,
+      status: 500,
+      headers: new Map(),
+    }));
     const resolver = createRemoteJWKS('https://example.com/jwks');
     const err = await resolver({ kid: 'k1' }).catch(e => e);
     assert.ok(err instanceof JwksError);
     assert.equal(err.code, ErrorCode.FETCH_FAILED);
   });
 
+  test('throws FETCH_FAILED on redirect response', async () => {
+    mockFetch(async () => ({
+      ok: false,
+      status: 302,
+      headers: new Map([['location', 'http://169.254.169.254/latest/meta-data/']]),
+    }));
+    const resolver = createRemoteJWKS('https://example.com/jwks');
+    const err = await resolver({ kid: 'k1' }).catch(e => e);
+    assert.ok(err instanceof JwksError);
+    assert.equal(err.code, ErrorCode.FETCH_FAILED);
+    assert.match(err.message, /redirect/i);
+  });
+
+  test('throws FETCH_FAILED on oversized response', async () => {
+    mockFetch(async () => ({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-length', '2000000']]),
+    }));
+    const resolver = createRemoteJWKS('https://example.com/jwks', { maxResponseSize: 1_000_000 });
+    const err = await resolver({ kid: 'k1' }).catch(e => e);
+    assert.ok(err instanceof JwksError);
+    assert.equal(err.code, ErrorCode.FETCH_FAILED);
+    assert.match(err.message, /maxResponseSize/i);
+  });
+
   test('throws FETCH_FAILED on invalid response body', async () => {
-    mockFetch(async () => ({ ok: true, json: async () => ({ notKeys: [] }) }));
+    mockFetch(async () => okResponse({ notKeys: [] }));
     const resolver = createRemoteJWKS('https://example.com/jwks');
     const err = await resolver({ kid: 'k1' }).catch(e => e);
     assert.ok(err instanceof JwksError);
@@ -142,7 +193,7 @@ describe('resolver — error handling', () => {
     let shouldFail = false;
     const fn = mockFetch(async () => {
       if (shouldFail) throw new Error('network down');
-      return { ok: true, json: async () => fakeJwksResponse() };
+      return okResponse(fakeJwksResponse());
     });
 
     const resolver = createRemoteJWKS('https://example.com/jwks', {
@@ -170,7 +221,7 @@ describe('resolver — error handling', () => {
     let shouldFail = true;
     const fn = mockFetch(async () => {
       if (shouldFail) throw new Error('network down');
-      return { ok: true, json: async () => fakeJwksResponse() };
+      return okResponse(fakeJwksResponse());
     });
 
     const resolver = createRemoteJWKS('https://example.com/jwks', { cooldownMs: 60_000 });
@@ -190,7 +241,7 @@ describe('resolver — alg cross-check', () => {
   afterEach(() => mock.restoreAll());
 
   test('throws on alg mismatch', async () => {
-    mockFetch(async () => ({ ok: true, json: async () => fakeJwksResponse() }));
+    mockFetch(async () => okResponse(fakeJwksResponse()));
     const resolver = createRemoteJWKS('https://example.com/jwks');
     const err = await resolver({ kid: 'k1', alg: 'RS256' }).catch(e => e);
     assert.ok(err instanceof JwksError);
@@ -199,14 +250,14 @@ describe('resolver — alg cross-check', () => {
   });
 
   test('passes when alg matches', async () => {
-    mockFetch(async () => ({ ok: true, json: async () => fakeJwksResponse() }));
+    mockFetch(async () => okResponse(fakeJwksResponse()));
     const resolver = createRemoteJWKS('https://example.com/jwks');
     const key = await resolver({ kid: 'k1', alg: 'ES256' });
     assert.equal(key.type, 'public');
   });
 
   test('passes when alg is not provided', async () => {
-    mockFetch(async () => ({ ok: true, json: async () => fakeJwksResponse() }));
+    mockFetch(async () => okResponse(fakeJwksResponse()));
     const resolver = createRemoteJWKS('https://example.com/jwks');
     const key = await resolver({ kid: 'k1' });
     assert.equal(key.type, 'public');
@@ -221,7 +272,7 @@ describe('resolver — coalescing', () => {
     mockFetch(async () => {
       callCount++;
       await new Promise(r => setTimeout(r, 50));
-      return { ok: true, json: async () => fakeJwksResponse() };
+      return okResponse(fakeJwksResponse());
     });
 
     const resolver = createRemoteJWKS('https://example.com/jwks');
@@ -241,7 +292,7 @@ describe('staleWhileError', () => {
     let shouldFail = false;
     mockFetch(async () => {
       if (shouldFail) throw new Error('network down');
-      return { ok: true, json: async () => fakeJwksResponse() };
+      return okResponse(fakeJwksResponse());
     });
 
     const resolver = createRemoteJWKS('https://example.com/jwks', {
@@ -276,7 +327,7 @@ describe('onInvalidKey callback', () => {
   afterEach(() => mock.restoreAll());
 
   test('called on kid not found', async () => {
-    mockFetch(async () => ({ ok: true, json: async () => fakeJwksResponse() }));
+    mockFetch(async () => okResponse(fakeJwksResponse()));
     const calls = [];
     const resolver = createRemoteJWKS('https://example.com/jwks', {
       cooldownMs: 60_000,
@@ -292,7 +343,7 @@ describe('onInvalidKey callback', () => {
   });
 
   test('called on alg mismatch', async () => {
-    mockFetch(async () => ({ ok: true, json: async () => fakeJwksResponse() }));
+    mockFetch(async () => okResponse(fakeJwksResponse()));
     const calls = [];
     const resolver = createRemoteJWKS('https://example.com/jwks', {
       onInvalidKey: (header, err) => calls.push({ header, err }),
@@ -309,7 +360,7 @@ describe('reload and cachedKids', () => {
   afterEach(() => mock.restoreAll());
 
   test('reload clears cache and refetches', async () => {
-    const fn = mockFetch(async () => ({ ok: true, json: async () => fakeJwksResponse() }));
+    const fn = mockFetch(async () => okResponse(fakeJwksResponse()));
     const resolver = createRemoteJWKS('https://example.com/jwks', { cooldownMs: 0 });
     await resolver({ kid: 'k1' });
     assert.deepEqual(resolver.cachedKids(), ['k1']);
@@ -334,7 +385,7 @@ describe('LRU eviction', () => {
       { ...SAMPLE_EC_JWK, kid: 'k2' },
       { ...SAMPLE_EC_JWK, kid: 'k3' },
     ];
-    mockFetch(async () => ({ ok: true, json: async () => ({ keys }) }));
+    mockFetch(async () => okResponse({ keys }));
 
     const resolver = createRemoteJWKS('https://example.com/jwks', { maxCacheKeys: 2 });
 

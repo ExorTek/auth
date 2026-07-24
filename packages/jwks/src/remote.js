@@ -24,6 +24,7 @@ import { assertNonEmptyString, invalidArgument } from './internal/guards.js';
  * @property {AbortSignal}    [signal]               caller-provided AbortSignal forwarded to fetch
  * @property {Record<string, string>} [headers]      extra headers sent on the fetch request
  * @property {(header: { kid: string, alg?: string }, error: Error) => void} [onInvalidKey] called when a key cannot be resolved (kid not found or alg mismatch)
+ * @property {number}         [maxResponseSize=1048576] max bytes accepted from the JWKS endpoint (default 1 MB)
  */
 
 /**
@@ -51,6 +52,7 @@ export function createRemoteJWKS(uri, options = {}) {
     signal: externalSignal,
     headers: extraHeaders,
     onInvalidKey,
+    maxResponseSize = 1_048_576,
   } = options;
 
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
@@ -91,16 +93,15 @@ export function createRemoteJWKS(uri, options = {}) {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
-    if (externalSignal) {
-      externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
-    }
+    const fetchSignal = externalSignal ? AbortSignal.any([controller.signal, externalSignal]) : controller.signal;
 
     async function doFetch() {
       /** @type {Response} */
       let res;
       try {
         res = await fetch(uri, {
-          signal: controller.signal,
+          signal: fetchSignal,
+          redirect: 'manual',
           headers: { accept: 'application/json', ...extraHeaders },
         });
       } catch (err) {
@@ -112,11 +113,40 @@ export function createRemoteJWKS(uri, options = {}) {
         clearTimeout(timer);
       }
 
+      if (res.status >= 300 && res.status < 400) {
+        throw new JwksError(
+          ErrorCode.FETCH_FAILED,
+          `JWKS fetch refused redirect (${res.status}) from ${uri} — redirects are disabled for SSRF safety`,
+        );
+      }
+
       if (!res.ok) {
         throw new JwksError(ErrorCode.FETCH_FAILED, `JWKS fetch failed: ${uri} responded with ${res.status}`);
       }
 
-      const body = await res.json();
+      const contentLength = Number(res.headers.get('content-length'));
+      if (contentLength > maxResponseSize) {
+        throw new JwksError(
+          ErrorCode.FETCH_FAILED,
+          `JWKS response from ${uri} exceeds maxResponseSize (${contentLength} > ${maxResponseSize})`,
+        );
+      }
+
+      const text = await res.text();
+      if (text.length > maxResponseSize) {
+        throw new JwksError(
+          ErrorCode.FETCH_FAILED,
+          `JWKS response from ${uri} exceeds maxResponseSize (${text.length} > ${maxResponseSize})`,
+        );
+      }
+
+      /** @type {unknown} */
+      let body;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        throw new JwksError(ErrorCode.FETCH_FAILED, `JWKS response from ${uri} is not valid JSON`);
+      }
       if (!isObject(body) || !Array.isArray(body.keys)) {
         throw new JwksError(
           ErrorCode.FETCH_FAILED,
@@ -154,7 +184,7 @@ export function createRemoteJWKS(uri, options = {}) {
 
   /** @returns {boolean} */
   function isCacheStale() {
-    return !jwksCache || (cacheEnabled && Date.now() - cachedAt > cacheTtl);
+    return !jwksCache || !cacheEnabled || Date.now() - cachedAt > cacheTtl;
   }
 
   /** @returns {boolean} */
