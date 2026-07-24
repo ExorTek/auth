@@ -480,6 +480,14 @@ __metadata:
 "@exortek/ua@workspace:packages/ua":
   version: 0.0.0-use.local
   resolution: "@exortek/ua@workspace:packages/ua"
+  peerDependencies:
+    express: ">=4"
+    fastify: ">=4"
+  peerDependenciesMeta:
+    express:
+      optional: true
+    fastify:
+      optional: true
   languageName: unknown
   linkType: soft
 
