@@ -167,7 +167,9 @@ export function createMemoryStore(options) {
     async markUsed(key, nowSec) {
       const record = map.get(key);
       if (!record || record.expiresAt <= now()) {
-        if (record) map.delete(key);
+        if (record) {
+          map.delete(key);
+        }
         return null;
       }
       const meta = record.metadata || {};

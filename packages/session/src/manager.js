@@ -685,7 +685,9 @@ export function createSessionManager(config) {
     };
     if (bindTo) {
       const fp = computeFingerprint(adminReq, bindTo);
-      if (fp) payload.fp = fp;
+      if (fp) {
+        payload.fp = fp;
+      }
     }
     const token = encodeToken(payload, secret[0], { now });
     const session = projectSession(record);

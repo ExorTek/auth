@@ -201,7 +201,9 @@ export function createRedisStore(options) {
     async markUsed(key, nowSec) {
       try {
         const result = await client.eval(MARK_USED_LUA, 1, build(key), String(nowSec));
-        if (result == null) return null;
+        if (result == null) {
+          return null;
+        }
         const [swapped, json] = result;
         const parsed = JSON.parse(json);
         return {
@@ -212,7 +214,9 @@ export function createRedisStore(options) {
           },
         };
       } catch (err) {
-        if (err instanceof JwtError) throw err;
+        if (err instanceof JwtError) {
+          throw err;
+        }
         throw new JwtError(
           ErrorCode.STORE_ERROR,
           `redis-store.markUsed: EVAL failed — ${err instanceof Error ? err.message : String(err)}`,
