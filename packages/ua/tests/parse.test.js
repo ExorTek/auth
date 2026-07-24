@@ -196,6 +196,28 @@ describe('Client Hints integration', () => {
     assert.equal(r.device.type, 'mobile');
   });
 
+  it('detects Windows 11 via CH platform version >= 13', () => {
+    const r = parse(CHROME_WIN, {
+      headers: {
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-ch-ua-platform-version': '"15.0.0"',
+      },
+    });
+    assert.equal(r.os.name, 'Windows');
+    assert.equal(r.os.version, '11');
+  });
+
+  it('detects Windows 10 via CH platform version < 13', () => {
+    const r = parse(CHROME_WIN, {
+      headers: {
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-ch-ua-platform-version': '"10.0.0"',
+      },
+    });
+    assert.equal(r.os.name, 'Windows');
+    assert.equal(r.os.version, '10');
+  });
+
   it('skips hints when clientHints: false', () => {
     const r = parse(CHROME_WIN, {
       clientHints: false,
