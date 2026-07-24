@@ -1,0 +1,107 @@
+{
+  "name": "@exortek/ua",
+  "version": "0.0.0",
+  "description": "User-Agent parser — browser, OS, device, engine, CPU detection + bot/AI crawler taxonomy + Client Hints + request fingerprinting. Tree-shakeable, ESM+CJS. Full-featured, high-performance.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./bots": {
+      "types": "./dist/bots.d.ts",
+      "import": "./dist/bots.mjs",
+      "require": "./dist/bots.cjs"
+    },
+    "./fingerprint": {
+      "types": "./dist/fingerprint.d.ts",
+      "import": "./dist/fingerprint.mjs",
+      "require": "./dist/fingerprint.cjs"
+    },
+    "./middleware/express": {
+      "types": "./dist/middleware/express.d.ts",
+      "import": "./dist/middleware/express.mjs",
+      "require": "./dist/middleware/express.cjs"
+    },
+    "./middleware/fastify": {
+      "types": "./dist/middleware/fastify.d.ts",
+      "import": "./dist/middleware/fastify.mjs",
+      "require": "./dist/middleware/fastify.cjs"
+    },
+    "./middleware/bot-guard": {
+      "types": "./dist/middleware/bot-guard-express.d.ts",
+      "import": "./dist/middleware/bot-guard-express.mjs",
+      "require": "./dist/middleware/bot-guard-express.cjs"
+    },
+    "./middleware/bot-guard/fastify": {
+      "types": "./dist/middleware/bot-guard-fastify.d.ts",
+      "import": "./dist/middleware/bot-guard-fastify.mjs",
+      "require": "./dist/middleware/bot-guard-fastify.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "prepack": "cp ../../LICENSE ./LICENSE"
+  },
+  "keywords": [
+    "user-agent",
+    "ua-parser",
+    "browser-detection",
+    "device-detection",
+    "os-detection",
+    "bot-detection",
+    "ai-crawler",
+    "client-hints",
+    "fingerprint",
+    "express",
+    "fastify"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/ua#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git",
+    "directory": "packages/ua"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "dependencies": {
+    "@exortek/shared": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "peerDependencies": {
+    "express": ">=4",
+    "fastify": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
