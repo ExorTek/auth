@@ -1,6 +1,6 @@
 # @exortek/auth
 
-A framework-agnostic authentication toolkit for Node.js — designed as 22 small packages under one scope; **12 are
+A framework-agnostic authentication toolkit for Node.js — designed as 22 small packages under one scope; **13 are
 published today** (see Shipping below), the rest are planned. Pick the one you need. Built on `node:crypto`.
 
 [![license](https://img.shields.io/github/license/ExorTek/auth?color=blue)](./LICENSE)
@@ -23,6 +23,7 @@ published today** (see Shipping below), the rest are planned. Pick the one you n
 | [`@exortek/apikey`](./packages/apikey) — Stripe-style prefixed API keys (`sk_live_id_secret`) with HMAC-SHA256 storage + optional pepper rotation, scope allowlists, memory / Redis stores, Express + Fastify middleware |      [![npm](https://img.shields.io/npm/v/@exortek/apikey.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/apikey)      | [auth.memet.dev/apikey](https://auth.memet.dev/apikey) |
 | [`@exortek/magic-link`](./packages/magic-link) — passwordless email-link auth — HMAC-signed short-lived tokens, single-use consume, opt-in per-email rate limit, memory / Redis stores; you send the email |      [![npm](https://img.shields.io/npm/v/@exortek/magic-link.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/magic-link)      | [auth.memet.dev/magic-link](https://auth.memet.dev/magic-link) |
 | [`@exortek/jwks`](./packages/jwks) — JWK Set (RFC 7517 §5) — local key set with zero-downtime rotation + remote JWKS URI fetching with kid-miss refetch, `/.well-known/jwks.json` handler |      [![npm](https://img.shields.io/npm/v/@exortek/jwks.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/jwks)      | [auth.memet.dev/jwks](https://auth.memet.dev/jwks) |
+| [`@exortek/ua`](./packages/ua) — User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting + Express/Fastify middleware + bot-guard |      [![npm](https://img.shields.io/npm/v/@exortek/ua.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/ua)      | [auth.memet.dev/ua](https://auth.memet.dev/ua) |
 
 ## The stack
 
@@ -71,6 +72,7 @@ npm install @exortek/challenge
 npm install @exortek/apikey             # + optional: ioredis or redis, express or fastify
 npm install @exortek/magic-link         # + optional: ioredis or redis
 npm install @exortek/jwks
+npm install @exortek/ua                 # + optional: express or fastify
 ```
 
 Node.js **22 or newer**.

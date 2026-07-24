@@ -31,6 +31,7 @@ body:
         - '@exortek/apikey'
         - '@exortek/magic-link'
         - '@exortek/jwks'
+        - '@exortek/ua'
         - 'Repo tooling (build, tests, CI, docs site)'
         - "Other / I don't know"
     validations:
