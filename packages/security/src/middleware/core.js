@@ -12,6 +12,10 @@ import { invalidArgument } from '../internal/guards.js';
  * @property {string | Buffer} secret       Minimum 32 bytes of entropy.
  * @property {string} [cookieName='__Host-csrf']
  * @property {string} [headerName='x-csrf-token']
+ * @property {string} [formField]           Form body field name. Defaults to
+ *                                          `cookieName`, but overriding lets
+ *                                          you decouple cookie naming from the
+ *                                          `<input name="…">` your templates use.
  * @property {string[]} [ignoreMethods=['GET','HEAD','OPTIONS']]
  * @property {object} [cookieOptions]       Overrides for the Set-Cookie flags.
  * @property {(req: unknown) => string | undefined} [tokenFromRequest]
@@ -68,6 +72,7 @@ export function normalizeCsrf(options) {
     secret: options.secret,
     cookieName: options.cookieName ?? '__Host-csrf',
     headerName: (options.headerName ?? 'x-csrf-token').toLowerCase(),
+    formField: options.formField ?? options.cookieName ?? '__Host-csrf',
     ignoreMethods: new Set((options.ignoreMethods ?? ['GET', 'HEAD', 'OPTIONS']).map(m => m.toUpperCase())),
     cookieOptions: { ...CSRF_DEFAULT_COOKIE_FLAGS, ...(options.cookieOptions ?? {}) },
     tokenFromRequest: options.tokenFromRequest,
@@ -180,7 +185,7 @@ export function extractCsrfToken(csrfConfig, req) {
   }
   const body = req.body;
   if (isObject(body)) {
-    const v = body[csrfConfig.cookieName];
+    const v = body[csrfConfig.formField];
     if (isString(v) && v.length > 0) {
       return v;
     }
@@ -280,7 +285,7 @@ async function _rawExtractCsrf(csrf, ctx) {
   // parseBody on demand). Await either shape uniformly.
   const body = await ctx.body();
   if (isObject(body)) {
-    const v = /** @type {Record<string, unknown>} */ (body)[csrf.cookieName];
+    const v = /** @type {Record<string, unknown>} */ (body)[csrf.formField];
     if (isString(v) && v.length > 0) {
       return v;
     }
