@@ -52,16 +52,17 @@ export function createHistory(config = {}) {
         return false;
       }
       const slice = previousHashes.slice(0, keepLast);
+      let reused = false;
       for (const stored of slice) {
         if (typeof stored !== 'string' || stored.length === 0) {
           continue;
         }
         const match = await umbrellaVerify(candidate, stored);
         if (match) {
-          return true;
+          reused = true;
         }
       }
-      return false;
+      return reused;
     },
 
     /**
