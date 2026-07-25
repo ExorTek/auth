@@ -1,6 +1,41 @@
-# `@exortek/ua`
+# @exortek/ua
 
-High-performance User-Agent parser with browser, OS, device, engine, and CPU detection — plus bot/AI crawler taxonomy, Client Hints support, and request fingerprinting.
+> High-performance User-Agent parser for Node.js 22+ — browser, OS, device, engine, CPU detection + bot/AI crawler taxonomy + Client Hints + request fingerprinting. Zero-dependency, tree-shakeable.
+
+[![npm](https://img.shields.io/npm/v/@exortek/ua.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/ua)
+[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![node](https://img.shields.io/node/v/@exortek/ua.svg?color=339933)](https://nodejs.org)
+[![install size](https://packagephobia.com/badge?p=@exortek/ua)](https://packagephobia.com/result?p=@exortek/ua)
+[![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
+[![zero-deps](https://img.shields.io/badge/dependencies-0-brightgreen)](./package.json)
+[![license](https://img.shields.io/npm/l/@exortek/ua.svg?color=blue)](./LICENSE)
+
+A full-featured UA parser with 60+ browsers, 30+ operating systems, 150+ device
+models across phones, tablets, TVs, consoles, XR headsets, vehicles, wearables,
+and IoT — plus a bot taxonomy that classifies AI crawlers, search engines,
+scrapers, and monitoring tools by category and confidence. Client Hints are
+handled transparently, and request fingerprinting gives you stable visitor
+identity without cookies.
+
+📖 **Docs:** [**auth.memet.dev/ua**](https://auth.memet.dev/ua)
+
+## Why
+
+The UA-parsing space has a few established players and each leaves gaps:
+
+- **`ua-parser-js`** — 10M downloads/week, good browser coverage, but no
+  bot taxonomy, no Client Hints, no fingerprinting, no middleware, and the
+  v2 paywall fragmented the community.
+- **`bowser`** — clean API but abandoned since 2021, no new browsers or
+  device types, no bot detection, no Client Hints.
+- **`useragent`** — regex-file-based, slow to update, no structured bot
+  classification, no modern device categories (XR, vehicles, IoT).
+- **`isbot`** — bot detection only, no parsing. Good at what it does but
+  you still need a second library for everything else.
+
+`@exortek/ua` ships everything — parsing, bot taxonomy, Client Hints,
+fingerprinting, and framework middleware — in one zero-dep package with
+an LRU cache, keyword pre-filters, and lazy getters for performance.
 
 ## Install
 
@@ -8,7 +43,7 @@ High-performance User-Agent parser with browser, OS, device, engine, and CPU det
 npm install @exortek/ua
 ```
 
-Node.js **22 or newer**.
+Requires **Node.js 22 or newer**. Zero runtime dependencies.
 
 ## Quick start
 
@@ -24,6 +59,8 @@ console.log(result.device.vendor);  // 'Samsung'
 console.log(result.engine.name);    // 'Blink'
 ```
 
+Bot detection:
+
 ```js
 import { detectBot, isAICrawler } from '@exortek/ua/bots';
 
@@ -34,30 +71,30 @@ console.log(bot.confidence);  // 'medium'
 isAICrawler('GPTBot/1.2');    // true
 ```
 
-## Entry points
+## Modules
 
-| Import path | What it exports |
-|---|---|
-| `@exortek/ua` | `parse`, `parseBrowser`, `parseOS`, `parseDevice`, `parseEngine`, `parseCPU`, `satisfies`, `isFrozenUA`, `clearCache`, `ACCEPT_CH`, `VARY_CH`, `BOT_CATEGORY` |
-| `@exortek/ua/bots` | `detectBot`, `isBot`, `isAICrawler`, `isAIAssistant`, `isSearchBot`, `isSocialPreview`, `isSEOBot`, `isSecurityScanner`, `isAutomation`, `createBotDetector`, `clearBotCache`, `BOT_CATEGORY` |
-| `@exortek/ua/fingerprint` | `createFingerprint`, `fingerprintRequest` |
-| `@exortek/ua/middleware/express` | `uaMiddleware` |
-| `@exortek/ua/middleware/fastify` | `uaPlugin` |
-| `@exortek/ua/middleware/bot-guard` | `botGuard` (Express) |
-| `@exortek/ua/middleware/bot-guard/fastify` | `botGuardPlugin` |
+| Subpath | Purpose |
+| --- | --- |
+| [`@exortek/ua`](https://github.com/ExorTek/auth/blob/master/packages/ua/src/index.js) | `parse`, `parseBrowser`, `parseOS`, `parseDevice`, `parseEngine`, `parseCPU`, `satisfies`, `isFrozenUA`, `clearCache`, `ACCEPT_CH`, `VARY_CH`, `BOT_CATEGORY` |
+| [`@exortek/ua/bots`](https://github.com/ExorTek/auth/blob/master/packages/ua/src/bots.js) | `detectBot`, `isBot`, `isAICrawler`, `isAIAssistant`, `isSearchBot`, `isSocialPreview`, `isSEOBot`, `isSecurityScanner`, `isAutomation`, `createBotDetector`, `clearBotCache`, `BOT_CATEGORY` |
+| [`@exortek/ua/fingerprint`](https://github.com/ExorTek/auth/blob/master/packages/ua/src/fingerprint.js) | `createFingerprint`, `fingerprintRequest` |
+| [`@exortek/ua/middleware/express`](https://github.com/ExorTek/auth/blob/master/packages/ua/src/middleware/express.js) | `uaMiddleware` — Express middleware |
+| [`@exortek/ua/middleware/fastify`](https://github.com/ExorTek/auth/blob/master/packages/ua/src/middleware/fastify.js) | `uaPlugin` — Fastify plugin |
+| [`@exortek/ua/middleware/bot-guard`](https://github.com/ExorTek/auth/blob/master/packages/ua/src/middleware/bot-guard-express.js) | `botGuard` — Express bot filter |
+| [`@exortek/ua/middleware/bot-guard/fastify`](https://github.com/ExorTek/auth/blob/master/packages/ua/src/middleware/bot-guard-fastify.js) | `botGuardPlugin` — Fastify bot filter |
 
 ## API
 
 ### `parse(ua, options?)`
 
-Parse a User-Agent string. Returns `{ ua, browser, os, device, engine, cpu }` with lazy getters — sections are only parsed when accessed.
-
-```js
-const result = parse(ua, {
-  headers: req.headers,   // pass request headers for Client Hints
-  clientHints: true,      // default: true
-});
+```ts
+parse(ua: string, options?: {
+  headers?: Record<string, string>;
+  clientHints?: boolean;  // default: true
+}): UAResult
 ```
+
+Parse a User-Agent string. Returns `{ ua, browser, os, device, engine, cpu }` with lazy getters — sections are only parsed when accessed.
 
 **`browser`** — `{ name, version, major, type }`
 **`os`** — `{ name, version }`
@@ -71,10 +108,14 @@ Parse only one section. Faster when you need a single field.
 
 ### `satisfies(result, conditions)`
 
+```ts
+satisfies(result: UAResult, conditions: Record<string, string | Record<string, string>>): boolean
+```
+
 Check if a parse result matches version conditions:
 
 ```js
-satisfies(result, { chrome: '>=120', firefox: '>=115' });        // OR
+satisfies(result, { chrome: '>=120', firefox: '>=115' });        // OR logic
 satisfies(result, { mobile: { safari: '>=16' } });               // device-scoped
 satisfies(result, { desktop: { chrome: '>=120' } });
 ```
@@ -83,9 +124,17 @@ Operators: `>=`, `>`, `<=`, `<`, `=`, `==`, `!=`
 
 ### `isFrozenUA(ua)`
 
+```ts
+isFrozenUA(ua: string): boolean
+```
+
 Returns `true` if the UA string uses Chrome 107+ frozen/reduced format. When true, Client Hints headers are required for accurate version and device info.
 
 ### `detectBot(ua)`
+
+```ts
+detectBot(ua: string): BotResult | null
+```
 
 Returns `{ name, version, type, category, confidence }` or `null`.
 
@@ -93,9 +142,23 @@ Returns `{ name, version, type, category, confidence }` or `null`.
 
 ### `isBot`, `isAICrawler`, `isSearchBot`, `isSecurityScanner`, `isAutomation`, `isSocialPreview`, `isSEOBot`, `isAIAssistant`
 
+```ts
+isBot(ua: string): boolean
+isAICrawler(ua: string): boolean
+// ... same signature for all
+```
+
 Boolean shorthand functions — each calls `detectBot` internally.
 
 ### `createBotDetector(extraPatterns)`
+
+```ts
+createBotDetector(patterns: Array<{
+  pattern: RegExp;
+  name: string;
+  category?: string;
+}>): (ua: string) => BotResult | null
+```
 
 Create a detector with custom patterns that fall through to built-in detection:
 
@@ -106,6 +169,19 @@ const detect = createBotDetector([
 ```
 
 ### `createFingerprint(input, options?)`
+
+```ts
+createFingerprint(input: {
+  ua: string;
+  headers?: Record<string, string>;
+  ip?: string;
+}, options?: {
+  includeIP?: boolean;
+  subnet?: boolean;
+  strict?: boolean;     // default: true
+  algorithm?: string;   // default: 'sha256'
+}): string
+```
 
 Deterministic hash from request signals:
 
@@ -118,27 +194,49 @@ const fp = createFingerprint({
 // → 'fp_a8f3b2c1...'
 ```
 
-**Options**: `includeIP` (full IP), `subnet` (IPv4 /24, IPv6 /64), `strict` (default `true`, includes semi-stable signals), `algorithm` (default `'sha256'`).
-
 ### `fingerprintRequest(req, options?)`
 
 Shorthand — extracts `ua`, `headers`, `ip` from a request object.
 
 ### Express middleware
 
+Global — every route gets `req.ua`:
+
 ```js
 import { uaMiddleware } from '@exortek/ua/middleware/express';
 
-app.get('/api', uaMiddleware(), (req, res) => {
+app.use(uaMiddleware());
+
+app.get('/api', (req, res) => {
   console.log(req.ua.browser.name);
   console.log(req.ua.bot);
+});
+```
+
+Route-level — only parse where you need it:
+
+```js
+import express from 'express';
+import { uaMiddleware } from '@exortek/ua/middleware/express';
+
+const app = express();
+
+app.get('/analytics', uaMiddleware(), (req, res) => {
+  res.json({
+    browser: req.ua.browser.name,
+    device: req.ua.device.type || 'desktop',
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ ok: true });
 });
 ```
 
 **Options**:
 
 | Option | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `clientHints` | `true` | Parse Client Hints headers |
 | `sendAcceptCH` | `true` | Auto-set `Accept-CH` + `Vary` response headers |
 | `detectBots` | `true` | Run bot detection and attach `.bot` to result |
@@ -161,6 +259,8 @@ app.use(uaMiddleware({
 
 ### Fastify plugin
 
+Global — registers on every route:
+
 ```js
 import { uaPlugin } from '@exortek/ua/middleware/fastify';
 
@@ -169,6 +269,25 @@ await app.register(uaPlugin, { detectBots: true });
 app.get('/', async (request) => {
   console.log(request.ua.browser.name);
 });
+```
+
+Scoped — register inside an encapsulated context:
+
+```js
+import Fastify from 'fastify';
+import { uaPlugin } from '@exortek/ua/middleware/fastify';
+
+const app = Fastify();
+
+app.register(async (scope) => {
+  await scope.register(uaPlugin);
+
+  scope.get('/analytics', async (request) => {
+    return { browser: request.ua.browser.name };
+  });
+});
+
+app.get('/health', async () => ({ ok: true }));
 ```
 
 Same options as Express middleware.
@@ -209,7 +328,7 @@ await app.register(botGuardPlugin, {
 **Options**:
 
 | Option | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `deny` | — | Bot categories to block |
 | `allow` | — | Categories to always allow (overrides `deny` and `denyAll`) |
 | `denyAll` | `false` | Block all detected bots |
@@ -253,7 +372,7 @@ if (isFrozenUA(ua)) {
 ## Bot taxonomy
 
 | Category | Examples |
-|---|---|
+| --- | --- |
 | `search` | Googlebot, Bingbot, DuckDuckBot, Baiduspider, YandexBot |
 | `ai-training` | GPTBot, Google-Extended, CCBot, Bytespider, Diffbot |
 | `ai-assistant` | ChatGPT-User, Perplexity, YouBot |
@@ -322,6 +441,21 @@ amd64, arm, arm64, ia32, ia64, mips, 68k, sparc, ppc, avr, irix, s390.
 
 User-Agent and Client Hints headers are **client-controlled** — they can be spoofed. Do not use parse results for authentication, authorization, or security decisions. They are useful for analytics, feature detection, content negotiation, and UX adaptation.
 
+## Why not
+
+Deliberate omissions — these will **not** be added:
+
+- Browser-side / edge-runtime support (server-only, `node:crypto` dependency)
+- Regex-list hot-reload (compile-time inlining; update by bumping the package)
+- `navigator.userAgentData` polyfill (that's a client concern)
+- Probabilistic device detection via screen size / feature sniffing
+
+## Links
+
+- **Source:** [github.com/ExorTek/auth](https://github.com/ExorTek/auth)
+- **Issues:** [github.com/ExorTek/auth/issues](https://github.com/ExorTek/auth/issues)
+- **Changelog:** [CHANGELOG.md](https://github.com/ExorTek/auth/blob/master/packages/ua/CHANGELOG.md)
+
 ## License
 
-MIT
+MIT © ExorTek — see [LICENSE](./LICENSE).
