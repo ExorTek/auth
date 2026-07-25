@@ -10,6 +10,25 @@ import { Callout } from 'nextra/components';
 High-performance User-Agent parser for Node.js 22+. Detects browsers,
 operating systems, devices, engines, CPUs, and bots — with Client Hints
 support, request fingerprinting, and middleware for Express and Fastify.
+Zero dependencies. Pure `node:crypto`.
+
+## What problem does this solve?
+
+The UA-parsing space has a few established players and each leaves gaps:
+
+- **`ua-parser-js`** — 10M downloads/week, good browser coverage, but no
+  bot taxonomy, no Client Hints, no fingerprinting, no middleware, and the
+  v2 paywall fragmented the community.
+- **`bowser`** — clean API but abandoned since 2021, no new browsers or
+  device types, no bot detection, no Client Hints.
+- **`useragent`** — regex-file-based, slow to update, no structured bot
+  classification, no modern device categories (XR, vehicles, IoT).
+- **`isbot`** — bot detection only, no parsing. Good at what it does but
+  you still need a second library for everything else.
+
+`@exortek/ua` ships everything — parsing, bot taxonomy, Client Hints,
+fingerprinting, and framework middleware — in one zero-dep package with
+an LRU cache, keyword pre-filters, and lazy getters for performance.
 
 ## Quick start
 
@@ -43,6 +62,27 @@ app.get('/', (req, res) => {
 });
 ```
 
+Or apply it to specific routes only:
+
+```js
+import express from 'express';
+import { uaMiddleware } from '@exortek/ua/middleware/express';
+
+const app = express();
+const ua = uaMiddleware();
+
+app.get('/analytics', ua, (req, res) => {
+  res.json({
+    browser: req.ua.browser.name,
+    device: req.ua.device.type || 'desktop',
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ ok: true });
+});
+```
+
 ## Package layout
 
 | Subpath                            | What it exports                                            |
@@ -63,8 +103,16 @@ The parser ships with built-in regex sets covering:
 - **30+ operating systems** — Windows, macOS, Linux, Android, iOS, ChromeOS, HarmonyOS, and more
 - **8 device categories** — mobile, tablet, smarttv, console, xr, vehicle, wearable, embedded
 - **100+ bot signatures** — search, AI training, AI assistant, social preview, SEO, monitoring, CLI, library
+- **128 unit tests** covering parsing, bot detection, Client Hints, middleware hooks, and bot guard.
 
-## Where to next
+<Callout type="warning">
+  User-Agent and Client Hints headers are **client-controlled** — they can
+  be spoofed. Do not use parse results for authentication, authorization, or
+  security decisions. They are useful for analytics, feature detection,
+  content negotiation, and UX adaptation.
+</Callout>
+
+## Where next?
 
 - [Parsing](/ua/parsing) — `parse()` and per-section parsers
 - [Bot detection](/ua/bots) — `detectBot()`, taxonomy, custom patterns

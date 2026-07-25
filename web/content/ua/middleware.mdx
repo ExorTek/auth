@@ -29,6 +29,27 @@ app.get('/', (req, res) => {
 });
 ```
 
+Route-level — mount on specific routes to skip the overhead elsewhere:
+
+```js
+import express from 'express';
+import { uaMiddleware } from '@exortek/ua/middleware/express';
+
+const app = express();
+const ua = uaMiddleware();
+
+app.get('/analytics', ua, (req, res) => {
+  res.json({
+    browser: req.ua.browser.name,
+    device: req.ua.device.type || 'desktop',
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ ok: true });
+});
+```
+
 ## Fastify
 
 ```js
@@ -45,6 +66,26 @@ app.get('/', async (request) => {
     isBot: !!request.ua.bot,
   };
 });
+```
+
+Scoped — register inside an encapsulated context to limit it to a
+route group:
+
+```js
+import Fastify from 'fastify';
+import { uaPlugin } from '@exortek/ua/middleware/fastify';
+
+const app = Fastify();
+
+app.register(async (scope) => {
+  await scope.register(uaPlugin);
+
+  scope.get('/analytics', async (request) => {
+    return { browser: request.ua.browser.name };
+  });
+});
+
+app.get('/health', async () => ({ ok: true }));
 ```
 
 ## Options
