@@ -1,15 +1,27 @@
 # @exortek/session
 
+## 1.3.1
+
+### Patch Changes
+
+- 689cf87: Remove workspace-only `devDependencies` from published package.json — `@exortek/shared` no longer appears as
+  `"0.0.0"` on the npm registry.
+- 689cf87: Replace `fastify-plugin` npm dependency with `@exortek/shared/fastify-plugin` — a built-in drop-in that
+  covers skip-override, display-name, plugin-meta, version constraints, and encapsulate. Users no longer need to
+  `npm i fastify-plugin` alongside fastify.
+- Updated dependencies [689cf87]
+  - @exortek/crypto@1.0.8
+
 ## 1.3.0
 
 ### Minor Changes
 
-- 48f1b5e: `verify()` now rejects tokens missing `fp` when `bindTo` is configured (fail-closed).
-  Previously, tokens without a fingerprint silently bypassed binding checks. `impersonate()` now sets `fp` from the
-  admin request, matching `issue()` and `rotate()`.
+- 48f1b5e: `verify()` now rejects tokens missing `fp` when `bindTo` is configured (fail-closed). Previously, tokens
+  without a fingerprint silently bypassed binding checks. `impersonate()` now sets `fp` from the admin request, matching
+  `issue()` and `rotate()`.
 
-  Note: existing impersonation sessions issued before this fix will be rejected on next verify when `bindTo`
-  is configured — affected users will need to re-authenticate.
+  Note: existing impersonation sessions issued before this fix will be rejected on next verify when `bindTo` is
+  configured — affected users will need to re-authenticate.
 
 - 48f1b5e: Remove 10 dead `ErrorCode` members that were never thrown (MISSING_TOKEN, IDLE_TIMEOUT, REVOKED,
   TOKEN_ROTATION_REQUIRED, FINGERPRINT_MISMATCH, SUSPICIOUS_ACTIVITY, CONCURRENT_LIMIT_EXCEEDED, FRESH_AUTH_REQUIRED,

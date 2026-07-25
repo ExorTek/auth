@@ -1,11 +1,18 @@
 # @exortek/jws
 
+## 1.0.2
+
+### Patch Changes
+
+- 689cf87: Remove workspace-only `devDependencies` from published package.json — `@exortek/shared` no longer appears as
+  `"0.0.0"` on the npm registry.
+
 ## 1.0.1
 
 ### Patch Changes
 
-- Internal refactor: errors extend the shared `BaseError`; `base64url`, `algorithms`, `crit`, `ecdsa`, `resolver`,
-  and `keys.js` delegate to `@exortek/shared`; argument guards bind through `@exortek/shared/asserts` via
+- Internal refactor: errors extend the shared `BaseError`; `base64url`, `algorithms`, `crit`, `ecdsa`, `resolver`, and
+  `keys.js` delegate to `@exortek/shared`; argument guards bind through `@exortek/shared/asserts` via
   `internal/guards.js`. No public API change.
 
 ## 1.0.0

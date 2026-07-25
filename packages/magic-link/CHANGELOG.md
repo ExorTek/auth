@@ -1,5 +1,12 @@
 # @exortek/magic-link
 
+## 2.0.1
+
+### Patch Changes
+
+- 689cf87: Remove workspace-only `devDependencies` from published package.json — `@exortek/shared` no longer appears as
+  `"0.0.0"` on the npm registry.
+
 ## 2.0.0
 
 ### Initial release

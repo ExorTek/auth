@@ -1,12 +1,19 @@
 # @exortek/crypto
 
+## 1.0.8
+
+### Patch Changes
+
+- 689cf87: Remove workspace-only `devDependencies` from published package.json — `@exortek/shared` no longer appears as
+  `"0.0.0"` on the npm registry.
+
 ## 1.0.7
 
 ### Patch Changes
 
-- Internal refactor: argument guards bind through `@exortek/shared/asserts` via `internal/guards.js`;
-  timing-safe compare, byte helpers, Crockford codec, and rejection-sampling primitives now delegate to
-  the shared package. No public API change; all exports behave identically.
+- Internal refactor: argument guards bind through `@exortek/shared/asserts` via `internal/guards.js`; timing-safe
+  compare, byte helpers, Crockford codec, and rejection-sampling primitives now delegate to the shared package. No
+  public API change; all exports behave identically.
 
 ## 1.0.6
 

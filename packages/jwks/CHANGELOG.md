@@ -1,5 +1,14 @@
 # @exortek/jwks
 
+## 1.0.2
+
+### Patch Changes
+
+- 689cf87: Remove workspace-only `devDependencies` from published package.json — `@exortek/shared` no longer appears as
+  `"0.0.0"` on the npm registry.
+- Updated dependencies [689cf87]
+  - @exortek/jwk@1.0.2
+
 ## 1.0.1
 
 ### Patch Changes
