@@ -13,51 +13,51 @@ Every package is built on `node:crypto` with zero required non-`@exortek/*` runt
 Ships adapters for Express and Fastify — the classic Node HTTP stack.
 
 ## Shipping
-
-| Package                              | Version |
-|--------------------------------------|:-------:|
-| **[`@exortek/crypto`](/crypto)**     |  `1.x`  |
-| **[`@exortek/security`](/security)** |  `1.x`  |
-| **[`@exortek/otp`](/otp)**           |  `1.x`  |
-| **[`@exortek/password`](/password)** |  `1.x`  |
-| **[`@exortek/session`](/session)**   |  `1.x`  |
-| **[`@exortek/jwk`](/jwk)**           |  `1.x`  |
-| **[`@exortek/jws`](/jws)**           |  `1.x`  |
-| **[`@exortek/jwt`](/jwt)**           |  `1.x`  |
-| **[`@exortek/challenge`](/challenge)** |  `1.x`  |
-| **[`@exortek/apikey`](/apikey)**       |  `1.x`  |
-| **[`@exortek/magic-link`](/magic-link)** |  `1.x`  |
-| **[`@exortek/jwks`](/jwks)**             |  `1.x`  |
+| Package                                  |                                                            Version                                                             |
+|------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------:|
+| **[`@exortek/crypto`](/crypto)**         |     [![npm](https://img.shields.io/npm/v/@exortek/crypto.svg?color=07d600)](https://www.npmjs.com/package/@exortek/crypto)     |
+| **[`@exortek/security`](/security)**     |   [![npm](https://img.shields.io/npm/v/@exortek/security.svg?color=07d600)](https://www.npmjs.com/package/@exortek/security)   |
+| **[`@exortek/otp`](/otp)**               |        [![npm](https://img.shields.io/npm/v/@exortek/otp.svg?color=07d600)](https://www.npmjs.com/package/@exortek/otp)        |
+| **[`@exortek/password`](/password)**     |   [![npm](https://img.shields.io/npm/v/@exortek/password.svg?color=07d600)](https://www.npmjs.com/package/@exortek/password)   |
+| **[`@exortek/session`](/session)**       |    [![npm](https://img.shields.io/npm/v/@exortek/session.svg?color=07d600)](https://www.npmjs.com/package/@exortek/session)    |
+| **[`@exortek/jwk`](/jwk)**               |        [![npm](https://img.shields.io/npm/v/@exortek/jwk.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jwk)        |
+| **[`@exortek/jws`](/jws)**               |        [![npm](https://img.shields.io/npm/v/@exortek/jws.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jws)        |
+| **[`@exortek/jwt`](/jwt)**               |        [![npm](https://img.shields.io/npm/v/@exortek/jwt.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jwt)        |
+| **[`@exortek/challenge`](/challenge)**   |  [![npm](https://img.shields.io/npm/v/@exortek/challenge.svg?color=07d600)](https://www.npmjs.com/package/@exortek/challenge)  |
+| **[`@exortek/apikey`](/apikey)**         |     [![npm](https://img.shields.io/npm/v/@exortek/apikey.svg?color=07d600)](https://www.npmjs.com/package/@exortek/apikey)     |
+| **[`@exortek/magic-link`](/magic-link)** | [![npm](https://img.shields.io/npm/v/@exortek/magic-link.svg?color=07d600)](https://www.npmjs.com/package/@exortek/magic-link) |
+| **[`@exortek/jwks`](/jwks)**             |       [![npm](https://img.shields.io/npm/v/@exortek/jwks.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jwks)       |
+| **[`@exortek/ua`](/ua)**                 |         [![npm](https://img.shields.io/npm/v/@exortek/ua.svg?color=07d600)](https://www.npmjs.com/package/@exortek/ua)         |
 
 ## The stack
 
 Numbers reflect dependency order — a lower number never imports from a higher one, so you can adopt one package at a
 time.
 
-| #  | Package                          | What it does                                                                         |
-|:--:|----------------------------------|--------------------------------------------------------------------------------------|
-| 01 | [`@exortek/crypto`](/crypto)     | crypto primitives — the foundation the rest builds on                                |
-| 02 | [`@exortek/password`](/password) | Argon2id / scrypt / bcrypt / PBKDF2, strength scoring, HIBP breach check, peppering  |
-| 03 | [`@exortek/otp`](/otp)           | TOTP / HOTP, backup codes, QR provisioning URI                                       |
-| 04 | [`@exortek/challenge`](/challenge) | HMAC-signed multi-step flow tokens with opt-in single-use + IP binding             |
-| 05 | [`@exortek/jwk`](/jwk)           | generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278 thumbprints |
-| 06 | [`@exortek/jws`](/jws)           | JWS compact + JSON, detached (§F), `b64:false`, HS / RS / PS / ES / EdDSA + secp256k1 |
-| 07 | [`@exortek/jwt`](/jwt)           | JWT sign / verify / peek, tokenPair with RFC 6749 §10.4 reuse detection, blacklist stores |
-| 08 | `@exortek/jwe`                   | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                       |
-| 09 | [`@exortek/jwks`](/jwks)         | JWKS local key set + remote URI fetching, caching, zero-downtime `kid` rotation      |
-| 10 | [`@exortek/session`](/session)   | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub        |
-| 11 | [`@exortek/security`](/security) | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers |
-| 12 | [`@exortek/ua`](/ua)             | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting       |
-| 13 | [`@exortek/apikey`](/apikey)     | Stripe-style prefixed API keys with HMAC-hashed storage, scopes, and middleware      |
-| 14 | [`@exortek/magic-link`](/magic-link) | passwordless email-link auth — HMAC-signed short-lived tokens with single-use consume |
-| 15 | `@exortek/passkey`               | WebAuthn / FIDO2 server verification (browser side via `@simplewebauthn/browser`)    |
-| 16 | `@exortek/opaque`                | OPAQUE (aPAKE) — zero-knowledge password auth                                        |
-| 17 | `@exortek/paseto`                | PASETO v4 (`local` / `public`)                                                       |
-| 18 | `@exortek/oauth2`                | OAuth 2.1 client (PKCE) + provider presets                                           |
-| 19 | `@exortek/oidc`                  | OpenID Connect on top of `oauth2`                                                    |
-| 20 | `@exortek/web3-evm`              | SIWE — Sign-In With Ethereum                                                         |
-| 21 | `@exortek/web3-solana`           | SIWS — Sign-In With Solana                                                           |
-| 22 | `@exortek/auth`                  | umbrella — re-exports every package above                                            |
+| #  | Package                              | What it does                                                                              |
+|:--:|--------------------------------------|-------------------------------------------------------------------------------------------|
+| 01 | [`@exortek/crypto`](/crypto)         | crypto primitives — the foundation the rest builds on                                     |
+| 02 | [`@exortek/password`](/password)     | Argon2id / scrypt / bcrypt / PBKDF2, strength scoring, HIBP breach check, peppering       |
+| 03 | [`@exortek/otp`](/otp)               | TOTP / HOTP, backup codes, QR provisioning URI                                            |
+| 04 | [`@exortek/challenge`](/challenge)   | HMAC-signed multi-step flow tokens with opt-in single-use + IP binding                    |
+| 05 | [`@exortek/jwk`](/jwk)               | generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278 thumbprints  |
+| 06 | [`@exortek/jws`](/jws)               | JWS compact + JSON, detached (§F), `b64:false`, HS / RS / PS / ES / EdDSA + secp256k1     |
+| 07 | [`@exortek/jwt`](/jwt)               | JWT sign / verify / peek, tokenPair with RFC 6749 §10.4 reuse detection, blacklist stores |
+| 08 | `@exortek/jwe`                       | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                            |
+| 09 | [`@exortek/jwks`](/jwks)             | JWKS local key set + remote URI fetching, caching, zero-downtime `kid` rotation           |
+| 10 | [`@exortek/session`](/session)       | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub             |
+| 11 | [`@exortek/security`](/security)     | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers      |
+| 12 | [`@exortek/ua`](/ua)                 | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting            |
+| 13 | [`@exortek/apikey`](/apikey)         | Stripe-style prefixed API keys with HMAC-hashed storage, scopes, and middleware           |
+| 14 | [`@exortek/magic-link`](/magic-link) | passwordless email-link auth — HMAC-signed short-lived tokens with single-use consume     |
+| 15 | `@exortek/passkey`                   | WebAuthn / FIDO2 server verification (browser side via `@simplewebauthn/browser`)         |
+| 16 | `@exortek/opaque`                    | OPAQUE (aPAKE) — zero-knowledge password auth                                             |
+| 17 | `@exortek/paseto`                    | PASETO v4 (`local` / `public`)                                                            |
+| 18 | `@exortek/oauth2`                    | OAuth 2.1 client (PKCE) + provider presets                                                |
+| 19 | `@exortek/oidc`                      | OpenID Connect on top of `oauth2`                                                         |
+| 20 | `@exortek/web3-evm`                  | SIWE — Sign-In With Ethereum                                                              |
+| 21 | `@exortek/web3-solana`               | SIWS — Sign-In With Solana                                                                |
+| 22 | `@exortek/auth`                      | umbrella — re-exports every package above                                                 |
 
 ## Install
 
