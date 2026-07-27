@@ -178,6 +178,28 @@ describe('handler', () => {
     );
     assert.equal(headers['cache-control'], 'no-cache');
   });
+
+  test('unwraps Fastify reply.raw', async () => {
+    const ks = await createLocalKeySet([{ alg: 'ES256', kid: 'h2' }]);
+    const handler = ks.handler();
+    let status, headers, body;
+    const reply = {
+      raw: {
+        writeHead(s, h) {
+          status = s;
+          headers = h;
+        },
+        end(b) {
+          body = b;
+        },
+      },
+    };
+    handler({}, reply);
+    assert.equal(status, 200);
+    assert.equal(headers['content-type'], 'application/json; charset=utf-8');
+    const parsed = JSON.parse(body);
+    assert.equal(parsed.keys[0].kid, 'h2');
+  });
 });
 
 describe('kids and size consistency', () => {

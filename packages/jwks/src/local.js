@@ -57,7 +57,7 @@ import { assertNonEmptyString, assertObject, invalidArgument } from './internal/
  * @property {number}                                     size
  * @property {(options: RotateOptions) => Promise<KeyEntry>} rotate
  * @property {(privateJwk: Record<string, unknown>) => void} addKey
- * @property {(options?: HandlerOptions) => (req: unknown, res: import('node:http').ServerResponse) => void} handler
+ * @property {(options?: HandlerOptions) => (req: unknown, res: unknown) => void} handler
  * @property {(header: { kid: string, alg?: string }) => Promise<import('node:crypto').KeyObject>} resolve
  */
 
@@ -268,21 +268,26 @@ export async function createLocalKeySet(specs, options = {}) {
     },
 
     /**
-     * HTTP handler for `/.well-known/jwks.json`. Uses the Node.js
-     * `http.ServerResponse` API which Express and Fastify both support.
+     * HTTP handler for `/.well-known/jwks.json`. Writes via the raw
+     * Node.js `http.ServerResponse` API — works with Express directly,
+     * and with Fastify by unwrapping `reply.raw`.
      *
      * @param {HandlerOptions} [handlerOptions]
-     * @returns {(req: unknown, res: import('node:http').ServerResponse) => void}
+     * @returns {(req: unknown, res: unknown) => void}
      */
     handler(handlerOptions = {}) {
       const cacheControl = handlerOptions.cacheControl ?? 'public, max-age=300';
-      return function jwksHandler(_req, /** @type {import('node:http').ServerResponse} */ res) {
+      return function jwksHandler(_req, res) {
         const json = JSON.stringify(buildPublicJwks());
-        res.writeHead(200, {
+
+        // Fastify's reply wraps the raw Node response under `.raw`; Express/raw Node pass it directly.
+        const rawRes = res.raw ?? res;
+
+        rawRes.writeHead(200, {
           'content-type': 'application/json; charset=utf-8',
           'cache-control': cacheControl,
         });
-        res.end(json);
+        rawRes.end(json);
       };
     },
 
