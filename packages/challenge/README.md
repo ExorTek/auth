@@ -3,10 +3,15 @@
 > Signed, single-use challenge tokens for multi-step auth flows on Node.js 22+ — HMAC-SHA256, opt-in single-use enforcement, opt-in IP binding, zero non-`@exortek/*` runtime dependencies. Built on `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/challenge.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/challenge)
+[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/challenge.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/challenge)](https://packagephobia.com/result?p=@exortek/challenge)
+[![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![license](https://img.shields.io/npm/l/@exortek/challenge.svg?color=blue)](./LICENSE)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+
+📖 **Docs:** [**auth.memet.dev/challenge**](https://auth.memet.dev/challenge)
+
+## Why
 
 A challenge is a small, HMAC-signed envelope that carries flow context — **who** is being challenged, **how** they proved themselves so far, **which step** of the flow they've cleared — from one HTTP request to the next without a server-side session record. It fills the awkward middle between an OTP code (single value, no context) and a JWT (heavier, meant for actual auth material).
 
@@ -119,6 +124,8 @@ verifyChallenge(token, {
   expectedNextStep?: string,
   ip?:               string,                     // required if token was IP-bound
 
+  prefix?:           string,                     // must match the value passed to createChallenge; default 'chall_v1'
+
   now?:              number,
 }): Promise<
   | { valid: true, payload: ChallengePayload }
@@ -216,6 +223,19 @@ Branch on `err.code`, never on the message. Expected verify failures return a `r
 - **You need a full session with rotation, revocation, sudo mode.** Use `@exortek/session`.
 - **You need an interoperable, third-party-verifiable token.** Use `@exortek/jwt`.
 - **You just need a rate-limit key.** Use `@exortek/security`'s rate-limit — `challenge` is about carrying auth flow state, not counting requests.
+
+## Highlights
+
+- Stateless by default — HMAC-signed envelope, no server-side session record required.
+- Versioned wire prefix (`chall_v1`) lets callers cheaply reject the wrong token shape before running the HMAC.
+- Opt-in single-use enforcement (`singleUse` + `consume`) and opt-in IP binding.
+- Memory + Redis stores for replay tracking, zero non-`@exortek/*` runtime dependencies.
+
+## Links
+
+- [Docs](https://auth.memet.dev/challenge)
+- [GitHub](https://github.com/ExorTek/auth/tree/master/packages/challenge)
+- [Issues](https://github.com/ExorTek/auth/issues)
 
 ## License
 
