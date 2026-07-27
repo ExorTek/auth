@@ -11,15 +11,29 @@
 //   curl -s http://127.0.0.1:3000/v1/whoami \
 //     -H 'Authorization: Bearer <paste-key-here>'
 //
+//   # Mint more than 5 keys within a minute — the 6th is 429
+//   for i in {1..6}; do curl -s -o /dev/null -w "%{http_code}\n" \
+//     -X POST http://127.0.0.1:3000/keys -H 'content-type: application/json' \
+//     -d '{"userId":"usr_123"}'; done
+//
 // Requires: `yarn workspace @exortek/apikey add fastify` in dev.
 
 import Fastify from 'fastify';
+import { rateLimit } from '@exortek/security';
+import { rateLimitPlugin } from '@exortek/security/fastify';
 import { createApiKey, mask } from '../src/index.js';
 import { memoryStore } from '../src/stores/memory.js';
 import { apiKeyPlugin } from '../src/middleware/fastify.js';
 
 const store = memoryStore();
 const app = Fastify({ logger: false });
+
+// fastify-plugin bypasses encapsulation, so this applies instance-wide —
+// fine here since /keys has no key-based auth of its own to bound it by
+// IP instead. See the "Rate limiting" section in the README.
+await app.register(rateLimitPlugin, {
+  limiter: rateLimit.sliding({ requests: 5, window: '1m', store: rateLimit.stores.memory() }),
+});
 
 // Unauthenticated key-management routes registered on the root scope.
 app.post('/keys', async (req, reply) => {

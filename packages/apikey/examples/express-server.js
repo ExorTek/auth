@@ -17,9 +17,16 @@
 //   curl -s -X POST http://127.0.0.1:3000/v1/admin \
 //     -H 'Authorization: Bearer <paste-key-here>'
 //
+//   # Mint more than 5 keys within a minute — the 6th is 429
+//   for i in {1..6}; do curl -s -o /dev/null -w "%{http_code}\n" \
+//     -X POST http://127.0.0.1:3000/keys -H 'content-type: application/json' \
+//     -d '{"userId":"usr_123"}'; done
+//
 // Requires: `yarn workspace @exortek/apikey add express` in dev.
 
 import express from 'express';
+import { rateLimit } from '@exortek/security';
+import { rateLimitMiddleware } from '@exortek/security/express';
 import { createApiKey, mask, revokeApiKey } from '../src/index.js';
 import { memoryStore } from '../src/stores/memory.js';
 import { apiKeyMiddleware } from '../src/middleware/express.js';
@@ -27,12 +34,19 @@ import { apiKeyMiddleware } from '../src/middleware/express.js';
 const store = memoryStore();
 
 const app = express();
+app.set('trust proxy', true);
 app.use(express.json());
+
+// The minting route has no key-based auth of its own yet, so bound it
+// by IP — see the "Rate limiting" section in the README.
+const mintLimiter = rateLimitMiddleware({
+  limiter: rateLimit.sliding({ requests: 5, window: '1m', store: rateLimit.stores.memory() }),
+});
 
 // Mint / revoke live behind an unauthenticated `/keys` prefix so the
 // demo works without seeding — in a real app these would be gated by
 // user session auth.
-app.post('/keys', async (req, res) => {
+app.post('/keys', mintLimiter, async (req, res) => {
   try {
     const { key, id, record } = await createApiKey({
       store,
@@ -78,6 +92,5 @@ app.post('/v1/admin', apiKeyMiddleware({ store, requiredScopes: ['admin'] }), (r
 
 const port = process.env.PORT ?? 3000;
 app.listen(port, () => {
-  // eslint-disable-next-line no-console
   console.log(`apikey demo on http://127.0.0.1:${port}`);
 });

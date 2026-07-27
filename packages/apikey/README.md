@@ -3,10 +3,15 @@
 > Stripe-style prefixed API keys for Node.js 22+ — 3-segment tokens (`sk_live_<id>_<secret>`), HMAC-SHA256 storage hash with optional pepper rotation, scope allowlists, memory + Redis stores, Express + Fastify middleware. Zero non-`@exortek/*` runtime dependencies.
 
 [![npm](https://img.shields.io/npm/v/@exortek/apikey.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/apikey)
+[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/apikey.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/apikey)](https://packagephobia.com/result?p=@exortek/apikey)
+[![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![license](https://img.shields.io/npm/l/@exortek/apikey.svg?color=blue)](./LICENSE)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+
+📖 **Docs:** [**auth.memet.dev/apikey**](https://auth.memet.dev/apikey)
+
+## Why
 
 Every API vendor rebuilds the same six things: a prefixed token format so keys are recognisable in logs, hashed storage so a leaked DB doesn't leak secrets, scope allowlists so a machine token can't accidentally admin your infrastructure, revocation, a per-user list for the "manage API keys" UI, and a middleware that turns `Authorization: Bearer <key>` into a verified caller identity. `@exortek/apikey` ships all six.
 
@@ -124,6 +129,27 @@ Never throws on a bad key. Failure reasons:
 | `missing_scope`     | `requiredScopes` not covered by the record's `scopes`.    |
 | `store_unavailable` | `store.getById` threw.                                    |
 
+### `revokeAllForUser(userId, options)`
+
+```ts
+revokeAllForUser(userId: string, {
+  store:    ApiKeyStore,
+  reason?:  string,
+}): Promise<number>  // count of records actually revoked
+```
+
+Revoke every non-revoked key belonging to `userId` in one call — password reset, account termination, etc.
+
+### `listApiKeys(userId, options)`
+
+```ts
+listApiKeys(userId: string, {
+  store: ApiKeyStore,
+}): Promise<ApiKeyRecord[]>  // most-recently-used first
+```
+
+For a "manage API keys" UI. Hide `record.hash` before rendering — only the plaintext `id` is safe to display.
+
 ### Scopes: `covers` / `hasAll` / `hasAny`
 
 ```js
@@ -221,6 +247,30 @@ app.get('/v1/whoami', async req => req.apiKey);
 
 Invalid keys respond with 401 `{ error: 'invalid_api_key', reason }`; missing scope responds 403; store failure responds 503.
 
+## Rate limiting
+
+`@exortek/apikey` doesn't ship a built-in limiter, and deliberately so: `verifyApiKey` is an O(1) store lookup plus a fast HMAC compare, and the secret half is 256-bit random — there's no brute-force cost here for a limiter to blunt (see [Token format](#token-format)). What you actually want to bound is generic request volume, which isn't specific to this package.
+
+Put [`@exortek/security`](https://www.npmjs.com/package/@exortek/security)'s rate-limit in front of the routes that matter:
+
+- **Key-minting route** (`POST /keys` or wherever `createApiKey` is called) — this one has no key-based auth yet, so limit by IP.
+- **Guarded routes** — if you want to slow down credential stuffing beyond a firehose, limit by the `id` segment (plaintext, already in your logs) instead of IP, so one leaked key can't be used to exhaust another caller's budget.
+
+```js
+import { rateLimit } from '@exortek/security';
+import { rateLimitMiddleware } from '@exortek/security/express';
+
+const mintLimiter = rateLimitMiddleware({
+  limiter: rateLimit.sliding({ requests: 5, window: '1m', store: rateLimit.stores.memory() }),
+});
+
+app.post('/keys', mintLimiter, async (req, res) => {
+  /* createApiKey(...) */
+});
+```
+
+See `@exortek/apikey/examples/express-server.js` and `fastify-server.js` for a runnable version.
+
 ## Stores
 
 `@exortek/apikey/stores` ships two implementations. Any object matching the `ApiKeyStore` interface works — bring your own if you already have a keys table in your DB.
@@ -257,6 +307,20 @@ import { ApiKeyError, ErrorCode } from '@exortek/apikey';
 | `STORE_ERROR`       | 500  | `store.put` threw at create time (unusual — usually a DB outage). |
 
 Expected verify failures do NOT throw — they surface as `{ valid: false, reason }`. See the failure-reasons table above.
+
+## Highlights
+
+- Stripe-style 3-segment tokens (`prefix_id_secret`) — recognisable in logs, O(1) lookup by id.
+- HMAC-SHA256 storage hash with optional pepper rotation — never store the raw secret.
+- Scope allowlists with namespace/super wildcards (`covers` / `hasAll` / `hasAny`).
+- Revocation, per-user listing, and last-used tracking for a "manage API keys" UI.
+- Express + Fastify middleware, memory + Redis stores, zero non-`@exortek/*` runtime dependencies.
+
+## Links
+
+- [Docs](https://auth.memet.dev/apikey)
+- [GitHub](https://github.com/ExorTek/auth/tree/master/packages/apikey)
+- [Issues](https://github.com/ExorTek/auth/issues)
 
 ## License
 
