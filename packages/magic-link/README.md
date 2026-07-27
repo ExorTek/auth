@@ -3,10 +3,15 @@
 > Passwordless email-link auth for Node.js 22+ — HMAC-signed short-lived tokens, single-use enforcement, opt-in per-email rate limiting, email hashed into the payload, memory + Redis stores. Ships the token — you send the email.
 
 [![npm](https://img.shields.io/npm/v/@exortek/magic-link.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/magic-link)
+[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/magic-link.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/magic-link)](https://packagephobia.com/result?p=@exortek/magic-link)
+[![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![license](https://img.shields.io/npm/l/@exortek/magic-link.svg?color=blue)](./LICENSE)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+
+📖 **Docs:** [**auth.memet.dev/magic-link**](https://auth.memet.dev/magic-link)
+
+## Why
 
 A passwordless sign-in flow is three moving parts:
 
@@ -168,6 +173,26 @@ await createMagicLink({
 
 The counter lives on the same store (`store.incrRate` — memory + Redis both ship it). This is a coarse limit on the `create` side — for `/auth/verify` DoS protection, put `@exortek/security`'s rate-limit in front of the route (the token itself is 128-bit random + HMAC-gated, so brute-forcing isn't the concern).
 
+### `listPendingForEmail(email, options)`
+
+```ts
+listPendingForEmail(email: string, {
+  store: MagicLinkStore,   // must implement listByEmail
+}): Promise<MagicLinkRecord[]>  // non-consumed, non-expired only
+```
+
+Handy for a "resend last email" flow.
+
+### `revokeAllForEmail(email, options)`
+
+```ts
+revokeAllForEmail(email: string, {
+  store: MagicLinkStore,   // must implement revokeByEmail
+}): Promise<number>  // count of records revoked
+```
+
+Invalidates every pending (unclicked) sign-in email for that address — useful after a password reset or account termination.
+
 ### Pepper-free by design
 
 There's no `peppers` array here (unlike `@exortek/apikey`). Magic-link tokens are single-use and short-lived — a stolen storage row is worth much less than a leaked API-key hash, and the extra rotation surface isn't worth the ergonomic cost. If you need HSM-style key rotation, keep the `secret` in a KMS and rotate it as a whole.
@@ -256,6 +281,19 @@ import { MagicLinkError, ErrorCode } from '@exortek/magic-link';
 | `INVALID_PREFIX`    | 400  | Prefix doesn't match `/^[A-Za-z0-9_-]{1,32}$/`. |
 | `RATE_LIMITED`      | 429  | `maxPerEmail` cap exceeded. |
 | `STORE_ERROR`       | 500  | `store.put` threw at create time (rare — usually a DB outage). |
+
+## Highlights
+
+- HMAC-signed, single-use tokens — the email never appears in the URL, only in the store.
+- Opt-in per-email rate limiting so a spammer can't burn your mail budget.
+- Two-phase preview → confirm flow for a "sign in as X?" confirmation step.
+- Memory + Redis stores, zero non-`@exortek/*` runtime dependencies — you bring the mail driver.
+
+## Links
+
+- [Docs](https://auth.memet.dev/magic-link)
+- [GitHub](https://github.com/ExorTek/auth/tree/master/packages/magic-link)
+- [Issues](https://github.com/ExorTek/auth/issues)
 
 ## License
 
