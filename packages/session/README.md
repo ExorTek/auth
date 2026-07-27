@@ -146,7 +146,7 @@ createSessionManager({
 Sensitive-endpoint gating — user must be recently re-authenticated:
 
 ```js
-// On a hassas endpoint:
+// On a sensitive endpoint:
 if (!(await sessions.requireFreshAuth(req, { maxAgeSeconds: 300 }))) {
   return res.redirect('/reauth');
 }
