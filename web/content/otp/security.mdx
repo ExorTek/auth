@@ -101,7 +101,7 @@ TOTP with a 6-digit code and `window: 1` gives an attacker
 becomes reachable. **Always compose with rate-limit.**
 
 ```js
-import { verifyTotp, OtpError, ErrorCode } from '@exortek/otp'
+import { verifyTotp } from '@exortek/otp'
 import { rateLimit } from '@exortek/security'
 
 const throttle = rateLimit.sliding({
@@ -109,13 +109,13 @@ const throttle = rateLimit.sliding({
   store: rateLimit.stores.memory(),   // Redis in multi-worker deploys
 })
 
+// Throttling is your application's concern, not `@exortek/otp`'s — there's
+// no `ErrorCode.THROTTLED` on `OtpError`. Handle the deny however fits
+// your stack (a plain Error, a 429 response, etc.).
 async function verify(userId, code, secret) {
   const rl = await throttle.check({ key: `otp:${userId}` })
   if (!rl.allowed) {
-    throw new OtpError(
-      ErrorCode.THROTTLED,
-      `Too many attempts. Try again in ${rl.retryAfter}s.`,
-    )
+    throw new Error(`Too many attempts. Try again in ${rl.retryAfter}s.`)
   }
   return verifyTotp(code, secret, {
     window: 1,

@@ -61,64 +61,55 @@ try {
 ## `ErrorCode`
 
 Codes are **stable across minor versions** — new codes may be added; existing codes are never renamed or repurposed.
+`@exortek/security` throws exactly 4 codes; every CSRF / CORS / rate-limit / redirect auth outcome is a returned
+decision (`false`, an `{ allowed: false }` object, a deny), never a throw — see the Callout above.
 
-| Code                 | Meaning                                                                                      | Typical status      |
-| -------------------- | -------------------------------------------------------------------------------------------- | ------------------- |
-| `INVALID_ARGUMENT`   | Type / range / shape validation failed on a function argument or config option.              | `400`               |
-| `CSRF_MISSING`       | CSRF cookie or header value is missing on a state-changing request.                          | `403`               |
-| `CSRF_MISMATCH`      | Cookie and header CSRF values don't match.                                                   | `403`               |
-| `CSRF_MALFORMED`     | CSRF token doesn't have the expected `<random>.<hmac>` shape.                                | `403`               |
-| `CSRF_TAMPERED`      | CSRF HMAC tag doesn't match the current secret.                                              | `403`               |
-| `RATE_LIMITED`       | Rate-limit deny (raised by adapters when configured to throw).                               | `429`               |
-| `ORIGIN_DENIED`      | Origin failed CORS / `checkOrigin` validation.                                               | `403`               |
-| `REDIRECT_UNSAFE`    | Redirect target failed `safeRedirect` validation (raised by adapters that convert to throw). | `400`               |
-| `PATH_TRAVERSAL`     | `safeJoin` refused a segment that would escape the base directory.                           | `400`               |
-| `BODY_TOO_LARGE`     | Request body / JSON payload exceeded the configured limit.                                   | `413`               |
-| `REQUEST_TIMEOUT`    | `timeout()` hit the deadline.                                                                | `504`               |
-| `WEBHOOK_INVALID`    | Webhook signature verification failed (raised by adapters).                                  | `401`               |
-| `HONEYPOT_TRIGGERED` | Honeypot field was filled — likely a bot.                                                    | `200` (silent drop) |
+| Code               | Meaning                                                                                       |
+| ------------------- | ---------------------------------------------------------------------------------------------- |
+| `INVALID_ARGUMENT`  | Type / range / shape validation failed on a function argument or config option.                |
+| `PATH_TRAVERSAL`    | `safeJoin` refused a segment that would escape the base directory, or a NUL byte in a segment. |
+| `BODY_TOO_LARGE`    | `safeJsonParse` input exceeded `maxBytes` (only in `mode: 'throw'`).                            |
+| `REQUEST_TIMEOUT`   | `timeout()` hit its deadline, or its `signal` aborted.                                          |
+
+<Callout type="warning">
+  All four codes carry HTTP status **400** — `SecurityError.statuses` is an empty map, so every instance falls
+  through to `defaultStatus: 400` unless a caller passes `{ status: ... }` at the throw site, which nothing in this
+  package currently does. Don't assume `REQUEST_TIMEOUT` is a 504 or `BODY_TOO_LARGE` is a 413 — check `err.status`
+  if you need to be sure, or map `err.code` yourself (see below).
+</Callout>
 
 ## Which code comes from where?
 
-| Module                             | Codes it emits                                                                                      |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `csrf.generate`                    | `INVALID_ARGUMENT` (short / missing secret)                                                         |
-| `csrf.verify` / `verifyForSession` | never throws for auth outcomes — return `false`                                                     |
-| `headers`                          | `INVALID_ARGUMENT` (bad HSTS preload eligibility, invalid CSP source, ALLOW-FROM frameguard)        |
-| `cors`                             | `INVALID_ARGUMENT` (`credentials: true` + reflect-any, bad maxAge, non-2xx `optionsSuccessStatus`)  |
-| `safeRedirect`                     | `INVALID_ARGUMENT` (bad `defaultTo`, non-string `allowedHosts` entries) — the _input_ never throws  |
-| `rateLimit.*`                      | `INVALID_ARGUMENT` (bad options), no throws from `check()` itself                                   |
-| Helpers                            | See table above — code depends on the specific helper                                               |
-| Middleware adapters                | Wrap the above; adapter errors are `INVALID_ARGUMENT` (bad options, missing cookie plugin for CSRF) |
+| Module                              | Codes it emits                                                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `csrf.generate`                      | `INVALID_ARGUMENT` (short / missing secret)                                                           |
+| `csrf.verify` / `verifyForSession`   | never throws for auth outcomes — return `false`                                                       |
+| `headers`                            | `INVALID_ARGUMENT` (bad HSTS preload eligibility, invalid CSP source, ALLOW-FROM frameguard)          |
+| `cors`                               | `INVALID_ARGUMENT` (`credentials: true` + reflect-any, bad maxAge, non-2xx `optionsSuccessStatus`)    |
+| `safeRedirect`                       | `INVALID_ARGUMENT` (bad `defaultTo`, non-string `allowedHosts` entries) — the _input_ never throws    |
+| `rateLimit.*`                        | `INVALID_ARGUMENT` (bad options), no throws from `check()` itself                                     |
+| `safeJoin`                           | `PATH_TRAVERSAL`                                                                                       |
+| `safeJsonParse` (`mode: 'throw'`)    | `BODY_TOO_LARGE`                                                                                       |
+| `timeout()`                          | `REQUEST_TIMEOUT`                                                                                       |
+| Middleware adapters                  | Wrap the above; adapter-level config errors are `INVALID_ARGUMENT` (bad options, missing cookie plugin for CSRF) |
 
-## Suggested HTTP status mappings
+## Mapping to your own HTTP statuses
 
-Adapters use this table already; roll your own error handler when using the primitives directly:
+Every `SecurityError` reports status `400` regardless of `code` (see the Callout above). If you want
+CSRF-style-403 / timeout-style-504 semantics in your own error handler, map `err.code` yourself:
 
 ```js
 function toHttpStatus(err) {
   if (!(err instanceof SecurityError)) return 500;
   switch (err.code) {
-    case ErrorCode.INVALID_ARGUMENT:
-      return 400;
-    case ErrorCode.CSRF_MISSING:
-    case ErrorCode.CSRF_MISMATCH:
-    case ErrorCode.CSRF_MALFORMED:
-    case ErrorCode.CSRF_TAMPERED:
-    case ErrorCode.ORIGIN_DENIED:
-      return 403;
-    case ErrorCode.WEBHOOK_INVALID:
-      return 401;
-    case ErrorCode.RATE_LIMITED:
-      return 429;
     case ErrorCode.BODY_TOO_LARGE:
-      return 413;
+      return 413; // reinterpreted — the package itself reports 400
     case ErrorCode.REQUEST_TIMEOUT:
-      return 504;
+      return 504; // reinterpreted — the package itself reports 400
     case ErrorCode.PATH_TRAVERSAL:
-      return 400;
+    case ErrorCode.INVALID_ARGUMENT:
     default:
-      return 500;
+      return 400;
   }
 }
 ```

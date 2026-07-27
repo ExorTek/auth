@@ -70,7 +70,7 @@ The regular session `ttl` never applies to impersonation sessions.
 Impersonation refuses to nest. An admin session that itself is
 already impersonated (i.e. `session.impersonatedBy` is set) cannot
 call `impersonate` — the manager throws
-`SessionError { code: INVALID_TOKEN }`.
+`SessionError { code: INVALID_ARGUMENT }`.
 
 Why: nested impersonation muddies audit trails ("who really did
 this?"). The one-level rule keeps `impersonatedBy` pointing at a

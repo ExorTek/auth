@@ -38,19 +38,16 @@ class PasswordError extends Error {
 
 ## `ErrorCode`
 
+`@exortek/password` throws exactly these 6 codes. Verifying a wrong password is **not** one of them — `verify` /
+`constantTimeVerify` return `false` rather than throw (see [When errors are thrown](#when-errors-are-thrown)).
+
 | Code                    | HTTP | Meaning                                                                    |
 | ----------------------- | ---- | -------------------------------------------------------------------------- |
 | `INVALID_ARGUMENT`      | 400  | Bad function argument — wrong type, wrong range, malformed record          |
-| `INVALID_PASSWORD`      | 401  | Verify path — reserved; the umbrella verify returns `false` instead        |
-| `INVALID_HASH`          | 400  | A stored hash string doesn't match the format its prefix claims            |
 | `UNSUPPORTED_ALGORITHM` | 400  | `pbkdf2.hash({ hash: 'md5' })`, `argon2.hash({ type: 'argon2xyz' })`, …    |
-| `UNSUPPORTED_PARAMS`    | 400  | Parameter set the target algorithm rejects (`ln` too high, etc.)           |
 | `MISSING_PEER_DEP`      | 500  | `argon2` or `bcryptjs` peer isn't installed — message names the package    |
 | `PASSWORD_TOO_LONG`     | 400  | Password exceeds `MAX_PASSWORD_BYTES` (1024) or bcrypt strict-mode 72      |
-| `PASSWORD_TOO_SHORT`    | 400  | Reserved — policy layer surfaces `POLICY_VIOLATION` instead                |
 | `POLICY_VIOLATION`      | 400  | `assertPolicy` rejected the password — `details.violations` lists reasons  |
-| `BREACHED_PASSWORD`     | 422  | Reserved — HIBP client returns `{ pwned: true }` and callers throw this    |
-| `REUSED_PASSWORD`       | 422  | Reserved — history helper returns `true` and callers throw this            |
 | `HIBP_UNAVAILABLE`      | 500  | HIBP network / HTTP failure and `failOpen` wasn't set                      |
 
 ## `status` field

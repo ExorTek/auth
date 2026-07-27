@@ -38,22 +38,17 @@ class SessionError extends Error {
 
 ## `ErrorCode`
 
-| Code                          | HTTP | Meaning                                                                                    |
-| ----------------------------- | ---- | ------------------------------------------------------------------------------------------ |
-| `INVALID_ARGUMENT`            | 400  | Bad function argument — malformed config, wrong type, out-of-range value.                  |
-| `MISSING_TOKEN`               | 401  | No cookie and no header token on the request.                                              |
-| `INVALID_TOKEN`               | 401  | Sealed cookie failed authentication — tampered bytes, wrong secret, or wrong shape.        |
-| `EXPIRED`                     | 401  | Absolute TTL passed. Verify returns null; this is thrown only from `decodeToken` directly. |
-| `IDLE_TIMEOUT`                | 401  | Idle window elapsed since `lastSeenAt`.                                                    |
-| `REVOKED`                     | 401  | Store returned `revoked: true` for the sid.                                                |
-| `SESSION_NOT_FOUND`           | 401  | Concurrent rotate or a store dropout — the sid has already gone.                           |
-| `TOKEN_ROTATION_REQUIRED`     | 401  | Reserved — future signalling for secret-rotation forced rehash.                            |
-| `FINGERPRINT_MISMATCH`        | 401  | `bindTo` was set to strict; ip / ua at verify time didn't match the record.                |
-| `SUSPICIOUS_ACTIVITY`         | 401  | Reserved — currently soft signal via `onSuspicious` rather than a throw.                   |
-| `CONCURRENT_LIMIT_EXCEEDED`   | 401  | Reserved — the manager evicts oldest instead of throwing in the normal flow.               |
-| `FRESH_AUTH_REQUIRED`         | 401  | Reserved — `requireFreshAuth` returns boolean, doesn't throw. Available for callers.       |
-| `IMPERSONATION_INVALID`       | 403  | Impersonation refused — most commonly nested impersonation attempt.                        |
-| `MISSING_PEER_DEP`            | 500  | An adapter subpath was imported but its peer (fastify, ioredis, etc.) isn't installed.     |
+`@exortek/session` throws exactly 4 codes — everything else (idle
+timeout, revocation, fingerprint mismatch, concurrent-limit eviction,
+suspicious activity) is a **denial or an event**, not a throw. See
+[Event vs error](#event-vs-error) below.
+
+| Code                | HTTP | Meaning                                                                                     |
+| ------------------- | ---- | --------------------------------------------------------------------------------------------|
+| `INVALID_ARGUMENT`  | 400  | Bad function argument — malformed config, wrong type, out-of-range value, or a disallowed operation (e.g. impersonation chaining, impersonation disabled). |
+| `INVALID_TOKEN`     | 401  | Sealed cookie failed authentication (tampered bytes, wrong secret, wrong shape), or the call requires a valid session on the request and there isn't one (`rotate`, `markFresh`, `impersonate`'s admin check, `upgrade`). |
+| `EXPIRED`           | 401  | Absolute TTL passed — thrown only from `decodeToken` directly; the higher-level `verify(req)` returns `null` instead. |
+| `SESSION_NOT_FOUND` | 401  | Concurrent rotate already consumed the sid, or a store dropout.                             |
 
 ## `status` field
 
@@ -91,13 +86,10 @@ throws are reserved for **misconfiguration** or **impossible states**:
   the sid (SESSION_NOT_FOUND).
 - `markFresh(req)` throws when there's no session on `req`
   (INVALID_TOKEN).
-- `impersonate(adminReq, targetUid)` throws when the admin session is
-  invalid, when the target uid is missing, or when the admin session
-  is itself an impersonation (IMPERSONATION_INVALID).
-- Subpath imports (`@exortek/session/stores/redis`,
-  `@exortek/session/fastify`, …) throw `MISSING_PEER_DEP` on the
-  first call into a peer that isn't installed. Actionable — the
-  message names the exact `yarn add` you need.
+- `impersonate(adminReq, targetUid)` throws `INVALID_ARGUMENT` when
+  impersonation isn't enabled on the manager or when the admin session
+  is itself an impersonation (chaining is refused to keep the audit
+  trail honest), and `INVALID_TOKEN` when the admin session is invalid.
 
 **Never throws:**
 
@@ -117,10 +109,10 @@ Errors carry a `cause` for upstream problems that triggered them:
 
 ```js
 try {
-  await sessions.verify(req);
+  const record = await verify(req);
 } catch (err) {
-  if (err.code === ErrorCode.MISSING_PEER_DEP) {
-    console.error(err.cause);   // the raw ERR_MODULE_NOT_FOUND
+  if (err instanceof SessionError && err.cause) {
+    console.error(err.cause);   // the underlying error, if any
   }
 }
 ```
@@ -144,9 +136,8 @@ Several failure modes emit **events** rather than throw:
 | IP change (`suspiciousActivity`) | No             | `onSuspicious('ip-change')`               |
 | UA change (`suspiciousActivity`) | No             | `onSuspicious('ua-change')`               |
 | Concurrent-limit eviction        | No             | `onRevoke('concurrent-limit')`            |
-| Missing peer dep                 | ✓ MISSING_PEER_DEP | —                                     |
-| Bad config                       | ✓ INVALID_ARGUMENT | —                                     |
-| Impersonation nesting            | ✓ IMPERSONATION_INVALID | —                                |
+| Bad config / disallowed op       | ✓ INVALID_ARGUMENT | —                                     |
+| No/invalid session on request    | ✓ INVALID_TOKEN | —                                        |
 
 Wire events into your telemetry sink for a full picture of what the
 manager is doing.

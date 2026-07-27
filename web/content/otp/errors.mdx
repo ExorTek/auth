@@ -64,16 +64,16 @@ try {
 ## `ErrorCode`
 
 Codes are **stable across minor versions** — new codes may be added;
-existing codes are never renamed or repurposed.
+existing codes are never renamed or repurposed. `@exortek/otp` throws
+exactly these 3 — replay detection and rate-limiting are **your**
+composition (this package doesn't ship a store or a limiter), not a
+built-in `OtpError` code.
 
-| Code | Meaning | Typical status |
+| Code | Meaning | Status |
 | --- | --- | --- |
 | `INVALID_ARGUMENT` | Type / range / shape validation failed on an option (bad `digits`, `period`, `window`, missing `label`, etc.). | `400` |
-| `INVALID_SECRET` | Secret is empty, malformed base32 / hex, or the wrong type. | `401` |
-| `INVALID_CODE` | Explicit code-shape rejection at the boundary (raised by higher-level flows, not `verify*` itself). | `401` |
 | `UNSUPPORTED_ALGORITHM` | Algorithm not in `SHA1 / SHA224 / SHA256 / SHA384 / SHA512`, or a `provisioningUri` call with `SHA-224` / `SHA-384`. | `400` |
-| `REPLAY_DETECTED` | Reserved — used by higher-level flows when they want to log replay separately from silent verify-false. | `403` |
-| `THROTTLED` | Rate-limit deny (raised by application code composing `@exortek/security`'s rate-limit with OTP). | `429` |
+| `INVALID_SECRET` | Secret is empty, malformed base32 / hex, or the wrong type. | `401` |
 
 ## Which code comes from where?
 
@@ -98,10 +98,7 @@ function toHttpStatus(err) {
   switch (err.code) {
     case ErrorCode.INVALID_ARGUMENT:
     case ErrorCode.UNSUPPORTED_ALGORITHM: return 400
-    case ErrorCode.INVALID_SECRET:
-    case ErrorCode.INVALID_CODE:          return 401
-    case ErrorCode.REPLAY_DETECTED:       return 403
-    case ErrorCode.THROTTLED:             return 429
+    case ErrorCode.INVALID_SECRET:        return 401
     default:                              return 500
   }
 }
