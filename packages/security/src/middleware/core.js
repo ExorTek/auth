@@ -234,8 +234,8 @@ export { buildCorsCheck, buildHeaders };
 //   - `null | undefined` — the concern did not terminate the response;
 //     the caller should continue the middleware chain.
 //   - anything truthy — the concern terminated (deny / preflight); the
-//     caller should stop the chain (Express: skip `next()`; Hono/Elysia:
-//     return the response object the runner produced).
+//     caller should stop the chain (Express: skip `next()`; Fastify:
+//     the reply is already sent).
 // -------------------------------------------------------------------
 
 /**
@@ -257,7 +257,7 @@ export { buildCorsCheck, buildHeaders };
  *   API where available, e.g. Fastify's `reply.setCookie`).
  * @property {(status: number, body: unknown, extraHeaders?: Record<string, string>) => unknown} json
  *   Terminal response with a JSON body. Returns whatever the framework
- *   expects the middleware to return (Express: undefined, Hono: Response).
+ *   expects the middleware to return (Express/Fastify: undefined).
  * @property {(status: number, extraHeaders?: Record<string, string>) => unknown} noContent
  *   Terminal response with no body.
  * @property {() => string | undefined} ip
@@ -266,8 +266,7 @@ export { buildCorsCheck, buildHeaders };
  *   Escape hatch for user callbacks (`keyGenerator`, `tokenFromRequest`)
  *   that expect the framework-native request object.
  * @property {() => unknown} rawRes
- *   Escape hatch for `onDenied`. `null` on frameworks without a distinct
- *   response object at this stage (Elysia).
+ *   Escape hatch for `onDenied`.
  * @property {(key: string, value: unknown) => void} decorate
  *   Attach state to the request/context for later handlers
  *   (e.g. `req.csrfToken = () => ...`).
@@ -281,8 +280,8 @@ async function _rawExtractCsrf(csrf, ctx) {
   if (isString(h) && h.length > 0) {
     return h;
   }
-  // Body may be sync (Express/Fastify already-parsed) or async (Hono
-  // parseBody on demand). Await either shape uniformly.
+  // Express/Fastify both hand back an already-parsed body; await
+  // uniformly in case a custom AdapterContext resolves it lazily.
   const body = await ctx.body();
   if (isObject(body)) {
     const v = /** @type {Record<string, unknown>} */ (body)[csrf.formField];

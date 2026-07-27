@@ -92,8 +92,8 @@ reporting policy above.
   rejection sampling where a bounded alphabet is involved.
 - **Prototype-pollution defence** on any user-supplied JSON in `@exortek/security` — `__proto__` / `constructor` /
   `prototype` keys are dropped unconditionally, survivors written as own properties via `Object.defineProperty`.
-- **Default XFF distrust** on edge-runtime adapters (Hono / Elysia rate-limit) — `X-Forwarded-For` is client-controlled
-  without a proxy in front, so we require an explicit `trustProxy: true` opt-in.
+- **Default XFF distrust** on every rate-limit adapter — `X-Forwarded-For` is client-controlled without a proxy in
+  front, so we require an explicit `trustProxy: true` opt-in.
 - **Every failure carries a machine-readable code** (`CryptoError`, `SecurityError`, `OtpError`, `PasswordError`,
   `SessionError`, `JwkError`, `JwsError`) so callers branch on `code`, not on message text that can change across versions.
 - **RFC test-vector coverage** for every standardised primitive: RFC 4226 Appendix D (HOTP), RFC 6238 Appendix B (TOTP),
