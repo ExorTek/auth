@@ -13,6 +13,8 @@
 
 A JWT carries its own claims — anyone can decode it, even without the signing key. An **opaque token** carries nothing: it's a random string, and the only way to learn anything about it is to ask the server that issued it. That's exactly what you want for a token whose lifetime and metadata need to be revocable at any moment (OAuth access tokens, short-lived reference tokens for a mobile client, session handles) — no waiting out an `exp`, no rotating a signing key to invalidate a batch. `@exortek/opaque` ships token generation, storage-backed create/verify/revoke, and the two RFCs every OAuth-style server needs on top: introspection (RFC 7662) so a resource server can ask "is this still good?", and revocation (RFC 7009) so a client can hand a token back.
 
+📖 **Docs:** [**auth.memet.dev/opaque**](https://auth.memet.dev/opaque)
+
 ## Install
 
 ```bash

@@ -1,5 +1,19 @@
 # @exortek/session
 
+## 1.4.0
+
+### Minor Changes
+
+- 46fd779: Add `sessionStore.custom(impl)` (also exported as `customStore`) — wrap your own `SessionStore`
+  implementation with validation (fails at construction time if a required method is missing) and transparent sync/async
+  wrapping, instead of hand-assembling the interface yourself.
+
+### Patch Changes
+
+- 40fc707: Remove a stale Hono/Elysia mention left over from their removal in an earlier major (the published
+  `description` field still advertised the removed adapters); fix a Turkish word that leaked into an English code
+  comment in the README.
+
 ## 1.3.1
 
 ### Patch Changes

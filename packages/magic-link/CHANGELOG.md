@@ -1,5 +1,18 @@
 # @exortek/magic-link
 
+## 2.1.0
+
+### Minor Changes
+
+- c587ef8: Add `customStore(impl)` — wrap your own `MagicLinkStore` implementation with validation (fails at
+  construction time if `put`/`getById`/`consume` are missing) and transparent sync/async wrapping.
+  `incrRate`/`listByEmail`/`revokeByEmail` are passed through only when your implementation provides them.
+
+### Patch Changes
+
+- 40fc707: Docs: document the previously-undocumented `listPendingForEmail` and `revokeAllForEmail` functions; align
+  README structure (badges, `Why`, `Highlights`, `Links`) with the rest of the `@exortek/*` packages.
+
 ## 2.0.1
 
 ### Patch Changes

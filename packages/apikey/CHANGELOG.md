@@ -1,5 +1,20 @@
 # @exortek/apikey
 
+## 1.1.0
+
+### Minor Changes
+
+- b1f5d6e: Add `customStore(impl)` — wrap your own `ApiKeyStore` implementation with validation (fails at construction
+  time if a required method is missing) and transparent sync/async wrapping, instead of hand-assembling the interface
+  yourself.
+
+### Patch Changes
+
+- 40fc707: Docs: add a "Rate limiting" section explaining why `@exortek/apikey` ships no built-in limiter and how to
+  front the mint/verify routes with `@exortek/security`'s rate-limit (with a runnable demo in both example servers);
+  document the previously-undocumented `revokeAllForUser` and `listApiKeys` functions; align README structure (badges,
+  `Why`, `Highlights`, `Links`) with the rest of the `@exortek/*` packages.
+
 ## 1.0.2
 
 ### Patch Changes

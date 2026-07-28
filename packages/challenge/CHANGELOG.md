@@ -1,5 +1,18 @@
 # @exortek/challenge
 
+## 1.1.0
+
+### Minor Changes
+
+- 76f8f83: Add `customStore(impl)` — wrap your own `IncrStore` implementation with validation (fails at construction
+  time if `incr` is missing) and transparent sync/async wrapping.
+
+### Patch Changes
+
+- 40fc707: Docs: document the previously-missing `prefix` option on `verifyChallenge` (it was already documented on
+  `createChallenge`); align README structure (badges, `Why`, `Highlights`, `Links`) with the rest of the `@exortek/*`
+  packages.
+
 ## 1.0.2
 
 ### Patch Changes

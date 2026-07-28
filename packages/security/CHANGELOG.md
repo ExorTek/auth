@@ -1,5 +1,12 @@
 # @exortek/security
 
+## 1.3.2
+
+### Patch Changes
+
+- 40fc707: Remove stale Hono/Elysia references left over from their removal in an earlier major — the published
+  `description` field and a few internal JSDoc comments still advertised/described the removed adapters.
+
 ## 1.3.1
 
 ### Patch Changes
