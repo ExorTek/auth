@@ -191,6 +191,11 @@ function encodePrfValues({ first, second }) {
  * keys are surfaced verbatim under `raw` so callers can inspect them
  * without waiting on us to name every draft extension.
  *
+ * ⚠ `out.raw` is the client's original object, unbounded and
+ * untrusted. Callers who log or persist the normalised extension
+ * record should treat `raw` as attacker-controlled input — decide
+ * whether to strip it before storing, and never render it as-is.
+ *
  * @param {Record<string, unknown> | undefined | null} results
  * @returns {Record<string, unknown>}
  */
