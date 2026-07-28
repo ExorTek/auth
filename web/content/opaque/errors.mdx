@@ -1,0 +1,44 @@
+---
+title: 'opaque/errors — OpaqueError'
+sidebarTitle: errors
+---
+
+import { Callout, Tabs } from 'nextra/components';
+
+# `errors`
+
+Every entry point in `@exortek/opaque` that can fail throws an
+`OpaqueError` carrying a stable, machine-readable `code`. **Branch on
+`code`, never on the message** — messages may change between
+versions, codes never do.
+
+<Tabs items={['ESM', 'CommonJS']}>
+  <Tabs.Tab>
+    ```js
+    import { OpaqueError, ErrorCode } from '@exortek/opaque'
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```js
+    const { OpaqueError, ErrorCode } = require('@exortek/opaque')
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="info">
+  **Not every failure throws.** `verify` returns `{ valid: false,
+  reason: 'not_found' }` on an unknown/expired/revoked token — that's a
+  normal outcome, not an error. Errors are reserved for **programmer**
+  or **configuration** mistakes.
+</Callout>
+
+## `ErrorCode`
+
+`@exortek/opaque` throws exactly one code.
+
+| Code               | Meaning                                                             |
+| ------------------ | ---------------------------------------------------------------------- |
+| `INVALID_ARGUMENT`  | Options object is missing, misshapen, or violates an invariant (bad `format`, missing `store`, unknown `generator`, a `customStore(impl)` missing a required method, …). |
+
+Expected verify failures do NOT throw — they surface as
+`{ valid: false, reason }`. See [`verify(token, options)`](/opaque/create-verify#verifytoken-options).

@@ -1,0 +1,62 @@
+---
+title: 'opaque/stores — memory, Redis, custom'
+sidebarTitle: Stores
+---
+
+# Stores
+
+`@exortek/opaque/stores` ships two implementations. Any object
+matching the `OpaqueStore` interface works.
+
+## `memoryStore(options?)`
+
+```js
+import { memoryStore } from '@exortek/opaque/stores';
+
+const store = memoryStore({ sweepMs: 60_000 }); // default shown
+```
+
+In-process `Map`, lazy expiry check on `get` plus a background sweep.
+Not cluster-safe. Fine for dev / single-node prod / tests.
+
+## `redisStore(client, options?)`
+
+```js
+import { redisStore } from '@exortek/opaque/stores';
+import Redis from 'ioredis';
+
+const client = new Redis(process.env.REDIS_URL);
+const store = redisStore(client, { keyPrefix: 'opaque:' }); // default shown
+```
+
+One key per token (`<keyPrefix><hash>`), native Redis `PX` TTL —
+expiry is Redis's job, not application code. Cluster-safe. Works with
+`ioredis`, `node-redis@4+`, `@upstash/redis`.
+
+## `customStore(impl)`
+
+```js
+import { customStore } from '@exortek/opaque/stores';
+
+const store = customStore({
+  set: (key, value, options) => db.tokens.upsert(key, value, options?.expiresIn),
+  get: key => db.tokens.find(key),
+  delete: key => db.tokens.remove(key),
+});
+```
+
+Wrap your own DB-backed implementation. Validates `set`/`get`/`delete`
+exist at construction time — a misconfiguration fails loudly when you
+build the store, not silently on the first `create`/`verify` call deep
+in a request. Sync implementations are wrapped transparently; return a
+plain value or a Promise, either works.
+
+## The interface
+
+```ts
+interface OpaqueStore {
+  set(key: string, value: Record<string, unknown>, options?: { expiresIn?: string | number }): Promise<void>;
+  get(key: string): Promise<Record<string, unknown> | null>; // must return null once expired
+  delete(key: string): Promise<boolean>;
+}
+```

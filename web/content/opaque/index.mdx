@@ -1,0 +1,69 @@
+---
+title: '@exortek/opaque — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/opaque`
+
+Opaque reference tokens for Node.js 22+. A JWT carries its own claims —
+anyone can decode it, even without the signing key. An opaque token
+carries nothing: it's a random string, and the only way to learn
+anything about it is to ask the server that issued it. That's exactly
+what you want for a token whose lifetime and metadata need to be
+revocable at any moment — no waiting out an `exp`, no rotating a
+signing key to invalidate a batch.
+
+`@exortek/opaque` ships token generation, storage-backed
+create/verify/revoke, and the two RFCs every OAuth-style server needs
+on top: introspection (RFC 7662) so a resource server can ask "is this
+still good?", and revocation (RFC 7009) so a client can hand a token
+back.
+
+## Quick start
+
+```js
+import { create, verify, revoke } from '@exortek/opaque';
+import { memoryStore } from '@exortek/opaque/stores';
+
+const store = memoryStore(); // or redisStore(client) for multi-worker
+
+const { token, hash, expiresAt } = await create({
+  format: 'hex',
+  store,
+  expiresIn: '1h',
+  metadata: { userId: 'usr_123', scope: 'read write' },
+});
+// → token = '3f9a...'  — hand this to the client, it's shown once.
+
+const result = await verify(token, { store });
+// → { valid: true, metadata: { userId: 'usr_123', scope: 'read write' } }
+// → { valid: false, reason: 'not_found' }  — unknown, expired, or revoked
+
+await revoke(token, { store });
+```
+
+## Token format
+
+`generate()` is the entropy layer underneath `create()` — reach for it
+directly when you just need a random string, not a stored/verifiable
+token. Formats: `hex` / `base64url` / `base58` / `crockford` (raw
+entropy), `ulid` / `uuid4` / `uuid7` (standard identifiers),
+`alphanumeric`, plus composite `prefixed` (`usr_3f9a...`) and
+`structured` (`v1.ref.01ARZ...`) shapes.
+
+## Where to next
+
+- [`create` / `verify` / `revoke` / `mask`](/opaque/create-verify)
+- [Introspection & Revocation](/opaque/introspection) — RFC 7662 / RFC 7009 HTTP handlers
+- [Stores](/opaque/stores) — memory + Redis + custom + interface
+- [Errors](/opaque/errors) — `OpaqueError` code catalogue
+
+<Callout type="info">
+  **Choose an opaque token over a JWT when** the token's metadata needs
+  to change or the token needs to die instantly — a stateless JWT can
+  only ever be as revocable as your blacklist story. If you need a
+  third-party-verifiable, self-contained bearer token instead, reach
+  for [`@exortek/jwt`](/jwt).
+</Callout>

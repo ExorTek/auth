@@ -1,0 +1,48 @@
+---
+title: 'opaque/introspection — RFC 7662 / RFC 7009 HTTP handlers'
+sidebarTitle: Introspection & Revocation
+---
+
+import { Callout } from 'nextra/components';
+
+# Introspection & Revocation
+
+Framework-agnostic HTTP handlers — works with raw Node, Express, and
+Fastify (unwraps `reply.raw` automatically, same trick
+[`@exortek/jwks`'s handler](/jwks) uses). Both assume the request body
+is already parsed (Express `json()` middleware, Fastify's built-in
+JSON parsing).
+
+```js
+import { introspectionHandler, revocationHandler } from '@exortek/opaque';
+
+// RFC 7662 — always 200, active: false for anything invalid so a
+// caller can't distinguish "unknown" from "expired" from "revoked".
+app.post('/oauth/introspect', introspectionHandler({ store }));
+
+// RFC 7009 — always 200 with an empty body, whether or not the token
+// existed, so the endpoint can't be used to probe token validity.
+app.post('/oauth/revoke', revocationHandler({ store }));
+```
+
+## Options (both handlers)
+
+| Option       | Default    | Notes                                    |
+| ------------ | ---------- | ------------------------------------------ |
+| `store`      | —          | Required.                                |
+| `hashAlgo`   | `'sha256'` |                                           |
+| `tokenField` | `'token'`  | Field read off the parsed request body.  |
+
+<Callout type="info">
+  Both endpoints deliberately respond `200` for every outcome — RFC
+  7662 §2.2 and RFC 7009 §2.2 both call this out: leaking a distinct
+  status code for "token doesn't exist" vs "token is expired" vs
+  "token was revoked" hands an attacker a free oracle for guessing
+  valid-looking tokens.
+</Callout>
+
+## Runnable demo
+
+See `@exortek/opaque/examples/express-server.js` and
+`fastify-server.js` for a full mint → introspect → revoke flow you can
+curl against.

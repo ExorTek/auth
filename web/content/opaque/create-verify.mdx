@@ -1,0 +1,65 @@
+---
+title: 'opaque/create-verify — create, verify, revoke, mask'
+sidebarTitle: create / verify / revoke
+---
+
+# `create` / `verify` / `revoke` / `mask`
+
+## `create(options)`
+
+```ts
+create({
+  // token shape — same options as generate()
+  format: OpaqueTokenFormat,
+  bytes?: number, length?: number, generator?: string,
+  prefix?: string, version?: string, type?: string, separator?: string,
+
+  store: OpaqueStore,
+  expiresIn?: string | number,       // omit for no expiry
+  metadata?: Record<string, unknown>,
+  hashAlgo?: HashAlgorithm,          // default 'sha256'
+  now?: number,                      // override Date.now() for testing
+}): Promise<{ token: string, hash: string, expiresAt?: Date }>
+```
+
+Only the hash is written to `store` — the raw `token` is returned once
+and never persisted, so a leaked store row can't be turned back into a
+usable token.
+
+## `verify(token, options)`
+
+```ts
+verify(token: string, {
+  store: OpaqueStore,
+  hashAlgo?: HashAlgorithm,
+}): Promise<
+  | { valid: true, metadata: Record<string, unknown> }
+  | { valid: false, reason: 'not_found' }
+>
+```
+
+Never throws for a bad token — unknown, malformed, expired, and
+revoked all collapse to `{ valid: false, reason: 'not_found' }`.
+Expiry and revocation are the store's job: `verify` only ever asks the
+store for the record and trusts whatever it gets back (or doesn't).
+
+## `revoke(token, options)`
+
+```ts
+revoke(token: string, { store: OpaqueStore, hashAlgo?: HashAlgorithm }): Promise<boolean>
+```
+
+Deletes the store entry. Idempotent — revoking twice, or a token that
+never existed, both return `false` the second time.
+
+## `mask(token)`
+
+```js
+import { mask } from '@exortek/opaque';
+
+mask('3f9ab2c1d4e5f6a7b8c9d0e1f2a3b4c5');
+// → '3f9a…b4c5' — log-safe
+```
+
+First 4 / last 4 characters, everything else replaced with an
+ellipsis. Use this anywhere a token might end up in a log line.
