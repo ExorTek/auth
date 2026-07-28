@@ -17,7 +17,7 @@
 // Requires: `yarn workspace @exortek/opaque add fastify` in dev.
 
 import Fastify from 'fastify';
-import { create, introspectionHandler, revocationHandler } from '../src/index.js';
+import { create, introspectionHandler, revocationHandler, OpaqueError } from '../src/index.js';
 import { memoryStore } from '../src/stores/memory.js';
 
 const store = memoryStore();
@@ -33,8 +33,11 @@ app.post('/tokens', async (req, reply) => {
     });
     return { token, hash, expiresAt };
   } catch (err) {
-    reply.code(400);
-    return { error: err.code ?? 'ERR', message: err.message };
+    if (err instanceof OpaqueError) {
+      reply.code(400);
+      return { error: err.code, message: err.message };
+    }
+    throw err;
   }
 });
 

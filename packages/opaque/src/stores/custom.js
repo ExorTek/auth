@@ -25,7 +25,9 @@ export function customStore(impl) {
     }
   }
   return {
-    set: (key, value, options) => Promise.resolve(impl.set(key, value, options)),
+    // Coerce to void — a native Map.set returns the Map, which would
+    // otherwise leak out as Promise<Map>, breaking the OpaqueStore type.
+    set: (key, value, options) => Promise.resolve(impl.set(key, value, options)).then(() => undefined),
     get: key => Promise.resolve(impl.get(key)),
     delete: key => Promise.resolve(impl.delete(key)),
   };

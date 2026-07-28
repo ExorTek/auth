@@ -104,7 +104,8 @@ function fakeRes() {
         body = b;
       },
     },
-    read: () => ({ status, headers, body: JSON.parse(body) }),
+    read: () => ({ status, headers, body: body === undefined ? undefined : JSON.parse(body) }),
+    rawBody: () => body,
   };
 }
 
@@ -134,6 +135,15 @@ describe('introspectionHandler', () => {
     const { res, read } = fakeRes();
     await handler({ body: {} }, res);
     assert.deepEqual(read().body, { active: false });
+  });
+
+  test('honors a custom tokenField', async () => {
+    const store = memoryStore();
+    const { token } = await create({ format: 'hex', store, metadata: { userId: 'u' } });
+    const handler = introspectionHandler({ store, tokenField: 'access_token' });
+    const { res, read } = fakeRes();
+    await handler({ body: { access_token: token } }, res);
+    assert.deepEqual(read().body, { userId: 'u', active: true });
   });
 
   test('unwraps Fastify reply.raw', async () => {
@@ -168,21 +178,22 @@ describe('introspectionHandler — store failure', () => {
 });
 
 describe('revocationHandler', () => {
-  test('revokes a known token and responds 200 {}', async () => {
+  test('revokes a known token and responds 204 with empty body', async () => {
     const store = memoryStore();
     const { token } = await create({ format: 'hex', store });
     const handler = revocationHandler({ store });
-    const { res, read } = fakeRes();
+    const { res, read, rawBody } = fakeRes();
     await handler({ body: { token } }, res);
-    assert.deepEqual(read(), { status: 200, headers: { 'content-type': 'application/json; charset=utf-8' }, body: {} });
+    assert.equal(read().status, 204);
+    assert.equal(rawBody(), undefined);
     assert.equal((await verify(token, { store })).valid, false);
   });
 
-  test('responds 200 {} for an unknown token too (no probing)', async () => {
+  test('responds 204 for an unknown token too (no probing)', async () => {
     const store = memoryStore();
     const handler = revocationHandler({ store });
     const { res, read } = fakeRes();
     await handler({ body: { token: 'nope' } }, res);
-    assert.deepEqual(read().body, {});
+    assert.equal(read().status, 204);
   });
 });

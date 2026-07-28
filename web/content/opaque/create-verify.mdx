@@ -49,8 +49,9 @@ store for the record and trusts whatever it gets back (or doesn't).
 revoke(token: string, { store: OpaqueStore, hashAlgo?: HashAlgorithm }): Promise<boolean>
 ```
 
-Deletes the store entry. Idempotent — revoking twice, or a token that
-never existed, both return `false` the second time.
+Deletes the store entry. Idempotent — returns `true` on the successful
+delete, `false` for any subsequent revoke of the same token and for a
+token that never existed.
 
 ## `mask(token)`
 

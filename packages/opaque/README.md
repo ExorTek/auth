@@ -126,7 +126,7 @@ Never throws for a bad token — unknown, malformed, expired, and revoked all co
 revoke(token: string, { store: OpaqueStore, hashAlgo?: HashAlgorithm }): Promise<boolean>
 ```
 
-Deletes the store entry. Idempotent — revoking twice, or a token that never existed, both return `false` the second time.
+Deletes the store entry. Idempotent — returns `true` on the successful delete, `false` for any subsequent revoke of the same token and for a token that never existed.
 
 ### `mask(token)`
 
@@ -172,6 +172,9 @@ app.post(
 | `store`      | —          | Required.                                |
 | `hashAlgo`   | `'sha256'` |                                           |
 | `tokenField` | `'token'`  | Field read off the parsed request body.  |
+| `onError`    | —          | `(err) => void` called if `store.get`/`store.delete` throws. The handler still replies with the no-oracle default. |
+
+Metadata is echoed verbatim by introspection, and the response's `active` field is always ours — a `metadata.active` you stored gets shadowed.
 
 See `@exortek/opaque/examples/express-server.js` and `fastify-server.js` for a runnable version.
 

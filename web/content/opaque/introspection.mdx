@@ -57,6 +57,38 @@ app.post(
 | `store`      | —          | Required.                                |
 | `hashAlgo`   | `'sha256'` |                                           |
 | `tokenField` | `'token'`  | Field read off the parsed request body.  |
+| `onError`    | —          | `(err) => void` — called if `store.get`/`store.delete` throws. The handler still responds with the no-oracle default so the store's health never leaks. |
+
+### Wire format
+
+RFC 7662 §2.1 defines the request as `application/x-www-form-urlencoded`
+with `token` and optional `token_type_hint`. The handler reads
+`req.body[tokenField]`, so it accepts whatever your framework has
+already parsed — JSON out of the box (Express `express.json()`,
+Fastify built-in). To accept form-encoded input, register the
+appropriate body parser (Express `express.urlencoded()`, Fastify
+`@fastify/formbody`); `tokenField: 'token'` still works.
+`token_type_hint` is ignored — an opaque reference token has one type.
+
+### Recommended metadata claims (RFC 7662 §2.2)
+
+Whatever you pass to `create({ metadata })` is what introspection
+returns to the caller. Prefer the RFC claim names so any standard
+resource server understands the response:
+
+| Claim         | Meaning                                             |
+| ------------- | --------------------------------------------------- |
+| `sub`         | The user the token was issued for.                  |
+| `scope`       | Space-separated OAuth scopes.                       |
+| `client_id`   | The OAuth client the token was issued to.           |
+| `exp`         | Expiry, seconds since epoch.                        |
+| `iat`         | Issued-at, seconds since epoch.                     |
+| `token_type`  | e.g. `"Bearer"`.                                    |
+| `iss`         | Issuer URL.                                         |
+| `username`    | Human-readable identifier.                          |
+
+The response's `active` field is always ours — a `metadata.active` you
+stored gets shadowed by the handler.
 
 <Callout type="info">
   Both endpoints deliberately respond `200` for every outcome — RFC

@@ -204,7 +204,12 @@ export function revocationHandler(options) {
     } catch (err) {
       if (typeof onError === 'function') onError(err);
     }
-    respondJson(res, 200, {});
+    // RFC 7009 §2.2: "The content of the response body is ignored by
+    // the client." 204 is smaller on the wire and less confusing to
+    // conformance tools than a JSON `{}`.
+    const target = /** @type {any} */ (res).raw ?? res;
+    target.writeHead(204);
+    target.end();
   };
 }
 

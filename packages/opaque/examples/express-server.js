@@ -21,7 +21,7 @@
 // Requires: `yarn workspace @exortek/opaque add express` in dev.
 
 import express from 'express';
-import { create, introspectionHandler, revocationHandler } from '../src/index.js';
+import { create, introspectionHandler, revocationHandler, OpaqueError } from '../src/index.js';
 import { memoryStore } from '../src/stores/memory.js';
 
 const store = memoryStore();
@@ -42,7 +42,13 @@ app.post('/tokens', async (req, res) => {
     });
     res.json({ token, hash, expiresAt });
   } catch (err) {
-    res.status(400).json({ error: err.code ?? 'ERR', message: err.message });
+    // Only echo the message for our own errors (deterministic, safe to
+    // share). Anything else may include a stack frame or env detail —
+    // let the framework's default handler log it and return a generic 500.
+    if (err instanceof OpaqueError) {
+      return res.status(400).json({ error: err.code, message: err.message });
+    }
+    throw err;
   }
 });
 
