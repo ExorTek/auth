@@ -10,7 +10,7 @@
  * `navigator.credentials.{create,get}`; `finish` parses and verifies
  * the response the browser returns.
  *
- * Server-only. Browser side lives in `@exortek/passkey-browser`.
+ * Server-only.
  */
 
 // Registration + authentication exports land here as each phase ships.
