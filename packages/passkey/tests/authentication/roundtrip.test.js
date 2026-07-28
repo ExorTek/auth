@@ -272,3 +272,64 @@ describe('authentication.finish', () => {
     );
   });
 });
+
+describe('authentication.finish — credential shape branches', () => {
+  test('accepts a credential exposing publicKeyCose (COSE Map)', async () => {
+    const store = memoryIncrStore();
+    const { credential, privateKey } = await register(store);
+    // publicKeyCose is already on the fixture credential; strip the
+    // KeyObject to force the COSE-import path.
+    const coseOnly = {
+      publicKeyCose: credential.publicKeyCose,
+      counter: credential.counter,
+      idBytes: credential.idBytes,
+    };
+    const beginRes = await authBegin({ rpId: RP_ID, challengeSecret: SECRET, challengeStore: store });
+    const assertion = makeAssertionResponse({
+      rpId: RP_ID,
+      challengeBase64Url: beginRes.options.challenge,
+      origin: ORIGIN,
+      privateKey,
+      counter: 5,
+      credentialId: credential.idBytes,
+    });
+    const res = await authFinish({
+      response: assertion,
+      challengeToken: beginRes.challengeToken,
+      expectedRpId: RP_ID,
+      expectedOrigin: ORIGIN,
+      challengeSecret: SECRET,
+      challengeStore: store,
+      credential: coseOnly,
+    });
+    assert.equal(res.verified, true);
+  });
+
+  test('rejects a credential exposing neither publicKey nor publicKeyCose', async () => {
+    const store = memoryIncrStore();
+    const { credential, privateKey } = await register(store);
+    const bare = { counter: credential.counter, idBytes: credential.idBytes };
+    const beginRes = await authBegin({ rpId: RP_ID, challengeSecret: SECRET, challengeStore: store });
+    const assertion = makeAssertionResponse({
+      rpId: RP_ID,
+      challengeBase64Url: beginRes.options.challenge,
+      origin: ORIGIN,
+      privateKey,
+      counter: 5,
+      credentialId: credential.idBytes,
+    });
+    await assert.rejects(
+      () =>
+        authFinish({
+          response: assertion,
+          challengeToken: beginRes.challengeToken,
+          expectedRpId: RP_ID,
+          expectedOrigin: ORIGIN,
+          challengeSecret: SECRET,
+          challengeStore: store,
+          credential: bare,
+        }),
+      err => err instanceof PasskeyError && err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+  });
+});

@@ -144,12 +144,20 @@ describe('android-safetynet attestation — rejections', { skip: !HAS_OPENSSL ? 
     const inputs = makeInputs('example.com', hex('02'));
     const key = mintAttestKey();
     const { attStmt } = buildSafetynetAttStmt({ ...inputs, key, cert: key });
-    // Swap the last signature char with another valid base64url
-    // char — keeps the JWS structurally valid but breaks the RSA
-    // signature.
+    // Locate the signature portion of the compact JWS and flip a
+    // byte deep inside it. Mutating "the last byte" was flaky —
+    // depending on where the base64url alphabet landed the flip
+    // could reduce to no change in the decoded signature bytes, so
+    // the RSA verify still succeeded ~1 in 3 runs.
     const bytes = attStmt.get('response');
-    const last = bytes[bytes.length - 1];
-    bytes[bytes.length - 1] = last === 0x41 /* 'A' */ ? 0x42 /* 'B' */ : 0x41;
+    const text = new TextDecoder().decode(bytes);
+    const lastDot = text.lastIndexOf('.');
+    assert.ok(lastDot >= 0 && lastDot < text.length - 8, 'JWS signature segment must be long enough to tamper');
+    const tamperIdx = lastDot + 4;
+    // Pick a definitely-different base64url character to guarantee
+    // the flip lands.
+    const orig = bytes[tamperIdx];
+    bytes[tamperIdx] = orig === 0x41 /* 'A' */ ? 0x5f /* '_' */ : 0x41;
     assert.throws(
       () => verifyAndroidSafetynet({ attStmt, ...inputs }),
       err => err instanceof PasskeyError && err.code === ErrorCode.SIGNATURE_INVALID,

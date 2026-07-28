@@ -83,10 +83,15 @@ describe('mds — verifyMdsBlob', { skip: !HAS_OPENSSL ? 'openssl not installed'
     const header = { alg: 'RS256', x5c: [Buffer.from(signer.der).toString('base64')] };
     const payload = { no: 1, nextUpdate: '2126-01-01', entries: [] };
     let jws = signBlob(signer, header, payload);
-    // Swap last char of the signature to stay within base64url alphabet.
+    // Deterministically corrupt a byte deep inside the signature
+    // segment. Swapping "the last character" was flaky because the
+    // final base64url char often decodes to trailing bits that RSA
+    // ignores, so verify still succeeded ~1 in 3 runs.
+    const lastDot = jws.lastIndexOf('.');
+    assert.ok(lastDot >= 0 && lastDot < jws.length - 8, 'signature segment too short to tamper');
     const chars = [...jws];
-    const last = chars[chars.length - 1];
-    chars[chars.length - 1] = last === 'A' ? 'B' : 'A';
+    const tamperIdx = lastDot + 4;
+    chars[tamperIdx] = chars[tamperIdx] === 'A' ? '_' : 'A';
     jws = chars.join('');
     assert.throws(
       () => verifyMdsBlob(jws, { rootAnchors: [signer.pem] }),
