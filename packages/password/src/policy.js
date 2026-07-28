@@ -30,9 +30,10 @@ import { strength } from './strength.js';
  *   discourages composition rules because they reduce entropy in
  *   practice — but some regulations still require them.
  * @property {string[]} [denyList]
- *   Additional strings that MUST NOT appear in the password
- *   (case-insensitive substring match). Great for company-specific
- *   banned words on top of the built-in common-password list.
+ *   Strings that MUST NOT appear in the password (case-insensitive
+ *   substring match) — company name, product name, common banned
+ *   words. There's no built-in common-password list to layer on top
+ *   of; pair with `createHibpClient` (HIBP) if you need one.
  * @property {string[]} [userInfo]
  *   Substrings — typically email, username, first name — that must not
  *   appear in the password. Case-insensitive, min length 3.

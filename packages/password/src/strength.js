@@ -48,8 +48,10 @@ const CLASSES = /** @type {const} */ ([
 
 /**
  * Score how weak a candidate password is. Runs entirely offline —
- * common-password check, character-class entropy estimate, repetition
- * / sequential-run detection, and optional user-info substring match.
+ * character-class entropy estimate, repetition / sequential-run
+ * detection, and optional user-info substring match. Does NOT check
+ * against a common-password list — pair with `createHibpClient` (HIBP,
+ * network-based, k-anonymity) if you need that.
  *
  * @param {unknown} password
  * @param {StrengthOptions} [options]
