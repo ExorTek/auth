@@ -101,8 +101,11 @@ for a change-password path than silently accepting.
 - `HIBP_UNAVAILABLE` — network / HTTP failure, and `failOpen` was not
   set. Message includes the underlying reason.
 
-Both malformed input and unrecognised responses simply return
-`{ pwned: false, count: 0 }` rather than throwing.
+An empty or non-string `password` throws `INVALID_ARGUMENT` immediately
+(a programmer bug, not a HIBP outcome) — this isn't a network call, so
+there's nothing to fail open on. Once the request is made, an
+unrecognised/no-match response simply returns `{ pwned: false, count: 0 }`
+rather than throwing.
 
 ## What HIBP sees
 

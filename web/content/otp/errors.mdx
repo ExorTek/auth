@@ -72,7 +72,7 @@ built-in `OtpError` code.
 | Code | Meaning | Status |
 | --- | --- | --- |
 | `INVALID_ARGUMENT` | Type / range / shape validation failed on an option (bad `digits`, `period`, `window`, missing `label`, etc.). | `400` |
-| `UNSUPPORTED_ALGORITHM` | Algorithm not in `SHA1 / SHA224 / SHA256 / SHA384 / SHA512`, or a `provisioningUri` call with `SHA-224` / `SHA-384`. | `400` |
+| `UNSUPPORTED_ALGORITHM` | Algorithm not in `SHA1 / SHA224 / SHA256 / SHA384 / SHA512`, or a `provisioningUri` call with `SHA224` / `SHA384`. | `400` |
 | `INVALID_SECRET` | Secret is empty, malformed base32 / hex, or the wrong type. | `401` |
 
 ## Which code comes from where?
@@ -84,7 +84,7 @@ built-in `OtpError` code.
 | `hotp` / `totp` | `INVALID_ARGUMENT`, `INVALID_SECRET`, `UNSUPPORTED_ALGORITHM` |
 | `verifyHotp` / `verifyTotp` | `INVALID_ARGUMENT` (bad `window`) — never throws for user-input problems, returns `false` / `null` |
 | `resynchronize` | `INVALID_ARGUMENT` (bad `codes` shape, out-of-range `maxLookAhead`) |
-| `provisioningUri` | `INVALID_ARGUMENT` (missing `label` / `secret`, bad `type`), `UNSUPPORTED_ALGORITHM` (`SHA-224` / `SHA-384`) |
+| `provisioningUri` | `INVALID_ARGUMENT` (missing `label` / `secret`, bad `type`), `UNSUPPORTED_ALGORITHM` (`SHA224` / `SHA384`) |
 | `parseProvisioningUri` | never throws — returns `null` on malformed input |
 | `backupCodes` | `INVALID_ARGUMENT` (bad `n` / `length` / `groups` / `alphabet`) |
 | `verifyBackupCode` / `compareBackupCode` | never throws — returns `null` / `false` |

@@ -7,15 +7,21 @@ import { Callout } from 'nextra/components';
 
 # Fingerprinting
 
-Generate a deterministic hash from a parsed User-Agent result — useful
-for session binding, bot detection, and analytics deduplication.
+Generate a deterministic hash from request signals — useful for
+session binding, bot detection, and analytics deduplication.
+
+`createFingerprint` does its own UA parsing internally; it takes the
+**raw** UA string, headers, and IP, not a `parse()` result.
 
 ```js
-import { parse } from '@exortek/ua';
 import { createFingerprint, fingerprintRequest } from '@exortek/ua/fingerprint';
 
-// From a parse result
-const fp = createFingerprint(parse(ua));
+// From raw request signals — headers carries Accept-Language
+const fp = createFingerprint({
+  ua: req.headers['user-agent'],
+  headers: req.headers,
+  ip: req.ip,
+});
 // fp_a1b2c3d4e5f6...
 
 // From an HTTP request (extracts UA + IP automatically)
@@ -31,15 +37,14 @@ The fingerprint is built from three layers of increasing specificity:
 - Browser name (`Chrome`, not `Mobile Chrome` — normalized)
 - OS name
 - Device type
-- CPU architecture
 
 ### Semi-stable layer (`strict: true`, the default)
 
 - Browser major version
 - OS version
-- `Accept-Language` header
+- `Accept-Language` header (read from `input.headers['accept-language']`)
 
-### Network layer (opt-in)
+### Network layer (opt-in, requires `input.ip`)
 
 - `subnet: true` — includes the /24 (IPv4) or /64 (IPv6) subnet
 - `includeIP: true` — includes the full IP address
@@ -47,22 +52,29 @@ The fingerprint is built from three layers of increasing specificity:
 ## Options
 
 ```js
-const fp = createFingerprint(result, {
-  strict: true,       // include semi-stable layer (default: true)
-  subnet: false,      // include network subnet (default: false)
-  includeIP: false,   // include full IP (default: false)
-  ip: req.ip,         // IP address (required for subnet/includeIP)
-  acceptLanguage: req.headers['accept-language'],
-});
+const fp = createFingerprint(
+  {
+    ua: req.headers['user-agent'],
+    headers: req.headers,   // Accept-Language comes from here
+    ip: req.ip,             // required for subnet/includeIP
+  },
+  {
+    strict: true,       // include semi-stable layer (default: true)
+    subnet: false,      // include network subnet (default: false)
+    includeIP: false,   // include full IP (default: false)
+    algorithm: 'sha256',
+  },
+);
 ```
 
-| Option           | Default | Notes |
-| ---------------- | ------- | ----- |
-| `strict`         | `true`  | Include browser major, OS version, Accept-Language. |
-| `subnet`         | `false` | Hash the /24 (v4) or /64 (v6) subnet. |
-| `includeIP`      | `false` | Hash the full IP. Overrides `subnet`. |
-| `ip`             | —       | Required when `subnet` or `includeIP` is set. |
-| `acceptLanguage` | —       | Optional; only used when `strict` is true. |
+| Option      | Default    | Notes |
+| ----------- | ---------- | ----- |
+| `strict`    | `true`     | Include browser major, OS version, Accept-Language. |
+| `subnet`    | `false`    | Hash the /24 (v4) or /64 (v6) subnet. Takes priority over `includeIP` when both are set. |
+| `includeIP` | `false`    | Hash the full IP. Ignored if `subnet` is also set. |
+| `algorithm` | `'sha256'` | Digest algorithm passed to `node:crypto.createHash`. |
+
+`ip`/`headers`/`ua` are not options — they're fields on the first argument (`FingerprintInput`), not the second (`FingerprintOptions`).
 
 ## `fingerprintRequest(req)`
 

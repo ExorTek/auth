@@ -100,9 +100,11 @@ needed for consumer accounts.
   **NIST SP 800-63B guidance** (2020 revision) recommends **against**
   composition rules (upper + lower + digit + symbol) — they reduce
   practical entropy by forcing users into predictable patterns like
-  `Password1!`. Prefer `minLength` + `requireMinScore` +
-  `banCommonPasswords` over `requireClasses` unless a compliance regime
-  forces your hand.
+  `Password1!`. Prefer `minLength` + `requireMinScore` over
+  `requireClasses` unless a compliance regime forces your hand. Neither
+  `strength` nor `assertPolicy` checks against a common-password list —
+  pair with [`createHibpClient`](/password/hibp) (HIBP, k-anonymity) if
+  you need that.
 </Callout>
 
 ## Recipe: signup + change-password endpoints
