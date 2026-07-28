@@ -16,7 +16,7 @@
  * Signed data: `authData || clientDataHash`.
  */
 
-import { createHash, createVerify, verify as verifyRaw, X509Certificate } from 'node:crypto';
+import { createVerify, verify as verifyRaw, X509Certificate } from 'node:crypto';
 import { importCoseKey, algorithmForId } from '../cose/key.js';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, TAG } from '../asn1/der.js';
@@ -172,11 +172,4 @@ function bytesEqual(a, b) {
     }
   }
   return true;
-}
-
-// Re-export the SHA-256 helper for callers that want to build
-// their own signed-data buffers — used by tests and by
-// authentication.finish.
-export function sha256(bytes) {
-  return new Uint8Array(createHash('sha256').update(bytes).digest());
 }

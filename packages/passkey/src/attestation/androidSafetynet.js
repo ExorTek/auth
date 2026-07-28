@@ -50,7 +50,6 @@ function decodeBase64UrlToUint8(str, label) {
   } catch (err) {
     throwAttestationInvalid(`android-safetynet: ${label} is not valid base64url (${err.message})`);
   }
-  return undefined;
 }
 
 function decodeJsonSegment(str, label) {
@@ -66,7 +65,6 @@ function decodeJsonSegment(str, label) {
   } catch (err) {
     throwAttestationInvalid(`android-safetynet: ${label} is not valid JSON (${err.message})`);
   }
-  return undefined;
 }
 
 /**

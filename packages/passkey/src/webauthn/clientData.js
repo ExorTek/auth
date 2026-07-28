@@ -93,25 +93,3 @@ export function parseClientData(bytes) {
     raw: bytes,
   };
 }
-
-/**
- * Constant-time byte-equal check for challenges. `Buffer.compare`
- * short-circuits on length, so we do the length check first then
- * fall through to a fixed-time comparison.
- *
- * @param {Uint8Array} a
- * @param {Uint8Array} b
- */
-export function challengesMatch(a, b) {
-  if (!(a instanceof Uint8Array) || !(b instanceof Uint8Array)) {
-    throw new Error('clientData.challengesMatch: expected Uint8Array on both sides');
-  }
-  if (a.byteLength !== b.byteLength) {
-    return false;
-  }
-  let diff = 0;
-  for (let i = 0; i < a.byteLength; i += 1) {
-    diff |= a[i] ^ b[i];
-  }
-  return diff === 0;
-}

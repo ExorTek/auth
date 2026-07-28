@@ -30,7 +30,6 @@ function decodeBase64UrlBytes(str, label) {
   } catch (err) {
     throwMdsBlobInvalid(`mds: ${label} is not valid base64url (${err.message})`);
   }
-  return undefined;
 }
 
 function decodeJsonSegment(str, label) {
@@ -46,7 +45,6 @@ function decodeJsonSegment(str, label) {
   } catch (err) {
     throwMdsBlobInvalid(`mds: ${label} is not valid JSON (${err.message})`);
   }
-  return undefined;
 }
 
 /**

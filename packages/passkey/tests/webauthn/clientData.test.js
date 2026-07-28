@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { base64url } from '@exortek/crypto/encode';
-import { parseClientData, challengesMatch } from '../../src/webauthn/clientData.js';
+import { parseClientData } from '../../src/webauthn/clientData.js';
 
 function encodeJson(obj) {
   return new TextEncoder().encode(JSON.stringify(obj));
@@ -88,23 +88,5 @@ describe('clientData — parseClientData', () => {
       origin: 'https://x',
     });
     assert.throws(() => parseClientData(bytes), /challenge missing/);
-  });
-});
-
-describe('clientData — challengesMatch', () => {
-  test('equal bytes match', () => {
-    assert.equal(challengesMatch(new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 3])), true);
-  });
-
-  test('different bytes do not match', () => {
-    assert.equal(challengesMatch(new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 4])), false);
-  });
-
-  test('different lengths do not match', () => {
-    assert.equal(challengesMatch(new Uint8Array([1, 2, 3]), new Uint8Array([1, 2])), false);
-  });
-
-  test('rejects non-Uint8Array', () => {
-    assert.throws(() => challengesMatch('a', new Uint8Array([1])), /Uint8Array on both sides/);
   });
 });

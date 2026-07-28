@@ -93,10 +93,8 @@ export function buildRegistrationExtensions(input = {}) {
     }
     out.minPinLength = true;
   }
-  if (input.credentialProtectionPolicy !== undefined) {
-    if (![1, 2, 3].includes(input.credentialProtectionPolicy)) {
-      throw new Error('extensions.credentialProtectionPolicy must be 1, 2, or 3 (CTAP2 §12.1)');
-    }
+  if (input.credentialProtectionPolicy !== undefined && ![1, 2, 3].includes(input.credentialProtectionPolicy)) {
+    throw new Error('extensions.credentialProtectionPolicy must be 1, 2, or 3 (CTAP2 §12.1)');
   }
   if (input.appidExclude !== undefined && typeof input.appidExclude !== 'string') {
     throw new Error('extensions.appidExclude must be a string');

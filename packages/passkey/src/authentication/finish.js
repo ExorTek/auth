@@ -43,7 +43,6 @@ function decodeB64uField(value, field) {
   } catch (err) {
     throwInvalidArgument(`authentication.finish: response.${field} is not valid base64url (${err.message})`);
   }
-  return undefined;
 }
 
 function importCredentialKey(credential) {
@@ -61,7 +60,6 @@ function importCredentialKey(credential) {
   throwInvalidArgument(
     'authentication.finish: credential must expose either `publicKey` (Node KeyObject) or `publicKeyCose` (COSE Map)',
   );
-  return undefined;
 }
 
 /**

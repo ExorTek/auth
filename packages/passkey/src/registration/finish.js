@@ -43,7 +43,6 @@ function decodeB64uField(value, field) {
   } catch (err) {
     throwInvalidArgument(`registration.finish: response.${field} is not valid base64url (${err.message})`);
   }
-  return undefined;
 }
 
 /**
