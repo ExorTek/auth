@@ -79,6 +79,7 @@ function importCredentialKey(credential) {
  * }} params.credential
  * @param {string} [params.expectedUserId]
  * @param {boolean} [params.requireUserVerification=true]
+ * @param {boolean} [params.requireBackupEligible=false]
  * @param {boolean} [params.requireBackedUp=false]
  * @param {string} [params.challengePrefix]
  * @returns {Promise<{
@@ -106,6 +107,7 @@ export async function finish(params) {
     credential,
     expectedUserId,
     requireUserVerification = true,
+    requireBackupEligible = false,
     requireBackedUp = false,
     challengePrefix,
   } = params;
@@ -160,7 +162,7 @@ export async function finish(params) {
     throwRpIdMismatch('authentication.finish: rpIdHash does not match any expected RP ID');
   }
 
-  enforceFlags(authData.flags, { requireUserVerification, requireBackedUp });
+  enforceFlags(authData.flags, { requireUserVerification, requireBackupEligible, requireBackedUp });
 
   // Signed input: authData || SHA-256(clientDataJSON)  — WebAuthn L3 §7.2 step 20.
   const clientDataHash = new Uint8Array(createHash('sha256').update(clientDataJSON).digest());
