@@ -39,7 +39,16 @@ server-only.
 - Hints (`security-key` / `client-device` / `hybrid`).
 - Related origins — `rpId` / `expectedRpId` accept string or array.
 - Conditional UI mediation on `authentication.begin`.
-- Backup-state policy dials: `requireBackedUp`, `requireBackupEligible`.
+- Backup-state policy dials: `requireBackedUp`, `requireBackupEligible`
+  (accepted on both registration.finish AND authentication.finish).
+- `allowCrossOriginCeremony` (default `false`) — reject
+  `clientDataJSON.crossOrigin=true` unless the caller opts in.
+- `attestationOptions?: Record<string, Record<string, unknown>>` on
+  `registration.finish` — per-format knobs, keyed by format name
+  (accepts hyphen-squashed keys too). Today lets the caller reach the
+  `android-safetynet` verifier's `enforceCtsCheck`, `timestampWindowMs`
+  and `now` options; new formats add knobs here without a signature
+  change.
 
 **Subpaths:**
 
@@ -66,15 +75,25 @@ server-only.
   (AAGUID OID, Apple nonce OID, KeyDescription OID, TCG-KP-AIK EKU).
 - Node's built-in `X509Certificate` + `crypto` for signatures.
 
-**Errors:** `PasskeyError` with 23 `ErrorCode` values — every code
-has a throwing factory (`throwXxx`), no dead codes.
+**Errors:** `PasskeyError` with 23 `ErrorCode` values — every code has
+a throwing factory (`throwXxx`) that is exercised by tests, including
+the four flag-policy codes (`USER_PRESENCE_REQUIRED`,
+`USER_VERIFICATION_REQUIRED`, `BACKUP_ELIGIBLE_REQUIRED`,
+`BACKED_UP_REQUIRED`) — no dead codes.
 
 **Challenge lifecycle** delegated to `@exortek/challenge`
 (single-use, TTL, method+step binding, replay guard via `IncrStore`).
 
-**Tests:** 270 total, real ECDSA / RSA / Ed25519 signatures produced
-via `node:crypto`, X.509 cert chains minted via openssl at test
-time (skipped when openssl absent).
+**Tests:** 296 total, real ECDSA / RSA / Ed25519 signatures produced
+via `node:crypto`, X.509 cert chains minted via openssl at test time
+(skipped when openssl absent). Covers packed self + full mode,
+none, fido-u2f, apple, android-key, android-safetynet, tpm; every
+flag-policy `ErrorCode` fires end-to-end.
+
+**Key hygiene:** RSA credential keys with a modulus below 2048 bits
+are rejected at import (both COSE key import and TPM `pubArea` RSA
+branch); packed leaf certificates are rewired against `basicConstraints
+CA:TRUE` per §8.2 step 2.3.
 
 **Deferred to 1.1:**
 
