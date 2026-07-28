@@ -4,14 +4,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import {
-  createHash,
-  createPrivateKey,
-  createPublicKey,
-  createSign,
-  generateKeyPairSync,
-  X509Certificate,
-} from 'node:crypto';
+import { createHash, createPrivateKey, createSign, generateKeyPairSync, X509Certificate } from 'node:crypto';
 import { base64url } from '@exortek/crypto/encode';
 import { verifyTpm } from '../../src/attestation/tpm.js';
 import { PasskeyError, ErrorCode } from '../../src/errors.js';

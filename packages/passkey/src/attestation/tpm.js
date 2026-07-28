@@ -44,7 +44,7 @@
  */
 
 import { createHash, createVerify, verify as verifyRaw, X509Certificate } from 'node:crypto';
-import { importCoseKey, algorithmForId } from '../cose/key.js';
+import { algorithmForId } from '../cose/key.js';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, readChildren, decodeOid, TAG } from '../asn1/der.js';
 import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSignatureInvalid } from '../errors.js';
