@@ -190,16 +190,10 @@ export async function finish(params) {
     throwRpIdMismatch(`registration.finish: rpIdHash does not match any expected RP ID`);
   }
 
-  // Flag policy
-  try {
-    enforceFlags(authData.flags, { requireUserVerification, requireBackupEligible, requireBackedUp });
-  } catch (err) {
-    // Distinguish UV vs UP vs backup for a better error taxonomy.
-    if (/UV bit/.test(err.message)) {
-      throw err;
-    }
-    throwAuthDataInvalid(`registration.finish: ${err.message}`);
-  }
+  // Flag policy — enforceFlags throws PasskeyError with the specific
+  // code (USER_VERIFICATION_REQUIRED / BACKUP_ELIGIBLE_REQUIRED / …)
+  // so no local translation is needed.
+  enforceFlags(authData.flags, { requireUserVerification, requireBackupEligible, requireBackedUp });
 
   // Algorithm allowlist
   const credAlg = authData.attestedCredentialData.credentialPublicKey.get(3);

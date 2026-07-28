@@ -14,6 +14,14 @@
  * Bits 1 and 5 are reserved.
  */
 
+import {
+  throwAuthDataInvalid,
+  throwBackedUpRequired,
+  throwBackupEligibleRequired,
+  throwUserPresenceRequired,
+  throwUserVerificationRequired,
+} from '../errors.js';
+
 export const FLAG_MASK = Object.freeze({
   UP: 0x01,
   UV: 0x04,
@@ -71,9 +79,12 @@ export function deviceTypeFromFlags(flags) {
 
 /**
  * Enforce user-presence / verification / backup policies against
- * decoded flags. Throws with an explicit reason on the first
- * violation. `up` is always required — WebAuthn spec §7.1 step 15
- * and §7.2 step 17 both mandate it. The rest are opt-in.
+ * decoded flags. Throws a `PasskeyError` with the code that matches
+ * the violated bit — callers can distinguish `USER_VERIFICATION_REQUIRED`
+ * from `BACKUP_ELIGIBLE_REQUIRED` without string-matching messages.
+ *
+ * `up` is always required — WebAuthn spec §7.1 step 15 and §7.2 step
+ * 17 both mandate it. The rest are opt-in.
  *
  * @param {AuthFlags} flags
  * @param {object} [policy]
@@ -83,20 +94,20 @@ export function deviceTypeFromFlags(flags) {
  */
 export function enforceFlags(flags, policy = {}) {
   if (!flags.up) {
-    throw new Error('flags: User Present bit (UP) is required and was not set');
+    throwUserPresenceRequired('flags: User Present bit (UP) is required and was not set');
   }
   if (policy.requireUserVerification && !flags.uv) {
-    throw new Error('flags: User Verification required but UV bit not set');
+    throwUserVerificationRequired('flags: User Verification required but UV bit not set');
   }
   if (policy.requireBackupEligible && !flags.be) {
-    throw new Error('flags: backup-eligible credential required but BE bit not set');
+    throwBackupEligibleRequired('flags: backup-eligible credential required but BE bit not set');
   }
   if (policy.requireBackedUp && !flags.bs) {
-    throw new Error('flags: backed-up state required but BS bit not set');
+    throwBackedUpRequired('flags: backed-up state required but BS bit not set');
   }
   // Spec sanity: BS=1 implies BE=1 (a credential can't be backed
   // up without being eligible for backup). WebAuthn L3 §6.1.3.
   if (flags.bs && !flags.be) {
-    throw new Error('flags: BS=1 with BE=0 is not a valid combination');
+    throwAuthDataInvalid('flags: BS=1 with BE=0 is not a valid combination');
   }
 }

@@ -128,12 +128,12 @@ export function makeClientDataJSON({ type, challengeBase64Url, origin, crossOrig
 /**
  * Build a full registration response with `fmt: "none"`.
  */
-export function makeNoneResponse({ rpId, challengeBase64Url, origin, algorithm = 'es256' }) {
+export function makeNoneResponse({ rpId, challengeBase64Url, origin, algorithm = 'es256', flags = 0x45 }) {
   const { publicKey, privateKey, jwk, coseKey } = genKeyPair(algorithm);
   const credentialId = hex('abcdef0123456789');
   const authDataBytes = makeAuthData({
     rpId,
-    flags: 0x45,
+    flags,
     counter: 0,
     aaguid: hex('00112233445566778899aabbccddeeff'),
     credentialId,

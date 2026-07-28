@@ -200,6 +200,66 @@ describe('registration.finish — fmt "none"', () => {
   });
 });
 
+describe('registration.finish — flag policy propagates PasskeyError codes', () => {
+  async function beginAndFinish({ fixtureFlags, finishOverrides = {} }) {
+    const store = memoryIncrStore();
+    const beginRes = await begin({
+      rp: { id: RP_ID, name: 'Example' },
+      user: { id: 'u_1', name: 'a', displayName: 'A' },
+      challengeSecret: SECRET,
+      challengeStore: store,
+    });
+    const fixture = makeNoneResponse({
+      rpId: RP_ID,
+      challengeBase64Url: beginRes.options.challenge,
+      origin: ORIGIN,
+      flags: fixtureFlags,
+    });
+    return finish({
+      response: fixture.response,
+      challengeToken: beginRes.challengeToken,
+      expectedRpId: RP_ID,
+      expectedOrigin: ORIGIN,
+      challengeSecret: SECRET,
+      challengeStore: store,
+      expectedUserId: 'u_1',
+      ...finishOverrides,
+    });
+  }
+
+  test('UP=0 → USER_PRESENCE_REQUIRED', async () => {
+    // AT=1 (0x40), UP=0 — attested credential data still present.
+    await assert.rejects(
+      () => beginAndFinish({ fixtureFlags: 0x40 }),
+      err => err instanceof PasskeyError && err.code === ErrorCode.USER_PRESENCE_REQUIRED,
+    );
+  });
+
+  test('UV=0 with requireUserVerification (default) → USER_VERIFICATION_REQUIRED', async () => {
+    // AT=1 | UP=1 = 0x41 — UV bit cleared.
+    await assert.rejects(
+      () => beginAndFinish({ fixtureFlags: 0x41 }),
+      err => err instanceof PasskeyError && err.code === ErrorCode.USER_VERIFICATION_REQUIRED,
+    );
+  });
+
+  test('BE=0 with requireBackupEligible → BACKUP_ELIGIBLE_REQUIRED', async () => {
+    // AT=1 | UP=1 | UV=1 = 0x45 — BE bit cleared.
+    await assert.rejects(
+      () => beginAndFinish({ fixtureFlags: 0x45, finishOverrides: { requireBackupEligible: true } }),
+      err => err instanceof PasskeyError && err.code === ErrorCode.BACKUP_ELIGIBLE_REQUIRED,
+    );
+  });
+
+  test('BS=0 with requireBackedUp → BACKED_UP_REQUIRED', async () => {
+    // AT=1 | UP=1 | UV=1 | BE=1 = 0x4d — BS bit cleared.
+    await assert.rejects(
+      () => beginAndFinish({ fixtureFlags: 0x4d, finishOverrides: { requireBackedUp: true } }),
+      err => err instanceof PasskeyError && err.code === ErrorCode.BACKED_UP_REQUIRED,
+    );
+  });
+});
+
 describe('registration.finish — fmt "packed" (self attestation)', () => {
   test('happy path round-trip', async () => {
     const store = memoryIncrStore();

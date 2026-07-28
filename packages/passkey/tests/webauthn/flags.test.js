@@ -1,6 +1,11 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FLAG_MASK, decodeFlags, deviceTypeFromFlags, enforceFlags } from '../../src/webauthn/flags.js';
+import { PasskeyError, ErrorCode } from '../../src/errors.js';
+
+function isPasskeyError(code) {
+  return err => err instanceof PasskeyError && err.code === code;
+}
 
 describe('flags — decodeFlags', () => {
   test('all zero → all false', () => {
@@ -69,31 +74,37 @@ describe('flags — enforceFlags', () => {
     enforceFlags(decodeFlags(0x01));
   });
 
-  test('rejects when UP is missing', () => {
-    assert.throws(() => enforceFlags(decodeFlags(0x00)), /UP.+required/);
+  test('rejects when UP is missing → USER_PRESENCE_REQUIRED', () => {
+    assert.throws(() => enforceFlags(decodeFlags(0x00)), isPasskeyError(ErrorCode.USER_PRESENCE_REQUIRED));
   });
 
-  test('requireUserVerification rejects UP-only', () => {
-    assert.throws(() => enforceFlags(decodeFlags(0x01), { requireUserVerification: true }), /UV bit not set/);
+  test('requireUserVerification rejects UP-only → USER_VERIFICATION_REQUIRED', () => {
+    assert.throws(
+      () => enforceFlags(decodeFlags(0x01), { requireUserVerification: true }),
+      isPasskeyError(ErrorCode.USER_VERIFICATION_REQUIRED),
+    );
   });
 
   test('requireUserVerification accepts UP+UV', () => {
     enforceFlags(decodeFlags(0x05), { requireUserVerification: true });
   });
 
-  test('requireBackupEligible rejects a non-syncable credential', () => {
-    assert.throws(() => enforceFlags(decodeFlags(0x01), { requireBackupEligible: true }), /BE bit not set/);
-  });
-
-  test('requireBackedUp rejects when BS=0', () => {
+  test('requireBackupEligible rejects a non-syncable credential → BACKUP_ELIGIBLE_REQUIRED', () => {
     assert.throws(
-      () => enforceFlags(decodeFlags(0x09), { requireBackedUp: true }), // BE=1, BS=0
-      /BS bit not set/,
+      () => enforceFlags(decodeFlags(0x01), { requireBackupEligible: true }),
+      isPasskeyError(ErrorCode.BACKUP_ELIGIBLE_REQUIRED),
     );
   });
 
-  test('BS=1 with BE=0 is a spec violation', () => {
+  test('requireBackedUp rejects when BS=0 → BACKED_UP_REQUIRED', () => {
+    assert.throws(
+      () => enforceFlags(decodeFlags(0x09), { requireBackedUp: true }), // BE=1, BS=0
+      isPasskeyError(ErrorCode.BACKED_UP_REQUIRED),
+    );
+  });
+
+  test('BS=1 with BE=0 is a spec violation → AUTH_DATA_INVALID', () => {
     // 0x11 = UP + BS but no BE — impossible per L3 §6.1.3.
-    assert.throws(() => enforceFlags(decodeFlags(0x11)), /BS=1 with BE=0/);
+    assert.throws(() => enforceFlags(decodeFlags(0x11)), isPasskeyError(ErrorCode.AUTH_DATA_INVALID));
   });
 });

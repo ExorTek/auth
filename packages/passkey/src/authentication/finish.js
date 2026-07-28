@@ -30,7 +30,6 @@ import {
   throwClientDataInvalid,
   throwOriginMismatch,
   throwRpIdMismatch,
-  throwAuthDataInvalid,
   throwSignatureInvalid,
   throwCounterRollback,
 } from '../errors.js';
@@ -161,11 +160,7 @@ export async function finish(params) {
     throwRpIdMismatch('authentication.finish: rpIdHash does not match any expected RP ID');
   }
 
-  try {
-    enforceFlags(authData.flags, { requireUserVerification, requireBackedUp });
-  } catch (err) {
-    throwAuthDataInvalid(`authentication.finish: ${err.message}`);
-  }
+  enforceFlags(authData.flags, { requireUserVerification, requireBackedUp });
 
   // Signed input: authData || SHA-256(clientDataJSON)  — WebAuthn L3 §7.2 step 20.
   const clientDataHash = new Uint8Array(createHash('sha256').update(clientDataJSON).digest());
