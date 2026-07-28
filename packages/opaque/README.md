@@ -155,10 +155,12 @@ app.post('/oauth/introspect', async (req, res) => {
   res.set(headers).status(status).json(body);
 });
 
-// RFC 7009 — always 204, no body, whether or not the token existed.
+// RFC 7009 — always 200 {}, whether or not the token existed. The
+// RFC forbids error responses here: the client cannot do anything
+// useful with them.
 app.post('/oauth/revoke', async (req, res) => {
-  const { status, headers } = await revokeRoute(req);
-  res.set(headers).status(status).end();
+  const { status, body, headers } = await revokeRoute(req);
+  res.set(headers).status(status).json(body);
 });
 ```
 

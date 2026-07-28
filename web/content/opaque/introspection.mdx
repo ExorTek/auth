@@ -31,19 +31,21 @@ app.post('/oauth/introspect', async (req, res) => {
   res.set(headers).status(status).json(body);
 });
 
-// RFC 7009 — always 204, no body, whether or not the token existed.
+// RFC 7009 §2.2 — always 200 {}, whether or not the token existed.
+// The RFC explicitly forbids error responses here: the client cannot
+// handle them in a reasonable way.
 app.post('/oauth/revoke', async (req, res) => {
-  const { status, headers } = await revokeRoute(req);
-  res.set(headers).status(status).end();
+  const { status, body, headers } = await revokeRoute(req);
+  res.set(headers).status(status).json(body);
 });
 ```
 
-Fastify: same `handler(req)` call — write with `reply.headers(headers).code(status)` then `return body` (introspection) or `.send()` (revocation).
+Fastify: same `handler(req)` call —
+`reply.headers(headers).code(status)` then `return body`.
 
 Every response's `headers` already carries the RFC-recommended
-defaults: `Content-Type: application/json` on introspection,
-`Cache-Control: no-store` and `Pragma: no-cache` on both (RFC 6749
-§5.1 sensitive-response guidance).
+defaults: `Content-Type: application/json`, `Cache-Control: no-store`,
+`Pragma: no-cache` (RFC 6749 §5.1 sensitive-response guidance).
 
 <Callout type="warning">
   **Both endpoints MUST be authenticated.** RFC 7662 §2.1 and RFC 7009

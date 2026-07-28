@@ -157,22 +157,22 @@ describe('introspectionHandler — store failure', () => {
 });
 
 describe('revocationHandler', () => {
-  test('revokes a known token and returns 204 with a null body', async () => {
+  test('revokes a known token and returns 200 with {} body (RFC 7009 §2.2)', async () => {
     const store = memoryStore();
     const { token } = await create({ format: 'hex', store });
     const handler = revocationHandler({ store });
     const result = await handler({ body: { token } });
-    assert.equal(result.status, 204);
-    assert.equal(result.body, null);
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.body, {});
     assert.equal(result.headers['Cache-Control'], 'no-store');
     assert.equal((await verify(token, { store })).valid, false);
   });
 
-  test('returns 204 for an unknown token too (no probing)', async () => {
+  test('returns 200 {} for an unknown token too (no probing)', async () => {
     const store = memoryStore();
     const handler = revocationHandler({ store });
     const result = await handler({ body: { token: 'nope' } });
-    assert.equal(result.status, 204);
-    assert.equal(result.body, null);
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.body, {});
   });
 });

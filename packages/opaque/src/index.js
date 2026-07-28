@@ -125,8 +125,7 @@ export function mask(token) {
 /**
  * @typedef {object} HandlerResult
  * @property {number} status   HTTP status the caller should respond with.
- * @property {Record<string, unknown> | null} body  JSON body to serialize,
- *   or `null` when there is no body (a 204 revocation response).
+ * @property {Record<string, unknown>} body  JSON body to serialize.
  * @property {Record<string, string>} headers  Response headers the
  *   caller should merge onto their response. Includes the RFC-mandated
  *   defaults (`Content-Type: application/json` on JSON responses,
@@ -137,11 +136,6 @@ export function mask(token) {
 
 const JSON_HEADERS = Object.freeze({
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
-  Pragma: 'no-cache',
-});
-
-const NO_CONTENT_HEADERS = Object.freeze({
   'Cache-Control': 'no-store',
   Pragma: 'no-cache',
 });
@@ -198,10 +192,12 @@ export function introspectionHandler(options) {
 }
 
 /**
- * RFC 7009 §2.2 token revocation. Returns `{ status: 204, body: null }`
- * regardless of whether the token existed, so the endpoint can't be
- * used to probe token validity. The caller writes the response
- * themselves.
+ * RFC 7009 §2.2 token revocation. Always returns
+ * `{ status: 200, body: {} }` — for a successful revoke, an unknown
+ * token, or a missing token field — so the endpoint can't be used to
+ * probe token validity. RFC 7009 §2.2 is explicit: "invalid tokens
+ * do not cause an error response since the client cannot handle such
+ * an error in a reasonable way."
  *
  * @param {HandlerOptions} options
  * @returns {(req: any) => Promise<HandlerResult>}
@@ -222,7 +218,7 @@ export function revocationHandler(options) {
         onError(err);
       }
     }
-    return { status: 204, body: null, headers: { ...NO_CONTENT_HEADERS } };
+    return { status: 200, body: {}, headers: { ...JSON_HEADERS } };
   };
 }
 

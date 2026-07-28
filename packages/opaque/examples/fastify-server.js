@@ -55,8 +55,9 @@ app.post('/oauth/introspect', async (req, reply) => {
 });
 
 app.post('/oauth/revoke', async (req, reply) => {
-  const { status, headers } = await revokeRoute(req);
-  reply.headers(headers).code(status).send();
+  const { status, body, headers } = await revokeRoute(req);
+  reply.headers(headers).code(status);
+  return body;
 });
 
 const port = Number(process.env.PORT ?? 3000);
