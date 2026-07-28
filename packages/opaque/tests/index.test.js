@@ -2,6 +2,8 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { create, verify, revoke, mask, introspectionHandler, revocationHandler, OpaqueError } from '../src/index.js';
 import { memoryStore } from '../src/stores/memory.js';
+import { customStore } from '../src/stores/custom.js';
+import { hash as hashFn } from '@exortek/crypto';
 
 describe('create / verify / revoke', () => {
   test('round-trips a token through the store', async () => {
@@ -50,6 +52,33 @@ describe('create / verify / revoke', () => {
   test('throws on missing store', async () => {
     await assert.rejects(() => create({ format: 'hex' }), OpaqueError);
     await assert.rejects(() => verify('tok', {}), OpaqueError);
+  });
+
+  test('honors a non-default hashAlgo end-to-end', async () => {
+    const store = memoryStore();
+    const { token } = await create({ format: 'hex', store, hashAlgo: 'sha512' });
+    assert.equal((await verify(token, { store, hashAlgo: 'sha512' })).valid, true);
+    // Wrong algo hashes to a different key, so it should miss.
+    assert.equal((await verify(token, { store })).valid, false);
+  });
+
+  test('create returns hash === hashFn(token) for the default algo', async () => {
+    const store = memoryStore();
+    const { token, hash } = await create({ format: 'hex', store });
+    assert.equal(hash, hashFn(token, { algo: 'sha256' }));
+  });
+
+  test('store keys are hashes, not raw tokens', async () => {
+    const raw = new Map();
+    const spy = customStore({
+      set: (k, v) => raw.set(k, v),
+      get: k => raw.get(k) ?? null,
+      delete: k => raw.delete(k),
+    });
+    const { token, hash } = await create({ format: 'hex', store: spy });
+    assert.equal(raw.has(token), false, 'raw token must NOT be a key');
+    assert.equal(raw.has(hash), true, 'hash IS the key');
+    assert.equal(raw.size, 1);
   });
 });
 
