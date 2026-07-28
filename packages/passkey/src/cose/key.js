@@ -14,7 +14,7 @@
 import { createPublicKey } from 'node:crypto';
 import { base64url } from '@exortek/crypto/encode';
 
-// ── COSE common labels (RFC 8152 §7.1) ────────────────────────────
+// COSE common labels (RFC 8152 §7.1)
 const LABEL = /** @type {const} */ ({
   KTY: 1,
   ALG: 3,
@@ -26,33 +26,33 @@ const KTY = /** @type {const} */ ({
   RSA: 3,
 });
 
-// ── EC2 parameters (RFC 8152 §13.1) ───────────────────────────────
+// EC2 parameters (RFC 8152 §13.1)
 const EC2 = /** @type {const} */ ({
   CRV: -1,
   X: -2,
   Y: -3,
 });
 
-// ── OKP parameters (RFC 8152 §13.2) ───────────────────────────────
+// OKP parameters (RFC 8152 §13.2)
 const OKP = /** @type {const} */ ({
   CRV: -1,
   X: -2,
 });
 
-// ── RSA parameters (RFC 8230 §4) ──────────────────────────────────
+// RSA parameters (RFC 8230 §4)
 const RSA = /** @type {const} */ ({
   N: -1,
   E: -2,
 });
 
-// ── EC curves (RFC 8152 §13.1) ────────────────────────────────────
+// EC curves (RFC 8152 §13.1)
 const EC_CURVE = /** @type {const} */ ({
   1: 'P-256',
   2: 'P-384',
   3: 'P-521',
 });
 
-// ── OKP curves (RFC 8152 §13.2) ───────────────────────────────────
+// OKP curves (RFC 8152 §13.2)
 const OKP_CURVE = /** @type {const} */ ({
   4: 'X25519',
   5: 'X448',
