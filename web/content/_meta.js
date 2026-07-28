@@ -14,5 +14,6 @@ export default {
   jwks: '@exortek/jwks',
   ua: '@exortek/ua',
   opaque: '@exortek/opaque',
+  passkey: '@exortek/passkey',
   compliance: 'Compliance',
 };

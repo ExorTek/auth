@@ -29,6 +29,7 @@ Ships adapters for Express and Fastify — the classic Node HTTP stack.
 | **[`@exortek/jwks`](/jwks)**             |       [![npm](https://img.shields.io/npm/v/@exortek/jwks.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jwks)       |
 | **[`@exortek/ua`](/ua)**                 |         [![npm](https://img.shields.io/npm/v/@exortek/ua.svg?color=07d600)](https://www.npmjs.com/package/@exortek/ua)         |
 | **[`@exortek/opaque`](/opaque)**         |     [![npm](https://img.shields.io/npm/v/@exortek/opaque.svg?color=07d600)](https://www.npmjs.com/package/@exortek/opaque)     |
+| **[`@exortek/passkey`](/passkey)**       |    [![npm](https://img.shields.io/npm/v/@exortek/passkey.svg?color=07d600)](https://www.npmjs.com/package/@exortek/passkey)    |
 
 ## The stack
 
@@ -51,7 +52,7 @@ time.
 | 12 | [`@exortek/ua`](/ua)                 | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting            |
 | 13 | [`@exortek/apikey`](/apikey)         | Stripe-style prefixed API keys with HMAC-hashed storage, scopes, and middleware           |
 | 14 | [`@exortek/magic-link`](/magic-link) | passwordless email-link auth — HMAC-signed short-lived tokens with single-use consume     |
-| 15 | `@exortek/passkey`                   | WebAuthn / FIDO2 server verification (browser side via `@simplewebauthn/browser`)         |
+| 15 | [`@exortek/passkey`](/passkey)       | WebAuthn Level 3 / FIDO2 server — all seven attestation formats + MDS3 + AAGUID           |
 | 16 | [`@exortek/opaque`](/opaque)          | opaque reference tokens — RFC 7662 introspection + RFC 7009 revocation                     |
 | 17 | `@exortek/paseto`                    | PASETO v4 (`local` / `public`)                                                            |
 | 18 | `@exortek/oauth2`                    | OAuth 2.1 client (PKCE) + provider presets                                                |
@@ -79,6 +80,7 @@ npm install @exortek/magic-link       # + optional: ioredis or redis
 npm install @exortek/jwks
 npm install @exortek/ua               # + optional: express or fastify
 npm install @exortek/opaque           # + optional: ioredis or redis, express or fastify
+npm install @exortek/passkey          # + optional: ioredis or redis, express or fastify
 ```
 
 Node.js **22 or newer**.
@@ -113,6 +115,9 @@ Node.js **22 or newer**.
   fingerprinting, Express + Fastify middleware, bot-guard.
 - **[`@exortek/opaque` reference →](/opaque)** — opaque reference tokens, RFC 7662 introspection + RFC 7009
   revocation HTTP handlers, memory + Redis + custom stores.
+- **[`@exortek/passkey` reference →](/passkey)** — WebAuthn Level 3 / FIDO2 server verification with all seven
+  attestation formats, WebAuthn hints, related origins, extension I/O (credProps / largeBlob / prf / hmac-secret /
+  minPinLength / credProtect / appid), plus MDS3 + AAGUID subpaths.
 - **[Source](https://github.com/ExorTek/auth)** — GitHub repo.
 - **[Contributing](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md)** — branch prefixes, commit conventions,
   changeset flow.

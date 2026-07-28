@@ -107,7 +107,7 @@ Status legend: ✅ shipped to npm · 🛠 on disk, pre-release · ⏳ planned.
 | 12 | `@exortek/ua`          |   ✅   | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting      |
 | 13 | `@exortek/apikey`      |   ✅   | Prefixed API keys (`sk_live_id_secret`), HMAC-SHA256 storage, scopes, middleware    |
 | 14 | `@exortek/magic-link`  |   ✅   | Passwordless email-link auth — signed short-lived tokens with single-use consume    |
-| 15 | `@exortek/passkey`     |   ⏳   | WebAuthn / FIDO2 server verification (`/server` only; browser via community lib)    |
+| 15 | `@exortek/passkey`     |   ✅   | WebAuthn Level 3 / FIDO2 server — all seven attestation formats + MDS3 + AAGUID   |
 | 16 | `@exortek/opaque`      |   ✅   | Opaque reference tokens, RFC 7662 introspection + RFC 7009 revocation                |
 | 17 | `@exortek/paseto`      |   ⏳   | PASETO v4 (`local` / `public`)                                                     |
 | 18 | `@exortek/oauth2`      |   ⏳   | OAuth 2.1 client (PKCE) + provider presets                                          |

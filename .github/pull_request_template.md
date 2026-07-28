@@ -25,6 +25,7 @@ doesn't apply — a "🟢 N/A" is fine, empty checkbox lists are noise.
 - [ ] `@exortek/jwks`
 - [ ] `@exortek/ua`
 - [ ] `@exortek/opaque`
+- [ ] `@exortek/passkey`
 - [ ] Repo tooling (build, CI, docs site, lint/format)
 - [ ] Docs only (no source code changed)
 

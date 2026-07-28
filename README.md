@@ -1,6 +1,6 @@
 # @exortek/auth
 
-A framework-agnostic authentication toolkit for Node.js — designed as 22 small packages under one scope; **14 are
+A framework-agnostic authentication toolkit for Node.js — designed as 22 small packages under one scope; **15 are
 published today** (see Shipping below), the rest are planned. Pick the one you need. Built on `node:crypto`.
 
 [![license](https://img.shields.io/github/license/ExorTek/auth?color=blue)](./LICENSE)
@@ -25,6 +25,7 @@ published today** (see Shipping below), the rest are planned. Pick the one you n
 | [`@exortek/jwks`](./packages/jwks) — JWK Set (RFC 7517 §5) — local key set with zero-downtime rotation + remote JWKS URI fetching with kid-miss refetch, `/.well-known/jwks.json` handler |      [![npm](https://img.shields.io/npm/v/@exortek/jwks.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/jwks)      | [auth.memet.dev/jwks](https://auth.memet.dev/jwks) |
 | [`@exortek/ua`](./packages/ua) — User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting + Express/Fastify middleware + bot-guard |      [![npm](https://img.shields.io/npm/v/@exortek/ua.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/ua)      | [auth.memet.dev/ua](https://auth.memet.dev/ua) |
 | [`@exortek/opaque`](./packages/opaque) — opaque reference tokens, RFC 7662 introspection + RFC 7009 revocation HTTP handlers, memory / Redis stores |      [![npm](https://img.shields.io/npm/v/@exortek/opaque.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/opaque)      | [auth.memet.dev/opaque](https://auth.memet.dev/opaque) |
+| [`@exortek/passkey`](./packages/passkey) — WebAuthn Level 3 / FIDO2 server verification, all seven attestation formats, MDS3 + AAGUID subpaths, extension I/O |      [![npm](https://img.shields.io/npm/v/@exortek/passkey.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/passkey)      | [auth.memet.dev/passkey](https://auth.memet.dev/passkey) |
 
 ## The stack
 
@@ -47,7 +48,7 @@ Linked entries are **published on npm**; the rest are **planned** and not yet in
 | 12 | [`@exortek/ua`](./packages/ua)             | shipped   | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting           |
 | 13 | [`@exortek/apikey`](./packages/apikey)     | shipped   | Stripe-style prefixed API keys, HMAC-hashed storage, scopes, middleware                  |
 | 14 | [`@exortek/magic-link`](./packages/magic-link) | shipped   | passwordless email-link auth — HMAC-signed short-lived tokens with single-use consume    |
-| 15 | `@exortek/passkey`                         | _planned_ | WebAuthn / FIDO2 server verification (browser side via `@simplewebauthn/browser`)        |
+| 15 | [`@exortek/passkey`](./packages/passkey)   | shipped   | WebAuthn Level 3 / FIDO2 server verification — all seven attestation formats + MDS3 + AAGUID |
 | 16 | [`@exortek/opaque`](./packages/opaque)     | shipped   | opaque reference tokens — RFC 7662 introspection + RFC 7009 revocation HTTP handlers      |
 | 17 | `@exortek/paseto`                          | _planned_ | PASETO v4 (`local` / `public`)                                                           |
 | 18 | `@exortek/oauth2`                          | _planned_ | OAuth 2.1 client (PKCE) + provider presets                                               |
@@ -75,6 +76,7 @@ npm install @exortek/magic-link         # + optional: ioredis or redis
 npm install @exortek/jwks
 npm install @exortek/ua                 # + optional: express or fastify
 npm install @exortek/opaque             # + optional: ioredis or redis, express or fastify
+npm install @exortek/passkey            # + optional: ioredis or redis, express or fastify
 ```
 
 Node.js **22 or newer**.

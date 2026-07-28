@@ -32,6 +32,7 @@ body:
         - '@exortek/jwks'
         - '@exortek/ua'
         - '@exortek/opaque'
+        - '@exortek/passkey'
         - 'A new package (please describe below)'
         - 'Repo tooling / docs site'
     validations:

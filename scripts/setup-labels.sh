@@ -40,6 +40,7 @@ LABELS=(
   "pkg:jwks|e6e6fa|Concerns @exortek/jwks"
   "pkg:ua|d4a5a5|Concerns @exortek/ua"
   "pkg:opaque|c9d1d9|Concerns @exortek/opaque"
+  "pkg:passkey|9dd6ff|Concerns @exortek/passkey"
   "pkg:tooling|e4e669|Repo tooling — build, CI, docs site, monorepo config"
 
   "good-first-issue|7057ff|Small, well-scoped — a nice entry point for new contributors"

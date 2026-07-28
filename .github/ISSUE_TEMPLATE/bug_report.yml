@@ -33,6 +33,7 @@ body:
         - '@exortek/jwks'
         - '@exortek/ua'
         - '@exortek/opaque'
+        - '@exortek/passkey'
         - 'Repo tooling (build, tests, CI, docs site)'
         - "Other / I don't know"
     validations:

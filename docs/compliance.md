@@ -42,7 +42,7 @@ Focused on the auth chapters (V2, V3, V4) and secrets storage (V6).
 | V2.8.1  | Time-based OTP compliant with RFC 6238                      |   ✅    | RFC 6238 Appendix B vectors covered                                                  |
 | V2.8.2  | HOTP compliant with RFC 4226                                |   ✅    | RFC 4226 Appendix D vectors covered                                                  |
 | V2.8.4  | HOTP counter resynchronisation                              |   ✅    | `otp.resynchronize` (RFC 4226 §7.4)                                                  |
-| V2.9    | Cryptographic authenticators                                |   🟡   | Passkey / WebAuthn package on roadmap                                                |
+| V2.9    | Cryptographic authenticators                                |   ✅   | `@exortek/passkey` — WebAuthn L3 server verification, all seven attestation formats  |
 | V2.10.4 | Backup / recovery codes stored hashed                       |   ✅    | `otp.backupCodes` — caller hashes via `password.scrypt.hash` before storing          |
 
 ### V3 — Session Management
@@ -130,7 +130,7 @@ Selected requirements relevant to auth libraries:
 | 8.3.1  | Strong cryptography for stored passwords         |   ✅    | argon2id / scrypt / bcrypt / pbkdf2                                           |
 | 8.3.6  | Passwords ≥ 12 chars mixed complexity            |   ✅    | `policy({ minLength: 12, requireClasses: […] })`                              |
 | 8.3.7  | Password history (last ≥ 4)                      |   ✅    | `createHistory({ keepLast: 4+ })`                                             |
-| 8.3.9  | MFA on non-console access                        |   ✅    | `@exortek/otp` for TOTP; passkey package on roadmap                           |
+| 8.3.9  | MFA on non-console access                        |   ✅    | `@exortek/otp` (TOTP) + `@exortek/passkey` (WebAuthn / FIDO2)                |
 | 8.3.10 | MFA replay protection                            |   ✅    | `otp.verifyTotp({ replay })`                                                  |
 | 8.5.1  | System secrets encrypted at rest / not in source |   🟡   | Caller loads from KMS / env; library never persists secrets                   |
 | 6.2.4  | Common attacks prevented — injection, XSS, CSRF  |   ✅    | `@exortek/security` — CSRF plugin, prototype-pollution defence, safe-redirect |
@@ -176,8 +176,9 @@ never transmit plaintext passwords over the network.
   (CSPRNG ids, `__Host-` cookies, server-side revocation, rotation)
 - ✅ **RFC 7662 / RFC 7009 OAuth 2 introspection + revocation** —
   `@exortek/opaque`, framework-agnostic handlers (see table above)
-- 🟡 **ASVS V2.9 cryptographic authenticators** — coming with
-  `@exortek/passkey`
+- ✅ **ASVS V2.9 cryptographic authenticators** — `@exortek/passkey`
+  (WebAuthn L3 / FIDO2 CTAP2 server verification, all seven
+  attestation formats)
 - 🟡 **Observability hooks** for SOC 2 / SIEM ingestion — roadmap
 
 ## Reading
