@@ -1,5 +1,6 @@
 import { createSessionManager } from './manager.js';
 import { memoryStore } from './stores/memory.js';
+import { customStore } from './stores/custom.js';
 import { SessionError, ErrorCode } from './errors.js';
 import { generateSessionId, encodeToken, decodeToken } from './token.js';
 import { parseCookies, serialiseCookie, serialiseDeleteCookie } from './cookie.js';
@@ -22,12 +23,14 @@ import { createTrustedDeviceCookie } from './trusted-device.js';
 
 export const sessionStore = Object.freeze({
   memory: memoryStore,
+  custom: customStore,
 });
 
 export {
   createSessionManager,
   createTrustedDeviceCookie,
   memoryStore,
+  customStore,
   SessionError,
   ErrorCode,
   generateSessionId,

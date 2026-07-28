@@ -270,6 +270,26 @@ Works with `ioredis` **or** `node-redis@4+`. `publishRevocations: true` emits ev
 `<keyPrefix>events` via `PUBLISH` — subscribe with a second connection to invalidate per-request caches on other
 workers.
 
+### Custom
+
+```js
+import { sessionStore } from '@exortek/session';
+
+const store = sessionStore.custom({
+  get: sid => db.sessions.findOne({ sid }),
+  put: record => db.sessions.upsert(record),
+  update: (sid, patch) => db.sessions.merge(sid, patch),
+  revoke: (sid, reason) => db.sessions.revoke(sid, reason),
+  revokeAllForUser: (uid, reason) => db.sessions.revokeAllForUser(uid, reason),
+  revokeAllExcept: (uid, keepSid, reason) => db.sessions.revokeAllExcept(uid, keepSid, reason),
+  listByUser: uid => db.sessions.listByUser(uid),
+  countActive: uid => db.sessions.countActive(uid),
+});
+```
+
+Validates the required methods exist at construction time (not on the first `issue`/`verify` call) and wraps sync
+return values in a Promise, so `impl` can be sync or async.
+
 ## Framework adapters
 
 Each adapter installs `req.session` (or `c.get('session')`) + a `sessions` handle to the manager for calling
