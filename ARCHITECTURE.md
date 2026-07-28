@@ -106,7 +106,7 @@ status lives in [`README.md`](./README.md).
 | 13 | `@exortek/apikey`      | Prefixed API keys (`sk_live_id_secret`), HMAC-SHA256 storage, scopes, middleware    |
 | 14 | `@exortek/magic-link`  | Passwordless email-link auth — signed short-lived tokens with single-use consume    |
 | 15 | `@exortek/passkey`     | WebAuthn / FIDO2 server verification (`/server` only; browser via community lib)    |
-| 16 | `@exortek/opaque`      | OPAQUE aPAKE — zero-knowledge password authentication                               |
+| 16 | `@exortek/opaque`      | Opaque reference tokens, RFC 7662 introspection + RFC 7009 revocation                |
 | 17 | `@exortek/paseto`      | PASETO v4 (`local` / `public`)                                                     |
 | 18 | `@exortek/oauth2`      | OAuth 2.1 client (PKCE) + provider presets                                          |
 | 19 | `@exortek/oidc`        | OpenID Connect on top of `@exortek/oauth2`                                          |
@@ -241,7 +241,7 @@ Where each protocol is anchored:
 | `jwt`           | RFC 7519 (JWT), RFC 8725 (BCP), RFC 9068 (JWT profile for OAuth2)              |
 | `jwe`           | RFC 7516 (JWE), RFC 7518 §4 (encryption algorithms), RFC 8037 (X25519 / X448)  |
 | `jwks`          | RFC 7517 §5 (JWK Set), OpenID Connect Discovery                                |
-| `opaque`        | draft-irtf-cfrg-opaque                                                        |
+| `opaque`        | RFC 7662 (Token Introspection), RFC 7009 (Token Revocation)                   |
 | `paseto`        | PASETO v4 spec                                                                |
 | `session`       | OWASP ASVS 4.0.3 V3, RFC 6265 (Cookies)                                       |
 | `security`      | OWASP ASVS 4.0.3 V13 / V14, RFC 6749 §10 (OAuth2 threats), RFC 7231 §5 (HTTP) |
