@@ -141,17 +141,28 @@ mask('3f9ab2c1d4e5f6a7b8c9d0e1f2a3b4c5');
 
 Framework-agnostic — works with raw Node, Express, and Fastify (unwraps `reply.raw` automatically, same as `@exortek/jwks`'s handler). Assumes the request body is already parsed (Express `json()` middleware, Fastify's built-in JSON parsing).
 
+Handlers are framework-neutral. They return `{ status, body, headers }` — you write the response yourself, so you can add CORS, wrap the body in an envelope, log status codes, anything.
+
 ```js
 import { introspectionHandler, revocationHandler } from '@exortek/opaque';
 
-// RFC 7662 — always 200, `active: false` for anything invalid so a
-// caller can't distinguish "unknown" from "expired" from "revoked".
-app.post('/oauth/introspect', introspectionHandler({ store }));
+const introspect = introspectionHandler({ store });
+const revokeRoute = revocationHandler({ store });
 
-// RFC 7009 — always 200 with an empty body, whether or not the token
-// existed, so the endpoint can't be used to probe token validity.
-app.post('/oauth/revoke', revocationHandler({ store }));
+// RFC 7662 — always 200, `active: false` for anything invalid.
+app.post('/oauth/introspect', async (req, res) => {
+  const { status, body, headers } = await introspect(req);
+  res.set(headers).status(status).json(body);
+});
+
+// RFC 7009 — always 204, no body, whether or not the token existed.
+app.post('/oauth/revoke', async (req, res) => {
+  const { status, headers } = await revokeRoute(req);
+  res.set(headers).status(status).end();
+});
 ```
+
+Every returned `headers` includes the RFC-recommended defaults (`Content-Type: application/json` on introspection, `Cache-Control: no-store`, `Pragma: no-cache`) — merge and add anything else you want.
 
 > **Security — both endpoints MUST be authenticated.** RFC 7662 §2.1 and RFC 7009 §2.1 require the caller to authenticate (resource-server credential, mTLS, HMAC, basic auth, …). An anonymous `/oauth/introspect` lets a probe scan for valid tokens; an anonymous `/oauth/revoke` lets any observer of a leaked token burn it. Gate the route before mounting the handler — nothing in this package will do it for you.
 >

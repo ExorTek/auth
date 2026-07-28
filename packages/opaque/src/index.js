@@ -7,6 +7,7 @@
 
 import { hash } from '@exortek/crypto';
 import { parseDuration } from '@exortek/shared/duration';
+import { isNonEmptyString, isFunction } from '@exortek/shared/predicates';
 import { generate } from './token.js';
 import { assertObject, assertNonEmptyString } from './internal/guards.js';
 
@@ -122,16 +123,28 @@ export function mask(token) {
 }
 
 /**
- * @param {unknown} raw  A Node `http.ServerResponse`, or a Fastify
- *   `Reply` (unwrapped via `.raw`).
- * @param {number} status
- * @param {Record<string, unknown>} body
+ * @typedef {object} HandlerResult
+ * @property {number} status   HTTP status the caller should respond with.
+ * @property {Record<string, unknown> | null} body  JSON body to serialize,
+ *   or `null` when there is no body (a 204 revocation response).
+ * @property {Record<string, string>} headers  Response headers the
+ *   caller should merge onto their response. Includes the RFC-mandated
+ *   defaults (`Content-Type: application/json` on JSON responses,
+ *   `Cache-Control: no-store`, `Pragma: no-cache` — RFC 6749 §5.1
+ *   applied to sensitive token responses). The caller is free to add
+ *   more (CORS, request-id, whatever) before writing them out.
  */
-function respondJson(raw, status, body) {
-  const target = /** @type {any} */ (raw).raw ?? raw;
-  target.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
-  target.end(JSON.stringify(body));
-}
+
+const JSON_HEADERS = Object.freeze({
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-store',
+  Pragma: 'no-cache',
+});
+
+const NO_CONTENT_HEADERS = Object.freeze({
+  'Cache-Control': 'no-store',
+  Pragma: 'no-cache',
+});
 
 /**
  * @typedef {object} HandlerOptions
@@ -139,77 +152,77 @@ function respondJson(raw, status, body) {
  * @property {import('@exortek/crypto').HashAlgorithm} [hashAlgo='sha256']
  * @property {string} [tokenField='token']  Field read from the parsed request body.
  * @property {(err: unknown) => void} [onError]  Called if `store.get`/`store.delete`
- *   throws. The handler still responds with the no-oracle default so the endpoint
- *   never leaks store-health signals — this hook exists so the app can still log
- *   the failure.
+ *   throws. The handler still returns the no-oracle default so the endpoint
+ *   never leaks store-health signals — this hook exists so the app can still
+ *   log the failure.
  */
 
 /**
- * RFC 7662 §2.2 token introspection endpoint. Always responds `200`
- * — `active: false` for a missing/malformed/unknown/revoked token, so
- * a caller can't distinguish "invalid" from "doesn't exist" by status
- * code alone. `req.body` must already be parsed (Express `json()`
- * middleware, Fastify's built-in JSON parsing).
+ * RFC 7662 §2.2 token introspection. Returns a `{ status, body }` pair
+ * the caller writes to their framework's response however they want —
+ * add CORS headers, wrap in an envelope, whatever. The status is always
+ * `200`, and `body.active` is `false` for a missing/malformed/unknown/
+ * revoked token, so the caller can't distinguish "invalid" from "doesn't
+ * exist" by status code alone (RFC 7662 §2.2 anti-oracle guidance).
+ *
+ * `req.body` must already be parsed (Express `json()` middleware,
+ * Fastify's built-in JSON parsing).
  *
  * @param {HandlerOptions} options
- * @returns {(req: any, res: any) => Promise<void>}
+ * @returns {(req: any) => Promise<HandlerResult>}
  */
 export function introspectionHandler(options) {
   assertObject(options, 'introspectionHandler.options');
   const { store, hashAlgo = 'sha256', tokenField = 'token', onError } = options;
   assertObject(store, 'introspectionHandler.options.store');
 
-  return async function introspection(req, res) {
+  return async function introspection(req) {
     const token = req?.body?.[tokenField];
-    if (typeof token !== 'string' || token.length === 0) {
-      respondJson(res, 200, { active: false });
-      return;
+    if (!isNonEmptyString(token)) {
+      return { status: 200, body: { active: false }, headers: { ...JSON_HEADERS } };
     }
     try {
       const result = await verify(token, { store, hashAlgo });
-      if (!result.valid) {
-        respondJson(res, 200, { active: false });
-        return;
-      }
-      respondJson(res, 200, { ...result.metadata, active: true });
+      const body = result.valid ? { ...result.metadata, active: true } : { active: false };
+      return { status: 200, body, headers: { ...JSON_HEADERS } };
     } catch (err) {
       // Preserve the no-oracle contract even under store failure — a
-      // 500 with a stack page would tell the caller "the store is
-      // reachable at X" and betray which endpoint hit the DB.
-      if (typeof onError === 'function') onError(err);
-      respondJson(res, 200, { active: false });
+      // 500 with a stack page would tell the caller the store is reachable
+      // and betray which endpoint hit the DB.
+      if (isFunction(onError)) {
+        onError(err);
+      }
+      return { status: 200, body: { active: false }, headers: { ...JSON_HEADERS } };
     }
   };
 }
 
 /**
- * RFC 7009 §2.2 token revocation endpoint. Always responds `200` with
- * an empty body — regardless of whether the token existed — so the
- * endpoint can't be used to probe token validity.
+ * RFC 7009 §2.2 token revocation. Returns `{ status: 204, body: null }`
+ * regardless of whether the token existed, so the endpoint can't be
+ * used to probe token validity. The caller writes the response
+ * themselves.
  *
  * @param {HandlerOptions} options
- * @returns {(req: any, res: any) => Promise<void>}
+ * @returns {(req: any) => Promise<HandlerResult>}
  */
 export function revocationHandler(options) {
   assertObject(options, 'revocationHandler.options');
   const { store, hashAlgo = 'sha256', tokenField = 'token', onError } = options;
   assertObject(store, 'revocationHandler.options.store');
 
-  return async function revocation(req, res) {
+  return async function revocation(req) {
     const token = req?.body?.[tokenField];
     try {
-      if (typeof token === 'string' && token.length > 0) {
+      if (isNonEmptyString(token)) {
         await revoke(token, { store, hashAlgo });
       }
     } catch (err) {
-      if (typeof onError === 'function') onError(err);
+      if (isFunction(onError)) {
+        onError(err);
+      }
     }
-    // RFC 7009 §2.2: "The content of the response body is ignored by
-    // the client." 204 is smaller on the wire and less confusing to
-    // conformance tools than a JSON `{}`.
-    const target = /** @type {any} */ (res).raw ?? res;
-    target.writeHead(204);
-    target.end();
+    return { status: 204, body: null, headers: { ...NO_CONTENT_HEADERS } };
   };
 }
 

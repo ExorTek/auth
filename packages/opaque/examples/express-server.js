@@ -52,8 +52,21 @@ app.post('/tokens', async (req, res) => {
   }
 });
 
-app.post('/oauth/introspect', introspectionHandler({ store }));
-app.post('/oauth/revoke', revocationHandler({ store }));
+// Handlers now return { status, body } — the caller owns the response.
+// Add CORS headers, envelope the body, whatever — the handler stays out
+// of the response object entirely.
+const introspect = introspectionHandler({ store });
+const revokeRoute = revocationHandler({ store });
+
+app.post('/oauth/introspect', async (req, res) => {
+  const { status, body, headers } = await introspect(req);
+  res.set(headers).status(status).json(body);
+});
+
+app.post('/oauth/revoke', async (req, res) => {
+  const { status, headers } = await revokeRoute(req);
+  res.set(headers).status(status).end();
+});
 
 const port = Number(process.env.PORT ?? 3000);
 app.listen(port, () => console.log(`opaque demo on http://127.0.0.1:${port}`));

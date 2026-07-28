@@ -41,8 +41,23 @@ app.post('/tokens', async (req, reply) => {
   }
 });
 
-app.post('/oauth/introspect', introspectionHandler({ store }));
-app.post('/oauth/revoke', revocationHandler({ store }));
+// Handlers now return { status, body, headers } — the caller owns the
+// response. Merge the RFC-recommended headers, add your own (CORS,
+// request-id, whatever), send the status/body however your framework
+// prefers.
+const introspect = introspectionHandler({ store });
+const revokeRoute = revocationHandler({ store });
+
+app.post('/oauth/introspect', async (req, reply) => {
+  const { status, body, headers } = await introspect(req);
+  reply.headers(headers).code(status);
+  return body;
+});
+
+app.post('/oauth/revoke', async (req, reply) => {
+  const { status, headers } = await revokeRoute(req);
+  reply.headers(headers).code(status).send();
+});
 
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: '127.0.0.1' });

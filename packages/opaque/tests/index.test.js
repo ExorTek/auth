@@ -92,67 +92,48 @@ describe('mask', () => {
   });
 });
 
-function fakeRes() {
-  let status, headers, body;
-  return {
-    res: {
-      writeHead(s, h) {
-        status = s;
-        headers = h;
-      },
-      end(b) {
-        body = b;
-      },
-    },
-    read: () => ({ status, headers, body: body === undefined ? undefined : JSON.parse(body) }),
-    rawBody: () => body,
-  };
-}
-
 describe('introspectionHandler', () => {
   test('active: true for a valid token', async () => {
     const store = memoryStore();
     const { token } = await create({ format: 'hex', store, metadata: { userId: 'usr_1' } });
     const handler = introspectionHandler({ store });
-    const { res, read } = fakeRes();
-    await handler({ body: { token } }, res);
-    const { status, body } = read();
-    assert.equal(status, 200);
-    assert.deepEqual(body, { userId: 'usr_1', active: true });
+    const result = await handler({ body: { token } });
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.body, { userId: 'usr_1', active: true });
+    assert.equal(result.headers['Content-Type'], 'application/json');
+    assert.equal(result.headers['Cache-Control'], 'no-store');
   });
 
   test('active: false for an unknown token', async () => {
     const store = memoryStore();
     const handler = introspectionHandler({ store });
-    const { res, read } = fakeRes();
-    await handler({ body: { token: 'nope' } }, res);
-    assert.deepEqual(read().body, { active: false });
+    const result = await handler({ body: { token: 'nope' } });
+    assert.deepEqual(result.body, { active: false });
+    assert.equal(result.status, 200);
   });
 
   test('active: false when body is missing the token field', async () => {
     const store = memoryStore();
     const handler = introspectionHandler({ store });
-    const { res, read } = fakeRes();
-    await handler({ body: {} }, res);
-    assert.deepEqual(read().body, { active: false });
+    const result = await handler({ body: {} });
+    assert.deepEqual(result.body, { active: false });
   });
 
   test('honors a custom tokenField', async () => {
     const store = memoryStore();
     const { token } = await create({ format: 'hex', store, metadata: { userId: 'u' } });
     const handler = introspectionHandler({ store, tokenField: 'access_token' });
-    const { res, read } = fakeRes();
-    await handler({ body: { access_token: token } }, res);
-    assert.deepEqual(read().body, { userId: 'u', active: true });
+    const result = await handler({ body: { access_token: token } });
+    assert.deepEqual(result.body, { userId: 'u', active: true });
   });
 
-  test('unwraps Fastify reply.raw', async () => {
+  test('caller can mutate returned headers without touching later calls', async () => {
     const store = memoryStore();
-    const { token } = await create({ format: 'hex', store });
     const handler = introspectionHandler({ store });
-    const { res, read } = fakeRes();
-    await handler({ body: { token } }, { raw: res });
-    assert.deepEqual(read().body, { active: true });
+    const first = await handler({ body: {} });
+    first.headers['X-Custom'] = 'yes';
+    const second = await handler({ body: {} });
+    assert.equal(second.headers['X-Custom'], undefined);
   });
 });
 
@@ -168,32 +149,30 @@ describe('introspectionHandler — store failure', () => {
     };
     const seen = [];
     const handler = introspectionHandler({ store: throwing, onError: e => seen.push(e) });
-    const { res, read } = fakeRes();
-    await handler({ body: { token: 'anything' } }, res);
-    const { status, body } = read();
-    assert.equal(status, 200);
-    assert.deepEqual(body, { active: false });
+    const result = await handler({ body: { token: 'anything' } });
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.body, { active: false });
     assert.deepEqual(seen, [err]);
   });
 });
 
 describe('revocationHandler', () => {
-  test('revokes a known token and responds 204 with empty body', async () => {
+  test('revokes a known token and returns 204 with a null body', async () => {
     const store = memoryStore();
     const { token } = await create({ format: 'hex', store });
     const handler = revocationHandler({ store });
-    const { res, read, rawBody } = fakeRes();
-    await handler({ body: { token } }, res);
-    assert.equal(read().status, 204);
-    assert.equal(rawBody(), undefined);
+    const result = await handler({ body: { token } });
+    assert.equal(result.status, 204);
+    assert.equal(result.body, null);
+    assert.equal(result.headers['Cache-Control'], 'no-store');
     assert.equal((await verify(token, { store })).valid, false);
   });
 
-  test('responds 204 for an unknown token too (no probing)', async () => {
+  test('returns 204 for an unknown token too (no probing)', async () => {
     const store = memoryStore();
     const handler = revocationHandler({ store });
-    const { res, read } = fakeRes();
-    await handler({ body: { token: 'nope' } }, res);
-    assert.equal(read().status, 204);
+    const result = await handler({ body: { token: 'nope' } });
+    assert.equal(result.status, 204);
+    assert.equal(result.body, null);
   });
 });

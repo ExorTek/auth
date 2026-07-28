@@ -13,17 +13,37 @@ Fastify (unwraps `reply.raw` automatically, same trick
 is already parsed (Express `json()` middleware, Fastify's built-in
 JSON parsing).
 
+Handlers return `{ status, body, headers }` — the caller owns the
+response. That lets you add CORS, request-id, envelope the body, or
+send it any way your framework prefers, without the handler ever
+touching `res` itself.
+
 ```js
 import { introspectionHandler, revocationHandler } from '@exortek/opaque';
 
+const introspect = introspectionHandler({ store });
+const revokeRoute = revocationHandler({ store });
+
 // RFC 7662 — always 200, active: false for anything invalid so a
 // caller can't distinguish "unknown" from "expired" from "revoked".
-app.post('/oauth/introspect', introspectionHandler({ store }));
+app.post('/oauth/introspect', async (req, res) => {
+  const { status, body, headers } = await introspect(req);
+  res.set(headers).status(status).json(body);
+});
 
-// RFC 7009 — always 200 with an empty body, whether or not the token
-// existed, so the endpoint can't be used to probe token validity.
-app.post('/oauth/revoke', revocationHandler({ store }));
+// RFC 7009 — always 204, no body, whether or not the token existed.
+app.post('/oauth/revoke', async (req, res) => {
+  const { status, headers } = await revokeRoute(req);
+  res.set(headers).status(status).end();
+});
 ```
+
+Fastify: same `handler(req)` call — write with `reply.headers(headers).code(status)` then `return body` (introspection) or `.send()` (revocation).
+
+Every response's `headers` already carries the RFC-recommended
+defaults: `Content-Type: application/json` on introspection,
+`Cache-Control: no-store` and `Pragma: no-cache` on both (RFC 6749
+§5.1 sensitive-response guidance).
 
 <Callout type="warning">
   **Both endpoints MUST be authenticated.** RFC 7662 §2.1 and RFC 7009
