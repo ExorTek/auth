@@ -1,15 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  TAG,
-  contextTag,
-  readTlv,
-  readChildren,
-  intoSequence,
-  decodeOid,
-  encodeOid,
-  findExtension,
-} from '../../src/asn1/der.js';
+import { TAG, contextTag, readTlv, intoSequence, decodeOid, encodeOid, findExtension } from '../../src/asn1/der.js';
 
 /**
  * Assemble one TLV. Uses short-form length when the payload fits,
