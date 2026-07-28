@@ -2,6 +2,8 @@
 
 > Opaque reference tokens for Node.js 22+ — random, unstructured tokens with no embedded payload, memory + Redis stores, RFC 7662 introspection and RFC 7009 revocation HTTP handlers. Zero non-`@exortek/*` runtime dependencies.
 
+> **Not the OPAQUE PAKE protocol.** This package implements OAuth-style opaque *reference* tokens (RFC 6749 §1.4 / RFC 7662). For the OPAQUE PAKE (CFRG draft), see [`@cloudflare/opaque-ts`](https://www.npmjs.com/package/@cloudflare/opaque-ts).
+
 [![npm](https://img.shields.io/npm/v/@exortek/opaque.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/opaque)
 [![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/opaque.svg?color=339933)](https://nodejs.org)
@@ -149,6 +151,20 @@ app.post('/oauth/introspect', introspectionHandler({ store }));
 // RFC 7009 — always 200 with an empty body, whether or not the token
 // existed, so the endpoint can't be used to probe token validity.
 app.post('/oauth/revoke', revocationHandler({ store }));
+```
+
+> **Security — both endpoints MUST be authenticated.** RFC 7662 §2.1 and RFC 7009 §2.1 require the caller to authenticate (resource-server credential, mTLS, HMAC, basic auth, …). An anonymous `/oauth/introspect` lets a probe scan for valid tokens; an anonymous `/oauth/revoke` lets any observer of a leaked token burn it. Gate the route before mounting the handler — nothing in this package will do it for you.
+>
+> Whatever you pass to `create({ metadata })` is what introspection echoes back — do **not** stash PII, secrets, or internal identifiers there. Prefer the RFC 7662 §2.2 claim names (`sub`, `scope`, `client_id`, `exp`, `token_type`, `iss`, …).
+
+```js
+// Minimal Express gate — replace with your real auth.
+import basicAuth from 'express-basic-auth';
+app.post(
+  '/oauth/introspect',
+  basicAuth({ users: { 'resource-server': process.env.INTROSPECT_SECRET } }),
+  introspectionHandler({ store }),
+);
 ```
 
 | Option       | Default    | Notes                                    |

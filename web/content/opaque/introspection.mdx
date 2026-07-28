@@ -25,6 +25,31 @@ app.post('/oauth/introspect', introspectionHandler({ store }));
 app.post('/oauth/revoke', revocationHandler({ store }));
 ```
 
+<Callout type="warning">
+  **Both endpoints MUST be authenticated.** RFC 7662 §2.1 and RFC 7009
+  §2.1 require the caller to authenticate — introspection is only safe
+  for a resource server you trust, revocation is only safe for the
+  client the token was minted for. Anonymous introspection lets an
+  attacker scan for valid tokens; anonymous revocation lets any observer
+  of a leaked token burn it. Gate the route before mounting the handler
+  — nothing in this package does it for you.
+
+  Whatever you pass to `create({ metadata })` is echoed back by
+  introspection — do NOT store PII, secrets, or internal identifiers
+  there. Prefer the RFC 7662 §2.2 claim names (`sub`, `scope`,
+  `client_id`, `exp`, `token_type`, `iss`, …).
+</Callout>
+
+```js
+// Minimal Express gate — replace with your real auth.
+import basicAuth from 'express-basic-auth';
+app.post(
+  '/oauth/introspect',
+  basicAuth({ users: { 'resource-server': process.env.INTROSPECT_SECRET } }),
+  introspectionHandler({ store }),
+);
+```
+
 ## Options (both handlers)
 
 | Option       | Default    | Notes                                    |

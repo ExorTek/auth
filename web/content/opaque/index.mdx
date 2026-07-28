@@ -7,6 +7,13 @@ import { Callout } from 'nextra/components';
 
 # `@exortek/opaque`
 
+<Callout type="warning">
+  **Not the OPAQUE PAKE protocol.** This package implements OAuth-style
+  opaque *reference* tokens (RFC 6749 §1.4 / RFC 7662). For the OPAQUE
+  PAKE (CFRG draft, WebAuthn-adjacent), see
+  [`@cloudflare/opaque-ts`](https://www.npmjs.com/package/@cloudflare/opaque-ts).
+</Callout>
+
 Opaque reference tokens for Node.js 22+. A JWT carries its own claims —
 anyone can decode it, even without the signing key. An opaque token
 carries nothing: it's a random string, and the only way to learn
