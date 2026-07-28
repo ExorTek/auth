@@ -252,6 +252,7 @@ Whatever driver you pick, make the link clickable — plain-text URLs sometimes 
 
 - **`memoryStore()`** — in-process Map with `structuredClone` semantics (deep-copy on read + write so caller mutation cannot escape). Reverse index by email + a per-email rate counter. Not cluster-safe.
 - **`redisStore(client, { keyPrefix? })`** — JSON blob per id + SADD-set per email + Lua CAS `consume` + Lua INCR-with-PEXPIRE `incrRate`. `keyPrefix` defaults to `'mlink:'`. Works with `ioredis`, `node-redis@4+`, `@upstash/redis`.
+- **`customStore(impl)`** — wrap your own DB-backed implementation. Validates `put`/`getById`/`consume` exist at construction time; `incrRate`/`listByEmail`/`revokeByEmail` are passed through only when present.
 
 ### The interface
 
