@@ -429,6 +429,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@exortek/passkey@workspace:packages/passkey":
+  version: 0.0.0-use.local
+  resolution: "@exortek/passkey@workspace:packages/passkey"
+  dependencies:
+    "@exortek/crypto": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
 "@exortek/password@workspace:packages/password":
   version: 0.0.0-use.local
   resolution: "@exortek/password@workspace:packages/password"
