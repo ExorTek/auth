@@ -291,10 +291,10 @@ import { MagicLinkError, ErrorCode } from '@exortek/magic-link';
 
 ## Links
 
-- [Docs](https://auth.memet.dev/magic-link)
-- [GitHub](https://github.com/ExorTek/auth/tree/master/packages/magic-link)
-- [Issues](https://github.com/ExorTek/auth/issues)
+- **Source:** [github.com/ExorTek/auth](https://github.com/ExorTek/auth)
+- **Issues & discussions:** [github.com/ExorTek/auth/issues](https://github.com/ExorTek/auth/issues)
+- **Changelog:** [CHANGELOG.md](./CHANGELOG.md)
 
 ## License
 
-MIT
+MIT © ExorTek — see [LICENSE](./LICENSE).

@@ -318,10 +318,10 @@ Expected verify failures do NOT throw — they surface as `{ valid: false, reaso
 
 ## Links
 
-- [Docs](https://auth.memet.dev/apikey)
-- [GitHub](https://github.com/ExorTek/auth/tree/master/packages/apikey)
-- [Issues](https://github.com/ExorTek/auth/issues)
+- **Source:** [github.com/ExorTek/auth](https://github.com/ExorTek/auth)
+- **Issues & discussions:** [github.com/ExorTek/auth/issues](https://github.com/ExorTek/auth/issues)
+- **Changelog:** [CHANGELOG.md](./CHANGELOG.md)
 
 ## License
 
-MIT
+MIT © ExorTek — see [LICENSE](./LICENSE).
