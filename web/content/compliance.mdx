@@ -133,6 +133,16 @@ some interpretations; our KDFs are one-way and salted, which satisfies
 the "pseudonymisation" bar in most authorities' interpretations. We
 never transmit plaintext passwords over the network.
 
+## OAuth 2 token endpoints (`@exortek/opaque`)
+
+| §                | Requirement                                                        | Status | How                                                                                              |
+|------------------|--------------------------------------------------------------------|:------:|--------------------------------------------------------------------------------------------------|
+| RFC 7662 §2.2    | Token introspection endpoint — JSON `{ active, ... }`               |   ✅    | `introspectionHandler` — always 200, `active: false` for anything invalid (no oracle)            |
+| RFC 7662 §2.1    | Introspection endpoint MUST authenticate the caller                |   🟡   | Docs require it; the handler ships un-gated so the app can pick mTLS / basic / HMAC              |
+| RFC 7009 §2.2    | Revocation endpoint responds regardless of token validity          |   ✅    | `revocationHandler` — always 204, empty body                                                     |
+| RFC 7009 §2.1    | Revocation endpoint MUST authenticate the client                   |   🟡   | Same as introspection — gated by the app                                                         |
+| RFC 6749 §1.4    | Opaque access tokens (bearer, unstructured)                        |   ✅    | `generate` / `create` / `verify` / `revoke`, only the hash lives in the store                    |
+
 ## Summary
 
 - ✅ **NIST SP 800-63B AAL2** — memorized secret + OOB OTP paths
@@ -141,6 +151,8 @@ never transmit plaintext passwords over the network.
 - ✅ **FIPS-compatible mode** — via presets and Node `--enable-fips`
 - ✅ **OWASP ASVS 4.0.3 V3 session management** — `@exortek/session`
   (CSPRNG ids, `__Host-` cookies, server-side revocation, rotation)
+- ✅ **RFC 7662 / RFC 7009 OAuth 2 introspection + revocation** —
+  `@exortek/opaque`, framework-agnostic handlers (see table above)
 - 🟡 **ASVS V2.9 cryptographic authenticators** — coming with
   `@exortek/passkey`
 - 🟡 **Observability hooks** for SOC 2 / SIEM — roadmap

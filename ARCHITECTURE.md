@@ -89,30 +89,35 @@ Numbers reflect *dependency order* — a lower number never imports from a
 higher one, so packages can be adopted incrementally. The current shipping
 status lives in [`README.md`](./README.md).
 
-| #  | Package                | Responsibility                                                                     |
-|:--:|------------------------|------------------------------------------------------------------------------------|
-| 01 | `@exortek/crypto`      | Primitives — hash, HMAC, KDFs, cipher, sign, seal, encode, CSPRNG                   |
-| 02 | `@exortek/password`    | Argon2id / scrypt / bcrypt / PBKDF2 + strength / pepper / history / HIBP           |
-| 03 | `@exortek/otp`         | RFC 4226 HOTP + RFC 6238 TOTP, backup codes, `otpauth://` provisioning URI          |
-| 04 | `@exortek/challenge`   | HMAC-signed multi-step flow tokens (userId · method · step) with opt-in single-use  |
-| 05 | `@exortek/jwk`         | JWK — generate, import, export, thumbprint, per RFC 7517 / 7638 / 8037 / 9278       |
-| 06 | `@exortek/jws`         | JWS — sign / verify / detached / b64:false / JSON serialisation per RFC 7515 / 7797  |
-| 07 | `@exortek/jwt`         | JWT — sign / verify with algorithm allowlists + claims validation per RFC 7519      |
-| 08 | `@exortek/jwe`         | JWE — RSA-OAEP, ECDH-ES, A256KW, dir per RFC 7516                                    |
-| 09 | `@exortek/jwks`        | JWKS URI fetching, caching, `kid` rotation per RFC 7517 §5                           |
-| 10 | `@exortek/session`     | Sealed-cookie sessions, rotation, revocation, sudo mode, Redis pub/sub              |
-| 11 | `@exortek/security`    | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect, defensive HTTP helpers  |
-| 12 | `@exortek/ua`          | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting      |
-| 13 | `@exortek/apikey`      | Prefixed API keys (`sk_live_id_secret`), HMAC-SHA256 storage, scopes, middleware    |
-| 14 | `@exortek/magic-link`  | Passwordless email-link auth — signed short-lived tokens with single-use consume    |
-| 15 | `@exortek/passkey`     | WebAuthn / FIDO2 server verification (`/server` only; browser via community lib)    |
-| 16 | `@exortek/opaque`      | Opaque reference tokens, RFC 7662 introspection + RFC 7009 revocation                |
-| 17 | `@exortek/paseto`      | PASETO v4 (`local` / `public`)                                                     |
-| 18 | `@exortek/oauth2`      | OAuth 2.1 client (PKCE) + provider presets                                          |
-| 19 | `@exortek/oidc`        | OpenID Connect on top of `@exortek/oauth2`                                          |
-| 20 | `@exortek/web3-evm`    | SIWE — Sign-In With Ethereum                                                       |
-| 21 | `@exortek/web3-solana` | SIWS — Sign-In With Solana                                                         |
-| 22 | `@exortek/auth`        | Umbrella — re-exports every package above                                          |
+Status legend: ✅ shipped to npm · 🛠 on disk, pre-release · ⏳ planned.
+
+| #  | Package                | Status | Responsibility                                                                     |
+|:--:|------------------------|:------:|------------------------------------------------------------------------------------|
+| 01 | `@exortek/crypto`      |   ✅   | Primitives — hash, HMAC, KDFs, cipher, sign, seal, encode, CSPRNG                   |
+| 02 | `@exortek/password`    |   ✅   | Argon2id / scrypt / bcrypt / PBKDF2 + strength / pepper / history / HIBP           |
+| 03 | `@exortek/otp`         |   ✅   | RFC 4226 HOTP + RFC 6238 TOTP, backup codes, `otpauth://` provisioning URI          |
+| 04 | `@exortek/challenge`   |   ✅   | HMAC-signed multi-step flow tokens (userId · method · step) with opt-in single-use  |
+| 05 | `@exortek/jwk`         |   ✅   | JWK — generate, import, export, thumbprint, per RFC 7517 / 7638 / 8037 / 9278       |
+| 06 | `@exortek/jws`         |   ✅   | JWS — sign / verify / detached / b64:false / JSON serialisation per RFC 7515 / 7797  |
+| 07 | `@exortek/jwt`         |   ✅   | JWT — sign / verify with algorithm allowlists + claims validation per RFC 7519      |
+| 08 | `@exortek/jwe`         |   ⏳   | JWE — RSA-OAEP, ECDH-ES, A256KW, dir per RFC 7516                                    |
+| 09 | `@exortek/jwks`        |   ✅   | JWKS URI fetching, caching, `kid` rotation per RFC 7517 §5                           |
+| 10 | `@exortek/session`     |   ✅   | Sealed-cookie sessions, rotation, revocation, sudo mode, Redis pub/sub              |
+| 11 | `@exortek/security`    |   ✅   | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect, defensive HTTP helpers  |
+| 12 | `@exortek/ua`          |   ✅   | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting      |
+| 13 | `@exortek/apikey`      |   ✅   | Prefixed API keys (`sk_live_id_secret`), HMAC-SHA256 storage, scopes, middleware    |
+| 14 | `@exortek/magic-link`  |   ✅   | Passwordless email-link auth — signed short-lived tokens with single-use consume    |
+| 15 | `@exortek/passkey`     |   ⏳   | WebAuthn / FIDO2 server verification (`/server` only; browser via community lib)    |
+| 16 | `@exortek/opaque`      |   ✅   | Opaque reference tokens, RFC 7662 introspection + RFC 7009 revocation                |
+| 17 | `@exortek/paseto`      |   ⏳   | PASETO v4 (`local` / `public`)                                                     |
+| 18 | `@exortek/oauth2`      |   ⏳   | OAuth 2.1 client (PKCE) + provider presets                                          |
+| 19 | `@exortek/oidc`        |   ⏳   | OpenID Connect on top of `@exortek/oauth2`                                          |
+| 20 | `@exortek/web3-evm`    |   ⏳   | SIWE — Sign-In With Ethereum                                                       |
+| 21 | `@exortek/web3-solana` |   ⏳   | SIWS — Sign-In With Solana                                                         |
+| 22 | `@exortek/auth`        |   ⏳   | Umbrella — re-exports every package above                                          |
+
+Not versioned in this table: `@exortek/shared` — internal consolidation
+workspace (see `PLAN.md`), not published on its own.
 
 ## Dependency layering
 
