@@ -148,6 +148,10 @@ function parsePubArea(bytes) {
         `tpm: pubArea RSA keyBits (${keyBits}) does not match modulus length (${modulus.byteLength * 8})`,
       );
     }
+    if (modulus.byteLength < 256) {
+      // 2048-bit floor — matches @exortek/passkey COSE key import.
+      throwAttestationInvalid(`tpm: pubArea RSA modulus is ${modulus.byteLength * 8} bits, minimum 2048`);
+    }
     key = { kind: 'rsa', modulus, exponent };
   } else if (type === TPM_ALG_ECC) {
     if (r.u16() !== TPM_ALG_NULL) {

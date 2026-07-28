@@ -45,6 +45,12 @@ const RSA = /** @type {const} */ ({
   E: -2,
 });
 
+// Minimum acceptable RSA modulus size (in bytes). FIDO2 and every
+// modern WebAuthn platform require at least 2048 bits; anything
+// smaller is a red flag we reject at import time so a malformed or
+// downgrade-attack COSE key never reaches Node's JWK importer.
+const MIN_RSA_MODULUS_BYTES = 256;
+
 // EC curves (RFC 8152 §13.1)
 const EC_CURVE = /** @type {const} */ ({
   1: 'P-256',
@@ -235,6 +241,9 @@ function rsaToJwk(coseKey) {
   const e = coseKey.get(RSA.E);
   if (!(n instanceof Uint8Array) || !(e instanceof Uint8Array)) {
     throw new Error('cose RSA: n and e must be byte strings');
+  }
+  if (n.byteLength < MIN_RSA_MODULUS_BYTES) {
+    throw new Error(`cose RSA: modulus is ${n.byteLength * 8} bits, minimum ${MIN_RSA_MODULUS_BYTES * 8}`);
   }
   // WebAuthn RSA keys are unsigned big-endian integers — Node's JWK
   // importer expects them stripped of a leading zero pad if present,

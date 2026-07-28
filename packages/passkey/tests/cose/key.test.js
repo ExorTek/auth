@@ -194,6 +194,14 @@ describe('COSE — importCoseKey (RSA)', () => {
     ]);
     assert.throws(() => importCoseKey(m), /n and e must be byte strings/);
   });
+
+  test('rejects RSA modulus below 2048 bits', () => {
+    // 1024-bit key — historically legal per JWK but a downgrade for FIDO2.
+    const { publicKey } = generateKeyPairSync('rsa', { modulusLength: 1024 });
+    const jwk = publicKey.export({ format: 'jwk' });
+    const cose = jwkToCoseMap(jwk, -257);
+    assert.throws(() => importCoseKey(cose), /1024 bits, minimum 2048/);
+  });
 });
 
 describe('COSE — argument shape guards', () => {
