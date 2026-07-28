@@ -51,9 +51,12 @@ export async function create(options) {
 
   const token = generate(tokenOptions);
   const hashedToken = hashToken(token, hashAlgo);
-  const expiresAt = expiresIn !== undefined ? new Date(now + parseDuration(expiresIn)) : undefined;
+  // Parse once — stores also accept a number, so a single ms value keeps
+  // the returned expiresAt and the store's TTL calculation in lockstep.
+  const expiresMs = expiresIn !== undefined ? parseDuration(expiresIn) : undefined;
+  const expiresAt = expiresMs !== undefined ? new Date(now + expiresMs) : undefined;
 
-  await store.set(hashedToken, metadata ?? {}, { expiresIn });
+  await store.set(hashedToken, metadata ?? {}, { expiresIn: expiresMs });
 
   return { token, hash: hashedToken, expiresAt };
 }
