@@ -104,9 +104,13 @@ becomes reachable. **Always compose with rate-limit.**
 import { verifyTotp } from '@exortek/otp'
 import { rateLimit } from '@exortek/security'
 
+// Two separate stores — the limiter's own counter store, and the
+// replay-guard store `verifyTotp` uses. `rateLimit.sliding()` returns
+// only `{ check }`, no `.store` property, so keep your own reference.
+const replayStore = rateLimit.stores.memory()   // Redis in multi-worker deploys
 const throttle = rateLimit.sliding({
   requests: 5, window: '10m',
-  store: rateLimit.stores.memory(),   // Redis in multi-worker deploys
+  store: rateLimit.stores.memory(),
 })
 
 // Throttling is your application's concern, not `@exortek/otp`'s — there's
@@ -119,7 +123,7 @@ async function verify(userId, code, secret) {
   }
   return verifyTotp(code, secret, {
     window: 1,
-    replay: { store: throttle.store, key: `user:${userId}` },
+    replay: { store: replayStore, key: `user:${userId}` },
   })
 }
 ```

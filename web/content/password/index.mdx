@@ -88,6 +88,10 @@ await password.pbkdf2.hash(pw)     // → $pbkdf2-sha256$i=600000$…
 | `@exortek/password/policy`       | Rule-based validator                               |
 | `@exortek/password/hibp`         | HIBP k-anonymity client (network)                  |
 
+`createPepper` and `createHistory` are umbrella-only — there's no
+dedicated `/pepper` or `/history` subpath, import them from
+`@exortek/password` directly.
+
 Tree-shakers see through the umbrella, but if you're on a strict bundle
 budget prefer the subpaths — they emit self-contained bundles with no
 router overhead.

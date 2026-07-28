@@ -115,7 +115,8 @@ For **Stripe-style** envelopes (`t=<timestamp>,v1=<hex>`) that need a freshness 
 `webhookVerify` deliberately doesn't enforce timestamp tolerance.
 
 Weak hashes are refused: `algorithm` accepts only `'sha256'` (default) or `'sha512'`. `sha1` throws even though
-`node:crypto` supports it.
+`node:crypto` supports it. A missing/malformed `secret` also throws `SecurityError(INVALID_ARGUMENT)` — only a
+missing/empty `signatureHeader` returns `false` instead of throwing.
 
 ```js
 const ok = webhookVerify(rawBody, req.headers['x-hub-signature-256'], process.env.GITHUB_WEBHOOK_SECRET);
@@ -164,7 +165,8 @@ const ok = webhookVerifyStripe(
 );
 ```
 
-Same RAW-body warning as `webhookVerify`.
+Same RAW-body warning as `webhookVerify`. A missing/malformed `secret` (or a non-empty array with a bad entry) throws
+`SecurityError(INVALID_ARGUMENT)` — only a missing/empty `signatureHeader` returns `false` instead of throwing.
 
 ## `sanitizeBody`
 
@@ -206,6 +208,9 @@ between parser and business logic. This collapses to a single value per key.
 const clean = sanitizeParams(req.query);
 ```
 
+Throws `SecurityError(INVALID_ARGUMENT)` if `query` has more than `maxParams` keys — a request that wide is almost
+always an attack, not a legitimate client.
+
 ## `safeJoin`
 
 ```ts
@@ -242,7 +247,7 @@ sanitizeFilename('CON.txt'); // → '_CON.txt'
 ## `freezePrototypes`
 
 ```ts
-freezePrototypes(options?: { additional?: object[] }): number
+freezePrototypes(options?: { additional?: object[], exclude?: string[] }): number
 ```
 
 Freezes built-in prototypes to defend against prototype pollution. After calling, `req.body.__proto__.isAdmin = true`
@@ -255,6 +260,13 @@ import { freezePrototypes } from '@exortek/security';
 freezePrototypes();
 // ... now load your app.
 ```
+
+- `additional` — extra objects to freeze (e.g. custom global classes) on top of the default list (`Object`, `Array`,
+  `Function`, `String`, `Number`, `Boolean`, `Map`, `Set`, `Promise`, `Date`, …).
+- `exclude` — constructor names to drop from the default freeze list. `Date` and `RegExp` are the usual candidates:
+  some polyfills (Temporal shims, ORM serialisers) patch them after boot, so freezing those specifically can break
+  otherwise-legitimate code — `freezePrototypes({ exclude: ['Date', 'RegExp'] })`. Silently ignored for names not in
+  the defaults. Every other default should stay frozen unless you know why you're loosening it.
 
 ## `timeout`
 

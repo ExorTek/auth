@@ -193,13 +193,13 @@ See [errors](/otp/errors) for the full enum.
 - **Not a QR image generator.** We produce the `otpauth://` string; you
   pass it to `qrcode` (or any QR library) for rendering.
 - **Not a session store.** Verification is a boolean; who is logged in
-  is your session layer's job (`@exortek/session` in the roadmap).
+  is your session layer's job — see [`@exortek/session`](/session).
 - **Not phishing-resistant.** Use [`@exortek/passkey`](https://github.com/ExorTek/auth)
   (WebAuthn / FIDO2, on the roadmap) if adversarial phishing is in your
   threat model. TOTP is a big step up from passwords-only but not the
   strongest layer.
-- **Not SMS / email code delivery.** Those live in `@exortek/challenge`
-  (roadmap).
+- **Not SMS / email code delivery.** Carrying that flow's state is
+  [`@exortek/challenge`](/challenge)'s job; sending the code is yours.
 - **Not a Steam Guard / Duo Push / Authy Push clone.** Those are
   proprietary protocols — this package is standards-only (RFC 4226 /
   6238 + Google Key URI Format).
