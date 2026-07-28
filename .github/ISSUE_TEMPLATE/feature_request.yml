@@ -31,6 +31,7 @@ body:
         - '@exortek/magic-link'
         - '@exortek/jwks'
         - '@exortek/ua'
+        - '@exortek/opaque'
         - 'A new package (please describe below)'
         - 'Repo tooling / docs site'
     validations:
