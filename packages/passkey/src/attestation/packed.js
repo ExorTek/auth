@@ -121,7 +121,8 @@ export function verifyPacked({ attStmt, authDataBytes, clientDataHash, attestedC
   }
 
   // Basic packed leaf-cert sanity per WebAuthn L3 §8.2 step 2.3:
-  //   version=3, subject-OU="Authenticator Attestation", subject-CN/O present.
+  //   version=3, subject-OU="Authenticator Attestation", subject-CN/O
+  //   present, basicConstraints CA:FALSE.
   // Node exposes .subject as multi-line text; parse loosely to avoid
   // rejecting minor formatting differences.
   const subject = leaf.subject.replace(/\r/g, '');
@@ -129,6 +130,9 @@ export function verifyPacked({ attStmt, authDataBytes, clientDataHash, attestedC
     throwAttestationInvalid(
       `packed attestation: leaf subject missing "OU=Authenticator Attestation" per §8.2 step 2.3 (got: ${subject.replace(/\n/g, ' ')})`,
     );
+  }
+  if (leaf.ca === true) {
+    throwAttestationInvalid('packed attestation: leaf basicConstraints CA must be FALSE (§8.2 step 2.3)');
   }
 
   // Chain verification against RP-supplied anchors.
