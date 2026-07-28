@@ -34,6 +34,27 @@ import {
   throwUnsupportedAlgorithm,
 } from '../errors.js';
 
+/**
+ * Resolve the per-format options blob a caller supplied via
+ * `attestationOptions`. The value at `attestationOptions[fmt]` wins;
+ * a hyphen-stripped key (`androidsafetynet` for `android-safetynet`)
+ * is accepted as a fallback for callers who prefer a single-word
+ * config name. Returns an empty object when nothing matches.
+ *
+ * Exported for tests — the real code path calls this once per verify.
+ *
+ * @param {string} fmt
+ * @param {Record<string, Record<string, unknown>> | undefined} attestationOptions
+ * @returns {Record<string, unknown>}
+ */
+export function resolveAttestationOptions(fmt, attestationOptions) {
+  if (!attestationOptions) {
+    return {};
+  }
+  const fmtNoDash = fmt.replace(/-/g, '');
+  return attestationOptions[fmt] ?? attestationOptions[fmtNoDash] ?? {};
+}
+
 function decodeB64uField(value, field) {
   if (typeof value !== 'string' || value.length === 0) {
     throwInvalidArgument(`registration.finish: response.${field} must be a base64url string`);
@@ -71,6 +92,12 @@ function decodeB64uField(value, field) {
  * @param {Record<string, Array<unknown>>} [params.trustAnchors]
  *   Per-format trust anchor arrays; each entry is a certificate
  *   accepted by `x509/chain.toCertificate` (PEM string / DER / X509).
+ * @param {Record<string, Record<string, unknown>>} [params.attestationOptions]
+ *   Per-format extra options, keyed by format name (same convention as
+ *   `trustAnchors`). Passed verbatim to the format's verifier — used
+ *   today by `android-safetynet` (`enforceCtsCheck`,
+ *   `timestampWindowMs`, `now`); new formats add knobs here without
+ *   further signature changes.
  * @param {string} [params.challengePrefix]
  * @returns {Promise<{
  *   credential: {
@@ -114,6 +141,7 @@ export async function finish(params) {
     allowCrossOriginCeremony = false,
     supportedAlgorithms = DEFAULT_SUPPORTED_ALGORITHMS,
     trustAnchors = {},
+    attestationOptions = {},
     challengePrefix,
   } = params;
 
@@ -217,12 +245,14 @@ export async function finish(params) {
   // Attestation verification
   const clientDataHash = new Uint8Array(createHash('sha256').update(clientDataJSON).digest());
   const verifier = getVerifier(fmt);
+  const fmtNoDash = fmt.replace(/-/g, '');
   const attestationReport = verifier({
     attStmt,
     authDataBytes,
     clientDataHash,
     attestedCredentialData: authData.attestedCredentialData,
-    trustAnchors: trustAnchors[fmt] ?? trustAnchors[fmt.replace(/-/g, '')],
+    trustAnchors: trustAnchors[fmt] ?? trustAnchors[fmtNoDash],
+    ...resolveAttestationOptions(fmt, attestationOptions),
   });
 
   // Import credential public key so callers get a Node KeyObject

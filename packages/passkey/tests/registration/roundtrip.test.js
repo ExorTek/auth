@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { begin } from '../../src/registration/begin.js';
-import { finish } from '../../src/registration/finish.js';
+import { finish, resolveAttestationOptions } from '../../src/registration/finish.js';
 import { PasskeyError, ErrorCode } from '../../src/errors.js';
 import { makeNoneResponse, makePackedSelfResponse } from '../_helpers/webauthnFixture.js';
 
@@ -302,6 +302,34 @@ describe('registration.finish — crossOrigin policy', () => {
   test('crossOrigin=false accepted by default (baseline)', async () => {
     const res = await runWith({ crossOrigin: false });
     assert.equal(res.attestation.format, 'none');
+  });
+});
+
+describe('registration.finish — resolveAttestationOptions', () => {
+  test('returns {} when attestationOptions is missing', () => {
+    assert.deepEqual(resolveAttestationOptions('packed', undefined), {});
+    assert.deepEqual(resolveAttestationOptions('packed', {}), {});
+  });
+
+  test('exact key match wins', () => {
+    const opts = { 'android-safetynet': { enforceCtsCheck: false } };
+    assert.deepEqual(resolveAttestationOptions('android-safetynet', opts), { enforceCtsCheck: false });
+  });
+
+  test('hyphen-squashed key is accepted as a fallback', () => {
+    const opts = { androidsafetynet: { enforceCtsCheck: false, timestampWindowMs: 999 } };
+    assert.deepEqual(resolveAttestationOptions('android-safetynet', opts), {
+      enforceCtsCheck: false,
+      timestampWindowMs: 999,
+    });
+  });
+
+  test('exact key beats squashed key when both are present', () => {
+    const opts = {
+      'android-safetynet': { enforceCtsCheck: true },
+      androidsafetynet: { enforceCtsCheck: false },
+    };
+    assert.deepEqual(resolveAttestationOptions('android-safetynet', opts), { enforceCtsCheck: true });
   });
 });
 
