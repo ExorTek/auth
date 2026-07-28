@@ -277,6 +277,7 @@ See `@exortek/apikey/examples/express-server.js` and `fastify-server.js` for a r
 
 - **`memoryStore()`** — in-process Map with a reverse index by `userId`. Not cluster-safe. Fine for dev / single-node prod / tests.
 - **`redisStore(client, { keyPrefix? })`** — layout: `<keyPrefix><id>` (JSON blob) + `<keyPrefix>u:<userId>` (SADD-set of ids). Cluster-safe. Works with `ioredis`, `node-redis@4+`, `@upstash/redis`.
+- **`customStore(impl)`** — wrap your own DB-backed implementation. Validates the required methods exist at construction time (not on the first `createApiKey` call) and wraps sync return values in a Promise, so `impl` can be sync or async.
 
 ### The interface
 
