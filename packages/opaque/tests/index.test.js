@@ -1,0 +1,138 @@
+import { describe, test } from 'node:test';
+import assert from 'node:assert/strict';
+import { create, verify, revoke, mask, introspectionHandler, revocationHandler, OpaqueError } from '../src/index.js';
+import { memoryStore } from '../src/stores/memory.js';
+
+describe('create / verify / revoke', () => {
+  test('round-trips a token through the store', async () => {
+    const store = memoryStore();
+    const { token, hash, expiresAt } = await create({ format: 'hex', store, metadata: { userId: 'usr_1' } });
+    assert.equal(typeof token, 'string');
+    assert.equal(typeof hash, 'string');
+    assert.equal(expiresAt, undefined);
+
+    const result = await verify(token, { store });
+    assert.deepEqual(result, { valid: true, metadata: { userId: 'usr_1' } });
+  });
+
+  test('verify returns not_found for an unknown token', async () => {
+    const store = memoryStore();
+    const result = await verify('deadbeef', { store });
+    assert.deepEqual(result, { valid: false, reason: 'not_found' });
+  });
+
+  test('expiresIn is honored and reflected in expiresAt', async () => {
+    const store = memoryStore();
+    const now = Date.now();
+    const { token, expiresAt } = await create({ format: 'hex', store, expiresIn: '1h', now });
+    assert.equal(expiresAt.getTime(), now + 60 * 60 * 1000);
+
+    const stillValid = await verify(token, { store });
+    assert.equal(stillValid.valid, true);
+  });
+
+  test('expired token fails verify', async () => {
+    const store = memoryStore();
+    const { token } = await create({ format: 'hex', store, expiresIn: 5 });
+    await new Promise(r => setTimeout(r, 20));
+    const result = await verify(token, { store });
+    assert.deepEqual(result, { valid: false, reason: 'not_found' });
+  });
+
+  test('revoke makes a token fail verify, and is idempotent', async () => {
+    const store = memoryStore();
+    const { token } = await create({ format: 'hex', store });
+    assert.equal(await revoke(token, { store }), true);
+    assert.equal((await verify(token, { store })).valid, false);
+    assert.equal(await revoke(token, { store }), false);
+  });
+
+  test('throws on missing store', async () => {
+    await assert.rejects(() => create({ format: 'hex' }), OpaqueError);
+    await assert.rejects(() => verify('tok', {}), OpaqueError);
+  });
+});
+
+describe('mask', () => {
+  test('masks the middle of a long token', () => {
+    assert.equal(mask('abcdefghijklmnop'), 'abcd…mnop');
+  });
+
+  test('fully masks a short token', () => {
+    assert.equal(mask('abcd'), '****');
+  });
+});
+
+function fakeRes() {
+  let status, headers, body;
+  return {
+    res: {
+      writeHead(s, h) {
+        status = s;
+        headers = h;
+      },
+      end(b) {
+        body = b;
+      },
+    },
+    read: () => ({ status, headers, body: JSON.parse(body) }),
+  };
+}
+
+describe('introspectionHandler', () => {
+  test('active: true for a valid token', async () => {
+    const store = memoryStore();
+    const { token } = await create({ format: 'hex', store, metadata: { userId: 'usr_1' } });
+    const handler = introspectionHandler({ store });
+    const { res, read } = fakeRes();
+    await handler({ body: { token } }, res);
+    const { status, body } = read();
+    assert.equal(status, 200);
+    assert.deepEqual(body, { userId: 'usr_1', active: true });
+  });
+
+  test('active: false for an unknown token', async () => {
+    const store = memoryStore();
+    const handler = introspectionHandler({ store });
+    const { res, read } = fakeRes();
+    await handler({ body: { token: 'nope' } }, res);
+    assert.deepEqual(read().body, { active: false });
+  });
+
+  test('active: false when body is missing the token field', async () => {
+    const store = memoryStore();
+    const handler = introspectionHandler({ store });
+    const { res, read } = fakeRes();
+    await handler({ body: {} }, res);
+    assert.deepEqual(read().body, { active: false });
+  });
+
+  test('unwraps Fastify reply.raw', async () => {
+    const store = memoryStore();
+    const { token } = await create({ format: 'hex', store });
+    const handler = introspectionHandler({ store });
+    const { res, read } = fakeRes();
+    await handler({ body: { token } }, { raw: res });
+    assert.deepEqual(read().body, { active: true });
+  });
+});
+
+describe('revocationHandler', () => {
+  test('revokes a known token and responds 200 {}', async () => {
+    const store = memoryStore();
+    const { token } = await create({ format: 'hex', store });
+    const handler = revocationHandler({ store });
+    const { res, read } = fakeRes();
+    await handler({ body: { token } }, res);
+    assert.deepEqual(read(), { status: 200, headers: { 'content-type': 'application/json; charset=utf-8' }, body: {} });
+    assert.equal((await verify(token, { store })).valid, false);
+  });
+
+  test('responds 200 {} for an unknown token too (no probing)', async () => {
+    const store = memoryStore();
+    const handler = revocationHandler({ store });
+    const { res, read } = fakeRes();
+    await handler({ body: { token: 'nope' } }, res);
+    assert.deepEqual(read().body, {});
+  });
+});
