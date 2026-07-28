@@ -14,6 +14,7 @@ import { throwUnsupportedAttestationFormat } from '../errors.js';
 import { verifyNone } from './none.js';
 import { verifyPacked } from './packed.js';
 import { verifyFidoU2f } from './fidoU2f.js';
+import { verifyApple } from './apple.js';
 
 /**
  * @param {string} fmt
@@ -26,6 +27,8 @@ export function getVerifier(fmt) {
       return verifyPacked;
     case 'fido-u2f':
       return verifyFidoU2f;
+    case 'apple':
+      return verifyApple;
     default:
       throwUnsupportedAttestationFormat(`attestation format "${fmt}" is not supported yet`);
   }
