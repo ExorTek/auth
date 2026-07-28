@@ -16,6 +16,7 @@ import { verifyPacked } from './packed.js';
 import { verifyFidoU2f } from './fidoU2f.js';
 import { verifyApple } from './apple.js';
 import { verifyAndroidSafetynet } from './androidSafetynet.js';
+import { verifyAndroidKey } from './androidKey.js';
 
 /**
  * @param {string} fmt
@@ -32,6 +33,8 @@ export function getVerifier(fmt) {
       return verifyApple;
     case 'android-safetynet':
       return verifyAndroidSafetynet;
+    case 'android-key':
+      return verifyAndroidKey;
     default:
       throwUnsupportedAttestationFormat(`attestation format "${fmt}" is not supported yet`);
   }

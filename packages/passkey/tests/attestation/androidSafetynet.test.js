@@ -144,10 +144,12 @@ describe('android-safetynet attestation — rejections', { skip: !HAS_OPENSSL ? 
     const inputs = makeInputs('example.com', hex('02'));
     const key = mintAttestKey();
     const { attStmt } = buildSafetynetAttStmt({ ...inputs, key, cert: key });
-    // Flip low bit of a signature char — stays ASCII (so UTF-8
-    // decode still succeeds) but breaks the RSA signature.
+    // Swap the last signature char with another valid base64url
+    // char — keeps the JWS structurally valid but breaks the RSA
+    // signature.
     const bytes = attStmt.get('response');
-    bytes[bytes.length - 1] ^= 0x01;
+    const last = bytes[bytes.length - 1];
+    bytes[bytes.length - 1] = last === 0x41 /* 'A' */ ? 0x42 /* 'B' */ : 0x41;
     assert.throws(
       () => verifyAndroidSafetynet({ attStmt, ...inputs }),
       err => err instanceof PasskeyError && err.code === ErrorCode.SIGNATURE_INVALID,
