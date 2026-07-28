@@ -135,6 +135,10 @@ function respondJson(raw, status, body) {
  * @property {OpaqueStore} store
  * @property {import('@exortek/crypto').HashAlgorithm} [hashAlgo='sha256']
  * @property {string} [tokenField='token']  Field read from the parsed request body.
+ * @property {(err: unknown) => void} [onError]  Called if `store.get`/`store.delete`
+ *   throws. The handler still responds with the no-oracle default so the endpoint
+ *   never leaks store-health signals — this hook exists so the app can still log
+ *   the failure.
  */
 
 /**
@@ -149,7 +153,7 @@ function respondJson(raw, status, body) {
  */
 export function introspectionHandler(options) {
   assertObject(options, 'introspectionHandler.options');
-  const { store, hashAlgo = 'sha256', tokenField = 'token' } = options;
+  const { store, hashAlgo = 'sha256', tokenField = 'token', onError } = options;
   assertObject(store, 'introspectionHandler.options.store');
 
   return async function introspection(req, res) {
@@ -158,12 +162,20 @@ export function introspectionHandler(options) {
       respondJson(res, 200, { active: false });
       return;
     }
-    const result = await verify(token, { store, hashAlgo });
-    if (!result.valid) {
+    try {
+      const result = await verify(token, { store, hashAlgo });
+      if (!result.valid) {
+        respondJson(res, 200, { active: false });
+        return;
+      }
+      respondJson(res, 200, { ...result.metadata, active: true });
+    } catch (err) {
+      // Preserve the no-oracle contract even under store failure — a
+      // 500 with a stack page would tell the caller "the store is
+      // reachable at X" and betray which endpoint hit the DB.
+      if (typeof onError === 'function') onError(err);
       respondJson(res, 200, { active: false });
-      return;
     }
-    respondJson(res, 200, { ...result.metadata, active: true });
   };
 }
 
@@ -177,13 +189,17 @@ export function introspectionHandler(options) {
  */
 export function revocationHandler(options) {
   assertObject(options, 'revocationHandler.options');
-  const { store, hashAlgo = 'sha256', tokenField = 'token' } = options;
+  const { store, hashAlgo = 'sha256', tokenField = 'token', onError } = options;
   assertObject(store, 'revocationHandler.options.store');
 
   return async function revocation(req, res) {
     const token = req?.body?.[tokenField];
-    if (typeof token === 'string' && token.length > 0) {
-      await revoke(token, { store, hashAlgo });
+    try {
+      if (typeof token === 'string' && token.length > 0) {
+        await revoke(token, { store, hashAlgo });
+      }
+    } catch (err) {
+      if (typeof onError === 'function') onError(err);
     }
     respondJson(res, 200, {});
   };

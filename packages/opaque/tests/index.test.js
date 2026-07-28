@@ -146,6 +146,27 @@ describe('introspectionHandler', () => {
   });
 });
 
+describe('introspectionHandler — store failure', () => {
+  test('a throwing store still yields 200 { active: false } and fires onError', async () => {
+    const err = new Error('redis down');
+    const throwing = {
+      get: async () => {
+        throw err;
+      },
+      set: async () => {},
+      delete: async () => false,
+    };
+    const seen = [];
+    const handler = introspectionHandler({ store: throwing, onError: e => seen.push(e) });
+    const { res, read } = fakeRes();
+    await handler({ body: { token: 'anything' } }, res);
+    const { status, body } = read();
+    assert.equal(status, 200);
+    assert.deepEqual(body, { active: false });
+    assert.deepEqual(seen, [err]);
+  });
+});
+
 describe('revocationHandler', () => {
   test('revokes a known token and responds 200 {}', async () => {
     const store = memoryStore();
