@@ -211,6 +211,36 @@ describe('authentication.finish', () => {
     );
   });
 
+  test('crossOrigin=true rejected by default → CLIENT_DATA_INVALID', async () => {
+    const store = memoryIncrStore();
+    const { credential, privateKey } = await register(store);
+
+    const beginRes = await authBegin({ rpId: RP_ID, challengeSecret: SECRET, challengeStore: store });
+    const assertion = makeAssertionResponse({
+      rpId: RP_ID,
+      challengeBase64Url: beginRes.options.challenge,
+      origin: ORIGIN,
+      privateKey,
+      counter: 5,
+      credentialId: credential.idBytes,
+      crossOrigin: true,
+    });
+
+    await assert.rejects(
+      () =>
+        authFinish({
+          response: assertion,
+          challengeToken: beginRes.challengeToken,
+          expectedRpId: RP_ID,
+          expectedOrigin: ORIGIN,
+          challengeSecret: SECRET,
+          challengeStore: store,
+          credential,
+        }),
+      err => err instanceof PasskeyError && err.code === ErrorCode.CLIENT_DATA_INVALID,
+    );
+  });
+
   test('requireBackupEligible rejects a non-syncable assertion', async () => {
     const store = memoryIncrStore();
     const { credential, privateKey } = await register(store);

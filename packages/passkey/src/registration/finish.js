@@ -62,6 +62,11 @@ function decodeB64uField(value, field) {
  * @param {boolean} [params.requireUserVerification=true]
  * @param {boolean} [params.requireBackupEligible=false]
  * @param {boolean} [params.requireBackedUp=false]
+ * @param {boolean} [params.allowCrossOriginCeremony=false]
+ *   Opt in to accepting `clientDataJSON.crossOrigin === true`. Off by
+ *   default: WebAuthn L3 §7.1 step 12 lets the RP set policy, and
+ *   most deployments should not accept cross-origin registration
+ *   ceremonies.
  * @param {number[]} [params.supportedAlgorithms]
  * @param {Record<string, Array<unknown>>} [params.trustAnchors]
  *   Per-format trust anchor arrays; each entry is a certificate
@@ -106,6 +111,7 @@ export async function finish(params) {
     requireUserVerification = true,
     requireBackupEligible = false,
     requireBackedUp = false,
+    allowCrossOriginCeremony = false,
     supportedAlgorithms = DEFAULT_SUPPORTED_ALGORITHMS,
     trustAnchors = {},
     challengePrefix,
@@ -142,6 +148,11 @@ export async function finish(params) {
   }
   if (!matchesOrigin(clientData.origin, expectedOrigin)) {
     throwOriginMismatch(`registration.finish: origin "${clientData.origin}" not in expectedOrigin`);
+  }
+  if (clientData.crossOrigin && !allowCrossOriginCeremony) {
+    throwClientDataInvalid(
+      'registration.finish: clientDataJSON.crossOrigin=true — set allowCrossOriginCeremony to accept cross-origin ceremonies',
+    );
   }
 
   // Consume challenge — verifies signature, TTL, single-use, method

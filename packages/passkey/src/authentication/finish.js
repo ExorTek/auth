@@ -81,6 +81,10 @@ function importCredentialKey(credential) {
  * @param {boolean} [params.requireUserVerification=true]
  * @param {boolean} [params.requireBackupEligible=false]
  * @param {boolean} [params.requireBackedUp=false]
+ * @param {boolean} [params.allowCrossOriginCeremony=false]
+ *   Opt in to accepting `clientDataJSON.crossOrigin === true`. Off by
+ *   default, matching registration.finish — the assertion is normally
+ *   invoked from the top-level RP origin.
  * @param {string} [params.challengePrefix]
  * @returns {Promise<{
  *   verified: true,
@@ -109,6 +113,7 @@ export async function finish(params) {
     requireUserVerification = true,
     requireBackupEligible = false,
     requireBackedUp = false,
+    allowCrossOriginCeremony = false,
     challengePrefix,
   } = params;
 
@@ -143,6 +148,11 @@ export async function finish(params) {
   }
   if (!matchesOrigin(clientData.origin, expectedOrigin)) {
     throwOriginMismatch(`authentication.finish: origin "${clientData.origin}" not in expectedOrigin`);
+  }
+  if (clientData.crossOrigin && !allowCrossOriginCeremony) {
+    throwClientDataInvalid(
+      'authentication.finish: clientDataJSON.crossOrigin=true — set allowCrossOriginCeremony to accept cross-origin ceremonies',
+    );
   }
 
   await consumePasskeyChallenge({

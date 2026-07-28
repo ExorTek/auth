@@ -260,6 +260,51 @@ describe('registration.finish — flag policy propagates PasskeyError codes', ()
   });
 });
 
+describe('registration.finish — crossOrigin policy', () => {
+  async function runWith({ crossOrigin, allow }) {
+    const store = memoryIncrStore();
+    const beginRes = await begin({
+      rp: { id: RP_ID, name: 'Example' },
+      user: { id: 'u_1', name: 'a', displayName: 'A' },
+      challengeSecret: SECRET,
+      challengeStore: store,
+    });
+    const fixture = makeNoneResponse({
+      rpId: RP_ID,
+      challengeBase64Url: beginRes.options.challenge,
+      origin: ORIGIN,
+      crossOrigin,
+    });
+    return finish({
+      response: fixture.response,
+      challengeToken: beginRes.challengeToken,
+      expectedRpId: RP_ID,
+      expectedOrigin: ORIGIN,
+      challengeSecret: SECRET,
+      challengeStore: store,
+      expectedUserId: 'u_1',
+      ...(allow === undefined ? {} : { allowCrossOriginCeremony: allow }),
+    });
+  }
+
+  test('crossOrigin=true rejected by default → CLIENT_DATA_INVALID', async () => {
+    await assert.rejects(
+      () => runWith({ crossOrigin: true }),
+      err => err instanceof PasskeyError && err.code === ErrorCode.CLIENT_DATA_INVALID,
+    );
+  });
+
+  test('crossOrigin=true accepted when allowCrossOriginCeremony is on', async () => {
+    const res = await runWith({ crossOrigin: true, allow: true });
+    assert.equal(res.attestation.format, 'none');
+  });
+
+  test('crossOrigin=false accepted by default (baseline)', async () => {
+    const res = await runWith({ crossOrigin: false });
+    assert.equal(res.attestation.format, 'none');
+  });
+});
+
 describe('registration.finish — fmt "packed" (self attestation)', () => {
   test('happy path round-trip', async () => {
     const store = memoryIncrStore();

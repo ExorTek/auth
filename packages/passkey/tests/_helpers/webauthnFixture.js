@@ -128,7 +128,7 @@ export function makeClientDataJSON({ type, challengeBase64Url, origin, crossOrig
 /**
  * Build a full registration response with `fmt: "none"`.
  */
-export function makeNoneResponse({ rpId, challengeBase64Url, origin, algorithm = 'es256', flags = 0x45 }) {
+export function makeNoneResponse({ rpId, challengeBase64Url, origin, algorithm = 'es256', flags = 0x45, crossOrigin }) {
   const { publicKey, privateKey, jwk, coseKey } = genKeyPair(algorithm);
   const credentialId = hex('abcdef0123456789');
   const authDataBytes = makeAuthData({
@@ -146,7 +146,7 @@ export function makeNoneResponse({ rpId, challengeBase64Url, origin, algorithm =
       ['attStmt', new Map()],
     ]),
   );
-  const clientDataJSON = makeClientDataJSON({ type: 'webauthn.create', challengeBase64Url, origin });
+  const clientDataJSON = makeClientDataJSON({ type: 'webauthn.create', challengeBase64Url, origin, crossOrigin });
   return {
     response: {
       id: base64url.encode(credentialId),
@@ -230,9 +230,10 @@ export function makeAssertionResponse({
   counter = 1,
   credentialId,
   flags = 0x05,
+  crossOrigin,
 }) {
   const authDataBytes = makeAuthData({ rpId, flags, counter });
-  const clientDataJSON = makeClientDataJSON({ type: 'webauthn.get', challengeBase64Url, origin });
+  const clientDataJSON = makeClientDataJSON({ type: 'webauthn.get', challengeBase64Url, origin, crossOrigin });
   const clientDataHash = new Uint8Array(createHash('sha256').update(clientDataJSON).digest());
   const signed = concat(authDataBytes, clientDataHash);
 
