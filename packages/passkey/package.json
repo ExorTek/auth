@@ -12,6 +12,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./mds": {
+      "types": "./dist/mds.d.ts",
+      "import": "./dist/mds.mjs",
+      "require": "./dist/mds.cjs"
+    },
+    "./aaguid": {
+      "types": "./dist/aaguid.d.ts",
+      "import": "./dist/aaguid.mjs",
+      "require": "./dist/aaguid.cjs"
     }
   },
   "files": [
