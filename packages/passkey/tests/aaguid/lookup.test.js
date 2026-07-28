@@ -1,6 +1,10 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { lookup, table } from '../../src/aaguid.js';
+
+const TABLE_SOURCE = fileURLToPath(new URL('../../data/aaguid-table.js', import.meta.url));
 
 describe('aaguid lookup', () => {
   test('returns the entry for a known AAGUID', () => {
@@ -23,5 +27,24 @@ describe('aaguid lookup', () => {
       assert.equal(typeof entry.name, 'string', `${aaguid} missing name`);
       assert.ok(entry.name.length > 0, `${aaguid} has empty name`);
     }
+  });
+
+  test('source file has no duplicate AAGUID keys', () => {
+    // Reading the source text catches duplicates that object-literal
+    // semantics would otherwise silently collapse to a single entry.
+    const src = readFileSync(TABLE_SOURCE, 'utf8');
+    const keys = Array.from(src.matchAll(/'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})'\s*:/gi)).map(
+      m => m[1].toLowerCase(),
+    );
+    assert.ok(keys.length > 0, 'no AAGUID keys parsed from source');
+    const seen = new Set();
+    const dupes = [];
+    for (const k of keys) {
+      if (seen.has(k)) {
+        dupes.push(k);
+      }
+      seen.add(k);
+    }
+    assert.deepEqual(dupes, [], `duplicate AAGUID key(s) in source: ${dupes.join(', ')}`);
   });
 });

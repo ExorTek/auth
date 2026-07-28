@@ -13,7 +13,6 @@
 export const AAGUID_TABLE = Object.freeze({
   // Apple platform authenticators
   'dd4ec289-e01d-41c9-bb89-70fa845d4bf2': { name: 'iCloud Keychain (Managed)' },
-  '2fc0579f-8113-47ea-b116-bb5a8db9202a': { name: 'YubiKey 5 Series with Lightning' },
   'fbfc3007-154e-4ecc-8c0b-6e020557d7bd': { name: 'iCloud Keychain' },
 
   // Google Password Manager (multiple entries — hardware / browser / Android)
