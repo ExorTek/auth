@@ -20,6 +20,7 @@ import { createVerify, verify as verifyRaw, X509Certificate } from 'node:crypto'
 import { importCoseKey, algorithmForId } from '../cose/key.js';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, TAG } from '../asn1/der.js';
+import { bytesEqual, concat } from '../internal/bytes.js';
 import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSignatureInvalid } from '../errors.js';
 
 const AAGUID_OID = '1.3.6.1.4.1.45724.1.1.4';
@@ -153,23 +154,4 @@ function verifySignature(publicKey, algParams, data, signature) {
   const v = createVerify(algParams.nodeAlgorithm);
   v.update(data);
   return v.verify(opts, signature);
-}
-
-function concat(a, b) {
-  const out = new Uint8Array(a.byteLength + b.byteLength);
-  out.set(a, 0);
-  out.set(b, a.byteLength);
-  return out;
-}
-
-function bytesEqual(a, b) {
-  if (a.byteLength !== b.byteLength) {
-    return false;
-  }
-  for (let i = 0; i < a.byteLength; i += 1) {
-    if (a[i] !== b[i]) {
-      return false;
-    }
-  }
-  return true;
 }

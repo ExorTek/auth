@@ -24,6 +24,7 @@ import { enforceFlags, deviceTypeFromFlags } from '../webauthn/flags.js';
 import { readClientExtensionResults, readAuthenticatorExtensions } from '../webauthn/extensions.js';
 import { importCoseKey, algorithmForId } from '../cose/key.js';
 import { consumePasskeyChallenge } from '../internal/challenge.js';
+import { concat } from '../internal/bytes.js';
 import {
   throwInvalidArgument,
   throwClientDataInvalid,
@@ -168,9 +169,7 @@ export async function finish(params) {
 
   // Signed input: authData || SHA-256(clientDataJSON)  — WebAuthn L3 §7.2 step 20.
   const clientDataHash = new Uint8Array(createHash('sha256').update(clientDataJSON).digest());
-  const signedInput = new Uint8Array(authDataBytes.byteLength + clientDataHash.byteLength);
-  signedInput.set(authDataBytes, 0);
-  signedInput.set(clientDataHash, authDataBytes.byteLength);
+  const signedInput = concat(authDataBytes, clientDataHash);
 
   const { publicKey, algorithm } = importCredentialKey(credential);
   const algParams = algorithmForId(algorithm);

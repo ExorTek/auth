@@ -43,6 +43,7 @@ import { createVerify, verify as verifyRaw, X509Certificate } from 'node:crypto'
 import { importCoseKey, algorithmForId } from '../cose/key.js';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, readChildren, TAG } from '../asn1/der.js';
+import { bytesEqual, concat } from '../internal/bytes.js';
 import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSignatureInvalid } from '../errors.js';
 
 const ANDROID_KEY_OID = '1.3.6.1.4.1.11129.2.1.17';
@@ -73,18 +74,6 @@ function readAttestationChallenge(certDer) {
     throwAttestationInvalid('android-key: KeyDescription attestationChallenge is not an OCTET STRING');
   }
   return challenge.contents;
-}
-
-function bytesEqual(a, b) {
-  if (a.byteLength !== b.byteLength) {
-    return false;
-  }
-  for (let i = 0; i < a.byteLength; i += 1) {
-    if (a[i] !== b[i]) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function spkiDer(keyObject) {
@@ -141,9 +130,7 @@ export function verifyAndroidKey({ attStmt, authDataBytes, clientDataHash, attes
   const leaf = chain[0];
 
   // 1. Signature verifies with leaf public key over authData || clientDataHash.
-  const signed = new Uint8Array(authDataBytes.byteLength + clientDataHash.byteLength);
-  signed.set(authDataBytes, 0);
-  signed.set(clientDataHash, authDataBytes.byteLength);
+  const signed = concat(authDataBytes, clientDataHash);
   if (!verifySignature(leaf.publicKey, algParams, signed, sig)) {
     throwSignatureInvalid('android-key: signature does not verify against leaf certificate');
   }

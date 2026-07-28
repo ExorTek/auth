@@ -39,6 +39,7 @@
 import { createHash, createVerify, X509Certificate } from 'node:crypto';
 import { base64url } from '@exortek/crypto/encode';
 import { verifyChain, toCertificates } from '../x509/chain.js';
+import { concat } from '../internal/bytes.js';
 import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSignatureInvalid } from '../errors.js';
 
 const LEAF_CN = 'attest.android.com';
@@ -146,10 +147,7 @@ export function verifyAndroidSafetynet(params) {
   }
 
   // Nonce check.
-  const combined = new Uint8Array(authDataBytes.byteLength + clientDataHash.byteLength);
-  combined.set(authDataBytes, 0);
-  combined.set(clientDataHash, authDataBytes.byteLength);
-  const expectedNonceB64 = createHash('sha256').update(combined).digest('base64');
+  const expectedNonceB64 = createHash('sha256').update(concat(authDataBytes, clientDataHash)).digest('base64');
   if (payload.nonce !== expectedNonceB64) {
     throwAttestationInvalid(
       `android-safetynet: payload.nonce does not equal base64(SHA-256(authData || clientDataHash))`,

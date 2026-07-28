@@ -47,6 +47,7 @@ import { createHash, createVerify, verify as verifyRaw, X509Certificate } from '
 import { algorithmForId } from '../cose/key.js';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, readChildren, decodeOid, TAG } from '../asn1/der.js';
+import { bytesEqual, concat } from '../internal/bytes.js';
 import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSignatureInvalid } from '../errors.js';
 
 const TPM_GENERATED_VALUE = 0xff544347;
@@ -219,18 +220,6 @@ function computeName(pubAreaBytes, nameAlg, nameAlgTpm) {
   return out;
 }
 
-function bytesEqual(a, b) {
-  if (a.byteLength !== b.byteLength) {
-    return false;
-  }
-  for (let i = 0; i < a.byteLength; i += 1) {
-    if (a[i] !== b[i]) {
-      return false;
-    }
-  }
-  return true;
-}
-
 /**
  * Compare a parsed pubArea key against the COSE credentialPublicKey.
  * Both should describe the same underlying key material.
@@ -396,9 +385,7 @@ export function verifyTpm({ attStmt, authDataBytes, clientDataHash, attestedCred
   // 3. extraData check.
   // attToBeSigned = authData || clientDataHash; extraData = hash of it.
   // The hash algorithm is determined by algParams.nodeAlgorithm.
-  const attToBeSigned = new Uint8Array(authDataBytes.byteLength + clientDataHash.byteLength);
-  attToBeSigned.set(authDataBytes, 0);
-  attToBeSigned.set(clientDataHash, authDataBytes.byteLength);
+  const attToBeSigned = concat(authDataBytes, clientDataHash);
   const digestAlg = (algParams.nodeAlgorithm ?? '').replace(/^RSA-/, '').toLowerCase();
   if (!digestAlg) {
     throwAttestationInvalid(`tpm: signature alg ${algParams.name} has no separate digest for extraData check`);

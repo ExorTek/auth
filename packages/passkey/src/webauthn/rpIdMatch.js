@@ -10,6 +10,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { bytesEqual } from '../internal/bytes.js';
 
 /**
  * @param {string} rpId
@@ -17,22 +18,6 @@ import { createHash } from 'node:crypto';
  */
 function sha256(rpId) {
   return new Uint8Array(createHash('sha256').update(rpId, 'utf8').digest());
-}
-
-/**
- * Constant-time comparison — RP ID hashes are public, but keeping
- * this branchless costs nothing and avoids a timing side-channel
- * shaped debate down the line.
- */
-function equalBytes(a, b) {
-  if (a.byteLength !== b.byteLength) {
-    return false;
-  }
-  let diff = 0;
-  for (let i = 0; i < a.byteLength; i += 1) {
-    diff |= a[i] ^ b[i];
-  }
-  return diff === 0;
 }
 
 /**
@@ -52,7 +37,7 @@ export function matchRpId(rpIdHash, expectedRpId) {
     if (typeof candidate !== 'string' || candidate.length === 0) {
       throw new Error('rpIdMatch: expectedRpId entries must be non-empty strings');
     }
-    if (equalBytes(rpIdHash, sha256(candidate))) {
+    if (bytesEqual(rpIdHash, sha256(candidate))) {
       return { matched: candidate };
     }
   }

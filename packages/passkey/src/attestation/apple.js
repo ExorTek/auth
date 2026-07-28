@@ -19,6 +19,7 @@
 import { createHash, X509Certificate } from 'node:crypto';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, readChildren, TAG, contextTag } from '../asn1/der.js';
+import { bytesEqual, concat } from '../internal/bytes.js';
 import { throwAttestationInvalid, throwAttestationTrustAnchorMissing } from '../errors.js';
 
 const APPLE_NONCE_OID = '1.2.840.113635.100.8.2';
@@ -110,18 +111,6 @@ function leafPublicKeyUncompressed(leaf) {
   return out;
 }
 
-function bytesEqual(a, b) {
-  if (a.byteLength !== b.byteLength) {
-    return false;
-  }
-  for (let i = 0; i < a.byteLength; i += 1) {
-    if (a[i] !== b[i]) {
-      return false;
-    }
-  }
-  return true;
-}
-
 /**
  * @param {object} params
  * @param {Map<unknown, unknown>} params.attStmt
@@ -150,10 +139,7 @@ export function verifyApple({ attStmt, authDataBytes, clientDataHash, attestedCr
 
   // Nonce check: SHA-256(authData || clientDataHash) must equal the
   // nonce inside the leaf's Apple extension.
-  const nonceToHash = new Uint8Array(authDataBytes.byteLength + clientDataHash.byteLength);
-  nonceToHash.set(authDataBytes, 0);
-  nonceToHash.set(clientDataHash, authDataBytes.byteLength);
-  const expectedNonce = new Uint8Array(createHash('sha256').update(nonceToHash).digest());
+  const expectedNonce = new Uint8Array(createHash('sha256').update(concat(authDataBytes, clientDataHash)).digest());
   const certNonce = readAppleNonce(x5cRaw[0]);
   if (!bytesEqual(expectedNonce, certNonce)) {
     throwAttestationInvalid(
