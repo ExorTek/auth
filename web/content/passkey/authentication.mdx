@@ -1,0 +1,62 @@
+---
+title: 'passkey/authentication — authentication.begin / .finish'
+sidebarTitle: Authentication
+---
+
+# Authentication
+
+## `authentication.begin(params)`
+
+```ts
+authentication.begin({
+  rpId: string | string[],
+  challengeSecret: string | Buffer,
+  challengeStore: IncrStore,
+  allowCredentials?: Array<{ id, type?, transports? }>,
+  userVerification?: 'required' | 'preferred' | 'discouraged',
+  hints?: Array<'security-key' | 'client-device' | 'hybrid'>,
+  timeoutMs?: number,
+  extensions?: { largeBlob?, prf?, hmacGetSecret?, appid? },
+  conditional?: boolean,      // hints browsers to expose passkey autofill
+  userId?: string,             // bind challenge to a specific user
+}): Promise<{ options, challengeToken }>
+```
+
+When `allowCredentials` is empty, the browser opens a discoverable-
+credential picker (resident keys). Passing an array narrows it.
+
+`conditional: true` emits `mediation: 'conditional'` on the options
+object — modern browsers use it to show passkey suggestions inside
+the username field's autofill dropdown.
+
+## `authentication.finish(params)`
+
+```ts
+authentication.finish({
+  response,                    // browser's PublicKeyCredential (get)
+  challengeToken,
+  expectedRpId, expectedOrigin,
+  challengeSecret, challengeStore,
+  credential: {                // fetched by the app from its store
+    publicKey?: KeyObject,     // one of publicKey OR publicKeyCose
+    publicKeyCose?: Map,
+    algorithm?: number,        // required when publicKeyCose is used
+    counter: number,           // stored signCount
+  },
+  expectedUserId?: string,
+  requireUserVerification?: boolean,   // default true
+  requireBackedUp?: boolean,
+}): Promise<{
+  verified: true,
+  newCounter: number,          // persist this — overwrite credential.counter
+  credentialId: string,
+  userHandle: Uint8Array | null,  // present iff resident credential
+  deviceType, backedUp,
+  extensionResults, rpId,
+}>
+```
+
+Counter monotonicity: `newCounter > stored.counter` is required
+UNLESS both are 0 (spec-permitted for authenticators that don't
+count). A rollback raises `ErrorCode.COUNTER_ROLLBACK` — flag the
+credential as potentially cloned.

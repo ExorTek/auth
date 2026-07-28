@@ -1,0 +1,48 @@
+---
+title: 'passkey/extensions — credProps, largeBlob, prf, hmac-secret, ...'
+sidebarTitle: Extensions
+---
+
+# WebAuthn extensions
+
+The registration and authentication flows accept an `extensions`
+object; unknown keys pass through untouched, so caller-side
+experimentation with draft extensions works without waiting on a
+library update.
+
+## Registration extensions
+
+| Extension                     | Type                                                | Notes                                        |
+| ----------------------------- | --------------------------------------------------- | -------------------------------------------- |
+| `credProps`                   | `true`                                              | Client tells you if the key is discoverable  |
+| `largeBlob`                   | `{ support: 'preferred' | 'required' }`             | Reserve blob storage                         |
+| `prf`                         | `{ eval?: { first, second? } }`                     | Enable per-credential PRF                    |
+| `hmacCreateSecret`            | `true`                                              | CTAP2.1 `hmac-secret` registration           |
+| `minPinLength`                | `true`                                              | Ask authenticator to report its PIN policy   |
+| `credentialProtectionPolicy`  | `1 | 2 | 3`                                         | CTAP2 credProtect level                      |
+| `appidExclude`                | `string`                                            | Legacy U2F migration exclusion               |
+
+Binary inputs (PRF `first`/`second`) accept `Uint8Array` — passkey
+base64url-encodes them for the JSON options.
+
+## Authentication extensions
+
+| Extension          | Type                                                                   |
+| ------------------ | ---------------------------------------------------------------------- |
+| `largeBlob`        | `{ read?: true } | { write?: Uint8Array }` (mutually exclusive)         |
+| `prf`              | `{ eval?, evalByCredential? }`                                          |
+| `hmacGetSecret`    | `{ salt1: Uint8Array(32), salt2?: Uint8Array(32) }`                     |
+| `appid`            | `string` (legacy AppID URL)                                             |
+
+## Reading extension outputs
+
+Both `registration.finish` and `authentication.finish` return
+`extensionResults: { client, authenticator }`.
+
+- `client` — parsed and normalised from
+  `response.clientExtensionResults`. Binary fields
+  (`largeBlob.blob`, `prf.results.first/second`) decoded to
+  `Uint8Array`.
+- `authenticator` — normalised from the CBOR extensions map inside
+  `authData`. Common named entries: `hmacSecret`, `minPinLength`,
+  `credProtect`. Everything else is available under `.raw`.

@@ -1,0 +1,83 @@
+---
+title: 'passkey/attestation — all seven WebAuthn L3 formats'
+sidebarTitle: Attestation
+---
+
+import { Callout } from 'nextra/components';
+
+# Attestation formats
+
+Every attestation format defined in WebAuthn Level 3 is verified
+by `registration.finish` — dispatch happens automatically based on
+`fmt` in the attestation object.
+
+| `fmt`                | Spec | Signed input                                    | Trust                                                                    |
+| -------------------- | ---- | ----------------------------------------------- | ------------------------------------------------------------------------ |
+| `none`               | §8.7 | —                                               | attStmt must be empty                                                    |
+| `packed`             | §8.2 | `authData ‖ clientDataHash`                     | self-signed by credential key OR x5c chain to `trustAnchors.packed`      |
+| `fido-u2f`           | §8.6 | U2F Raw Message                                 | single-cert x5c; implicit ES256 / P-256                                  |
+| `apple`              | §8.8 | (nonce = `SHA-256(authData ‖ clientDataHash)`)  | leaf ext `1.2.840.113635.100.8.2` carries nonce; leaf key = cred key     |
+| `android-key`        | §8.4 | `authData ‖ clientDataHash`                     | leaf ext `1.3.6.1.4.1.11129.2.1.17`; `attestationChallenge` = cdHash     |
+| `android-safetynet`  | §8.5 | JWS payload                                     | leaf CN = `attest.android.com`; CTS + timestamp checks                   |
+| `tpm`                | §8.3 | TPMS_ATTEST bytes                               | AIK cert profile (`2.23.133.8.3` EKU, empty subject, SAN)                |
+
+<Callout type="warning">
+  GHSA-6hxq-p678-4hr2 (2026-06) — a self-signed cert inside `x5c`
+  MUST NOT bypass RP-supplied anchors. `passkey`'s
+  [`x509/chain.verifyChain`](https://github.com/ExorTek/auth/blob/master/packages/passkey/src/x509/chain.js)
+  enforces this from day one; the regression test lives in
+  `packages/passkey/tests/x509/chain.test.js`.
+</Callout>
+
+## Trust anchors
+
+Pass per-format anchors to `registration.finish`:
+
+```js
+await registration.finish({
+  // ...
+  trustAnchors: {
+    packed: [applePackedRootPem],
+    tpm: [infineonTpmRootPem, intelTpmRootPem],
+    androidKey: [googleHardwareRootPem],
+    androidSafetynet: [googleAttestRootPem],
+    apple: [appleAnonAttestRootPem],
+  },
+});
+```
+
+If no anchor is supplied for a format, chain verification is skipped
+(signature still verifies but `attestation.trustPath = 'no-anchor'`).
+This lets you start permissively and tighten later.
+
+<Callout type="info">
+  Bundled default root CAs are deliberately NOT shipped in 1.0.0 —
+  vendor rotation would make pinning risky, and shipping stale roots
+  would silently reject legitimate authenticators. Fetch the current
+  set from the vendors (Apple / Google hardware / TPM manufacturers)
+  or from the FIDO MDS3 blob via
+  [`@exortek/passkey/mds`](/passkey/mds).
+</Callout>
+
+## SafetyNet-specific dial
+
+`android-safetynet` enforces the Google CTS profile match by default.
+Older or grey-market devices sometimes fail CTS while remaining
+otherwise legitimate; disable the enforcement with:
+
+```js
+attestation.androidSafetynet = { enforceCtsCheck: false };
+```
+
+Timestamp skew tolerance defaults to ±5 minutes; override via
+`timestampWindowMs`.
+
+## TPM caveat
+
+Deep parsing of the SAN's `tpmManufacturer` / `tpmModel` /
+`tpmVersion` directory attributes is deferred to 1.1 — SAN presence
+is checked, but the internal directory-name attribute walk requires
+extending our DER parser for high-tag-number context-specific tags
+(Keymaster tag numbers 600+ in `android-key` land in the same
+bucket). Signature, name, extraData, EKU, basicConstraints, and
+subject-empty checks all run at 1.0.0.

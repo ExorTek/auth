@@ -1,0 +1,51 @@
+---
+title: 'passkey/errors — PasskeyError + ErrorCode'
+sidebarTitle: Errors
+---
+
+# Errors
+
+Every failure — user error, malformed input, signature failure,
+attestation problem — throws `PasskeyError`. Branch on `err.code`,
+map to HTTP with `err.status`.
+
+```js
+import { PasskeyError, ErrorCode } from '@exortek/passkey';
+
+try {
+  await registration.finish({ /* ... */ });
+} catch (err) {
+  if (err instanceof PasskeyError) {
+    return res.status(err.status).json({ error: err.code, message: err.message });
+  }
+  throw err;
+}
+```
+
+## Full code catalogue
+
+| Code                                | HTTP | Raised when                                                                       |
+| ----------------------------------- | ---- | --------------------------------------------------------------------------------- |
+| `INVALID_ARGUMENT`                  | 400  | Options object is missing, misshapen, or violates an invariant                    |
+| `CHALLENGE_MISMATCH`                | 400  | `clientData.challenge` does not equal the challenge token's `jti`                 |
+| `CHALLENGE_EXPIRED`                 | 400  | Challenge token past its TTL                                                      |
+| `CHALLENGE_ALREADY_USED`            | 400  | Single-use guard fired on a replayed challenge token                              |
+| `CHALLENGE_INVALID`                 | 400  | Challenge token could not be verified (bad signature, malformed)                  |
+| `ORIGIN_MISMATCH`                   | 400  | `clientData.origin` not in `expectedOrigin`                                       |
+| `RP_ID_MISMATCH`                    | 400  | `authData.rpIdHash` matches no `expectedRpId`                                     |
+| `CLIENT_DATA_INVALID`               | 400  | clientDataJSON malformed (bad UTF-8 / JSON / type)                                |
+| `AUTH_DATA_INVALID`                 | 400  | authenticatorData structure violation                                             |
+| `USER_VERIFICATION_REQUIRED`        | 400  | `requireUserVerification: true` but UV bit not set                                |
+| `USER_PRESENCE_REQUIRED`            | 400  | UP bit not set (always mandatory per spec)                                        |
+| `BACKUP_ELIGIBLE_REQUIRED`          | 400  | `requireBackupEligible: true` but BE bit not set                                  |
+| `BACKED_UP_REQUIRED`                | 400  | `requireBackedUp: true` but BS bit not set                                        |
+| `SIGNATURE_INVALID`                 | 400  | Attestation or assertion signature does not verify                                |
+| `COUNTER_ROLLBACK`                  | 400  | `newCounter <= storedCounter` — possible cloned authenticator                     |
+| `PUBLIC_KEY_UNSUPPORTED`            | 400  | COSE key parses but Node can't import it                                          |
+| `UNSUPPORTED_ALGORITHM`             | 400  | COSE algorithm outside `supportedAlgorithms`                                      |
+| `ATTESTATION_INVALID`               | 400  | Format-specific attestation check failed (nonce, cert extension, etc.)            |
+| `ATTESTATION_TRUST_ANCHOR_MISSING`  | 400  | Cert chain did not terminate at an RP-supplied trust anchor                       |
+| `ATTESTATION_CERT_REVOKED`          | 400  | Optional `checkCertRevocation` hook flagged a cert (not wired at 1.0.0)           |
+| `UNSUPPORTED_ATTESTATION_FORMAT`    | 400  | `fmt` outside the seven WebAuthn L3 formats                                       |
+| `EXTENSION_INVALID`                 | 400  | Extension input/output malformed                                                  |
+| `MDS_BLOB_INVALID`                  | 400  | MDS3 blob malformed / signature bad / header wrong                                |

@@ -1,0 +1,67 @@
+---
+title: '@exortek/passkey — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/passkey`
+
+WebAuthn Level 3 / FIDO2 CTAP2 server verification for Node.js 22+.
+Two flows, two calls each — `registration.begin` → `registration.finish`,
+`authentication.begin` → `authentication.finish`. All seven WebAuthn
+attestation formats (`none`, `packed`, `fido-u2f`, `tpm`,
+`android-key`, `android-safetynet`, `apple`), WebAuthn L3 hints,
+related origins, extension I/O (credProps, largeBlob, prf,
+hmac-secret, minPinLength, credProtect, appid), and offline AAGUID
+lookup ship out of the box. Zero non-`@exortek/*` runtime
+dependencies.
+
+Server-only. For the browser side use
+[`@simplewebauthn/browser`](https://simplewebauthn.dev/) or
+[`@github/webauthn-json`](https://github.com/github/webauthn-json).
+
+<Callout type="info">
+  Challenge storage is delegated to
+  [`@exortek/challenge`](/challenge). Single-use, TTL, and the
+  method/step binding are handled there — passkey doesn't reinvent
+  it.
+</Callout>
+
+## Quick start
+
+```js
+import { registration, authentication } from '@exortek/passkey';
+import { memoryIncrStore } from '@exortek/challenge/stores';
+
+const challengeStore = memoryIncrStore();
+const CHALLENGE_SECRET = process.env.PASSKEY_CHALLENGE_SECRET;
+
+// Registration
+const { options, challengeToken } = await registration.begin({
+  rp: { id: 'example.com', name: 'Example' },
+  user: { id: 'u_1', name: 'alice@example.com', displayName: 'Alice' },
+  challengeSecret: CHALLENGE_SECRET,
+  challengeStore,
+});
+
+// ... browser calls navigator.credentials.create(options), posts back ...
+
+const { credential } = await registration.finish({
+  response: browserResponse,
+  challengeToken,
+  expectedRpId: 'example.com',
+  expectedOrigin: 'https://example.com',
+  challengeSecret: CHALLENGE_SECRET,
+  challengeStore,
+});
+```
+
+## Where to next
+
+- [Registration](/passkey/registration) — `begin` / `finish` deep dive
+- [Authentication](/passkey/authentication) — `begin` / `finish`
+- [Attestation formats](/passkey/attestation) — all seven, trust anchors
+- [Extensions](/passkey/extensions) — credProps, largeBlob, prf, ...
+- [MDS3 + AAGUID](/passkey/mds) — offline lookup + blob verifier
+- [Errors](/passkey/errors) — full `ErrorCode` catalogue

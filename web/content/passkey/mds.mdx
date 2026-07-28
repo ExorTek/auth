@@ -1,0 +1,66 @@
+---
+title: 'passkey/mds — FIDO MDS3 + AAGUID lookup'
+sidebarTitle: MDS3 + AAGUID
+---
+
+import { Callout } from 'nextra/components';
+
+# MDS3 + AAGUID subpaths
+
+Two optional entrypoints for authenticator metadata.
+
+## `@exortek/passkey/aaguid`
+
+Offline `AAGUID → { name }` lookup. Ships a ~15-entry baseline
+covering iCloud Keychain, Google Password Manager, Windows Hello,
+common YubiKeys, 1Password, and Bitwarden. Zero network.
+
+```js
+import { lookup, table } from '@exortek/passkey/aaguid';
+
+lookup('ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4');
+// → { name: 'Google Password Manager' }
+
+lookup('unknown-aaguid');
+// → null
+
+Object.keys(table).length;
+// → 15 (baseline)
+```
+
+Refresh the baseline via `scripts/refresh-aaguid-table.mjs` (fetches
+FIDO MDS3 via the `mds` subpath below and rewrites
+`data/aaguid-table.js`).
+
+## `@exortek/passkey/mds`
+
+FIDO Metadata Service v3 blob verifier.
+
+```js
+import { verifyMdsBlob, buildAaguidIndex } from '@exortek/passkey/mds';
+
+const jws = await fetch('https://mds3.fidoalliance.org/').then(r => r.text());
+const { payload, certChain } = verifyMdsBlob(jws, {
+  rootAnchors: [fidoMds3RootPem],   // fetch from fidoalliance.org
+});
+
+const index = buildAaguidIndex(payload);
+index['ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4'].name;
+// → 'Google Password Manager'
+```
+
+<Callout type="warning">
+  We DO NOT bundle the FIDO MDS3 root CA. It rotates on the FIDO
+  Alliance schedule, and pinning a stale one would silently reject
+  legitimate blobs. Vendor the current root in your app.
+</Callout>
+
+`verifyMdsBlob` runs the full chain verification via
+`x509/chain.verifyChain` — the GHSA-6hxq-p678-4hr2 self-signed-x5c
+guard applies. `buildAaguidIndex` skips entries without a
+`metadataStatement`, so the returned map only carries entries with
+a usable description.
+
+The `nextUpdate` field on the payload is a `YYYY-MM-DD` string. We
+don't enforce freshness ourselves — cache the blob until
+`nextUpdate` and re-fetch after.

@@ -1,0 +1,74 @@
+---
+title: 'passkey/registration — registration.begin / .finish'
+sidebarTitle: Registration
+---
+
+# Registration
+
+## `registration.begin(params)`
+
+Builds a `PublicKeyCredentialCreationOptionsJSON` for the browser
+plus a signed challenge token to hand back at `finish` time.
+
+```ts
+registration.begin({
+  rp: { id: string, name: string },
+  user: { id: string, name: string, displayName: string },
+  challengeSecret: string | Buffer,
+  challengeStore: IncrStore,
+  authenticatorSelection?: {
+    authenticatorAttachment?: 'platform' | 'cross-platform',
+    residentKey?: 'required' | 'preferred' | 'discouraged',
+    userVerification?: 'required' | 'preferred' | 'discouraged',
+  },
+  attestation?: 'none' | 'direct' | 'enterprise',  // NOT 'indirect' — spec-noise
+  hints?: Array<'security-key' | 'client-device' | 'hybrid'>,
+  timeoutMs?: number,                                // default 60_000
+  excludeCredentials?: Array<{ id, type?, transports? }>,
+  extensions?: { credProps?, largeBlob?, prf?, hmacCreateSecret?, minPinLength?,
+                 credentialProtectionPolicy?, appidExclude? },
+  supportedAlgorithms?: number[],                    // default [-8, -7, -257]
+  challengeExpiresIn?: string | number,              // default '5m'
+}): Promise<{ options: object, challengeToken: string }>
+```
+
+Store `challengeToken` on the server (session, encrypted cookie) so
+you can pass it to `finish`. The browser only sees `options`.
+
+## `registration.finish(params)`
+
+Verifies the browser's response and hands back the credential row.
+Throws `PasskeyError` on any failure.
+
+```ts
+registration.finish({
+  response,                    // the browser's PublicKeyCredential
+  challengeToken,              // what begin() returned
+  expectedRpId,                // string | string[]  (related origins)
+  expectedOrigin,              // string | string[] | RegExp
+  challengeSecret, challengeStore,
+  expectedUserId?,             // bind to the logged-in user
+  requireUserVerification?: boolean,   // default true
+  requireBackupEligible?: boolean,     // default false
+  requireBackedUp?: boolean,           // default false
+  supportedAlgorithms?: number[],
+  trustAnchors?: {
+    packed?, fidoU2f?, tpm?, androidKey?, androidSafetynet?, apple?,
+  },
+}): Promise<{
+  credential: {
+    id: string, idBytes: Uint8Array,
+    publicKey: KeyObject, publicKeyJwk, publicKeyCose,
+    algorithm: number, counter: number, transports?: string[],
+  },
+  aaguid: string, deviceType: 'singleDevice' | 'multiDevice',
+  backedUp: boolean,
+  attestation: { format, trustPath, aaguidExtensionOk?, certChain? },
+  extensionResults: { client, authenticator },
+  rpId: string,
+}>
+```
+
+Persist `credential` (at minimum `id`, `publicKeyCose`, `algorithm`,
+`counter`, `transports`). The COSE map serialises via
+`[...map.entries()]` and rehydrates with `new Map(rows)`.
