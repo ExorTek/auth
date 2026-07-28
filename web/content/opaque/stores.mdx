@@ -19,6 +19,16 @@ const store = memoryStore({ sweepMs: 60_000 }); // default shown
 In-process `Map`, lazy expiry check on `get` plus a background sweep.
 Not cluster-safe. Fine for dev / single-node prod / tests.
 
+The background sweep is created with `setInterval(...).unref()` so it
+never blocks process exit on its own, but a long-lived server that
+creates stores per request (or wants an orderly shutdown) should call
+`store.stop()`:
+
+```js
+const store = memoryStore();
+process.on('SIGTERM', () => store.stop());
+```
+
 ## `redisStore(client, options?)`
 
 ```js

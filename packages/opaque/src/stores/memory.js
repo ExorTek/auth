@@ -21,7 +21,7 @@ import { parseDuration } from '@exortek/shared/duration';
 
 /**
  * @param {MemoryStoreOptions} [options]
- * @returns {import('../index.js').OpaqueStore & { _size: () => number, _stop: () => void }}
+ * @returns {import('../index.js').OpaqueStore & { _size: () => number, stop: () => void }}
  */
 export function memoryStore(options = {}) {
   const { sweepMs = 60000 } = options;
@@ -67,6 +67,6 @@ export function memoryStore(options = {}) {
     },
 
     _size: () => map.size,
-    _stop: () => clearInterval(timer),
+    stop: () => clearInterval(timer),
   };
 }

@@ -7,13 +7,13 @@ describe('memoryStore', () => {
     const store = memoryStore();
     await store.set('hash1', { userId: 'usr_1' });
     assert.deepEqual(await store.get('hash1'), { userId: 'usr_1' });
-    store._stop();
+    store.stop();
   });
 
   test('get returns null for an unknown key', async () => {
     const store = memoryStore();
     assert.equal(await store.get('nope'), null);
-    store._stop();
+    store.stop();
   });
 
   test('entries expire after expiresIn', async () => {
@@ -21,7 +21,7 @@ describe('memoryStore', () => {
     await store.set('hash1', { a: 1 }, { expiresIn: 5 });
     await new Promise(r => setTimeout(r, 20));
     assert.equal(await store.get('hash1'), null);
-    store._stop();
+    store.stop();
   });
 
   test('no expiresIn means no expiry', async () => {
@@ -29,7 +29,7 @@ describe('memoryStore', () => {
     await store.set('hash1', { a: 1 });
     await new Promise(r => setTimeout(r, 20));
     assert.deepEqual(await store.get('hash1'), { a: 1 });
-    store._stop();
+    store.stop();
   });
 
   test('delete removes the entry and is idempotent', async () => {
@@ -38,7 +38,7 @@ describe('memoryStore', () => {
     assert.equal(await store.delete('hash1'), true);
     assert.equal(await store.get('hash1'), null);
     assert.equal(await store.delete('hash1'), false);
-    store._stop();
+    store.stop();
   });
 
   test('background sweep prunes expired entries', async () => {
@@ -46,6 +46,6 @@ describe('memoryStore', () => {
     await store.set('hash1', { a: 1 }, { expiresIn: 5 });
     await new Promise(r => setTimeout(r, 30));
     assert.equal(store._size(), 0);
-    store._stop();
+    store.stop();
   });
 });
