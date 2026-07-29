@@ -1,0 +1,67 @@
+name: Release
+
+# Manual publish. Versions are bumped beforehand through a normal
+# "chore: version packages" PR (yarn changeset:ver → commit → PR → merge);
+# this workflow only builds, publishes to npm, tags, and cuts GitHub
+# Releases for whatever versions currently sit on master. Trigger it from
+# Actions → Release → "Run workflow", or `gh workflow run release.yml`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build + pack only, do not publish or tag'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # push tags + create GitHub Releases
+  id-token: write # OIDC — npm Trusted Publishing (no stored token) + provenance
+
+concurrency: release
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn build
+
+      # Auth is OIDC Trusted Publishing — no NPM_TOKEN. Configure a trusted
+      # publisher for each @exortek/* package on npmjs.com first (repo
+      # ExorTek/auth, workflow release.yml). Yarn detects the GitHub OIDC
+      # environment automatically when id-token:write is granted and no auth
+      # token is set. YARN_NPM_PUBLISH_PROVENANCE attaches build provenance.
+      - name: Publish to npm (OIDC Trusted Publishing + provenance)
+        if: ${{ !inputs.dry_run }}
+        env:
+          YARN_NPM_PUBLISH_PROVENANCE: 'true'
+        run: |
+          yarn workspaces foreach --all --topological --no-private npm publish --tolerate-republish --access public
+
+      - name: Tag released versions and push tags
+        if: ${{ !inputs.dry_run }}
+        run: |
+          yarn changeset tag
+          git push --tags
+
+      - name: Create GitHub Releases from tags
+        if: ${{ !inputs.dry_run }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for tag in $(git tag --points-at HEAD); do
+            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "$tag" --generate-notes
+          done
+
+      - name: Dry-run notice
+        if: ${{ inputs.dry_run }}
+        run: echo "dry_run=true — built only, nothing published or tagged."
