@@ -14,7 +14,12 @@
 
 import { base64url } from '@exortek/crypto/encode';
 import { createChallenge, verifyChallenge } from '@exortek/challenge';
-import { throwChallengeInvalid, throwChallengeExpired, throwChallengeAlreadyUsed } from '../errors.js';
+import {
+  throwChallengeInvalid,
+  throwChallengeExpired,
+  throwChallengeAlreadyUsed,
+  throwChallengeMismatch,
+} from '../errors.js';
 
 /**
  * Decode a challenge-lib token's payload without verifying the MAC.
@@ -108,6 +113,6 @@ export async function consumePasskeyChallenge(options) {
     throwChallengeInvalid(`passkey: challenge verify failed (${result.reason})`);
   }
   if (result.payload.jti !== challengeBase64UrlFromClient) {
-    throwChallengeInvalid(`passkey: challenge in clientDataJSON does not match issued challenge`);
+    throwChallengeMismatch(`passkey: challenge in clientDataJSON does not match issued challenge`);
   }
 }

@@ -28,7 +28,6 @@ export const ErrorCode = Object.freeze({
   // Attestation
   ATTESTATION_INVALID: 'ATTESTATION_INVALID',
   ATTESTATION_TRUST_ANCHOR_MISSING: 'ATTESTATION_TRUST_ANCHOR_MISSING',
-  ATTESTATION_CERT_REVOKED: 'ATTESTATION_CERT_REVOKED',
   UNSUPPORTED_ATTESTATION_FORMAT: 'UNSUPPORTED_ATTESTATION_FORMAT',
 
   // Extensions / MDS
@@ -57,7 +56,6 @@ export class PasskeyError extends BaseError {
     [ErrorCode.UNSUPPORTED_ALGORITHM]: 400,
     [ErrorCode.ATTESTATION_INVALID]: 400,
     [ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING]: 400,
-    [ErrorCode.ATTESTATION_CERT_REVOKED]: 400,
     [ErrorCode.UNSUPPORTED_ATTESTATION_FORMAT]: 400,
     [ErrorCode.EXTENSION_INVALID]: 400,
     [ErrorCode.MDS_BLOB_INVALID]: 400,
@@ -91,7 +89,6 @@ export const throwPublicKeyUnsupported = throwFactory(ErrorCode.PUBLIC_KEY_UNSUP
 export const throwUnsupportedAlgorithm = throwFactory(ErrorCode.UNSUPPORTED_ALGORITHM);
 export const throwAttestationInvalid = throwFactory(ErrorCode.ATTESTATION_INVALID);
 export const throwAttestationTrustAnchorMissing = throwFactory(ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING);
-export const throwAttestationCertRevoked = throwFactory(ErrorCode.ATTESTATION_CERT_REVOKED);
 export const throwUnsupportedAttestationFormat = throwFactory(ErrorCode.UNSUPPORTED_ATTESTATION_FORMAT);
 export const throwExtensionInvalid = throwFactory(ErrorCode.EXTENSION_INVALID);
 export const throwMdsBlobInvalid = throwFactory(ErrorCode.MDS_BLOB_INVALID);

@@ -27,6 +27,7 @@
  */
 
 import { base64url } from '@exortek/crypto/encode';
+import { throwExtensionInvalid } from '../errors.js';
 
 function b64u(bytes) {
   if (!(bytes instanceof Uint8Array)) {
@@ -204,7 +205,7 @@ export function readClientExtensionResults(results) {
     return {};
   }
   if (typeof results !== 'object' || Array.isArray(results)) {
-    throw new Error('extensions: clientExtensionResults must be an object');
+    throwExtensionInvalid('extensions: clientExtensionResults must be an object');
   }
 
   const out = {};
@@ -221,7 +222,7 @@ export function readClientExtensionResults(results) {
     if (typeof results.largeBlob.blob === 'string') {
       const decoded = decodeB64u(results.largeBlob.blob);
       if (!decoded) {
-        throw new Error('extensions.largeBlob.blob is not valid base64url');
+        throwExtensionInvalid('extensions.largeBlob.blob is not valid base64url');
       }
       lb.blob = decoded;
     }
@@ -241,14 +242,14 @@ export function readClientExtensionResults(results) {
       if (typeof results.prf.results.first === 'string') {
         const first = decodeB64u(results.prf.results.first);
         if (!first) {
-          throw new Error('extensions.prf.results.first is not valid base64url');
+          throwExtensionInvalid('extensions.prf.results.first is not valid base64url');
         }
         r.first = first;
       }
       if (typeof results.prf.results.second === 'string') {
         const second = decodeB64u(results.prf.results.second);
         if (!second) {
-          throw new Error('extensions.prf.results.second is not valid base64url');
+          throwExtensionInvalid('extensions.prf.results.second is not valid base64url');
         }
         r.second = second;
       }
@@ -280,7 +281,7 @@ export function readAuthenticatorExtensions(map) {
     return {};
   }
   if (!(map instanceof Map)) {
-    throw new Error('extensions: authenticator extensions must be a Map');
+    throwExtensionInvalid('extensions: authenticator extensions must be a Map');
   }
 
   const out = {};
