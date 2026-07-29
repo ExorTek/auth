@@ -29,14 +29,14 @@
  *      DER export, canonical byte identity)
  *   4. extension present, `attestationChallenge` field byte-equals
  *      the clientDataHash
- *   5. chain verifies against RP-supplied trust anchors (Google
+ *   5. `allApplications [600]` is absent from both AuthorizationLists
+ *      (the key must be RP-scoped, not shared across every app)
+ *   6. chain verifies against RP-supplied trust anchors (Google
  *      hardware root in prod)
  *
- * The AuthorizationList security checks (allApplications absent,
- * origin = KM_ORIGIN_GENERATED = 0, purpose includes KM_PURPOSE_SIGN
- * = 2) are documented in the source but not enforced in 1.0.0
- * because reading them requires a DER walker extension for
- * high-tag-number context-specific tags. Follow-up TODO for 1.1.
+ * The remaining AuthorizationList fields (origin = KM_ORIGIN_GENERATED
+ * = 0, purpose includes KM_PURPOSE_SIGN = 2) are not asserted — matching
+ * `@simplewebauthn/server`, which also checks only `allApplications`.
  */
 
 import { createVerify, verify as verifyRaw, X509Certificate } from 'node:crypto';
@@ -48,14 +48,22 @@ import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSigna
 
 const ANDROID_KEY_OID = '1.3.6.1.4.1.11129.2.1.17';
 
+// Keymaster authorization tag: allApplications [600]. A key carrying
+// it is usable by *every* app on the device, which defeats the point
+// of a per-RP attestation — WebAuthn L3 §8.4 step 4 requires it to be
+// absent from both the software- and hardware-enforced lists.
+const KM_TAG_ALL_APPLICATIONS = 600;
+const CONTEXT_CLASS = 2;
+
 /**
- * Extract `attestationChallenge` — the 5th element (index 4) of the
- * top-level KeyDescription SEQUENCE.
+ * Read and structurally validate the KeyDescription SEQUENCE from the
+ * leaf's Android Key attestation extension. Returns its top-level
+ * child TLVs (indices per WebAuthn L3 §8.4 / Keymaster KeyDescription).
  *
  * @param {Uint8Array} certDer
- * @returns {Uint8Array}
+ * @returns {import('../asn1/der.js').Tlv[]}
  */
-function readAttestationChallenge(certDer) {
+function readKeyDescriptionFields(certDer) {
   const raw = findExtension(certDer, ANDROID_KEY_OID);
   if (raw === null) {
     throwAttestationInvalid(`android-key: leaf missing attestation extension (OID ${ANDROID_KEY_OID})`);
@@ -69,11 +77,44 @@ function readAttestationChallenge(certDer) {
   if (fields.length < 8) {
     throwAttestationInvalid(`android-key: KeyDescription has ${fields.length} fields, expected at least 8`);
   }
+  return fields;
+}
+
+/**
+ * Extract `attestationChallenge` — the 5th element (index 4).
+ *
+ * @param {import('../asn1/der.js').Tlv[]} fields
+ * @returns {Uint8Array}
+ */
+function readAttestationChallenge(fields) {
   const challenge = fields[4];
   if (challenge.tag !== TAG.OCTET_STRING) {
     throwAttestationInvalid('android-key: KeyDescription attestationChallenge is not an OCTET STRING');
   }
   return challenge.contents;
+}
+
+/**
+ * WebAuthn L3 §8.4 step 4: `allApplications [600]` MUST NOT appear in
+ * either the softwareEnforced (index 6) or teeEnforced/hardwareEnforced
+ * (index 7) AuthorizationList.
+ *
+ * @param {import('../asn1/der.js').Tlv[]} fields
+ */
+function assertNoAllApplications(fields) {
+  for (const idx of [6, 7]) {
+    const list = fields[idx];
+    if (list.tag !== TAG.SEQUENCE) {
+      throwAttestationInvalid(`android-key: KeyDescription AuthorizationList at index ${idx} is not a SEQUENCE`);
+    }
+    for (const entry of readChildren(list.contents)) {
+      if (entry.tagClass === CONTEXT_CLASS && entry.tagNumber === KM_TAG_ALL_APPLICATIONS) {
+        throwAttestationInvalid(
+          'android-key: KeyDescription must not contain allApplications [600] — the key is not RP-scoped',
+        );
+      }
+    }
+  }
 }
 
 function spkiDer(keyObject) {
@@ -141,11 +182,14 @@ export function verifyAndroidKey({ attStmt, authDataBytes, clientDataHash, attes
     throwAttestationInvalid('android-key: leaf public key does not match credentialPublicKey (SPKI mismatch)');
   }
 
-  // 3. attestationChallenge in the extension MUST equal clientDataHash.
-  const challenge = readAttestationChallenge(x5cRaw[0]);
+  // 3. attestationChallenge in the extension MUST equal clientDataHash,
+  //    and allApplications [600] MUST be absent from both auth lists.
+  const keyDescription = readKeyDescriptionFields(x5cRaw[0]);
+  const challenge = readAttestationChallenge(keyDescription);
   if (!bytesEqual(challenge, clientDataHash)) {
     throwAttestationInvalid('android-key: attestationChallenge in KeyDescription does not equal clientDataHash');
   }
+  assertNoAllApplications(keyDescription);
 
   // 4. Chain verification.
   let trustPath = 'no-anchor';

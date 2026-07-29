@@ -39,7 +39,13 @@ if (HAS_OPENSSL && !existsSync(WORK)) {
  *     SEQUENCE { }        -- hardwareEnforced (empty for tests)
  *   }
  */
-function encodeKeyDescription(challenge32) {
+function encodeKeyDescription(challenge32, { allApplications = false } = {}) {
+  // softwareEnforced: empty, or carrying allApplications [600] EXPLICIT
+  // NULL (tag BF 84 58, then NULL 05 00) to exercise the §8.4 step-4
+  // rejection.
+  const softwareEnforced = allApplications
+    ? Buffer.from([0x30, 0x06, 0xbf, 0x84, 0x58, 0x02, 0x05, 0x00])
+    : Buffer.from([0x30, 0x00]);
   const parts = [
     // INTEGER 3
     Buffer.from([0x02, 0x01, 0x03]),
@@ -53,8 +59,8 @@ function encodeKeyDescription(challenge32) {
     Buffer.concat([Buffer.from([0x04, challenge32.length]), Buffer.from(challenge32)]),
     // OCTET STRING (empty uniqueId)
     Buffer.from([0x04, 0x00]),
-    // SEQUENCE softwareEnforced (empty)
-    Buffer.from([0x30, 0x00]),
+    // SEQUENCE softwareEnforced (empty, or with allApplications [600])
+    softwareEnforced,
     // SEQUENCE hardwareEnforced (empty)
     Buffer.from([0x30, 0x00]),
   ];
@@ -67,13 +73,13 @@ function encodeKeyDescription(challenge32) {
  * Generate an EC P-256 keypair and self-signed cert carrying the
  * Android Key attestation extension with `challenge32`.
  */
-function mintAndroidKeyCert(challenge32) {
+function mintAndroidKeyCert(challenge32, keyDescOpts = {}) {
   const keyPath = join(WORK, 'ak.key');
   const certPath = join(WORK, 'ak.pem');
   const cnfPath = join(WORK, 'ak.cnf');
   execSync(`${OPENSSL} ecparam -name P-256 -genkey -noout -out ${keyPath}`, { stdio: 'ignore' });
 
-  const extDer = encodeKeyDescription(challenge32);
+  const extDer = encodeKeyDescription(challenge32, keyDescOpts);
   const extHex = extDer.toString('hex').match(/../g).join(':');
 
   writeFileSync(
@@ -175,6 +181,28 @@ describe('android-key attestation — rejections', { skip: !HAS_OPENSSL ? 'opens
     assert.throws(
       () => verifyAndroidKey({ attStmt, ...inputs }),
       err => err instanceof PasskeyError && err.code === ErrorCode.ATTESTATION_INVALID,
+    );
+  });
+
+  test('rejects when KeyDescription carries allApplications [600]', () => {
+    const credentialId = hex('0a');
+    const clientDataHash = new Uint8Array(createHash('sha256').update('client-data-hash-here-32-bytes!!').digest());
+    // Correct challenge + valid signature, but the key is scoped to
+    // allApplications — must be rejected on the §8.4 step-4 gate.
+    const cert = mintAndroidKeyCert(clientDataHash, { allApplications: true });
+    const inputs = buildAndroidKeyInputs({ rpId: 'example.com', credentialId, cert });
+    const sig = signAttestation({ ...inputs, cert });
+    const attStmt = new Map([
+      ['alg', -7],
+      ['sig', sig],
+      ['x5c', [cert.der]],
+    ]);
+    assert.throws(
+      () => verifyAndroidKey({ attStmt, ...inputs }),
+      err =>
+        err instanceof PasskeyError &&
+        err.code === ErrorCode.ATTESTATION_INVALID &&
+        /allApplications/.test(err.message),
     );
   });
 
