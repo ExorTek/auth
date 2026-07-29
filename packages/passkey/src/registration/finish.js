@@ -32,6 +32,8 @@ import {
   throwRpIdMismatch,
   throwAuthDataInvalid,
   throwUnsupportedAlgorithm,
+  throwPublicKeyUnsupported,
+  throwAttestationTrustAnchorMissing,
 } from '../errors.js';
 
 /**
@@ -98,6 +100,13 @@ function decodeB64uField(value, field) {
  *   today by `android-safetynet` (`enforceCtsCheck`,
  *   `timestampWindowMs`, `now`); new formats add knobs here without
  *   further signature changes.
+ * @param {boolean} [params.requireTrustAnchor=false]
+ *   When true, reject a chain-bearing attestation format that resolved
+ *   to `trustPath: 'no-anchor'` (i.e. the caller supplied no anchors
+ *   for it). Turns the "attestation silently unverified" footgun into
+ *   an explicit `ATTESTATION_TRUST_ANCHOR_MISSING`. `none` and packed
+ *   self-attestation are unaffected. Leave false for the passkey common
+ *   case (`attestation: 'none'`).
  * @param {string} [params.challengePrefix]
  * @returns {Promise<{
  *   credential: {
@@ -142,6 +151,7 @@ export async function finish(params) {
     supportedAlgorithms = DEFAULT_SUPPORTED_ALGORITHMS,
     trustAnchors = {},
     attestationOptions = {},
+    requireTrustAnchor = false,
     challengePrefix,
   } = params;
 
@@ -150,6 +160,12 @@ export async function finish(params) {
   }
   if (response.type !== undefined && response.type !== 'public-key') {
     throwInvalidArgument(`registration.finish: response.type must be 'public-key' (got "${response.type}")`);
+  }
+  // WebAuthn transports `id` as the base64url of `rawId`; a client
+  // that sends mismatched values is malformed (SimpleWebAuthn rejects
+  // the same way). Only enforced when both are present.
+  if (typeof response.id === 'string' && typeof response.rawId === 'string' && response.id !== response.rawId) {
+    throwInvalidArgument('registration.finish: response.id must equal response.rawId (base64url mismatch)');
   }
   if (typeof challengeToken !== 'string' || challengeToken.length === 0) {
     throwInvalidArgument('registration.finish: challengeToken is required');
@@ -255,9 +271,29 @@ export async function finish(params) {
     ...resolveAttestationOptions(fmt, attestationOptions),
   });
 
+  // Trust-anchor policy. A format that carries a certificate chain
+  // (`packed` full, `tpm`, `apple`, `android-key`, `android-safetynet`,
+  // `fido-u2f`) reports `trustPath: 'no-anchor'` when the caller did
+  // not supply anchors for it — the chain was NOT verified to any root,
+  // so the attestation proves nothing about the authenticator's make.
+  // `none` (and `packed` self, which reports `'self'`) are exempt: they
+  // never had a chain to anchor. Opt in with `requireTrustAnchor` to
+  // turn that silent gap into a hard failure.
+  if (requireTrustAnchor && fmt !== 'none' && attestationReport.trustPath === 'no-anchor') {
+    throwAttestationTrustAnchorMissing(
+      `registration.finish: attestation format "${fmt}" was not verified against any trust anchor ` +
+        `(pass trustAnchors["${fmt}"], or drop requireTrustAnchor to accept unanchored attestation)`,
+    );
+  }
+
   // Import credential public key so callers get a Node KeyObject
   // ready for signature verify without re-decoding COSE bytes.
-  const importedKey = importCoseKey(authData.attestedCredentialData.credentialPublicKey);
+  let importedKey;
+  try {
+    importedKey = importCoseKey(authData.attestedCredentialData.credentialPublicKey);
+  } catch (err) {
+    throwPublicKeyUnsupported(`registration.finish: credential public key could not be imported (${err.message})`);
+  }
 
   return {
     credential: {

@@ -392,3 +392,86 @@ describe('registration.finish — fmt "packed" (self attestation)', () => {
     );
   });
 });
+
+describe('registration.finish — response.id / rawId integrity', () => {
+  test('rejects when response.id does not equal response.rawId', async () => {
+    const store = memoryIncrStore();
+    const beginRes = await begin({
+      rp: { id: RP_ID, name: 'Example' },
+      user: { id: 'u_1', name: 'alice', displayName: 'Alice' },
+      challengeSecret: SECRET,
+      challengeStore: store,
+    });
+    const fixture = makeNoneResponse({
+      rpId: RP_ID,
+      challengeBase64Url: beginRes.options.challenge,
+      origin: ORIGIN,
+    });
+    // Tamper: id and rawId must be the same base64url value.
+    fixture.response.id = `${fixture.response.rawId}AA`;
+    await assert.rejects(
+      () =>
+        finish({
+          response: fixture.response,
+          challengeToken: beginRes.challengeToken,
+          expectedRpId: RP_ID,
+          expectedOrigin: ORIGIN,
+          challengeSecret: SECRET,
+          challengeStore: store,
+        }),
+      err => err instanceof PasskeyError && err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+  });
+});
+
+describe('registration.finish — requireTrustAnchor exemptions', () => {
+  test('none attestation still passes with requireTrustAnchor: true', async () => {
+    const store = memoryIncrStore();
+    const beginRes = await begin({
+      rp: { id: RP_ID, name: 'Example' },
+      user: { id: 'u_1', name: 'alice', displayName: 'Alice' },
+      challengeSecret: SECRET,
+      challengeStore: store,
+    });
+    const fixture = makeNoneResponse({
+      rpId: RP_ID,
+      challengeBase64Url: beginRes.options.challenge,
+      origin: ORIGIN,
+    });
+    const res = await finish({
+      response: fixture.response,
+      challengeToken: beginRes.challengeToken,
+      expectedRpId: RP_ID,
+      expectedOrigin: ORIGIN,
+      challengeSecret: SECRET,
+      challengeStore: store,
+      requireTrustAnchor: true,
+    });
+    assert.equal(res.attestation.format, 'none');
+  });
+
+  test('packed self-attestation (trustPath "self") passes with requireTrustAnchor: true', async () => {
+    const store = memoryIncrStore();
+    const beginRes = await begin({
+      rp: { id: RP_ID, name: 'Example' },
+      user: { id: 'u_1', name: 'alice', displayName: 'Alice' },
+      challengeSecret: SECRET,
+      challengeStore: store,
+    });
+    const fixture = makePackedSelfResponse({
+      rpId: RP_ID,
+      challengeBase64Url: beginRes.options.challenge,
+      origin: ORIGIN,
+    });
+    const res = await finish({
+      response: fixture.response,
+      challengeToken: beginRes.challengeToken,
+      expectedRpId: RP_ID,
+      expectedOrigin: ORIGIN,
+      challengeSecret: SECRET,
+      challengeStore: store,
+      requireTrustAnchor: true,
+    });
+    assert.equal(res.attestation.trustPath, 'self');
+  });
+});

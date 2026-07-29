@@ -32,6 +32,7 @@ import {
   throwRpIdMismatch,
   throwSignatureInvalid,
   throwCounterRollback,
+  throwPublicKeyUnsupported,
 } from '../errors.js';
 
 function decodeB64uField(value, field) {
@@ -54,7 +55,12 @@ function importCredentialKey(credential) {
     return { publicKey: credential.publicKey, algorithm: credential.algorithm };
   }
   if (credential.publicKeyCose instanceof Map) {
-    const imported = importCoseKey(credential.publicKeyCose);
+    let imported;
+    try {
+      imported = importCoseKey(credential.publicKeyCose);
+    } catch (err) {
+      throwPublicKeyUnsupported(`authentication.finish: stored credential public key is unusable (${err.message})`);
+    }
     return { publicKey: imported.publicKey, algorithm: imported.algorithm };
   }
   throwInvalidArgument(
@@ -122,6 +128,11 @@ export async function finish(params) {
   }
   if (response.type !== undefined && response.type !== 'public-key') {
     throwInvalidArgument(`authentication.finish: response.type must be 'public-key' (got "${response.type}")`);
+  }
+  // `id` is the base64url of `rawId`; reject a client that disagrees
+  // with itself (matches SimpleWebAuthn). Only when both are present.
+  if (typeof response.id === 'string' && typeof response.rawId === 'string' && response.id !== response.rawId) {
+    throwInvalidArgument('authentication.finish: response.id must equal response.rawId (base64url mismatch)');
   }
   if (!challengeToken) {
     throwInvalidArgument('authentication.finish: challengeToken is required');
