@@ -1,6 +1,6 @@
 {
   "name": "@exortek/passkey",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "WebAuthn / FIDO2 server verification for Node.js 22+ — registration + authentication with an in-house CBOR + COSE + ASN.1 stack, all seven attestation formats (none, packed, fido-u2f, tpm, android-key, android-safetynet, apple), challenge store via @exortek/challenge. Zero non-@exortek/* runtime dependencies.",
   "type": "module",
   "sideEffects": false,
