@@ -3,10 +3,19 @@
 > WebAuthn Level 3 / FIDO2 CTAP2 server verification for Node.js 22+ — registration + authentication with an in-house CBOR + COSE + ASN.1 stack, all seven attestation formats, WebAuthn hints, related origins, extension I/O (credProps / largeBlob / prf / hmac-secret / minPinLength / credProtect / appid), FIDO MDS3 verifier + offline AAGUID lookup. Zero non-`@exortek/*` runtime dependencies.
 
 [![npm](https://img.shields.io/npm/v/@exortek/passkey.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/passkey)
+[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/passkey.svg?color=339933)](https://nodejs.org)
+[![install size](https://packagephobia.com/badge?p=@exortek/passkey)](https://packagephobia.com/result?p=@exortek/passkey)
+[![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![license](https://img.shields.io/npm/l/@exortek/passkey.svg?color=blue)](./LICENSE)
 
+📖 **Docs:** [**auth.memet.dev/passkey**](https://auth.memet.dev/passkey)
+
 Server-only. For the browser side use `@simplewebauthn/browser` or `@github/webauthn-json`; a companion `@exortek/passkey-browser` will ship separately.
+
+## Why
+
+The server half of WebAuthn is deceptively hard: you hand-parse CBOR attestation objects, COSE public keys, and ASN.1 certificate chains, then verify seven attestation formats — each with its own quirks — while enforcing challenge single-use, origin, RP ID hash, the user-presence/verification/backup flag policy, counter monotonicity, and a trust-anchor story that a self-signed cert must not bypass (the exact CVE that hit a major library in 2026). `@exortek/passkey` ships all of it behind two calls per flow — `begin` then `finish` — on an in-house CBOR + COSE + ASN.1/DER + X.509 stack with no runtime dependency outside `@exortek/*`.
 
 ## Install
 
@@ -30,7 +39,7 @@ const CHALLENGE_SECRET = process.env.PASSKEY_CHALLENGE_SECRET;
 const RP = { id: 'example.com', name: 'Example' };
 const ORIGIN = 'https://example.com';
 
-// ── Registration ────────────────────────────────────────────────
+// REGISTRATION
 
 // 1. Server mints options + a signed challenge token
 app.post('/passkey/register/begin', async (req, res) => {
@@ -75,7 +84,7 @@ app.post('/passkey/register/finish', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Authentication ──────────────────────────────────────────────
+// AUTHENTICATION
 
 app.post('/passkey/login/begin', async (req, res) => {
   const { options, challengeToken } = await authentication.begin({
@@ -172,7 +181,7 @@ Every code branches on `err.code` and maps to an HTTP status via `err.status`. F
 ## Links
 
 - **Source:** [github.com/ExorTek/auth](https://github.com/ExorTek/auth)
-- **Issues:** [github.com/ExorTek/auth/issues](https://github.com/ExorTek/auth/issues)
+- **Issues & discussions:** [github.com/ExorTek/auth/issues](https://github.com/ExorTek/auth/issues)
 - **Changelog:** [CHANGELOG.md](./CHANGELOG.md)
 
 ## License

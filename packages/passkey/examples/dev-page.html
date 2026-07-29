@@ -91,7 +91,7 @@
         logEl.textContent = '';
       };
 
-      // --- base64url <-> ArrayBuffer (no external dependency) ---
+      // base64url <-> ArrayBuffer (no external dependency)
       const b64uToBuf = str => {
         const s = str.replace(/-/g, '+').replace(/_/g, '/');
         const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : '';
