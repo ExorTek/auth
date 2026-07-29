@@ -63,12 +63,13 @@ node --test 'tests/**/*.test.js'          # run all tests
 node --test tests/path/to/file.test.js    # run one test file
 ```
 
-**No hosted CI today** — nothing guards `master` between local pushes. `yarn
-verify` is the mirror of what a CI job would run (`format:check → lint →
-typecheck → build → test`); run it locally before every push. Adding
-`.github/workflows/ci.yml` (Node 22.x + 24.x) and a `publish.yml` Changesets
-job is on the roadmap; until they exist, releases go through
-`yarn release` on a maintainer's machine.
+**CI** runs `yarn verify` (`typecheck → lint → format:check → test`) on every
+push and PR via `.github/workflows/ci.yml`; it builds all packages first so the
+cross-package `dist` imports resolve. `master` is **branch-protected** — work
+lands through PRs and the CI check must pass. Run `yarn verify` locally before
+pushing to catch failures early. `.github/workflows/codeql.yml` adds security
+scanning; `release.yml` is the manual publish job. See
+**"## Git workflow"** below for the full branch / PR / release flow.
 
 ## Architecture
 
@@ -224,6 +225,40 @@ implementing new pieces:
   Appendix A for JWS — spec-compliance canaries. When a curve or algorithm is
   added, add its published test vector.
 
+## Git workflow (branches · PRs · releases)
+
+`master` is branch-protected: a PR is required and the CI check
+(`typecheck · lint · format · test`) must pass to merge. **Do not commit
+straight to `master`.**
+
+- **Branch** off an updated `master`, named `<type>/<scope>-<slug>` — `type` is
+  the conventional-commit kind (`feat|fix|chore|docs|refactor|test|perf`),
+  `scope` a package short name (`passkey`, `session`, …) or `repo`/`ci`, `slug`
+  a short kebab description. e.g. `feat/passkey-conditional-ui`,
+  `fix/session-rotation-race`, `docs/agents-git-workflow`.
+- **Commit** in the style below; `yarn format` before committing; English only;
+  no AI-attribution trailers.
+- **Changeset** whenever a published package changed — `yarn changeset` (a new
+  package starts at `0.0.0` so `major` → `1.0.0`).
+- **PR** — `gh pr create`, let CI go green, merge (squash); the branch
+  auto-deletes.
+
+**Releasing is manual**, and versioning is separate from publishing:
+
+1. `yarn changeset:ver` → commit `chore: version packages` → PR → merge (bumps
+   versions + writes CHANGELOGs).
+2. Trigger `.github/workflows/release.yml` (`workflow_dispatch`): Actions →
+   Release → Run (the `dry_run` input builds without publishing). It builds,
+   publishes to npm, pushes tags, and cuts GitHub Releases.
+3. **Auth is npm Trusted Publishing over GitHub OIDC — no stored token.** Each
+   `@exortek/*` package needs a trusted publisher on npmjs.com (repo
+   `ExorTek/auth`, workflow `release.yml`, action `npm publish`) plus the
+   "require 2FA and disallow tokens" publishing-access option. A brand-new
+   package's *first* publish can't use OIDC — the package must exist before you
+   can configure its trusted publisher — so publish it once locally with
+   `yarn npm publish` (interactive 2FA), then wire the trusted publisher for
+   every release after.
+
 ## Workflow: building a new package end to end
 
 Split the work into small, self-contained commits — each one should leave the
@@ -262,9 +297,12 @@ build-out goes:
 9. **Verify.** `yarn verify` from the repo root. `cd packages/<name> && yarn
    npm publish --dry-run` to inspect the tarball. Optional: cross-check
    against the reference library (e.g. can `jose` verify a token we produce?).
-10. **Release.** `git push --follow-tags` then `yarn release`. The release
-    script now runs `changeset version` before publish; older scripts did
-    not, which is how `@exortek/jwk@0.0.0` briefly escaped to npm.
+10. **Release.** Merge the build-out PR once CI is green, then follow the
+    release flow in "## Git workflow" — a `chore: version packages` PR, then
+    trigger `release.yml`. The initial `1.0.0` publish is done locally
+    (`yarn npm publish`, interactive 2FA) because a brand-new package has no
+    trusted publisher yet; wire OIDC trusted publishing straight after so every
+    later release runs from CI.
 11. **Post-release documentation sweep — one commit per file group.** Root
     `README.md` Shipping table + "N published" counter + install snippet,
     `web/content/index.mdx` Shipping table + stack row status, `SECURITY.md`
