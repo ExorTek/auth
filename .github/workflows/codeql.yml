@@ -1,6 +1,7 @@
 name: CodeQL
 
 on:
+  workflow_dispatch: # manual run: Actions tab → CodeQL → "Run workflow", or `gh workflow run codeql.yml`
   push:
     branches: [master]
   pull_request:

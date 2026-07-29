@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch: # manual run: Actions tab → CI → "Run workflow", or `gh workflow run ci.yml`
   push:
     branches: [master]
   pull_request:
