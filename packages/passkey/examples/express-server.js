@@ -157,4 +157,6 @@ app.use((err, req, res, next) => {
 });
 
 const port = Number(process.env.PORT ?? 3000);
-app.listen(port, () => console.log(`passkey demo on http://127.0.0.1:${port}`));
+// Print the localhost URL (NOT 127.0.0.1): the RP ID is "localhost" and
+// WebAuthn rejects the IP form with "This is an invalid domain".
+app.listen(port, () => console.log(`passkey demo on http://localhost:${port}`));

@@ -147,5 +147,7 @@ app.setErrorHandler((err, req, reply) => {
 
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: '127.0.0.1' });
+// Print the localhost URL (NOT 127.0.0.1): the RP ID is "localhost" and
+// WebAuthn rejects the IP form with "This is an invalid domain".
 // eslint-disable-next-line no-console
-console.log(`passkey demo on http://127.0.0.1:${port}`);
+console.log(`passkey demo on http://localhost:${port}`);
