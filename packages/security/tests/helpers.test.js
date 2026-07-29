@@ -537,3 +537,11 @@ test('slowDown: rejects invalid config', () => {
   assert.throws(() => slowDown({}), SecurityError);
   store._stop();
 });
+
+test('sanitizeFilename: strips trailing spaces/dots without ReDoS (linear)', () => {
+  assert.equal(sanitizeFilename('report.txt.  '), 'report.txt');
+  assert.equal(sanitizeFilename('name...'), 'name');
+  // Old /[ .]+$/ was O(n^2) on a flood of trailing spaces; must be linear now.
+  const flooded = 'file' + ' '.repeat(500000);
+  assert.equal(sanitizeFilename(flooded), 'file');
+});

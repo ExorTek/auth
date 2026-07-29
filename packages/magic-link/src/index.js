@@ -363,7 +363,9 @@ function _assertStringOrUndef(v, name) {
 }
 
 function _requireEmail(v, name) {
-  if (!isString(v) || !EMAIL_RE.test(v)) {
+  // Reject over-long input before the regex (RFC 5321 caps an address at 254
+  // chars) so no pathological string can reach EMAIL_RE at all.
+  if (!isString(v) || v.length > 254 || !EMAIL_RE.test(v)) {
     throw invalidArgument(`${name} must be a well-formed email address`);
   }
   return v;
