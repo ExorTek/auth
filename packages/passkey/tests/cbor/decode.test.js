@@ -203,3 +203,19 @@ describe('CBOR — decodeWithLength', () => {
     assert.strictEqual(bytesRead, 1);
   });
 });
+
+describe('cbor — recursion depth cap (DoS hardening)', () => {
+  test('rejects deeply nested arrays past MAX_DEPTH', () => {
+    // 40 single-element array heads (0x81) then a 0-value; each head
+    // costs one byte but one stack frame — the classic cheap-DoS shape.
+    const heads = new Uint8Array([...Array(40).fill(0x81), 0x00]);
+    assert.throws(() => decode(heads), /nesting depth exceeds/);
+  });
+
+  test('accepts nesting within the cap', () => {
+    // 8 nested arrays terminating in an integer — comfortably shallow.
+    const ok = new Uint8Array([...Array(8).fill(0x81), 0x00]);
+    const value = decode(ok);
+    assert.ok(Array.isArray(value));
+  });
+});

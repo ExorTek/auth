@@ -163,10 +163,22 @@ function normaliseInt(v) {
   return v;
 }
 
+// WebAuthn CBOR is shallow: attestationObject → attStmt → x5c array,
+// COSE keys, and the extensions map never nest more than a few levels.
+// Cap recursion so a hostile stream of nested array/map heads
+// (one byte per level) can't overflow the call stack — a cheap DoS
+// otherwise, since each `0x81`/`0xa1` head costs the attacker 1 byte
+// but us a stack frame.
+const MAX_DEPTH = 32;
+
 /**
  * @param {Cursor} c
+ * @param {number} [depth]
  */
-function readItem(c) {
+function readItem(c, depth = 0) {
+  if (depth > MAX_DEPTH) {
+    throw new Error(`cbor: nesting depth exceeds ${MAX_DEPTH}`);
+  }
   const initial = c.readU8();
   const major = initial >> 5;
   const info = initial & 0x1f;
@@ -212,7 +224,7 @@ function readItem(c) {
     }
     const out = new Array(len);
     for (let i = 0; i < len; i += 1) {
-      out[i] = readItem(c);
+      out[i] = readItem(c, depth + 1);
     }
     return out;
   }
@@ -225,8 +237,8 @@ function readItem(c) {
     }
     const out = new Map();
     for (let i = 0; i < len; i += 1) {
-      const key = readItem(c);
-      const value = readItem(c);
+      const key = readItem(c, depth + 1);
+      const value = readItem(c, depth + 1);
       if (out.has(key)) {
         // Duplicate keys are legal CBOR but not deterministic — for a
         // security-critical parser we reject rather than silently pick
