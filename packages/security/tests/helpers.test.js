@@ -407,10 +407,21 @@ test('timeout: resolves when promise settles before deadline', async () => {
 });
 
 test('timeout: rejects with REQUEST_TIMEOUT when deadline hits', async () => {
-  await assert.rejects(
-    () => timeout(new Promise(() => {}), 20, { label: 'test' }),
-    err => err instanceof SecurityError && /timed out/.test(err.message),
-  );
+  // `timeout` unref's its timer (correct for prod — a timeout guard must not
+  // keep the process alive by itself). When the wrapped promise never settles
+  // and nothing else keeps the loop busy — as on a quiet CI runner — the event
+  // loop can drain before the 20ms timer fires, and node:test cancels the
+  // pending assertion (and every sibling after it). Hold a ref'd timer for the
+  // duration so the deadline reliably lands.
+  const keepAlive = setTimeout(() => {}, 1000);
+  try {
+    await assert.rejects(
+      () => timeout(new Promise(() => {}), 20, { label: 'test' }),
+      err => err instanceof SecurityError && /timed out/.test(err.message),
+    );
+  } finally {
+    clearTimeout(keepAlive);
+  }
 });
 
 test('timeout: rejects on invalid ms', () => {
