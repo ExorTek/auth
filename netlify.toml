@@ -1,0 +1,7 @@
+# Netlify hosts the docs site (web/). Skip the build — and its deploy-preview
+# check on PRs — whenever a change doesn't touch web/. The ignore command's
+# exit 0 tells Netlify to cancel the build; git diff --quiet returns 0 when
+# web/ is unchanged between the last deploy and this commit. Build command and
+# publish directory stay configured in the Netlify UI (base directory = root).
+[build]
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- web/"
