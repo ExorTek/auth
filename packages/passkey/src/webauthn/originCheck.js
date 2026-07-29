@@ -38,7 +38,13 @@ export function matchesOrigin(actual, expected) {
     return false;
   }
   if (expected instanceof RegExp) {
-    return expected.test(actual);
+    // `.test()` on a global/sticky RegExp advances `lastIndex`, so a
+    // caller who passes `/…/g` would get alternating results across
+    // ceremonies — an intermittent origin bypass/lockout. Test against
+    // a flag-stripped clone so matching is always stateless.
+    const stateless =
+      expected.global || expected.sticky ? new RegExp(expected.source, expected.flags.replace(/[gy]/g, '')) : expected;
+    return stateless.test(actual);
   }
   throw new Error('originCheck: expected must be string, string[], or RegExp');
 }

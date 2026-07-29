@@ -47,4 +47,13 @@ describe('originCheck — matchesOrigin', () => {
   test('rejects unsupported expected', () => {
     assert.throws(() => matchesOrigin('x', 42), /string, string\[\], or RegExp/);
   });
+
+  test('a global-flag RegExp matches statelessly (no lastIndex drift)', () => {
+    const re = /^https:\/\/example\.com$/g;
+    // Called twice with the same input: a naive `.test()` on a /g regex
+    // would flip to false on the second call as lastIndex advances.
+    assert.equal(matchesOrigin('https://example.com', re), true);
+    assert.equal(matchesOrigin('https://example.com', re), true);
+    assert.equal(matchesOrigin('https://evil.com', re), false);
+  });
 });
