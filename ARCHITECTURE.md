@@ -30,8 +30,7 @@ These are the invariants — expect PRs that violate them to be rejected.
 ### 1. Zero runtime dependencies
 
 Every package depends on `node:crypto` and its declared peer dependencies —
-nothing else. The single planned external exception is `@exortek/web3-evm`,
-which will use `ethereum-cryptography`.
+nothing else, with no external-dependency exceptions.
 
 ### 2. Fully standalone packages (with one sanctioned exception)
 
@@ -60,7 +59,7 @@ allowed to know about which concept.
 Every package targets Node.js. No browser code, no `crypto.subtle`
 polyfills, no `window` / `document` references, no `/client` subpaths.
 
-For protocols with an inherent browser side (WebAuthn, SIWE, SIWS, OAuth2
+For protocols with an inherent browser side (WebAuthn, OAuth2
 SPA / PKCE, OPAQUE), we verify server-side and point users at a maintained
 companion library — see the "Server-only" section of [`AGENTS.md`](./AGENTS.md).
 
@@ -83,7 +82,7 @@ Where a specification publishes reference vectors (RFC 4226 §5.4, RFC 6238
 §B, RFC 7638 §3.1, RFC 7515 Appendix A), we hard-code them in tests. They
 are the canary for spec-compliance regressions.
 
-## The 22-package stack
+## The 20-package stack
 
 Numbers reflect *dependency order* — a lower number never imports from a
 higher one, so packages can be adopted incrementally. The current shipping
@@ -112,9 +111,7 @@ Status legend: ✅ shipped to npm · 🛠 on disk, pre-release · ⏳ planned.
 | 17 | `@exortek/paseto`      |   ⏳   | PASETO v4 (`local` / `public`)                                                     |
 | 18 | `@exortek/oauth2`      |   ⏳   | OAuth 2.1 client (PKCE) + provider presets                                          |
 | 19 | `@exortek/oidc`        |   ⏳   | OpenID Connect on top of `@exortek/oauth2`                                          |
-| 20 | `@exortek/web3-evm`    |   ⏳   | SIWE — Sign-In With Ethereum                                                       |
-| 21 | `@exortek/web3-solana` |   ⏳   | SIWS — Sign-In With Solana                                                         |
-| 22 | `@exortek/auth`        |   ⏳   | Umbrella — re-exports every package above                                          |
+| 20 | `@exortek/auth`        |   ⏳   | Umbrella — re-exports every package above                                          |
 
 Not versioned in this table: `@exortek/shared` — internal consolidation
 workspace (see `PLAN.md`), not published on its own.
@@ -134,9 +131,7 @@ crypto
    │
    ├─── security (csrf, rate-limit, headers, cors, redirect)
    │
-   ├─── oauth2 ─── oidc
-   │
-   └─── web3-evm, web3-solana
+   └─── oauth2 ─── oidc
 
 otp    → challenge
 apikey → security/rate-limit
@@ -253,8 +248,6 @@ Where each protocol is anchored:
 | `oauth2`        | RFC 6749, RFC 7636 (PKCE), RFC 9126 (PAR), RFC 8414 (metadata), RFC 8628 (device)|
 | `oidc`          | OpenID Connect Core 1.0, OpenID Connect Discovery                              |
 | `passkey`       | W3C WebAuthn Level 3, FIDO2 CTAP2                                             |
-| `web3-evm`      | EIP-4361 (SIWE)                                                              |
-| `web3-solana`   | SIWS spec                                                                    |
 
 For deeper per-package interface tables (JSDoc typedefs, worked API
 examples, migration notes) look at a shipping package alongside its

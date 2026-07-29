@@ -1,6 +1,6 @@
 # @exortek/auth
 
-A framework-agnostic authentication toolkit for Node.js — designed as 22 small packages under one scope; **15 are
+A framework-agnostic authentication toolkit for Node.js — designed as 20 small packages under one scope; **15 are
 published today** (see Shipping below), the rest are planned. Pick the one you need. Built on `node:crypto`.
 
 [![license](https://img.shields.io/github/license/ExorTek/auth?color=blue)](./LICENSE)
@@ -53,9 +53,7 @@ Linked entries are **published on npm**; the rest are **planned** and not yet in
 | 17 | `@exortek/paseto`                          | _planned_ | PASETO v4 (`local` / `public`)                                                           |
 | 18 | `@exortek/oauth2`                          | _planned_ | OAuth 2.1 client (PKCE) + provider presets                                               |
 | 19 | `@exortek/oidc`                            | _planned_ | OpenID Connect on top of `oauth2`                                                        |
-| 20 | `@exortek/web3-evm`                        | _planned_ | SIWE — Sign-In With Ethereum                                                             |
-| 21 | `@exortek/web3-solana`                     | _planned_ | SIWS — Sign-In With Solana                                                               |
-| 22 | `@exortek/auth`                            | _planned_ | umbrella — re-exports every package above                                                |
+| 20 | `@exortek/auth`                            | _planned_ | umbrella — re-exports every package above                                                |
 
 ## Install
 

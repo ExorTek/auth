@@ -8,7 +8,7 @@ per-tool notes live in each tool's own configuration (`.claude/`, `.cursorrules`
 
 `@exortek/auth` — a framework-agnostic, server-only authentication toolkit for
 Node.js 22+ positioned as a modern successor to Passport.js. Yarn-workspaces
-monorepo of **22 packages** under the `@exortek/*` scope, each independently
+monorepo of **20 packages** under the `@exortek/*` scope, each independently
 versioned via Changesets and published to npm. Individual packages are also
 consumable standalone; a planned umbrella `@exortek/auth` package will
 re-export everything.
@@ -80,8 +80,7 @@ from it. Key edges (from `ARCHITECTURE.md`):
 ```
 crypto → jwk → jws → jwt → jwe → jwks
 crypto → opaque, paseto, password, otp, magic-link, passkey,
-         session, csrf, rate-limit, device, oauth2 → oidc,
-         web3-evm, web3-solana
+         session, csrf, rate-limit, device, oauth2 → oidc
 otp → challenge
 apikey → rate-limit
 auth (umbrella) → re-exports everything above
@@ -100,22 +99,19 @@ graph.
 policy was formalised. Do not add new cross-package deps; if session ever
 gets a major refactor, inline the seal helpers to fall in line.
 
-`@exortek/crypto` may only depend on `node:crypto`. The single planned
-external exception is `@exortek/web3-evm`, which will use
-`ethereum-cryptography`.
+`@exortek/crypto` may only depend on `node:crypto`, with no external
+exceptions.
 
 ### Server-only
 
 **Every package in this monorepo is server-only.** They rely on `node:crypto`.
 Do not introduce browser code, `crypto.subtle` polyfills, `window` / `document`
 references, or `/client` subpaths — even for protocols with an inherent browser
-side (WebAuthn, SIWE, SIWS, OAuth2 SPA/PKCE, OPAQUE).
+side (WebAuthn, OAuth2 SPA/PKCE, OPAQUE).
 
 We verify server-side and point users at a maintained client companion:
 
 - **Passkey / WebAuthn** → `@simplewebauthn/browser`
-- **SIWE (Ethereum)** → `viem` + optional `siwe`
-- **SIWS (Solana)** → `@solana/wallet-adapter-react` + `@solana/web3.js`
 - **OAuth2 SPA / PKCE (browser redirect)** → `oauth4webapi`
 - **OPAQUE** → `@cloudflare/opaque-ts`
 
@@ -358,7 +354,7 @@ Deliberate constraints — reject PRs that violate them:
 
 ## Notes
 
-- `ARCHITECTURE.md` describes the design principles, the 22-package stack,
+- `ARCHITECTURE.md` describes the design principles, the 20-package stack,
   dependency layering, and RFC references. Read it before writing code for a
   new package.
 - Anthropic Claude Code users: `.claude/` holds Claude-specific configuration
