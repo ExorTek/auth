@@ -2,15 +2,20 @@
 //
 //   node packages/passkey/examples/express-server.js
 //
-// Then open http://127.0.0.1:3000/ in a browser and use the little
-// dev page (relies on the community @simplewebauthn/browser lib
-// loaded from a CDN — the server itself is `@exortek/passkey`).
+// Then open http://localhost:3000/ in a browser (use `localhost`, not
+// 127.0.0.1 — the RP ID is "localhost" and WebAuthn matches the origin
+// exactly) and click "Register a passkey", then "Sign in". The served
+// page (examples/dev-page.html) is a self-contained vanilla-JS client;
+// no CDN or @simplewebauthn/browser needed. The server is @exortek/passkey.
 //
 // Requires: `yarn workspace @exortek/passkey add express` in dev.
 
 import express from 'express';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { registration, authentication, PasskeyError } from '../src/index.js';
+
+const DEV_PAGE = readFileSync(new URL('./dev-page.html', import.meta.url));
 
 const RP = { id: 'localhost', name: 'Passkey Demo' };
 const ORIGIN = 'http://localhost:3000';
@@ -42,6 +47,8 @@ const sessions = new Map();
 
 const app = express();
 app.use(express.json());
+
+app.get('/', (req, res) => res.type('html').send(DEV_PAGE));
 
 function getOrCreateSession(req, res) {
   const sid = req.headers.cookie?.match(/sid=([^;]+)/)?.[1];

@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@exortek/passkey demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family:
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          sans-serif;
+      }
+      body {
+        max-width: 42rem;
+        margin: 3rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 1.4rem;
+        margin-bottom: 0.25rem;
+      }
+      p.sub {
+        margin-top: 0;
+        opacity: 0.7;
+      }
+      .row {
+        display: flex;
+        gap: 0.75rem;
+        margin: 1.25rem 0;
+      }
+      button {
+        flex: 1;
+        padding: 0.7rem 1rem;
+        font-size: 1rem;
+        border: 1px solid currentColor;
+        border-radius: 0.5rem;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        background: color-mix(in srgb, currentColor 12%, transparent);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      #log {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: color-mix(in srgb, currentColor 8%, transparent);
+        border-radius: 0.5rem;
+        padding: 0.9rem 1rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.85rem;
+        min-height: 8rem;
+      }
+      .ok {
+        color: #2e7d32;
+      }
+      .err {
+        color: #c62828;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>@exortek/passkey demo</h1>
+    <p class="sub">Register a passkey, then sign in with it. Open over <code>http://localhost:3000/</code>.</p>
+
+    <div class="row">
+      <button id="register">Register a passkey</button>
+      <button id="login">Sign in</button>
+    </div>
+
+    <div id="log">Ready.</div>
+
+    <script>
+      const logEl = document.getElementById('log');
+      const log = (msg, cls) => {
+        const line = document.createElement('div');
+        if (cls) line.className = cls;
+        line.textContent = msg;
+        logEl.appendChild(line);
+      };
+      const reset = () => {
+        logEl.textContent = '';
+      };
+
+      // --- base64url <-> ArrayBuffer (no external dependency) ---
+      const b64uToBuf = str => {
+        const s = str.replace(/-/g, '+').replace(/_/g, '/');
+        const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : '';
+        const bin = atob(s + pad);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+        return bytes.buffer;
+      };
+      const bufToB64u = buf => {
+        const bytes = new Uint8Array(buf);
+        let bin = '';
+        for (const b of bytes) bin += String.fromCharCode(b);
+        return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      };
+
+      const postJSON = async (url, body) => {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(body ?? {}),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);
+        return data;
+      };
+
+      // Serialize a PublicKeyCredential into the JSON-transport shape
+      // @exortek/passkey's registration.finish / authentication.finish expect.
+      const serialize = cred => {
+        const r = cred.response;
+        const out = {
+          id: cred.id,
+          rawId: bufToB64u(cred.rawId),
+          type: cred.type,
+          clientExtensionResults: cred.getClientExtensionResults?.() ?? {},
+          response: {},
+        };
+        if (r.attestationObject) {
+          out.response.clientDataJSON = bufToB64u(r.clientDataJSON);
+          out.response.attestationObject = bufToB64u(r.attestationObject);
+          if (r.getTransports) out.response.transports = r.getTransports();
+        } else {
+          out.response.clientDataJSON = bufToB64u(r.clientDataJSON);
+          out.response.authenticatorData = bufToB64u(r.authenticatorData);
+          out.response.signature = bufToB64u(r.signature);
+          if (r.userHandle) out.response.userHandle = bufToB64u(r.userHandle);
+        }
+        return out;
+      };
+
+      async function register() {
+        reset();
+        log('Requesting registration options…');
+        const options = await postJSON('/passkey/register/begin');
+        options.challenge = b64uToBuf(options.challenge);
+        options.user.id = b64uToBuf(options.user.id);
+        (options.excludeCredentials || []).forEach(c => {
+          c.id = b64uToBuf(c.id);
+        });
+        log('Creating credential — follow your device prompt…');
+        const cred = await navigator.credentials.create({ publicKey: options });
+        log('Verifying with the server…');
+        const result = await postJSON('/passkey/register/finish', serialize(cred));
+        log('Registered ✔  credentialId=' + result.credentialId, 'ok');
+        log('aaguid=' + result.aaguid);
+      }
+
+      async function login() {
+        reset();
+        log('Requesting authentication options…');
+        const options = await postJSON('/passkey/login/begin');
+        options.challenge = b64uToBuf(options.challenge);
+        (options.allowCredentials || []).forEach(c => {
+          c.id = b64uToBuf(c.id);
+        });
+        log('Getting assertion — follow your device prompt…');
+        const cred = await navigator.credentials.get({ publicKey: options });
+        log('Verifying with the server…');
+        await postJSON('/passkey/login/finish', serialize(cred));
+        log('Signed in ✔', 'ok');
+      }
+
+      const guard = fn => async () => {
+        document.querySelectorAll('button').forEach(b => (b.disabled = true));
+        try {
+          await fn();
+        } catch (err) {
+          log('Error: ' + err.message, 'err');
+        } finally {
+          document.querySelectorAll('button').forEach(b => (b.disabled = false));
+        }
+      };
+
+      document.getElementById('register').addEventListener('click', guard(register));
+      document.getElementById('login').addEventListener('click', guard(login));
+    </script>
+  </body>
+</html>

@@ -2,9 +2,11 @@
 //
 //   node packages/passkey/examples/fastify-server.js
 //
-// Then open http://127.0.0.1:3000/ in a browser and use the little
-// dev page (relies on the community @simplewebauthn/browser lib
-// loaded from a CDN — the server itself is `@exortek/passkey`).
+// Then open http://localhost:3000/ in a browser (use `localhost`, not
+// 127.0.0.1 — the RP ID is "localhost" and WebAuthn matches the origin
+// exactly) and click "Register a passkey", then "Sign in". The served
+// page (examples/dev-page.html) is a self-contained vanilla-JS client;
+// no CDN or @simplewebauthn/browser needed.
 //
 // `@exortek/passkey` ships no framework plugin: it is a pure server-side
 // verification library, so this example wires the same
@@ -15,7 +17,10 @@
 
 import Fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { registration, authentication, PasskeyError } from '../src/index.js';
+
+const DEV_PAGE = readFileSync(new URL('./dev-page.html', import.meta.url));
 
 const RP = { id: 'localhost', name: 'Passkey Demo' };
 const ORIGIN = 'http://localhost:3000';
@@ -55,6 +60,8 @@ function getOrCreateSession(req, reply) {
   reply.header('Set-Cookie', `sid=${fresh.id}; Path=/; HttpOnly`);
   return fresh;
 }
+
+app.get('/', async (req, reply) => reply.type('text/html').send(DEV_PAGE));
 
 app.post('/passkey/register/begin', async (req, reply) => {
   const session = getOrCreateSession(req, reply);
