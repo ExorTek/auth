@@ -241,4 +241,24 @@ describe('android-safetynet attestation — rejections', { skip: !HAS_OPENSSL ? 
     const { attStmt } = buildSafetynetAttStmt({ ...inputs, key: wrongKey, cert: wrongKey });
     assert.throws(() => verifyAndroidSafetynet({ attStmt, ...inputs }), /CN must be "attest.android.com"/);
   });
+
+  test('rejects a subdomain-suffix CN (attest.android.com.attacker.example)', () => {
+    const inputs = makeInputs('example.com', hex('09'));
+    // The `.` after "com" used to satisfy the old `(?:$|\D)` terminator,
+    // letting a look-alike CN through as the SafetyNet leaf identity.
+    const keyPath = join(WORK, 'suffixcn.key');
+    const certPath = join(WORK, 'suffixcn.pem');
+    execSync(`${OPENSSL} genrsa -out ${keyPath} 2048`, { stdio: 'ignore' });
+    execSync(
+      `${OPENSSL} req -x509 -new -key ${keyPath} -sha256 -days 3650 -out ${certPath} -subj "/CN=attest.android.com.attacker.example"`,
+      { stdio: 'ignore' },
+    );
+    const evilKey = { keyPem: readFileSync(keyPath, 'utf8'), certPem: readFileSync(certPath, 'utf8') };
+    evilKey.certDer = new X509Certificate(evilKey.certPem).raw;
+    const { attStmt } = buildSafetynetAttStmt({ ...inputs, key: evilKey, cert: evilKey });
+    assert.throws(
+      () => verifyAndroidSafetynet({ attStmt, ...inputs }),
+      err => err instanceof PasskeyError && err.code === ErrorCode.ATTESTATION_INVALID,
+    );
+  });
 });

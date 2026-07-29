@@ -154,8 +154,12 @@ export function verifyAndroidSafetynet(params) {
     );
   }
 
-  // Leaf CN check — WebAuthn L3 §8.5 step 3.
-  if (!/CN=attest\.android\.com(?:$|\D)/i.test(leaf.subject)) {
+  // Leaf CN check — WebAuthn L3 §8.5 step 3. Anchor the CN to a real
+  // RDN boundary (start/end of the flattened subject or a comma /
+  // newline separator). The previous `(?:$|\D)` terminator matched a
+  // trailing `.`, so `CN=attest.android.com.attacker.example` slipped
+  // through — a subdomain-suffix bypass of the leaf identity gate.
+  if (!/(?:^|[,\n])CN=attest\.android\.com(?:$|[,\n])/i.test(leaf.subject)) {
     throwAttestationInvalid(
       `android-safetynet: leaf subject CN must be "${LEAF_CN}" (got "${leaf.subject.replace(/\n/g, ' ')}")`,
     );
