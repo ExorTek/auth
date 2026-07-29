@@ -1,5 +1,27 @@
 # @exortek/session
 
+## 1.4.1
+
+### Patch Changes
+
+- e53ae64: Fix polynomial-ReDoS (quadratic regex backtracking) surfaced by CodeQL, plus small code-quality fixes.
+  Bundled `@exortek/shared` utilities (base32, base64, duration) are inlined into the packages listed above, so each
+  ships the fix.
+
+  - Replace `/=+$/` trailing-padding strips (base32 / base64 decode, OTP provisioning URI) with linear scans —
+    `"=".repeat(n) + "x"` was O(n²).
+  - Rework the duration parser regex so surrounding whitespace can no longer cause O(n²) matching (trim first, single
+    interior `\s*`).
+  - Strip trailing spaces/dots in filename sanitisation with a linear scan — upload filenames are attacker-controlled.
+  - Cap email length before the regex in magic-link.
+  - Thread the JWT decode label into error messages (removes dead arguments and gives failures which segment broke).
+  - Drop a duplicate character in a UA browser-detection regex character class.
+
+  DoS-hardening and hygiene only — no API or behavioural change for valid input.
+
+- Updated dependencies [e53ae64]
+  - @exortek/crypto@1.0.9
+
 ## 1.4.0
 
 ### Minor Changes

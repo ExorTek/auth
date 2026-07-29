@@ -1,6 +1,6 @@
 {
   "name": "@exortek/opaque",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Opaque reference tokens for Node.js 22+ — random unstructured tokens with no embedded payload, memory + Redis stores, RFC 7662 introspection and RFC 7009 revocation HTTP handlers. Zero non-@exortek/* runtime dependencies.",
   "type": "module",
   "sideEffects": false,

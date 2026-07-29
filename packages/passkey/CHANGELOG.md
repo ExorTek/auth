@@ -1,5 +1,13 @@
 # @exortek/passkey
 
+## 1.0.2
+
+### Patch Changes
+
+- Updated dependencies [e53ae64]
+  - @exortek/challenge@1.1.1
+  - @exortek/crypto@1.0.9
+
 ## 1.0.1
 
 ### Patch Changes
