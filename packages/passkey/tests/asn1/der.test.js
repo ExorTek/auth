@@ -92,8 +92,22 @@ describe('DER — readTlv rejections', () => {
     assert.throws(() => readTlv(h('308000')), /indefinite length/);
   });
 
-  test('rejects high-tag-number form', () => {
-    assert.throws(() => readTlv(h('1f2000')), /high-tag-number/);
+  test('parses high-tag-number form (Android Key allApplications [600])', () => {
+    // [600] EXPLICIT, constructed context tag: BF 84 58, then length 00.
+    // 600 = 0x258 → base128 [4, 88] → continuation byte 0x84, final 0x58.
+    const t = readTlv(h('BF845800'));
+    assert.equal(t.tagClass, 2); // context
+    assert.equal(t.constructed, true);
+    assert.equal(t.tagNumber, 600);
+    assert.equal(t.contents.byteLength, 0);
+  });
+
+  test('rejects non-minimal high-tag-number encoding', () => {
+    assert.throws(() => readTlv(h('BF800100')), /non-minimal high-tag-number/);
+  });
+
+  test('rejects truncated high-tag-number form', () => {
+    assert.throws(() => readTlv(h('BF84')), /truncated in high-tag-number/);
   });
 
   test('rejects truncated length', () => {
@@ -254,5 +268,16 @@ describe('DER — contextTag argument guard', () => {
   test('rejects out-of-range', () => {
     assert.throws(() => contextTag(-1), /out of range/);
     assert.throws(() => contextTag(31), /out of range/);
+  });
+});
+
+describe('der — long-form length overflow', () => {
+  test('4-byte length with high bit does not underflow the bounds check', () => {
+    // OCTET STRING, long-form length 0x84 → 4 length bytes 0x80000001.
+    // A signed `<<` shift would make this negative and slip past the
+    // bounds guard; multiplication keeps it a large positive and the
+    // parser reports truncation instead of mis-slicing.
+    const der = new Uint8Array([0x04, 0x84, 0x80, 0x00, 0x00, 0x01, 0xaa]);
+    assert.throws(() => readTlv(der), /TLV declares 2147483649 bytes/);
   });
 });

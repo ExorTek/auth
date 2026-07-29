@@ -12,8 +12,11 @@
  * Deliberately restrictive:
  *   - Indefinite-length form (0x80) is rejected. DER forbids it
  *     entirely; BER-only content has no place in a certificate.
- *   - High-tag-number form (tag class byte with low 5 bits = 0x1f)
- *     is rejected — WebAuthn's extensions never need tags above 30.
+ *   - High-tag-number form (tag byte low 5 bits = 0x1f) IS parsed —
+ *     the Android Key attestation `AuthorizationList` uses Keymaster
+ *     tag numbers well above 30 (e.g. `allApplications [600]`). For
+ *     those TLVs `tag` is the sentinel first byte and the true number
+ *     is in `tagNumber`; universal low-tag TLVs are unaffected.
  */
 
 // Universal tag constants (X.680 §8.6).
@@ -77,10 +80,33 @@ export function readTlv(bytes, offset = 0) {
   const tag = bytes[pos++];
   const tagClass = (tag >> 6) & 0x03;
   const constructed = (tag & 0x20) !== 0;
-  const tagNumber = tag & 0x1f;
+  let tagNumber = tag & 0x1f;
 
   if (tagNumber === 0x1f) {
-    throw new Error('der: high-tag-number form is not supported');
+    // High-tag-number form: the real number is a base-128 big-endian
+    // run, continuation bit set on every byte but the last.
+    if (pos >= bytes.byteLength) {
+      throw new Error('der: truncated in high-tag-number form');
+    }
+    if ((bytes[pos] & 0x7f) === 0) {
+      // A leading byte of 0x80 encodes a redundant zero — forbidden
+      // (X.690 §8.1.2.4.2c), and 0x1f 0x00 would mean "use low form".
+      throw new Error('der: non-minimal high-tag-number encoding');
+    }
+    tagNumber = 0;
+    let count = 0;
+    let b;
+    do {
+      if (pos >= bytes.byteLength) {
+        throw new Error('der: truncated in high-tag-number form');
+      }
+      b = bytes[pos++];
+      tagNumber = tagNumber * 128 + (b & 0x7f);
+      count += 1;
+      if (count > 4) {
+        throw new Error('der: high-tag-number too large');
+      }
+    } while ((b & 0x80) !== 0);
   }
   if (pos >= bytes.byteLength) {
     throw new Error('der: truncated after tag');
@@ -104,9 +130,13 @@ export function readTlv(bytes, offset = 0) {
     if (pos + nBytes > bytes.byteLength) {
       throw new Error('der: truncated inside long-form length');
     }
+    // Accumulate with multiplication, not a signed `<<` shift: a
+    // 4-byte length with the top bit set would overflow int32 and go
+    // negative, defeating the bounds check below and silently
+    // mis-parsing a hostile certificate.
     length = 0;
     for (let i = 0; i < nBytes; i += 1) {
-      length = (length << 8) | bytes[pos++];
+      length = length * 256 + bytes[pos++];
     }
   }
 
