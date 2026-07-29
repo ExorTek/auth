@@ -51,7 +51,8 @@ yarn format:check       # CI uses this
 yarn clean              # rm -rf dist tsconfig.tsbuildinfo per workspace
 yarn changeset          # author a changeset (interactive)
 yarn changeset:ver      # apply pending changesets — bumps versions + CHANGELOGs
-yarn release            # login → changeset version → build → publish → tag
+yarn release            # LOCAL fallback publish only (login → version → build → publish → tag);
+                        #   the normal path is the release.yml Actions workflow (see "Git workflow")
 yarn verify             # typecheck + lint + format:check + test — the CI mirror
 ```
 
@@ -336,8 +337,9 @@ release, not a follow-up.
    change (fail-open → fail-closed counts as breaking for consumers who
    relied on the fail-open, so raise a minor or major bump and note it
    loudly in the changeset body).
-6. **Release the fix.** Same `yarn release` flow. For high-severity fixes,
-   deprecate previously-shipping vulnerable versions with `npm deprecate`
+6. **Release the fix.** Follow the release flow in "## Git workflow" (a
+   `chore: version packages` PR, then trigger `release.yml`). For high-severity
+   fixes, deprecate previously-shipping vulnerable versions with `npm deprecate`
    pointing at the fixed release.
 
 ## Workflow: adding a feature to an existing package
