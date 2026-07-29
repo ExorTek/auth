@@ -19,15 +19,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      # Decide whether this change touches code/config. Docs-only changes
+      # (READMEs, AGENTS.md, web/, docs/, .changeset/) don't need the full
+      # build + test — but the job must still run and report, because branch
+      # protection requires this check. So we always run, and skip the heavy
+      # steps below when nothing code-relevant changed.
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            code:
+              - 'packages/**'
+              - '.github/workflows/**'
+              - 'package.json'
+              - 'yarn.lock'
+              - 'tsconfig*.json'
+              - 'rollup.config*.js'
+              - '.prettierrc*'
+              - 'eslint.config*'
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: corepack enable
       - run: yarn install --immutable
-      # Build every package's dist first. Packages import their
-      # @exortek/* workspace deps from the built dist/*.mjs (jwks → jwk,
-      # passkey → challenge / crypto, session → crypto, …); on a fresh
-      # checkout dist/ is absent (gitignored), so without this the
-      # cross-package tests fail with ERR_MODULE_NOT_FOUND.
-      - run: yarn build
-      - run: yarn verify
+
+      # Full pipeline when code/config changed. `yarn build` first: packages
+      # import their @exortek/* workspace deps from the built dist/*.mjs
+      # (jwks → jwk, passkey → challenge / crypto, …), which is gitignored and
+      # absent on a fresh checkout, so tests would otherwise fail with
+      # ERR_MODULE_NOT_FOUND.
+      - name: Verify (build + typecheck + lint + format + test)
+        if: steps.changes.outputs.code == 'true'
+        run: |
+          yarn build
+          yarn verify
+
+      # Docs-only change: just keep the repo prettier-clean. Fast, and the
+      # required check still reports success so the PR can merge.
+      - name: Format check only (docs-only change)
+        if: steps.changes.outputs.code != 'true'
+        run: yarn format:check
