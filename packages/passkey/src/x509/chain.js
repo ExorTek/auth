@@ -18,6 +18,13 @@
  * (matching `@simplewebauthn/server` v13.0 behaviour) — an RP may
  * pin an intermediate rather than the root.
  *
+ * Any certificate used as an *issuer* must be a CA (basicConstraints
+ * cA = TRUE, RFC 5280 §6.1.4) — see `assertIssuerIsCa`. We do NOT
+ * consult revocation (CRL/OCSP): that needs network I/O in the verify
+ * hot path plus a cache/offline story, so it is left to the caller /
+ * a future opt-in rather than coupling every ceremony to a CA's CRL
+ * endpoint availability.
+ *
  * Reference: RFC 5280 §6 (Certification Path Validation).
  */
 
@@ -87,6 +94,27 @@ function findIssuerAnchor(cert, anchors) {
  */
 function isAnchor(cert, anchorFingerprints) {
   return anchorFingerprints.has(cert.fingerprint256);
+}
+
+/**
+ * Assert that a certificate acting as an *issuer* is actually a CA
+ * (RFC 5280 §6.1.4 — basicConstraints cA MUST be TRUE for any cert
+ * that signs another). Node exposes this as the boolean `.ca` getter.
+ *
+ * Without this, a leaf/end-entity certificate legitimately issued by a
+ * trusted root (a TLS server cert from the same CA, say) could be
+ * slotted in as an "intermediate" to sign a forged attestation leaf,
+ * and the chain would otherwise validate.
+ *
+ * @param {X509Certificate} signer
+ * @param {number} position  index of the cert being signed (for the message)
+ */
+function assertIssuerIsCa(signer, position) {
+  if (signer.ca !== true) {
+    throw new Error(
+      `x509.verifyChain: issuer of certificate ${position} is not a CA (basicConstraints cA must be TRUE): ${signer.subject.replace(/\n/g, ' ')}`,
+    );
+  }
 }
 
 /**
@@ -161,6 +189,7 @@ export function verifyChain({ x5c, trustAnchors, now = new Date() }) {
       if (!current.checkIssued(signer)) {
         throw new Error(`x509.verifyChain: certificate ${i} not issued by certificate ${i + 1} (DN mismatch)`);
       }
+      assertIssuerIsCa(signer, i);
     } else {
       signer = findIssuerAnchor(current, anchors);
       if (!signer) {
@@ -173,6 +202,7 @@ export function verifyChain({ x5c, trustAnchors, now = new Date() }) {
           `x509.verifyChain: no trust anchor terminates chain (leaf-most orphan subject: ${current.subject.replace(/\n/g, ' ')})`,
         );
       }
+      assertIssuerIsCa(signer, i);
     }
 
     if (!current.verify(signer.publicKey)) {
