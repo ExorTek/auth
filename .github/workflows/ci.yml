@@ -23,11 +23,10 @@ jobs:
           node-version: 22
       - run: corepack enable
       - run: yarn install --immutable
-      - run: yarn typecheck
-      - run: yarn lint
-      - run: yarn format:check
-      # Run test files serially on the 2-core runner: the default
-      # per-CPU parallelism starves the event loop and makes the
-      # real-timer tests (security rate-limit / slow-down / timeout)
-      # miss their deadlines, cascading into cancellations.
-      - run: node --test --test-concurrency=1 'packages/*/tests/**/*.test.js'
+      # Build every package's dist first. Packages import their
+      # @exortek/* workspace deps from the built dist/*.mjs (jwks → jwk,
+      # passkey → challenge / crypto, session → crypto, …); on a fresh
+      # checkout dist/ is absent (gitignored), so without this the
+      # cross-package tests fail with ERR_MODULE_NOT_FOUND.
+      - run: yarn build
+      - run: yarn verify
