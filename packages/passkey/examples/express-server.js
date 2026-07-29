@@ -148,7 +148,6 @@ app.post('/passkey/login/finish', async (req, res, next) => {
   }
 });
 
-// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   if (err instanceof PasskeyError) {
     return res.status(err.status).json({ error: err.code, message: err.message });
