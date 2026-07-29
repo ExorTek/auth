@@ -11,7 +11,7 @@
 
 📖 **Docs:** [**auth.memet.dev/passkey**](https://auth.memet.dev/passkey)
 
-Server-only. For the browser side use `@simplewebauthn/browser` or `@github/webauthn-json`; a companion `@exortek/passkey-browser` will ship separately.
+Server-only. For the browser side use `@simplewebauthn/browser` or `@github/webauthn-json`.
 
 ## Why
 
