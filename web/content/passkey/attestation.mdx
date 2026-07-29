@@ -17,7 +17,7 @@ by `registration.finish` — dispatch happens automatically based on
 | `packed`             | §8.2 | `authData ‖ clientDataHash`                     | self-signed by credential key OR x5c chain to `trustAnchors.packed`      |
 | `fido-u2f`           | §8.6 | U2F Raw Message                                 | single-cert x5c; implicit ES256 / P-256                                  |
 | `apple`              | §8.8 | (nonce = `SHA-256(authData ‖ clientDataHash)`)  | leaf ext `1.2.840.113635.100.8.2` carries nonce; leaf key = cred key     |
-| `android-key`        | §8.4 | `authData ‖ clientDataHash`                     | leaf ext `1.3.6.1.4.1.11129.2.1.17`; `attestationChallenge` = cdHash     |
+| `android-key`        | §8.4 | `authData ‖ clientDataHash`                     | leaf ext `1.3.6.1.4.1.11129.2.1.17`; `attestationChallenge` = cdHash; no `allApplications [600]` |
 | `android-safetynet`  | §8.5 | JWS payload                                     | leaf CN = `attest.android.com`; CTS + timestamp checks                   |
 | `tpm`                | §8.3 | TPMS_ATTEST bytes                               | AIK cert profile (`2.23.133.8.3` EKU, empty subject, SAN)                |
 
@@ -50,6 +50,12 @@ If no anchor is supplied for a format, chain verification is skipped
 (signature still verifies but `attestation.trustPath = 'no-anchor'`).
 This lets you start permissively and tighten later.
 
+To make an unanchored chain-bearing attestation a hard failure instead,
+pass `requireTrustAnchor: true` to `registration.finish`: a format that
+resolves to `'no-anchor'` then throws `ATTESTATION_TRUST_ANCHOR_MISSING`
+(`none` and `packed` self-attestation are exempt — they never had a
+chain to anchor).
+
 <Callout type="info">
   Bundled default root CAs are deliberately NOT shipped in 1.0.0 —
   vendor rotation would make pinning risky, and shipping stale roots
@@ -75,9 +81,12 @@ Timestamp skew tolerance defaults to ±5 minutes; override via
 ## TPM caveat
 
 Deep parsing of the SAN's `tpmManufacturer` / `tpmModel` /
-`tpmVersion` directory attributes is deferred to 1.1 — SAN presence
-is checked, but the internal directory-name attribute walk requires
-extending our DER parser for high-tag-number context-specific tags
-(Keymaster tag numbers 600+ in `android-key` land in the same
-bucket). Signature, name, extraData, EKU, basicConstraints, and
-subject-empty checks all run at 1.0.0.
+`tpmVersion` directory attributes is not enforced — SAN presence is
+checked, but the internal directory-name attribute walk is left for a
+later release. Signature, name, extraData, EKU, basicConstraints, and
+subject-empty checks all run.
+
+(The DER walker _does_ handle high-tag-number context-specific tags —
+that is how `android-key` enforces the absence of Keymaster
+`allApplications [600]`; only the TPM SAN attribute walk above is
+still outstanding.)

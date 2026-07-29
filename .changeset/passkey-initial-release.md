@@ -61,8 +61,17 @@ server-only.
 
 - Full X.509 chain verification with the GHSA-6hxq-p678-4hr2 guard
   (self-signed cert inside `x5c` cannot bypass RP-supplied anchors).
+- Any certificate used as an issuer must be a CA (`basicConstraints
+  cA=TRUE`, RFC 5280 §6.1.4) — stricter than `@simplewebauthn/server`.
 - Intermediate certs recognised as trust anchors (matches
   `@simplewebauthn/server` v13.0 behaviour).
+- Opt-in `requireTrustAnchor` on `registration.finish` — turns an
+  unanchored chain-bearing attestation (`trustPath: 'no-anchor'`) into a
+  hard `ATTESTATION_TRUST_ANCHOR_MISSING` (`none` / packed-self exempt).
+- `android-key` rejects a KeyDescription carrying `allApplications [600]`
+  in either AuthorizationList (§8.4 step 4) — the key must be RP-scoped.
+- Both finish flows reject `response.id !== response.rawId` (parity with
+  `@simplewebauthn/server`).
 - Default root CAs deliberately NOT bundled — vendor rotation
   makes pinning risky; callers supply their own `trustAnchors`.
 
@@ -75,7 +84,7 @@ server-only.
   (AAGUID OID, Apple nonce OID, KeyDescription OID, TCG-KP-AIK EKU).
 - Node's built-in `X509Certificate` + `crypto` for signatures.
 
-**Errors:** `PasskeyError` with 23 `ErrorCode` values — every code has
+**Errors:** `PasskeyError` with 22 `ErrorCode` values — every code has
 a throwing factory (`throwXxx`) that is exercised by tests, including
 the four flag-policy codes (`USER_PRESENCE_REQUIRED`,
 `USER_VERIFICATION_REQUIRED`, `BACKUP_ELIGIBLE_REQUIRED`,
@@ -84,22 +93,28 @@ the four flag-policy codes (`USER_PRESENCE_REQUIRED`,
 **Challenge lifecycle** delegated to `@exortek/challenge`
 (single-use, TTL, method+step binding, replay guard via `IncrStore`).
 
-**Tests:** 296 total, real ECDSA / RSA / Ed25519 signatures produced
+**Tests:** 309 total, real ECDSA / RSA / Ed25519 signatures produced
 via `node:crypto`, X.509 cert chains minted via openssl at test time
 (skipped when openssl absent). Covers packed self + full mode,
 none, fido-u2f, apple, android-key, android-safetynet, tpm; every
-flag-policy `ErrorCode` fires end-to-end.
+flag-policy `ErrorCode` fires end-to-end; plus regression tests for the
+CBOR depth cap, DER length/high-tag parsing, the SafetyNet CN
+subdomain bypass, non-CA issuer rejection, `requireTrustAnchor`, and
+`android-key` `allApplications`.
 
 **Key hygiene:** RSA credential keys with a modulus below 2048 bits
 are rejected at import (both COSE key import and TPM `pubArea` RSA
 branch); packed leaf certificates are rewired against `basicConstraints
 CA:TRUE` per §8.2 step 2.3.
 
-**Deferred to 1.1:**
+**Deliberately out of scope for 1.0.0:**
 
-- `AuthorizationList` security-property checks inside `android-key`
-  KeyDescription (require high-tag-number DER decoding).
+- Remaining `android-key` `AuthorizationList` fields beyond
+  `allApplications` (`origin` = KM_ORIGIN_GENERATED, `purpose` ⊇
+  KM_PURPOSE_SIGN) — matching `@simplewebauthn/server`, which also
+  checks only `allApplications`.
 - TPM `subjectAltName` deep parse for `tpmManufacturer` /
   `tpmModel` / `tpmVersion` directory attributes.
 - Bundled default root CAs per format.
-- `checkCertRevocation` optional CRL/OCSP hook.
+- Online revocation (CRL/OCSP) — kept out of the verify hot path;
+  a cached, opt-in hook is the intended future shape.
