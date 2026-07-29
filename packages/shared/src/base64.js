@@ -26,7 +26,15 @@
  */
 export function encode(bytes, options) {
   const raw = Buffer.from(bytes).toString('base64');
-  return options?.pad === true ? raw : raw.replace(/=+$/, '');
+  if (options?.pad === true) {
+    return raw;
+  }
+  // Linear trailing-'=' strip (see base32.js) — `/=+$/` backtracks O(n^2).
+  let end = raw.length;
+  while (end > 0 && raw.charCodeAt(end - 1) === 0x3d /* '=' */) {
+    end -= 1;
+  }
+  return end === raw.length ? raw : raw.slice(0, end);
 }
 
 /**

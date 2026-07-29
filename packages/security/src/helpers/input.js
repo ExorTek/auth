@@ -239,7 +239,22 @@ export function sanitizeFilename(input, options = {}) {
   name = name.replace(ILLEGAL_FILENAME_CHARS, replacement);
   // Strip leading dots (`.hidden`, `..`) and trailing spaces/dots — the
   // latter causes silent name changes on Windows.
-  name = name.replace(/^\.+/, '').replace(/[ .]+$/, '');
+  // Leading-dot strip is anchored (`^`) and linear. The trailing strip uses a
+  // linear scan, not `/[ .]+$/` — that backtracks O(n^2) on a hostile filename
+  // like `" ".repeat(n) + "x"`, and filenames are attacker-controlled.
+  name = name.replace(/^\.+/, '');
+  let tail = name.length;
+  while (tail > 0) {
+    const c = name.charCodeAt(tail - 1);
+    if (c === 0x20 /* space */ || c === 0x2e /* '.' */) {
+      tail -= 1;
+    } else {
+      break;
+    }
+  }
+  if (tail !== name.length) {
+    name = name.slice(0, tail);
+  }
   if (RESERVED_WINDOWS_NAMES.has(name.split('.')[0].toUpperCase())) {
     name = replacement + name;
   }

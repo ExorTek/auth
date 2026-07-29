@@ -71,7 +71,13 @@ export function provisioningUri(options) {
 
   const params = new URLSearchParams();
   // Strip padding for max compatibility — some scanners choke on `=`.
-  params.set('secret', options.secret.replace(/=+$/, ''));
+  // Linear scan, not `/=+$/` (which backtracks O(n^2) on hostile input).
+  const secret = options.secret;
+  let secEnd = secret.length;
+  while (secEnd > 0 && secret.charCodeAt(secEnd - 1) === 0x3d /* '=' */) {
+    secEnd -= 1;
+  }
+  params.set('secret', secEnd === secret.length ? secret : secret.slice(0, secEnd));
   if (options.issuer) {
     params.set('issuer', options.issuer);
   }

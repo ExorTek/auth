@@ -61,7 +61,11 @@ const UNIT_MS = Object.freeze({
   years: 31_536_000_000,
 });
 
-const DURATION_RE = /^\s*(-?\d+(?:\.\d+)?)\s*([a-z]+)?\s*$/i;
+// Note: no leading/trailing `\s*` — the caller trims first. Two `\s*` runs
+// around the optional unit (`\s*([a-z]+)?\s*`) made this O(n^2) on hostile
+// input like `"1" + " ".repeat(n) + "!"`; trimming plus a single interior
+// `\s*` keeps matching linear.
+const DURATION_RE = /^(-?\d+(?:\.\d+)?)\s*([a-z]+)?$/i;
 
 const SUPPORTED_UNITS = 'ms, s, m, h, d, w, y (and long/plural forms)';
 
@@ -91,7 +95,7 @@ export function parseDuration(input) {
     throw new TypeError(`parseDuration: expected string or number; got ${typeof input}`);
   }
 
-  const match = DURATION_RE.exec(input);
+  const match = DURATION_RE.exec(input.trim());
   if (!match) {
     throw new Error(
       `parseDuration: could not parse ${JSON.stringify(input)}. Examples: 900 (ms), '15m', '2h', '7d', '500ms', '30s'.`,

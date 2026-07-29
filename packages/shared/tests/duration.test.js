@@ -64,3 +64,15 @@ test('rejects non-string non-number inputs', () => {
   assert.throws(() => parseDuration({}), TypeError);
   assert.throws(() => parseDuration([]), TypeError);
 });
+
+test('parses with surrounding whitespace', () => {
+  assert.equal(parseDuration('  15m '), 15 * 60_000);
+  assert.equal(parseDuration('\t2h\n'), 2 * 3_600_000);
+  assert.equal(parseDuration(' 500ms'), 500);
+});
+
+test('rejects a whitespace-flooded string without ReDoS (linear)', () => {
+  // Old regex had two `\s*` runs around the optional unit → O(n^2) on
+  // "1" + spaces + junk. Must throw quickly now, not hang.
+  assert.throws(() => parseDuration('1' + ' '.repeat(500000) + '!'), /could not parse/);
+});

@@ -37,7 +37,7 @@ export const browserRules = [
 
   [
     /(opera mini)\/([\w.-]+)/i,
-    /(opera [mobiletab]{3,6})\b.+version\/([\w.-]+)/i,
+    /(opera [mobileta]{3,6})\b.+version\/([\w.-]+)/i,
     /(opera)(?:.+version\/|[\/ ]+)([\w.]+)/i,
   ],
   [NAME, VERSION],

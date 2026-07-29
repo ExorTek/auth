@@ -43,10 +43,11 @@ export function decodeToString(text) {
   }
 }
 
-export function decodeJson(text) {
+export function decodeJson(text, label) {
   try {
     return sb.decodeJson(text);
   } catch (err) {
-    throw new JwtError(ErrorCode.INVALID_TOKEN, err.message);
+    const where = label ? `${label}: ` : '';
+    throw new JwtError(ErrorCode.INVALID_TOKEN, `${where}${err.message}`);
   }
 }

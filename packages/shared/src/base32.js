@@ -79,7 +79,15 @@ export function decode(input) {
   if (typeof input !== 'string') {
     throw new TypeError('base32.decode: expected a string');
   }
-  const clean = input.replace(/=+$/, '');
+  // Strip trailing '=' padding with a linear scan. `input.replace(/=+$/, '')`
+  // is O(n^2) on hostile input like `"=".repeat(n) + "x"` (the engine retries
+  // the `=+$` match at every position) — a real DoS since decode() takes
+  // attacker-controlled strings.
+  let padEnd = input.length;
+  while (padEnd > 0 && input.charCodeAt(padEnd - 1) === 0x3d /* '=' */) {
+    padEnd -= 1;
+  }
+  const clean = padEnd === input.length ? input : input.slice(0, padEnd);
   const out = Buffer.alloc(Math.floor((clean.length * 5) / 8));
 
   // Same 32-bit masking rationale as encode.

@@ -45,3 +45,11 @@ test('decode: rejects characters outside the alphabet', () => {
   assert.throws(() => decode('MZXW1'), /invalid base32 character/);
   assert.throws(() => decode(123), TypeError);
 });
+
+test('decode: strips heavy trailing padding without ReDoS (linear)', () => {
+  // `MZXW6` decodes to "foo"; a huge run of trailing '=' must be stripped by a
+  // linear scan, not the old O(n^2) /=+$/ backtracking. Completing quickly IS
+  // the assertion — a reintroduced quadratic strip would hang this.
+  const decoded = decode('MZXW6' + '='.repeat(500000));
+  assert.equal(Buffer.from(decoded).toString('utf8'), 'foo');
+});
