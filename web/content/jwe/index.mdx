@@ -1,0 +1,64 @@
+---
+title: '@exortek/jwe — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/jwe`
+
+<Callout type="warning">
+  **Pre-release.** The package surface, algorithm registries, and the
+  unsafe `decode` are on disk, but the encrypt / decrypt core is still
+  under development and `@exortek/jwe` is **not yet published to npm**.
+  This page tracks the intended API.
+</Callout>
+
+JSON Web Encryption for Node.js 22+ — RFC 7516, RFC 7518 §4–§5. Where
+[`@exortek/jws`](/jws) signs a payload so anyone with the public key can
+read it, `@exortek/jwe` *encrypts* it so only the holder of the private
+key can. Server-only, zero runtime dependencies, built on `node:crypto`.
+
+Like every JOSE package here, `decrypt` refuses to trust a token's own
+header: the accepted `alg` and `enc` values are a **mandatory allowlist**,
+and `RSA1_5` — the padding-oracle-prone key-management algorithm — has no
+registry entry at all, mirroring how [`@exortek/jws`](/jws) refuses
+`alg: 'none'`.
+
+## Algorithms
+
+| `alg` (key management)                        | `enc` (content encryption)      |
+| --------------------------------------------- | ------------------------------- |
+| `RSA-OAEP`, `RSA-OAEP-256`                    | `A128GCM`, `A192GCM`, `A256GCM` |
+| `ECDH-ES`, `ECDH-ES+A128KW`, `ECDH-ES+A256KW` | `A128CBC-HS256`, `A256CBC-HS512` |
+| `A128KW`, `A256KW`, `dir`                     |                                 |
+
+## Intended API
+
+```js
+import { jwe } from '@exortek/jwe';
+
+const token = await jwe.encrypt({ userId: 1, scope: 'admin' }, publicKey, {
+  alg: 'ECDH-ES+A256KW',
+  enc: 'A256GCM',
+  expiresIn: '1h',
+});
+
+const { payload } = await jwe.decrypt(token, privateKey, {
+  alg: ['ECDH-ES+A256KW'],
+  enc: ['A256GCM'],
+});
+```
+
+## Available today
+
+`decode` and `decodeProtectedHeader` are implemented — they split and
+base64url-decode a compact JWE's five segments **without** decrypting, for
+inspecting `alg` / `enc` / `kid` before you pick a key. Never gate
+authorisation on them.
+
+```js
+import { decodeProtectedHeader } from '@exortek/jwe';
+
+const { alg, enc, kid } = decodeProtectedHeader(token);
+```

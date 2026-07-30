@@ -8,6 +8,7 @@ export default {
   jwk: '@exortek/jwk',
   jws: '@exortek/jws',
   jwt: '@exortek/jwt',
+  jwe: '@exortek/jwe',
   challenge: '@exortek/challenge',
   apikey: '@exortek/apikey',
   'magic-link': '@exortek/magic-link',
