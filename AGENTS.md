@@ -95,14 +95,36 @@ user who installs a single package pulls no transitive workspace deps.
 The layering above tells you the *semantic* order, not the runtime import
 graph.
 
-**One sanctioned exception:** `@exortek/session` depends on
-`@exortek/crypto` at runtime for the sealed-cookie primitive
-(`seal` / `unseal` / `CryptoError`). It was written before the standalone
-policy was formalised. Do not add new cross-package deps; if session ever
-gets a major refactor, inline the seal helpers to fall in line.
+**Sanctioned cross-package runtime edges.** A handful of packages *do* declare a
+cross-`@exortek/*` runtime dependency where inlining the primitive would be worse
+than the transitive dep. Each is declared in `package.json` `dependencies`:
+
+- `@exortek/session` → `@exortek/crypto` — sealed-cookie primitive
+  (`seal` / `unseal` / `CryptoError`).
+- `@exortek/opaque` → `@exortek/crypto` — hashing + token randomness.
+- `@exortek/passkey` → `@exortek/crypto`, `@exortek/challenge` — COSE/encode
+  helpers + challenge store.
+- `@exortek/jwks` → `@exortek/jwk` — key import/validate.
+
+These are the *only* sanctioned edges. **Do not add new ones** for new work —
+prefer a plain-object boundary or accept the deliberate utility duplication. Use
+`workspace:^` for a sanctioned edge (it publishes as a caret range that dedupes;
+`workspace:*` pins an exact version and can force a duplicate copy in the
+consumer's tree). If `session` ever gets a major refactor, inline the seal
+helpers to drop its edge.
 
 `@exortek/crypto` may only depend on `node:crypto`, with no external
-exceptions.
+exceptions — it is the dependency-light root of the tree.
+
+**`@exortek/shared` is not a cross-package dep — it is inlined at build.** It is
+`private`, ships no `dist`, and its `exports` point straight at `./src/*.js`.
+Every other package imports it (e.g. `@exortek/shared/asserts`,
+`@exortek/shared/predicates`) but **declares it nowhere**; rollup bundles its
+source into each package's `dist` at build time, so a standalone install pulls no
+`shared` dependency. Consequences to respect: never "fix" the missing
+`dependencies` entry (it would break the standalone guarantee), never publish
+`shared`, and note it emits no `.d.ts` of its own — consumer types are inferred
+through re-export at each package's `tsc` emit.
 
 ### Server-only
 

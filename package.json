@@ -2,7 +2,7 @@
   "name": "exortek-auth",
   "private": true,
   "type": "module",
-  "description": "Framework-agnostic authentication toolkit for Node.js — a monorepo of 22 focused packages under the @exortek scope. Built on node:crypto.",
+  "description": "Framework-agnostic authentication toolkit for Node.js — a monorepo of 20 focused packages under the @exortek scope. Built on node:crypto.",
   "homepage": "https://github.com/ExorTek/auth#readme",
   "repository": {
     "type": "git",
