@@ -3,7 +3,7 @@
 > WebAuthn Level 3 / FIDO2 CTAP2 server verification for Node.js 22+ — registration + authentication with an in-house CBOR + COSE + ASN.1 stack, all seven attestation formats, WebAuthn hints, related origins, extension I/O (credProps / largeBlob / prf / hmac-secret / minPinLength / credProtect / appid), FIDO MDS3 verifier + offline AAGUID lookup. Zero non-`@exortek/*` runtime dependencies.
 
 [![npm](https://img.shields.io/npm/v/@exortek/passkey.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/passkey)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://github.com/ExorTek/auth/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/passkey.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/passkey)](https://packagephobia.com/result?p=@exortek/passkey)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
