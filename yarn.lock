@@ -375,6 +375,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@exortek/jwe@workspace:packages/jwe":
+  version: 0.0.0-use.local
+  resolution: "@exortek/jwe@workspace:packages/jwe"
+  languageName: unknown
+  linkType: soft
+
 "@exortek/jwk@workspace:^, @exortek/jwk@workspace:packages/jwk":
   version: 0.0.0-use.local
   resolution: "@exortek/jwk@workspace:packages/jwk"
