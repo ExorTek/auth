@@ -31,6 +31,7 @@ jobs:
           filters: |
             code:
               - 'packages/**'
+              - '!packages/**/*.md'
               - '.github/workflows/**'
               - 'package.json'
               - 'yarn.lock'
