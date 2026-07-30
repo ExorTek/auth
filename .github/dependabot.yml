@@ -11,11 +11,6 @@ updates:
     groups:
       npm:
         patterns: ['*']
-    ignore:
-      # TypeScript 7 is a breaking major the toolchain isn't ready for — don't
-      # let Dependabot keep proposing it. Patch/minor bumps still come through.
-      - dependency-name: typescript
-        update-types: ['version-update:semver-major']
 
   # Keep the CI / CodeQL action pins current.
   - package-ecosystem: github-actions
