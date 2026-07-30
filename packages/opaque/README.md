@@ -5,7 +5,7 @@
 > **Not the OPAQUE PAKE protocol.** This package implements OAuth-style opaque *reference* tokens (RFC 6749 §1.4 / RFC 7662). For the OPAQUE PAKE (CFRG draft), see [`@cloudflare/opaque-ts`](https://www.npmjs.com/package/@cloudflare/opaque-ts).
 
 [![npm](https://img.shields.io/npm/v/@exortek/opaque.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/opaque)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://github.com/ExorTek/auth/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/opaque.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/opaque)](https://packagephobia.com/result?p=@exortek/opaque)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)

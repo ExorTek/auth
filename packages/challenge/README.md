@@ -3,7 +3,7 @@
 > Signed, single-use challenge tokens for multi-step auth flows on Node.js 22+ — HMAC-SHA256, opt-in single-use enforcement, opt-in IP binding, zero non-`@exortek/*` runtime dependencies. Built on `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/challenge.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/challenge)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://github.com/ExorTek/auth/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/challenge.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/challenge)](https://packagephobia.com/result?p=@exortek/challenge)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)

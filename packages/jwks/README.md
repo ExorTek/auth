@@ -3,7 +3,7 @@
 > JSON Web Key Set (RFC 7517 §5) for Node.js 22+ — local key set with zero-downtime rotation, remote JWKS URI fetching with kid-miss refetch, HTTP handler for `/.well-known/jwks.json`. Zero non-`@exortek/*` runtime dependencies. Built on `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/jwks.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/jwks)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://github.com/ExorTek/auth/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/jwks.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/jwks)](https://packagephobia.com/result?p=@exortek/jwks)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)

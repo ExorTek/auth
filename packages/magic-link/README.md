@@ -3,7 +3,7 @@
 > Passwordless email-link auth for Node.js 22+ — HMAC-signed short-lived tokens, single-use enforcement, opt-in per-email rate limiting, email hashed into the payload, memory + Redis stores. Ships the token — you send the email.
 
 [![npm](https://img.shields.io/npm/v/@exortek/magic-link.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/magic-link)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://github.com/ExorTek/auth/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/magic-link.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/magic-link)](https://packagephobia.com/result?p=@exortek/magic-link)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)

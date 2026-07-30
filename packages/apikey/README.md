@@ -3,7 +3,7 @@
 > Stripe-style prefixed API keys for Node.js 22+ — 3-segment tokens (`sk_live_<id>_<secret>`), HMAC-SHA256 storage hash with optional pepper rotation, scope allowlists, memory + Redis stores, Express + Fastify middleware. Zero non-`@exortek/*` runtime dependencies.
 
 [![npm](https://img.shields.io/npm/v/@exortek/apikey.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/apikey)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://github.com/ExorTek/auth/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/apikey.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/apikey)](https://packagephobia.com/result?p=@exortek/apikey)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)

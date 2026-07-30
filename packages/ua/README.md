@@ -3,7 +3,7 @@
 > High-performance User-Agent parser for Node.js 22+ — browser, OS, device, engine, CPU detection + bot/AI crawler taxonomy + Client Hints + request fingerprinting. Zero-dependency, tree-shakeable.
 
 [![npm](https://img.shields.io/npm/v/@exortek/ua.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/ua)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://github.com/ExorTek/auth/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/ua.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/ua)](https://packagephobia.com/result?p=@exortek/ua)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)

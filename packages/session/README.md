@@ -5,8 +5,9 @@
 > cookies, and adapters for Fastify and Express. Built on `@exortek/crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/session.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/session)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
+[![tests](https://github.com/ExorTek/auth/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/session.svg?color=339933)](https://nodejs.org)
+[![install size](https://packagephobia.com/badge?p=@exortek/session)](https://packagephobia.com/result?p=@exortek/session)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![license](https://img.shields.io/npm/l/@exortek/session.svg?color=blue)](./LICENSE)
 
