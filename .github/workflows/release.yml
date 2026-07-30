@@ -47,19 +47,35 @@ jobs:
         run: |
           yarn workspaces foreach --all --topological --no-private npm publish --tolerate-republish --access public
 
-      - name: Tag released versions and push tags
-        if: ${{ !inputs.dry_run }}
-        run: |
-          yarn changeset tag
-          git push --tags
-
-      - name: Create GitHub Releases from tags
+      # Tag each just-published package and cut a GitHub Release for it, with
+      # its CHANGELOG entry as the notes. `gh release create` creates AND pushes
+      # the tag atomically — `changeset tag` + `git push --tags` silently pushed
+      # nothing in CI ("Everything up-to-date"), leaving the Releases page empty.
+      # Idempotent: a package whose release already exists is skipped, so
+      # re-runs and unchanged packages are no-ops. `@exortek/shared` is private
+      # and skipped.
+      - name: Tag + cut GitHub Releases
         if: ${{ !inputs.dry_run }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for tag in $(git tag --points-at HEAD); do
-            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "$tag" --generate-notes
+          sha=$(git rev-parse HEAD)
+          for dir in packages/*/; do
+            name=$(node -p "try{require('./${dir}package.json').name}catch{''}")
+            [ -z "$name" ] && continue
+            private=$(node -p "try{require('./${dir}package.json').private?'y':'n'}catch{'y'}")
+            [ "$private" = "y" ] && continue
+            ver=$(node -p "require('./${dir}package.json').version")
+            tag="${name}@${ver}"
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "skip (exists): $tag"; continue
+            fi
+            notes=$(mktemp)
+            awk '/^## /{c++} c==1{print} c==2{exit}' "${dir}CHANGELOG.md" > "$notes" 2>/dev/null || true
+            [ -s "$notes" ] || echo "Release $tag" > "$notes"
+            gh release create "$tag" --target "$sha" --title "$tag" --notes-file "$notes"
+            rm -f "$notes"
+            echo "created: $tag"
           done
 
       - name: Dry-run notice
