@@ -11,6 +11,13 @@ updates:
     groups:
       npm:
         patterns: ['*']
+    ignore:
+      # TypeScript 7 is a breaking major the toolchain isn't ready for: the docs
+      # site's twoslash transformer (via nextra / @shikijs/twoslash) peers on
+      # `^5.5.0 || ^6.0.0` and hard-fails the web build on TS 7. Don't let
+      # Dependabot keep proposing it. Patch/minor bumps still come through.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
 
   # Keep the CI / CodeQL action pins current.
   - package-ecosystem: github-actions
