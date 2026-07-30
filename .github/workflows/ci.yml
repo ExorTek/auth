@@ -25,7 +25,7 @@ jobs:
       # build + test — but the job must still run and report, because branch
       # protection requires this check. So we always run, and skip the heavy
       # steps below when nothing code-relevant changed.
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: changes
         with:
           filters: |
