@@ -47,20 +47,11 @@ jobs:
         run: |
           yarn workspaces foreach --all --topological --no-private npm publish --tolerate-republish --access public
 
-      - name: Tag released versions and push tags
-        if: ${{ !inputs.dry_run }}
-        run: |
-          yarn changeset tag
-          git push --tags
-
-      - name: Create GitHub Releases from tags
-        if: ${{ !inputs.dry_run }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          for tag in $(git tag --points-at HEAD); do
-            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "$tag" --generate-notes
-          done
+      # NOTE: this workflow only publishes to npm. Git tags and the GitHub
+      # Releases page are created afterwards, locally, with
+      # `./scripts/releases.sh --apply` (`gh release create` per package). The
+      # in-CI `changeset tag` + `git push --tags` approach silently pushed
+      # nothing here ("Everything up-to-date"), so it was moved out.
 
       - name: Dry-run notice
         if: ${{ inputs.dry_run }}
