@@ -233,20 +233,20 @@ Where each protocol is anchored:
 
 | Package         | RFC / spec references                                                        |
 |-----------------|------------------------------------------------------------------------------|
-| `crypto`        | NIST SP 800-108 (KDF), NIST SP 800-38D (GCM), RFC 5869 (HKDF), RFC 8018 (PBKDF2) |
+| `crypto`        | NIST SP 800-108 (KDF), NIST SP 800-38D (GCM), RFC 5869 (HKDF), RFC 8018 (PBKDF2), RFC 8785 (JCS) |
 | `password`      | Argon2 spec (2015), NIST SP 800-63B §5.1.1, OWASP ASVS V2                     |
 | `otp`           | RFC 4226 (HOTP), RFC 6238 (TOTP), Google Authenticator `otpauth://` URI spec |
 | `jwk`           | RFC 7517 (JWK), RFC 7518 §6 (JWK parameters), RFC 7638 (thumbprint), RFC 8037 (OKP), RFC 8812 (secp256k1), RFC 9278 (thumbprint URI) |
 | `jws`           | RFC 7515 (JWS), RFC 7518 §3 (JWA), RFC 7797 (unencoded payload), RFC 8037, RFC 8812, RFC 8725 (BCP) |
-| `jwt`           | RFC 7519 (JWT), RFC 8725 (BCP), RFC 9068 (JWT profile for OAuth2)              |
-| `jwe`           | RFC 7516 (JWE), RFC 7518 §4 (encryption algorithms), RFC 8037 (X25519 / X448)  |
+| `jwt`           | RFC 6749 §10.4 (refresh reuse), RFC 7519 (JWT), RFC 8725 (BCP), RFC 9068 (JWT profile for OAuth2) |
+| `jwe`           | _(planned)_ RFC 7516 (JWE), RFC 7518 §4 (encryption algorithms), RFC 8037 (X25519 / X448) |
 | `jwks`          | RFC 7517 §5 (JWK Set), OpenID Connect Discovery                                |
 | `opaque`        | RFC 7662 (Token Introspection), RFC 7009 (Token Revocation)                   |
-| `paseto`        | PASETO v4 spec                                                                |
+| `paseto`        | _(planned)_ PASETO v4 spec |
 | `session`       | OWASP ASVS 4.0.3 V3, RFC 6265 (Cookies)                                       |
 | `security`      | OWASP ASVS 4.0.3 V13 / V14, RFC 6749 §10 (OAuth2 threats), RFC 7231 §5 (HTTP) |
-| `oauth2`        | RFC 6749, RFC 7636 (PKCE), RFC 9126 (PAR), RFC 8414 (metadata), RFC 8628 (device)|
-| `oidc`          | OpenID Connect Core 1.0, OpenID Connect Discovery                              |
+| `oauth2`        | _(planned)_ RFC 6749, RFC 7636 (PKCE), RFC 9126 (PAR), RFC 8414 (metadata), RFC 8628 (device) |
+| `oidc`          | _(planned)_ OpenID Connect Core 1.0, OpenID Connect Discovery |
 | `passkey`       | W3C WebAuthn Level 3, FIDO2 CTAP2                                             |
 
 For deeper per-package interface tables (JSDoc typedefs, worked API
