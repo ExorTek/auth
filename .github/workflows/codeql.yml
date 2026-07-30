@@ -4,8 +4,14 @@ on:
   workflow_dispatch: # manual run: Actions tab → CodeQL → "Run workflow", or `gh workflow run codeql.yml`
   push:
     branches: [master]
+    paths-ignore: &docs-only
+      - '**/*.md'
+      - 'docs/**'
+      - '.changeset/**'
+      - 'LICENSE'
   pull_request:
     branches: [master]
+    paths-ignore: *docs-only
   schedule:
     - cron: '0 6 * * 1'
 
