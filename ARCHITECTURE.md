@@ -1,7 +1,7 @@
 # Architecture
 
 `@exortek/auth` is a **framework-agnostic, server-only authentication toolkit
-for Node.js 22+**, structured as **22 focused packages** under one npm scope.
+for Node.js 22+**, structured as **20 focused packages** under one npm scope.
 This document describes the design decisions that shape the whole codebase.
 Which packages are currently on npm lives in [`README.md`](./README.md); this
 document is about *why the shape is the shape*.
