@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 
 import { jwe, encrypt, decrypt, decode, decodeProtectedHeader, JweError, ErrorCode } from '../src/index.js';
 import { SUPPORTED as SUPPORTED_ALG } from '../src/internal/algorithms.js';
@@ -67,15 +68,12 @@ test('decode rejects a token without exactly five segments', () => {
   );
 });
 
-// STUBS (replaced by the encryption core; asserted so the marker can't rot silently)
+// END-TO-END SANITY (full matrix lives in roundtrip.test.js)
 
-test('encrypt / decrypt / encryptJson / decryptJson report NOT_IMPLEMENTED for now', async () => {
-  for (const call of [
-    () => encrypt({ a: 1 }, Buffer.alloc(32), { alg: 'dir', enc: 'A256GCM' }),
-    () => decrypt('a.b.c.d.e', Buffer.alloc(32), { alg: ['dir'], enc: ['A256GCM'] }),
-    () => jwe.encryptJson({ a: 1 }, [], {}),
-    () => jwe.decryptJson({}, Buffer.alloc(32), { alg: ['dir'], enc: ['A256GCM'] }),
-  ]) {
-    await assert.rejects(call, err => err instanceof JweError && err.code === ErrorCode.NOT_IMPLEMENTED);
-  }
+test('dir + A256GCM round-trips a JSON payload', async () => {
+  const key = randomBytes(32);
+  const token = await encrypt({ userId: 7 }, key, { alg: 'dir', enc: 'A256GCM' });
+  const { payload, protectedHeader } = await decrypt(token, key, { alg: ['dir'], enc: ['A256GCM'] });
+  assert.deepEqual(payload, { userId: 7 });
+  assert.equal(protectedHeader.alg, 'dir');
 });
