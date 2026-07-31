@@ -1,0 +1,74 @@
+---
+title: 'jwe.decrypt — mandatory alg + enc allowlist'
+sidebarTitle: decrypt
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwe.decrypt`
+
+Decrypt a compact JWE. The accepted `alg` and `enc` values are a **mandatory
+allowlist** — a token is never trusted to select its own algorithms.
+
+```js
+import { decrypt } from '@exortek/jwe';
+
+const { payload, protectedHeader } = await decrypt(token, recipientPrivateKey, {
+  alg: ['ECDH-ES+A256KW'],
+  enc: ['A256GCM'],
+});
+```
+
+## Signature
+
+```ts
+decrypt(token, key, options) → Promise<{ protectedHeader, payload }>
+```
+
+`payload` is parsed JSON when the plaintext is valid JSON, otherwise the raw
+`Buffer` (binary payloads round-trip untouched).
+
+## Options
+
+| Option | Type | Notes |
+| --- | --- | --- |
+| `alg` | `string[]` | **required, non-empty** — else `MISSING_ALG_ALLOWLIST` |
+| `enc` | `string[]` | **required, non-empty** — else `MISSING_ENC_ALLOWLIST` |
+| `maxTokenSize` | `number` | default `8192`; larger tokens raise `TOKEN_TOO_LARGE` before any crypto |
+| `knownCriticalHeaders` | `string[]` | `crit` params you understand |
+| `clockTolerance` | `number` | seconds of leeway when enforcing `exp` |
+
+<Callout type="warning">
+  Leave `alg` or `enc` off and decryption refuses to run. There is no default
+  and no fallback — the single most common JOSE misconfiguration cannot happen
+  here.
+</Callout>
+
+## What gets rejected
+
+| Condition | `ErrorCode` |
+| --- | --- |
+| `alg` / `enc` allowlist missing | `MISSING_ALG_ALLOWLIST` / `MISSING_ENC_ALLOWLIST` |
+| token's `alg` not in allowlist | `ALGORITHM_MISMATCH` |
+| token's `enc` not in allowlist | `ENCRYPTION_MISMATCH` |
+| bad tag, wrong key, tampered segment | `DECRYPTION_FAILED` |
+| unknown `crit` header | `CRIT_UNSUPPORTED` |
+| `exp` in the past | `TOKEN_EXPIRED` |
+| token over `maxTokenSize` | `TOKEN_TOO_LARGE` |
+
+Every integrity failure collapses to `DECRYPTION_FAILED` — nothing about *why*
+leaks to an attacker. See [errors](/jwe/errors) for the full catalogue.
+
+## Example — key by `kid`
+
+```js
+const { alg, enc, kid } = decodeProtectedHeader(token); // unsafe peek
+const key = await myKeyStore.lookup(kid);
+
+const { payload } = await decrypt(token, key, {
+  alg: ['RSA-OAEP-256', 'ECDH-ES+A256KW'],
+  enc: ['A256GCM', 'A128CBC-HS256'],
+});
+```
+
+Next: [JSON serialization →](/jwe/json)

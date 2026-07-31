@@ -1,0 +1,65 @@
+---
+title: 'jwe.encryptJson / decryptJson — JSON serialisation'
+sidebarTitle: json
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwe.encryptJson` / `jwe.decryptJson`
+
+The JWE JSON serialisation (RFC 7516 §7.2) — General and Flattened. The content
+is encrypted once under a single CEK; each recipient's per-recipient header
+carries its own `alg`, so one ciphertext can be unlocked by any one of several
+recipient keys.
+
+```js
+import { encryptJson, decryptJson } from '@exortek/jwe';
+
+const jwe = await encryptJson(payload, [
+  { key: rsaPublicKey, alg: 'RSA-OAEP-256', kid: 'r1' },
+  { key: ecPublicKey, alg: 'ECDH-ES+A256KW', kid: 'e1' },
+], { enc: 'A256GCM' });
+
+// Either recipient recovers the same payload.
+const { payload: out } = await decryptJson(jwe, rsaPrivateKey, {
+  alg: ['RSA-OAEP-256', 'ECDH-ES+A256KW'],
+  enc: ['A256GCM'],
+});
+```
+
+## Signatures
+
+```ts
+encryptJson(payload, recipients, options) → Promise<GeneralJwe>
+decryptJson(jwe, key, options) → Promise<{ protectedHeader, payload }>
+```
+
+`decryptJson` accepts both the General shape (a `recipients` array) and the
+Flattened shape (a single recipient inlined at the top level).
+
+## `encryptJson` options
+
+- **`recipients`** — `[{ key, alg, kid?, header?, apu?, apv? }]`, non-empty.
+- **`options.enc`** — required content-encryption algorithm.
+- **`options.header`** — extra protected params (`enc` lives here).
+- **`options.aad`** — optional JWE AAD (`string` / `Buffer`), bound into the
+  tag and emitted as the `aad` member.
+- **`options.expiresIn`** — stamps `exp` on object payloads.
+
+`decryptJson` takes the same mandatory `alg` + `enc` allowlist as
+[`decrypt`](/jwe/decrypt).
+
+<Callout type="info">
+  `dir` and bare `ECDH-ES` determine the CEK themselves, so they are only valid
+  as the **sole** recipient — pairing them with others raises
+  `INVALID_ARGUMENT`.
+</Callout>
+
+## Additional authenticated data
+
+```js
+const jwe = await encryptJson(payload, recipients, { enc: 'A256GCM', aad: 'tenant-42' });
+// Tampering with jwe.aad (or the protected header) fails the tag → DECRYPTION_FAILED.
+```
+
+Next: [algorithms →](/jwe/algorithms)

@@ -1,0 +1,59 @@
+---
+title: 'JweError — the error catalogue'
+sidebarTitle: errors
+---
+
+# Errors — `JweError`
+
+Every recoverable failure throws a `JweError` with a stable, machine-branchable
+`code` and an HTTP `status` a middleware layer can translate. Branch on `code`,
+never on the message.
+
+```js
+import { JweError, ErrorCode } from '@exortek/jwe';
+
+try {
+  await jwe.decrypt(token, key, { alg: ['dir'], enc: ['A256GCM'] });
+} catch (err) {
+  if (err instanceof JweError && err.code === ErrorCode.DECRYPTION_FAILED) {
+    // wrong key, bad tag, or a tampered token
+  }
+}
+```
+
+## Codes
+
+| `ErrorCode` | `status` | When |
+| --- | :--: | --- |
+| `INVALID_ARGUMENT` | 400 | malformed options / arguments |
+| `UNSUPPORTED_ALGORITHM` | 400 | `alg` not in the registry (includes `RSA1_5`) |
+| `UNSUPPORTED_ENCRYPTION` | 400 | `enc` not in the registry |
+| `MISSING_ALG_ALLOWLIST` | 400 | `decrypt` called without `options.alg` |
+| `MISSING_ENC_ALLOWLIST` | 400 | `decrypt` called without `options.enc` |
+| `INVALID_TOKEN` | 401 | not a five-segment compact JWE |
+| `INVALID_HEADER` | 401 | protected header is not valid JSON / not an object |
+| `INVALID_KEY` | 401 | key shape / type / length wrong for the `alg` |
+| `ALGORITHM_MISMATCH` | 401 | token `alg` outside the allowlist |
+| `ENCRYPTION_MISMATCH` | 401 | token `enc` outside the allowlist |
+| `CRIT_UNSUPPORTED` | 401 | unknown critical header parameter |
+| `DECRYPTION_FAILED` | 401 | bad tag, wrong key, or tampered ciphertext |
+| `KEY_NOT_FOUND` | 401 | no JSON recipient matched the supplied key |
+| `TOKEN_EXPIRED` | 401 | `exp` claim is in the past |
+| `TOKEN_TOO_LARGE` | 413 | token exceeds `maxTokenSize` |
+
+## Shape
+
+`JweError` extends the shared `BaseError`:
+
+```ts
+class JweError extends Error {
+  code: string;    // one of ErrorCode
+  status: number;  // HTTP status for middleware
+  cause?: unknown; // the underlying node:crypto error, when relevant
+}
+```
+
+<br />
+
+All integrity failures deliberately share `DECRYPTION_FAILED` so nothing about
+*why* a token failed leaks to a caller.
