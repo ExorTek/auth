@@ -116,6 +116,11 @@ Runtime restriction to FIPS-approved primitives is available via
 | RSA-PSS               |           ✅           |             ✅             | Available                           |
 | **KDF**               |                       |                           |                                     |
 | HKDF-HMAC-SHA-256+    |           ✅           |             ✅             | Default in `crypto.hash.hkdf`       |
+| Concat KDF (SP 800-56A) |         ✅           |             ✅             | `@exortek/jwe` ECDH-ES derivation   |
+| **Key transport / agreement** |               |                           |                                     |
+| RSA-OAEP (SP 800-56B) |           ✅           |             ✅             | `@exortek/jwe` — JWE key management  |
+| ECDH (SP 800-56A, P-256/384/521) |    ✅         |             ✅             | `@exortek/jwe` — ECDH-ES (NIST curves; X25519 is non-FIPS) |
+| AES Key Wrap (SP 800-38F) |       ✅           |             ✅             | `@exortek/jwe` — A128KW / A256KW     |
 
 When Node is started with the `--enable-fips` flag on a FIPS-enabled
 OpenSSL build, `@exortek/crypto` inherits the OpenSSL restrictions
@@ -179,6 +184,10 @@ never transmit plaintext passwords over the network.
 - ✅ **ASVS V2.9 cryptographic authenticators** — `@exortek/passkey`
   (WebAuthn L3 / FIDO2 CTAP2 server verification, all seven
   attestation formats)
+- ✅ **RFC 7516 JSON Web Encryption (JWE)** — `@exortek/jwe`
+  (RSA-OAEP / ECDH-ES / AES-KW / dir over AES-GCM / AES-CBC-HMAC,
+  FIPS-approved key transport on NIST curves, mandatory `alg` + `enc`
+  allowlist, `RSA1_5` refused)
 - 🟡 **Observability hooks** for SOC 2 / SIEM ingestion — roadmap
 
 ## Reading
