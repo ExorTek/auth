@@ -1,125 +1,117 @@
 ---
-title: '@exortek/auth'
+title: '@exortek/auth — authentication toolkit for Node.js'
+description: 'Framework-agnostic, zero-dependency authentication primitives for Node.js 22+ — password hashing, OTP, sessions, passkeys, API keys, and the full RFC-compliant JOSE stack (JWK/JWS/JWT/JWE/JWKS). Built on node:crypto.'
 sidebarTitle: Introduction
 ---
 
-# `@exortek/auth`
+<div className="home-hero">
 
-A framework-agnostic authentication toolkit for Node.js — built as 20 small packages under one scope. Pick the one you
-need, or install the umbrella.
+<div className="home-eyebrow">Authentication toolkit · Node.js 22+</div>
 
-Every package is built on `node:crypto` with zero required non-`@exortek/*` runtime dependencies. The heaviest primitives
-(Argon2id, bcrypt) come from opt-in peer packages you install only if you use them. Pure JavaScript with JSDoc → `.d.ts`.
-Ships adapters for Express and Fastify — the classic Node HTTP stack.
+<h1 className="home-title">Auth primitives you don't hand-assemble.</h1>
 
-## Shipping
-| Package                                  |                                                            Version                                                             |
-|------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------:|
-| **[`@exortek/crypto`](/crypto)**         |     [![npm](https://img.shields.io/npm/v/@exortek/crypto.svg?color=07d600)](https://www.npmjs.com/package/@exortek/crypto)     |
-| **[`@exortek/security`](/security)**     |   [![npm](https://img.shields.io/npm/v/@exortek/security.svg?color=07d600)](https://www.npmjs.com/package/@exortek/security)   |
-| **[`@exortek/otp`](/otp)**               |        [![npm](https://img.shields.io/npm/v/@exortek/otp.svg?color=07d600)](https://www.npmjs.com/package/@exortek/otp)        |
-| **[`@exortek/password`](/password)**     |   [![npm](https://img.shields.io/npm/v/@exortek/password.svg?color=07d600)](https://www.npmjs.com/package/@exortek/password)   |
-| **[`@exortek/session`](/session)**       |    [![npm](https://img.shields.io/npm/v/@exortek/session.svg?color=07d600)](https://www.npmjs.com/package/@exortek/session)    |
-| **[`@exortek/jwk`](/jwk)**               |        [![npm](https://img.shields.io/npm/v/@exortek/jwk.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jwk)        |
-| **[`@exortek/jws`](/jws)**               |        [![npm](https://img.shields.io/npm/v/@exortek/jws.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jws)        |
-| **[`@exortek/jwt`](/jwt)**               |        [![npm](https://img.shields.io/npm/v/@exortek/jwt.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jwt)        |
-| **[`@exortek/challenge`](/challenge)**   |  [![npm](https://img.shields.io/npm/v/@exortek/challenge.svg?color=07d600)](https://www.npmjs.com/package/@exortek/challenge)  |
-| **[`@exortek/apikey`](/apikey)**         |     [![npm](https://img.shields.io/npm/v/@exortek/apikey.svg?color=07d600)](https://www.npmjs.com/package/@exortek/apikey)     |
-| **[`@exortek/magic-link`](/magic-link)** | [![npm](https://img.shields.io/npm/v/@exortek/magic-link.svg?color=07d600)](https://www.npmjs.com/package/@exortek/magic-link) |
-| **[`@exortek/jwks`](/jwks)**             |       [![npm](https://img.shields.io/npm/v/@exortek/jwks.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jwks)       |
-| **[`@exortek/ua`](/ua)**                 |         [![npm](https://img.shields.io/npm/v/@exortek/ua.svg?color=07d600)](https://www.npmjs.com/package/@exortek/ua)         |
-| **[`@exortek/opaque`](/opaque)**         |     [![npm](https://img.shields.io/npm/v/@exortek/opaque.svg?color=07d600)](https://www.npmjs.com/package/@exortek/opaque)     |
-| **[`@exortek/passkey`](/passkey)**       |    [![npm](https://img.shields.io/npm/v/@exortek/passkey.svg?color=07d600)](https://www.npmjs.com/package/@exortek/passkey)    |
-| **[`@exortek/jwe`](/jwe)**               |        [![npm](https://img.shields.io/npm/v/@exortek/jwe.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jwe)        |
+<div className="home-sub">A framework-agnostic toolkit built as <strong>20 small packages</strong> under one scope — password hashing, OTP, sessions, passkeys, API keys, and the full JOSE stack. Every one is built on <code>node:crypto</code>, ships secure defaults, and installs on its own.</div>
+
+<div className="home-cta">
+  <a className="home-btn home-btn-primary" href="/crypto">Get started →</a>
+  <a className="home-btn home-btn-ghost" href="https://github.com/ExorTek/auth">GitHub ↗</a>
+</div>
+
+<div className="home-stats">
+  <div className="home-stat"><b>16</b><span>packages on npm</span></div>
+  <div className="home-stat"><b>0</b><span>required runtime deps</span></div>
+  <div className="home-stat"><b>22+</b><span>Node.js LTS</span></div>
+  <div className="home-stat"><b>RFC</b><span>-backed throughout</span></div>
+</div>
+
+</div>
+
+<div className="home-grid">
+  <div className="home-card">
+    <div className="home-ico">🔒</div>
+    <h3>Secure by default</h3>
+    <div className="home-card-body">Mandatory algorithm allowlists, timing-safe comparisons, AEAD ciphers, <code>alg:none</code> and <code>RSA1_5</code> refused everywhere.</div>
+  </div>
+  <div className="home-card">
+    <div className="home-ico">📦</div>
+    <h3>Zero-dependency core</h3>
+    <div className="home-card-body">Built on <code>node:crypto</code>. Heavy primitives (Argon2id, bcrypt) are opt-in peers you install only if you use them.</div>
+  </div>
+  <div className="home-card">
+    <div className="home-ico">📐</div>
+    <h3>RFC-compliant JOSE</h3>
+    <div className="home-card-body">JWK · JWS · JWT · JWE · JWKS built to spec, with pinned test vectors — cross-vendor interop, not just self-consistency.</div>
+  </div>
+  <div className="home-card">
+    <div className="home-ico">🧩</div>
+    <h3>Framework-agnostic</h3>
+    <div className="home-card-body">Plain functions everywhere, plus first-class adapters for Express and Fastify. Adopt one package at a time.</div>
+  </div>
+</div>
+
+## A quick taste
+
+```js
+import { argon2 } from '@exortek/password';
+import { sign, verify } from '@exortek/jwt';
+import { jwe } from '@exortek/jwe';
+
+// Hash a password — Argon2id with OWASP defaults.
+const phc = await argon2.hash('correct horse battery staple');
+
+// Mint and check a signed token — the alg allowlist is mandatory.
+const token = await sign({ sub: 'user-1' }, key, { alg: 'ES256', expiresIn: '15m' });
+const { payload } = await verify(token, key, { alg: ['ES256'] });
+
+// Encrypt a token so only the recipient's private key can read it.
+const encrypted = await jwe.encrypt(payload, recipientPublicKey, {
+  alg: 'ECDH-ES+A256KW',
+  enc: 'A256GCM',
+});
+```
+
+New here? Start with the **[Guides](/guides)** for end-to-end flows, or jump into any package below.
 
 ## The stack
 
 Numbers reflect dependency order — a lower number never imports from a higher one, so you can adopt one package at a
 time.
 
-| #  | Package                              | What it does                                                                              |
-|:--:|--------------------------------------|-------------------------------------------------------------------------------------------|
-| 01 | [`@exortek/crypto`](/crypto)         | crypto primitives — the foundation the rest builds on                                     |
-| 02 | [`@exortek/password`](/password)     | Argon2id / scrypt / bcrypt / PBKDF2, strength scoring, HIBP breach check, peppering       |
-| 03 | [`@exortek/otp`](/otp)               | TOTP / HOTP, backup codes, QR provisioning URI                                            |
-| 04 | [`@exortek/challenge`](/challenge)   | HMAC-signed multi-step flow tokens with opt-in single-use + IP binding                    |
-| 05 | [`@exortek/jwk`](/jwk)               | generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278 thumbprints  |
-| 06 | [`@exortek/jws`](/jws)               | JWS compact + JSON, detached (§F), `b64:false`, HS / RS / PS / ES / EdDSA + secp256k1     |
-| 07 | [`@exortek/jwt`](/jwt)               | JWT sign / verify / peek, tokenPair with RFC 6749 §10.4 reuse detection, blacklist stores |
-| 08 | [`@exortek/jwe`](/jwe)               | JWE encrypted payloads — RSA-OAEP, ECDH-ES, AES-KW, dir over AES-GCM / AES-CBC-HMAC       |
-| 09 | [`@exortek/jwks`](/jwks)             | JWKS local key set + remote URI fetching, caching, zero-downtime `kid` rotation           |
-| 10 | [`@exortek/session`](/session)       | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub             |
-| 11 | [`@exortek/security`](/security)     | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers      |
-| 12 | [`@exortek/ua`](/ua)                 | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting            |
-| 13 | [`@exortek/apikey`](/apikey)         | Stripe-style prefixed API keys with HMAC-hashed storage, scopes, and middleware           |
-| 14 | [`@exortek/magic-link`](/magic-link) | passwordless email-link auth — HMAC-signed short-lived tokens with single-use consume     |
-| 15 | [`@exortek/passkey`](/passkey)       | WebAuthn Level 3 / FIDO2 server — all seven attestation formats + MDS3 + AAGUID           |
-| 16 | [`@exortek/opaque`](/opaque)          | opaque reference tokens — RFC 7662 introspection + RFC 7009 revocation                     |
-| 17 | `@exortek/paseto`                    | PASETO v4 (`local` / `public`)                                                            |
-| 18 | `@exortek/oauth2`                    | OAuth 2.1 client (PKCE) + provider presets                                                |
-| 19 | `@exortek/oidc`                      | OpenID Connect on top of `oauth2`                                                         |
-| 20 | `@exortek/auth`                      | umbrella — re-exports every package above                                                 |
+| #  | Package                              | npm | What it does                                                                        |
+|:--:|--------------------------------------|:---:|-------------------------------------------------------------------------------------|
+| 01 | [`@exortek/crypto`](/crypto)         | [![npm](https://img.shields.io/npm/v/@exortek/crypto.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/crypto) | crypto primitives — the foundation the rest builds on                               |
+| 02 | [`@exortek/password`](/password)     | [![npm](https://img.shields.io/npm/v/@exortek/password.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/password) | Argon2id / scrypt / bcrypt / PBKDF2, strength scoring, HIBP breach check, peppering |
+| 03 | [`@exortek/otp`](/otp)               | [![npm](https://img.shields.io/npm/v/@exortek/otp.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/otp) | TOTP / HOTP, backup codes, QR provisioning URI                                      |
+| 04 | [`@exortek/challenge`](/challenge)   | [![npm](https://img.shields.io/npm/v/@exortek/challenge.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/challenge) | HMAC-signed multi-step flow tokens with opt-in single-use + IP binding             |
+| 05 | [`@exortek/jwk`](/jwk)               | [![npm](https://img.shields.io/npm/v/@exortek/jwk.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/jwk) | generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278        |
+| 06 | [`@exortek/jws`](/jws)               | [![npm](https://img.shields.io/npm/v/@exortek/jws.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/jws) | JWS compact + JSON, detached (§F), `b64:false`, HS / RS / PS / ES / EdDSA           |
+| 07 | [`@exortek/jwt`](/jwt)               | [![npm](https://img.shields.io/npm/v/@exortek/jwt.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/jwt) | JWT sign / verify / peek, tokenPair with RFC 6749 §10.4 reuse detection             |
+| 08 | [`@exortek/jwe`](/jwe)               | [![npm](https://img.shields.io/npm/v/@exortek/jwe.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/jwe) | JWE encrypted payloads — RSA-OAEP, ECDH-ES, AES-KW, dir over AES-GCM / AES-CBC-HMAC |
+| 09 | [`@exortek/jwks`](/jwks)             | [![npm](https://img.shields.io/npm/v/@exortek/jwks.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/jwks) | JWKS local key set + remote URI fetching, caching, zero-downtime `kid` rotation     |
+| 10 | [`@exortek/session`](/session)       | [![npm](https://img.shields.io/npm/v/@exortek/session.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/session) | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub       |
+| 11 | [`@exortek/security`](/security)     | [![npm](https://img.shields.io/npm/v/@exortek/security.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/security) | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive helpers     |
+| 12 | [`@exortek/ua`](/ua)                 | [![npm](https://img.shields.io/npm/v/@exortek/ua.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/ua) | User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting      |
+| 13 | [`@exortek/apikey`](/apikey)         | [![npm](https://img.shields.io/npm/v/@exortek/apikey.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/apikey) | Stripe-style prefixed API keys with HMAC-hashed storage, scopes, and middleware     |
+| 14 | [`@exortek/magic-link`](/magic-link) | [![npm](https://img.shields.io/npm/v/@exortek/magic-link.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/magic-link) | passwordless email-link auth — HMAC-signed short-lived single-use tokens            |
+| 15 | [`@exortek/passkey`](/passkey)       | [![npm](https://img.shields.io/npm/v/@exortek/passkey.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/passkey) | WebAuthn Level 3 / FIDO2 server — all seven attestation formats + MDS3 + AAGUID     |
+| 16 | [`@exortek/opaque`](/opaque)         | [![npm](https://img.shields.io/npm/v/@exortek/opaque.svg?label=&color=12b76a)](https://www.npmjs.com/package/@exortek/opaque) | opaque reference tokens — RFC 7662 introspection + RFC 7009 revocation              |
+| 17 | `@exortek/paseto`                    | _planned_ | PASETO v4 (`local` / `public`)                                                     |
+| 18 | `@exortek/oauth2`                    | _planned_ | OAuth 2.1 client (PKCE) + provider presets                                         |
+| 19 | `@exortek/oidc`                      | _planned_ | OpenID Connect on top of `oauth2`                                                  |
+| 20 | `@exortek/auth`                      | _planned_ | umbrella — re-exports every package above                                          |
 
 ## Install
 
-Every published package installs on its own:
+Every published package installs on its own — no meta-package required:
 
 ```bash
-npm install @exortek/crypto
-npm install @exortek/security
-npm install @exortek/otp
-npm install @exortek/password         # + optional: argon2, bcryptjs
-npm install @exortek/session          # + optional: ioredis or redis
-npm install @exortek/jwk
-npm install @exortek/jws
-npm install @exortek/jwt              # + optional: ioredis or redis
-npm install @exortek/challenge        # + optional: ioredis or redis for single-use
-npm install @exortek/apikey           # + optional: ioredis or redis, express or fastify
-npm install @exortek/magic-link       # + optional: ioredis or redis
-npm install @exortek/jwks
-npm install @exortek/jwe
-npm install @exortek/ua               # + optional: express or fastify
-npm install @exortek/opaque           # + optional: ioredis or redis, express or fastify
-npm install @exortek/passkey          # + optional: ioredis or redis, express or fastify
+npm install @exortek/jwt        # or crypto, session, passkey, jwe, …
 ```
 
-Node.js **22 or newer**.
+Node.js **22 or newer**. Full per-package install notes live on each package page.
 
-## Where to next
+## Learn more
 
-- **[`@exortek/crypto` reference →](/crypto)** — every export, every option, every edge case.
-- **[`@exortek/security` reference →](/security)** — CSRF, rate-limit, headers, CORS, safe redirects + 17 helpers +
-  adapters for Fastify and Express.
-- **[`@exortek/otp` reference →](/otp)** — RFC 4226 HOTP + RFC 6238 TOTP with secure defaults, backup codes,
-  provisioning URIs, opt-in replay defense.
-- **[`@exortek/password` reference →](/password)** — Argon2id, scrypt, bcrypt, PBKDF2 under one API +
-  strength / policy / generate / passphrase / pepper (with rotation) / history / HIBP / constant-time verify.
-- **[`@exortek/session` reference →](/session)** — sealed-cookie sessions with rotation, revocation, sudo mode,
-  impersonation, concurrent limits, Redis pub/sub, CSRF derivation, trusted-device cookie, and 4 framework adapters.
-- **[`@exortek/jwk` reference →](/jwk)** — generate / import / export EC · RSA · OKP · oct keys, RFC 7638 + 9278
-  thumbprints, `toPublic()` / `matches()` / strict `use` × `key_ops` consistency.
-- **[`@exortek/jws` reference →](/jws)** — JWS compact + JSON serialisation, detached content, unencoded payload,
-  mandatory `alg` allowlist, `alg: 'none'` refused everywhere, granular `ErrorCode` enum.
-- **[`@exortek/jwe` reference →](/jwe)** — JWE compact + JSON serialisation, RSA-OAEP · ECDH-ES (direct + AES-KW) ·
-  AES-KW · dir over AES-GCM / AES-CBC-HMAC, mandatory `alg` + `enc` allowlist, `RSA1_5` refused everywhere.
-- **[`@exortek/jwt` reference →](/jwt)** — RFC 7519 + 8725 + 9068 JWT with `sign` / `verify` / `peek`, `tokenPair`
-  create / rotate / revoke with RFC 6749 §10.4 reuse detection, memory / Redis / custom stores, 26 error codes.
-- **[`@exortek/challenge` reference →](/challenge)** — HMAC-signed multi-step flow tokens carrying
-  `userId` / `method` / `step` / `nextStep` / `metadata`, opt-in single-use + IP binding, memory / Redis stores.
-- **[`@exortek/apikey` reference →](/apikey)** — Stripe-style prefixed API keys with HMAC-SHA256 storage,
-  optional pepper rotation, scopes (`hasAll` / `hasAny` / wildcards), memory + Redis stores, Express + Fastify
-  middleware.
-- **[`@exortek/magic-link` reference →](/magic-link)** — passwordless email-link auth — HMAC-signed short-lived
-  tokens with single-use consume, opt-in per-email rate limit, memory + Redis stores; you send the email.
-- **[`@exortek/jwks` reference →](/jwks)** — JWK Set (RFC 7517 §5) — local key set with zero-downtime rotation,
-  remote JWKS URI fetching with kid-miss refetch, `/.well-known/jwks.json` handler.
-- **[`@exortek/ua` reference →](/ua)** — User-Agent parsing, device/browser/bot detection, Client Hints,
-  fingerprinting, Express + Fastify middleware, bot-guard.
-- **[`@exortek/opaque` reference →](/opaque)** — opaque reference tokens, RFC 7662 introspection + RFC 7009
-  revocation HTTP handlers, memory + Redis + custom stores.
-- **[`@exortek/passkey` reference →](/passkey)** — WebAuthn Level 3 / FIDO2 server verification with all seven
-  attestation formats, WebAuthn hints, related origins, extension I/O (credProps / largeBlob / prf / hmac-secret /
-  minPinLength / credProtect / appid), plus MDS3 + AAGUID subpaths.
-- **[Source](https://github.com/ExorTek/auth)** — GitHub repo.
-- **[Contributing](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md)** — branch prefixes, commit conventions,
-  changeset flow.
+- **[Guides →](/guides)** — end-to-end flows that combine packages: login, 2FA, passwordless, API keys.
+- **[Compliance mapping →](/compliance)** — where the toolkit sits against NIST / OWASP ASVS / PCI-DSS / FIPS.
+- **[Source](https://github.com/ExorTek/auth)** · **[Contributing](https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md)** — branch prefixes, commit conventions, changeset flow.
