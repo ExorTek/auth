@@ -62,10 +62,18 @@ import { JweError, ErrorCode } from './internal/errors.js';
  * @returns {Buffer}
  */
 function toBytes(value) {
-  if (value === undefined || value === null) return Buffer.alloc(0);
-  if (Buffer.isBuffer(value)) return value;
-  if (value instanceof Uint8Array) return Buffer.from(value);
-  if (typeof value === 'string') return Buffer.from(value, 'utf8');
+  if (value === undefined || value === null) {
+    return Buffer.alloc(0);
+  }
+  if (Buffer.isBuffer(value)) {
+    return value;
+  }
+  if (value instanceof Uint8Array) {
+    return Buffer.from(value);
+  }
+  if (typeof value === 'string') {
+    return Buffer.from(value, 'utf8');
+  }
   throw new JweError(ErrorCode.INVALID_ARGUMENT, 'aad must be a string, Buffer, or Uint8Array.');
 }
 
@@ -114,7 +122,9 @@ export async function encryptJson(payload, recipients, options) {
     const result = wrapCek(alg, enc, recipient.key, { apu: recipient.apu, apv: recipient.apv }, sharedCek);
     cek = result.cek;
     const header = { ...(recipient.header ?? {}), alg: recipient.alg };
-    if (recipient.kid !== undefined) header.kid = recipient.kid;
+    if (recipient.kid !== undefined) {
+      header.kid = recipient.kid;
+    }
     Object.assign(header, result.header);
     return { header, encrypted_key: b64uEncode(result.encryptedKey) };
   });
@@ -129,7 +139,9 @@ export async function encryptJson(payload, recipients, options) {
     ciphertext: b64uEncode(ciphertext),
     tag: b64uEncode(tag),
   };
-  if (encodedAad !== undefined) jwe.aad = encodedAad;
+  if (encodedAad !== undefined) {
+    jwe.aad = encodedAad;
+  }
   return jwe;
 }
 
@@ -196,7 +208,9 @@ export async function decryptJson(jwe, key, options) {
   }
 
   if (cek === undefined || matchedEnc === undefined || matchedHeader === undefined) {
-    if (lastError instanceof JweError) throw lastError;
+    if (lastError instanceof JweError) {
+      throw lastError;
+    }
     throw new JweError(ErrorCode.KEY_NOT_FOUND, 'decryptJson: no recipient could be decrypted with the supplied key.');
   }
 
