@@ -7,7 +7,7 @@
 [![node](https://img.shields.io/node/v/@exortek/security.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/security)](https://packagephobia.com/result?p=@exortek/security)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
-[![license](https://img.shields.io/npm/l/@exortek/security.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/security.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 CSRF, rate limiting, helmet-style headers, CORS, safe redirects, and 17 focused defensive helpers — one install replaces
 `helmet` + `csrf-csrf` + `express-rate-limit` + `express-slow-down` + `cors` + `hpp` + `express-mongo-sanitize`. Adapters
@@ -142,4 +142,4 @@ Codes: `INVALID_ARGUMENT`, `PATH_TRAVERSAL`, `BODY_TOO_LARGE`, `REQUEST_TIMEOUT`
 
 ## License
 
-MIT © ExorTek — see [LICENSE](./LICENSE).
+MIT © ExorTek — see [LICENSE](https://github.com/ExorTek/auth/blob/master/LICENSE).

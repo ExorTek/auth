@@ -7,7 +7,7 @@
 [![node](https://img.shields.io/node/v/@exortek/jwks.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/jwks)](https://packagephobia.com/result?p=@exortek/jwks)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
-[![license](https://img.shields.io/npm/l/@exortek/jwks.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/jwks.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 📖 **Docs:** [**auth.memet.dev/jwks**](https://auth.memet.dev/jwks)
 
@@ -208,4 +208,4 @@ Branch on `err.code`, never on the message.
 
 ## License
 
-MIT © ExorTek — see [LICENSE](./LICENSE).
+MIT © ExorTek — see [LICENSE](https://github.com/ExorTek/auth/blob/master/LICENSE).

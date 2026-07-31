@@ -8,7 +8,7 @@
 [![install size](https://packagephobia.com/badge?p=@exortek/crypto)](https://packagephobia.com/result?p=@exortek/crypto)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![zero-deps](https://img.shields.io/badge/dependencies-0-brightgreen)](./package.json)
-[![license](https://img.shields.io/npm/l/@exortek/crypto.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/crypto.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 Hash, HMAC, KDFs, authenticated encryption, asymmetric signatures, timing-safe compare, sealed tokens, CSPRNG helpers,
 and encoders — all built directly on `node:crypto`. No runtime dependencies, no polyfills, pure ESM with a matching CJS
@@ -166,4 +166,4 @@ A few primitives that are hard to find elsewhere done well:
 
 ## License
 
-MIT © ExorTek — see [LICENSE](./LICENSE).
+MIT © ExorTek — see [LICENSE](https://github.com/ExorTek/auth/blob/master/LICENSE).

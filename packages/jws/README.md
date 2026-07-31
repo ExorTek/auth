@@ -7,7 +7,7 @@
 [![node](https://img.shields.io/node/v/@exortek/jws.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/jws)](https://packagephobia.com/result?p=@exortek/jws)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
-[![license](https://img.shields.io/npm/l/@exortek/jws.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/jws.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 Sign and verify JWS in compact + JSON serialisation, with detached content
 (RFC 7515 Appendix F) and unencoded payloads (RFC 7797). Covers HMAC / RSA /
@@ -234,4 +234,4 @@ credible JS alternative you can plug into your own code path.
 
 ## License
 
-MIT © ExorTek — see [LICENSE](./LICENSE).
+MIT © ExorTek — see [LICENSE](https://github.com/ExorTek/auth/blob/master/LICENSE).

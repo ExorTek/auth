@@ -8,7 +8,7 @@
 [![install size](https://packagephobia.com/badge?p=@exortek/ua)](https://packagephobia.com/result?p=@exortek/ua)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![zero-deps](https://img.shields.io/badge/dependencies-0-brightgreen)](./package.json)
-[![license](https://img.shields.io/npm/l/@exortek/ua.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/ua.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 A full-featured UA parser with 60+ browsers, 30+ operating systems, 150+ device
 models across phones, tablets, TVs, consoles, XR headsets, vehicles, wearables,
@@ -458,4 +458,4 @@ Deliberate omissions — these will **not** be added:
 
 ## License
 
-MIT © ExorTek — see [LICENSE](./LICENSE).
+MIT © ExorTek — see [LICENSE](https://github.com/ExorTek/auth/blob/master/LICENSE).

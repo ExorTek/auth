@@ -7,7 +7,7 @@
 [![node](https://img.shields.io/node/v/@exortek/jwe.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/jwe)](https://packagephobia.com/result?p=@exortek/jwe)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
-[![license](https://img.shields.io/npm/l/@exortek/jwe.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/jwe.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 Encrypt and decrypt JWE in compact + JSON serialisation. Where
 [`@exortek/jws`](https://www.npmjs.com/package/@exortek/jws) signs a payload so
@@ -141,4 +141,4 @@ HTTP `status` for middleware translation.
 
 ## License
 
-[MIT](./LICENSE) © ExorTek.
+[MIT](https://github.com/ExorTek/auth/blob/master/LICENSE) © ExorTek.

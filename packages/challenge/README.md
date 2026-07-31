@@ -7,7 +7,7 @@
 [![node](https://img.shields.io/node/v/@exortek/challenge.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/challenge)](https://packagephobia.com/result?p=@exortek/challenge)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
-[![license](https://img.shields.io/npm/l/@exortek/challenge.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/challenge.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 📖 **Docs:** [**auth.memet.dev/challenge**](https://auth.memet.dev/challenge)
 
@@ -240,4 +240,4 @@ Branch on `err.code`, never on the message. Expected verify failures return a `r
 
 ## License
 
-MIT © ExorTek — see [LICENSE](./LICENSE).
+MIT © ExorTek — see [LICENSE](https://github.com/ExorTek/auth/blob/master/LICENSE).

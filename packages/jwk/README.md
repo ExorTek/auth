@@ -7,7 +7,7 @@
 [![node](https://img.shields.io/node/v/@exortek/jwk.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/jwk)](https://packagephobia.com/result?p=@exortek/jwk)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
-[![license](https://img.shields.io/npm/l/@exortek/jwk.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/jwk.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 Generate, import, export, thumbprint EC / RSA / OKP / oct keys. Modern helpers `jose` doesn't ship:
 `toPublic` (defensive private-member strip), `matches` (thumbprint-based semantic equality),
@@ -167,4 +167,4 @@ credible, audited JS implementation you can plug into your own code path.
 
 ## License
 
-MIT © ExorTek — see [LICENSE](./LICENSE).
+MIT © ExorTek — see [LICENSE](https://github.com/ExorTek/auth/blob/master/LICENSE).
