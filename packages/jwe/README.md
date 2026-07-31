@@ -52,7 +52,7 @@ npm install @exortek/jwe
 
 Node.js **22 or newer**.
 
-## Usage
+## Quick start
 
 ```js
 import { jwe } from '@exortek/jwe';
@@ -116,6 +116,28 @@ Every failure throws a `JweError` with a stable `code` from `ErrorCode`:
 `INVALID_KEY`, `INVALID_HEADER`, `INVALID_TOKEN`, `CRIT_UNSUPPORTED`,
 `DECRYPTION_FAILED`, `TOKEN_TOO_LARGE`, and `TOKEN_EXPIRED`. Each carries an
 HTTP `status` for middleware translation.
+
+## Highlights
+
+- **RFC 7516 Appendix A.3 test vector pinned.** The spec's own A128KW +
+  A128CBC-HS256 example decrypts verbatim — a cross-vendor interop guard.
+- **Mandatory `alg` + `enc` allowlist on `decrypt`.** No default, no fallback;
+  a token never selects its own algorithms.
+- **`RSA1_5` has no registry entry** — the padding-oracle algorithm is refused
+  as `UNSUPPORTED_ALGORITHM`, the same posture jws takes toward `alg: 'none'`.
+- **Algorithm/key confusion caught at the boundary** with `INVALID_KEY`, whether
+  you pass a `KeyObject`, a JWK, a PEM string, or raw key material.
+- **ECDH-ES uses the RFC 7518 §4.6.2 Concat KDF** (SHA-256) — EC P-256/384/521
+  and X25519, direct or with A128/256KW wrap.
+- **AEAD everywhere.** AES-GCM tags and timing-safe AES-CBC-HMAC; any integrity
+  failure collapses to `DECRYPTION_FAILED`.
+- **`maxTokenSize` DoS guard** — default 8 KB, checked before any crypto.
+
+## Links
+
+- **Source:** [github.com/ExorTek/auth](https://github.com/ExorTek/auth)
+- **Issues:** [github.com/ExorTek/auth/issues](https://github.com/ExorTek/auth/issues)
+- **Changelog:** [CHANGELOG.md](./CHANGELOG.md)
 
 ## License
 
