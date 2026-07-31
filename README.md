@@ -1,11 +1,50 @@
 # @exortek/auth
 
-A framework-agnostic authentication toolkit for Node.js — designed as 20 small packages under one scope; **16 are
-published today** (see Shipping below), the rest are planned. Pick the one you need. Built on `node:crypto`.
+**Authentication primitives you don't hand-assemble.** A framework-agnostic toolkit for Node.js 22+, built as 20 small
+packages under one scope — password hashing, OTP, sessions, passkeys, API keys, and the full RFC-compliant JOSE stack.
+Every package is built on `node:crypto`, ships secure defaults, and installs on its own. **16 published today**, the
+rest planned.
 
 [![license](https://img.shields.io/github/license/ExorTek/auth?color=blue)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D22-339933)](https://nodejs.org)
 [![docs](https://img.shields.io/badge/docs-auth.memet.dev-cb3837)](https://auth.memet.dev)
+
+## Why
+
+- **Secure by default** — mandatory algorithm allowlists, timing-safe comparisons, AEAD ciphers; `alg:none` and
+  `RSA1_5` refused everywhere.
+- **Zero-dependency core** — built on `node:crypto`; heavy primitives (Argon2id, bcrypt) are opt-in peers you install
+  only if you use them.
+- **RFC-compliant JOSE** — JWK · JWS · JWT · JWE · JWKS built to spec, with pinned test vectors for cross-vendor interop.
+- **Framework-agnostic** — plain functions everywhere, plus first-class Express and Fastify adapters. Adopt one package
+  at a time.
+
+## Quick example
+
+```js
+import { argon2 } from '@exortek/password';
+import { sign, verify } from '@exortek/jwt';
+import { jwe } from '@exortek/jwe';
+
+// Hash a password — Argon2id with OWASP defaults.
+const phc = await argon2.hash('correct horse battery staple');
+
+// Mint and check a signed token — the alg allowlist is mandatory.
+const token = await sign({ sub: 'user-1' }, key, { alg: 'ES256', expiresIn: '15m' });
+const { payload } = await verify(token, key, { alg: ['ES256'] });
+
+// Encrypt a token so only the recipient's private key can read it.
+const encrypted = await jwe.encrypt(payload, recipientPublicKey, { alg: 'ECDH-ES+A256KW', enc: 'A256GCM' });
+```
+
+## Documentation
+
+Full reference, guides, and compliance mapping live at **[auth.memet.dev](https://auth.memet.dev)**.
+
+- **[Guides →](https://auth.memet.dev/guides)** — end-to-end flows: email + password login, JWT access + refresh, 2FA,
+  passkeys, passwordless magic links, API keys, and more.
+- **[Comparison →](https://auth.memet.dev/comparison)** — how it stacks up against `jose`, `jsonwebtoken`, and Passport.
+- **[Compliance →](https://auth.memet.dev/compliance)** — NIST / OWASP ASVS / PCI-DSS / FIPS mapping.
 
 ## Shipping
 
