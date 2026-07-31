@@ -9,31 +9,29 @@
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![license](https://img.shields.io/npm/l/@exortek/jwe.svg?color=blue)](./LICENSE)
 
-Encrypt and decrypt JWE in compact + JSON serialisation. Covers RSA-OAEP,
-ECDH-ES (direct + key-wrap), AES-KW, and direct (`dir`) key management over
-AES-GCM and AES-CBC-HMAC content encryption. Server-only, zero runtime
-dependencies.
+Encrypt and decrypt JWE in compact + JSON serialisation. Where
+[`@exortek/jws`](https://www.npmjs.com/package/@exortek/jws) signs a payload so
+anyone with the public key can read it, `@exortek/jwe` *encrypts* it so only the
+holder of the private key can. Covers RSA-OAEP, ECDH-ES (direct + key-wrap),
+AES-KW, and direct (`dir`) key management over AES-GCM and AES-CBC-HMAC content
+encryption. Server-only, zero runtime dependencies.
 
 📖 **Docs:** [**auth.memet.dev/jwe**](https://auth.memet.dev/jwe)
-
-> **Status:** early scaffold. The package surface, algorithm registries, and
-> unsafe `decode` are in place; the encrypt / decrypt core is under active
-> development and not yet published.
 
 ## Why
 
 `jose` is the reference JOSE library, but — as with JWS verification — its
 decrypt contract lets you leave the algorithm allowlist off by mistake. This
-package sits deliberately in the JWE layer, is server-only, has zero runtime
-dependencies, and enforces:
+package sits deliberately in the JWE layer, is server-only, and enforces:
 
-- **Mandatory `alg` + `enc` allowlists on `decrypt`.** No default, no fallback.
-- **`RSA1_5` refused everywhere.** No flag, no configuration — the padding-oracle
-  algorithm has no registry entry (`UNSUPPORTED_ALGORITHM`), the same posture
-  `@exortek/jws` takes toward `alg: 'none'`. Tracks
-  `draft-ietf-jose-deprecate-none-rsa15`.
-- **Granular `ErrorCode` enum.** Machine-branchable codes; `switch (err.code)`
-  beats string-matching on `err.message`.
+- **Mandatory `alg` + `enc` allowlists on `decrypt`.** Omitting either raises
+  `MISSING_ALG_ALLOWLIST` / `MISSING_ENC_ALLOWLIST`. No default, no fallback.
+- **`RSA1_5` refused everywhere.** The padding-oracle-prone algorithm has no
+  registry entry (`UNSUPPORTED_ALGORITHM`), the same posture `@exortek/jws`
+  takes toward `alg: 'none'`. Tracks `draft-ietf-jose-deprecate-none-rsa15`.
+- **Every integrity failure collapses to one code.** Bad tag, wrong key, or a
+  tampered segment all raise `DECRYPTION_FAILED` — nothing leaks to an attacker.
+- **Granular `ErrorCode` enum.** `switch (err.code)` beats string-matching.
 
 ## Algorithms
 
@@ -43,7 +41,8 @@ dependencies, and enforces:
 | `ECDH-ES`, `ECDH-ES+A128KW`, `ECDH-ES+A256KW` | `A128CBC-HS256`, `A256CBC-HS512` |
 | `A128KW`, `A256KW`, `dir` | |
 
-`RSA1_5` is intentionally unsupported.
+`RSA1_5` is intentionally unsupported. ECDH-ES accepts EC (P-256/P-384/P-521)
+and X25519 keys.
 
 ## Install
 
@@ -58,17 +57,65 @@ Node.js **22 or newer**.
 ```js
 import { jwe } from '@exortek/jwe';
 
-const token = await jwe.encrypt({ userId: 1, scope: 'admin' }, publicKey, {
+// Recipient has an EC or RSA key pair; you hold only their public key.
+const token = await jwe.encrypt({ userId: 1, scope: 'admin' }, recipientPublicKey, {
   alg: 'ECDH-ES+A256KW',
   enc: 'A256GCM',
   expiresIn: '1h',
 });
 
-const { payload } = await jwe.decrypt(token, privateKey, {
+const { payload, protectedHeader } = await jwe.decrypt(token, recipientPrivateKey, {
   alg: ['ECDH-ES+A256KW'],
   enc: ['A256GCM'],
 });
 ```
+
+Payloads may be a JSON-serialisable value, a string, or raw bytes
+(`Buffer` / `Uint8Array`) — binary round-trips untouched. Keys may be a
+`KeyObject`, a JWK, a PEM string (asymmetric), or raw key material / an `oct`
+JWK (symmetric).
+
+### Direct and symmetric key management
+
+```js
+import { randomBytes } from 'node:crypto';
+
+const key = randomBytes(32); // 256-bit CEK
+const token = await jwe.encrypt({ hello: 'world' }, key, { alg: 'dir', enc: 'A256GCM' });
+const { payload } = await jwe.decrypt(token, key, { alg: ['dir'], enc: ['A256GCM'] });
+```
+
+### JSON serialization (multi-recipient)
+
+```js
+const encrypted = await jwe.encryptJson(payload, [
+  { key: rsaPublicKey, alg: 'RSA-OAEP-256', kid: 'r1' },
+  { key: ecPublicKey, alg: 'ECDH-ES+A256KW', kid: 'e1' },
+], { enc: 'A256GCM' });
+
+// Either recipient's private key recovers the same payload.
+const { payload: out } = await jwe.decryptJson(encrypted, rsaPrivateKey, {
+  alg: ['RSA-OAEP-256', 'ECDH-ES+A256KW'],
+  enc: ['A256GCM'],
+});
+```
+
+### Inspect without decrypting
+
+```js
+import { decodeProtectedHeader } from '@exortek/jwe';
+
+const { alg, enc, kid } = decodeProtectedHeader(token); // never gate auth on this
+```
+
+## Errors
+
+Every failure throws a `JweError` with a stable `code` from `ErrorCode`:
+`MISSING_ALG_ALLOWLIST`, `MISSING_ENC_ALLOWLIST`, `ALGORITHM_MISMATCH`,
+`ENCRYPTION_MISMATCH`, `UNSUPPORTED_ALGORITHM`, `UNSUPPORTED_ENCRYPTION`,
+`INVALID_KEY`, `INVALID_HEADER`, `INVALID_TOKEN`, `CRIT_UNSUPPORTED`,
+`DECRYPTION_FAILED`, `TOKEN_TOO_LARGE`, and `TOKEN_EXPIRED`. Each carries an
+HTTP `status` for middleware translation.
 
 ## License
 
