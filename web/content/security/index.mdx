@@ -7,6 +7,11 @@ import { Callout, Tabs } from 'nextra/components';
 
 # `@exortek/security`
 
+<Callout type="info">
+  **Hardening an app?** The [CSRF + security headers guide](/guides/security-hardening)
+  wires up double-submit CSRF and a secure header baseline.
+</Callout>
+
 Framework-agnostic defensive HTTP layer for Node.js 22+. CSRF, rate limiting, helmet-style headers, CORS, safe
 redirects, and 17 focused helpers — everything built on `node:crypto`, `node:path`, and (only if you import the Fastify
 adapter) `fastify-plugin`.
