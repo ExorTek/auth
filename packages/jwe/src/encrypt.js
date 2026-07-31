@@ -1,16 +1,22 @@
 /**
- * Compact JWE production — `encrypt(payload, key, options)` (RFC 7516 §3.1).
+ * Compact JWE production — `encrypt(payload, key, options)` (RFC 7516 §3.1 / §7.1).
  *
- * SCAFFOLD: the signature and options contract are frozen here so the
- * public surface and types are stable; the encryption core (CEK
- * generation, `alg` key-management wrap, `enc` AEAD, 5-segment assembly)
- * lands in the next implementation commit.
+ * Generates (or derives) the Content Encryption Key via the `alg`
+ * key-management step, encrypts the payload under the `enc` AEAD binding
+ * the protected header as Additional Authenticated Data, and assembles
+ * the five-segment compact serialization.
  */
 
-import { JweError, ErrorCode } from './internal/errors.js';
+import { lookup as lookupAlg } from './internal/algorithms.js';
+import { lookup as lookupEnc } from './internal/encryptions.js';
+import { wrapCek } from './internal/keymgmt.js';
+import { contentEncrypt } from './internal/content.js';
+import { encodePlaintext } from './internal/common.js';
+import { encode as b64uEncode, encodeJson as b64uEncodeJson } from './internal/base64url.js';
+import { assertObject, assertNonEmptyString } from './internal/guards.js';
 
 /**
- * @typedef {import('node:crypto').KeyObject | Buffer | Uint8Array | Record<string, unknown>} KeyInput
+ * @typedef {import('./internal/keys.js').KeyInput} KeyInput
  */
 
 /**
@@ -21,22 +27,50 @@ import { JweError, ErrorCode } from './internal/errors.js';
  *   `'A256GCM'`, `'A128CBC-HS256'`.
  * @property {string} [kid]  Key ID written to the protected header.
  * @property {Record<string, unknown>} [header]  Extra protected-header
- *   params, merged after `alg` / `enc` / `kid` (those are never overridden).
+ *   params, merged first; `alg` / `enc` / `kid` and the key-management
+ *   params (`epk` / `apu` / `apv`) always win over them.
  * @property {string | number} [expiresIn]  When the payload is a JSON
- *   object, stamp an `exp` claim this far in the future.
+ *   object, stamp an `exp` claim this far in the future (duration string
+ *   like `'1h'`, or milliseconds).
+ * @property {string | Buffer | Uint8Array} [apu]  ECDH-ES Agreement
+ *   PartyUInfo. Ignored by non-ECDH algorithms.
+ * @property {string | Buffer | Uint8Array} [apv]  ECDH-ES Agreement PartyVInfo.
  */
 
 /**
  * Encrypt a payload into a compact JWE string.
  *
- * @param {unknown} _payload
- * @param {KeyInput} _key
- * @param {EncryptOptions} _options
+ * @param {unknown} payload  A JSON-serialisable value, a string, or raw
+ *   bytes (`Buffer` / `Uint8Array`).
+ * @param {KeyInput} key  The recipient key — a public key / JWK for
+ *   RSA-OAEP and ECDH-ES, symmetric key material for AES-KW and `dir`.
+ * @param {EncryptOptions} options
  * @returns {Promise<string>}
  */
-export async function encrypt(_payload, _key, _options) {
-  throw new JweError(
-    ErrorCode.NOT_IMPLEMENTED,
-    'jwe.encrypt is not implemented yet — the encryption core lands in a follow-up commit.',
+export async function encrypt(payload, key, options) {
+  assertObject(options, 'encrypt.options');
+  assertNonEmptyString(options.alg, 'encrypt.options.alg');
+  assertNonEmptyString(options.enc, 'encrypt.options.enc');
+
+  const alg = lookupAlg(options.alg);
+  const enc = lookupEnc(options.enc);
+
+  const plaintext = encodePlaintext(payload, options);
+  const { cek, encryptedKey, header: kmHeader } = wrapCek(alg, enc, key, { apu: options.apu, apv: options.apv });
+
+  const protectedHeader = { ...(options.header ?? {}) };
+  protectedHeader.alg = options.alg;
+  protectedHeader.enc = options.enc;
+  if (options.kid !== undefined) {
+    protectedHeader.kid = options.kid;
+  }
+  Object.assign(protectedHeader, kmHeader);
+
+  const encodedProtected = b64uEncodeJson(protectedHeader);
+  const aad = Buffer.from(encodedProtected, 'ascii');
+  const { iv, ciphertext, tag } = contentEncrypt(enc, cek, plaintext, aad);
+
+  return [encodedProtected, b64uEncode(encryptedKey), b64uEncode(iv), b64uEncode(ciphertext), b64uEncode(tag)].join(
+    '.',
   );
 }
