@@ -1,0 +1,87 @@
+---
+title: 'Guide — Multi-step auth flow'
+description: 'Carry a login across steps (password → MFA) with @exortek/challenge — signed, short-lived flow tokens instead of stashing half-logged-in state in the session.'
+sidebarTitle: Multi-step auth flow
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Multi-step auth flow
+
+A login that spans steps — password, then a second factor — needs to carry
+"the password succeeded, MFA is still pending" between requests. Stashing that in
+the session invites bugs (a half-authenticated session is a footgun).
+[`@exortek/challenge`](/challenge) issues a **signed, short-lived flow token**
+that names exactly where the user is, and nothing more.
+
+<Steps>
+
+### Step 1 — password succeeds, issue a challenge
+
+```js
+import { createChallenge } from '@exortek/challenge';
+
+const SECRET = process.env.CHALLENGE_SECRET; // ≥ 32 bytes
+
+app.post('/login', async (req, res) => {
+  const user = await verifyPassword(req.body); // see the password guide
+  if (!user) return res.status(401).json({ error: 'invalid credentials' });
+
+  if (!user.mfaEnabled) return finishLogin(res, user); // no second factor
+
+  const token = await createChallenge({
+    secret: SECRET,
+    userId: user.id,
+    method: 'password',
+    step: 'pw_verified',
+    nextStep: 'mfa',
+    expiresIn: '5m',
+  });
+
+  res.json({ mfaRequired: true, challenge: token });
+});
+```
+
+### Step 2 — verify the challenge, then the OTP
+
+```js
+import { verifyChallenge } from '@exortek/challenge';
+import { verifyTotp } from '@exortek/otp';
+
+app.post('/login/mfa', async (req, res) => {
+  const result = await verifyChallenge(req.body.challenge, {
+    secret: SECRET,
+    expectedMethod: 'password',
+    expectedStep: 'pw_verified',
+  });
+  if (!result.valid) return res.status(401).json({ error: result.reason }); // expired / tampered / wrong step
+
+  const user = await db.users.find(result.payload.userId);
+  const ok = await verifyTotp(req.body.code, user.totpSecret, { window: 1 });
+  if (!ok) return res.status(401).json({ error: 'invalid code' });
+
+  finishLogin(res, user); // only now is the user fully authenticated
+});
+```
+
+</Steps>
+
+<Callout type="info">
+  Opt into single-use + IP binding on the challenge to stop a captured flow token
+  from being replayed or used from another host — see the
+  [package reference](/challenge).
+</Callout>
+
+## Why a challenge token beats session state
+
+- **The state is explicit and signed** — `method` / `step` / `nextStep` travel in
+  the token; a tampered or expired one fails `verifyChallenge`.
+- **No half-authenticated session** — the user isn't "logged in" until the final
+  step; there's no partial session for other code to mistake for a real one.
+- **Short-lived by construction** — `expiresIn: '5m'` bounds the window between
+  steps without a cleanup job.
+
+This composes with any second factor — swap `verifyTotp` for the
+[passkey](/guides/passkey) or [magic link](/guides/magic-link) flow.
+
+Next: [Nested JWT — sign then encrypt →](/guides/nested-jwt)

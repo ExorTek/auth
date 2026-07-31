@@ -1,0 +1,127 @@
+/* Landing-page styles for content/index.mdx. Kept in a global stylesheet
+   (not an MDX <style> tag) so it never hydrates as a React element. */
+
+.home-hero {
+  margin: 1rem 0 2.5rem;
+}
+.home-eyebrow {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #12b76a;
+  margin: 0 0 0.75rem;
+}
+.home-title {
+  font-size: clamp(2rem, 5vw, 3.1rem);
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 1rem;
+  max-width: 20ch;
+}
+.home-sub {
+  font-size: 1.075rem;
+  line-height: 1.6;
+  max-width: 62ch;
+  color: #4b5563;
+  margin: 0 0 1.5rem;
+}
+.home-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+}
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.15rem;
+  border-radius: 0.55rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition:
+    transform 0.08s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.home-btn:hover {
+  transform: translateY(-1px);
+}
+.home-btn-primary {
+  background: #12b76a;
+  color: #04120b;
+}
+.home-btn-primary:hover {
+  background: #10a862;
+}
+.home-btn-ghost {
+  border-color: #d1d5db;
+  color: inherit;
+}
+.home-btn-ghost:hover {
+  border-color: #12b76a;
+}
+.home-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e5e7eb;
+}
+.home-stat b {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.home-stat span {
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.home-grid {
+  display: grid;
+  gap: 1rem;
+  margin: 2rem 0 2.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.home-card {
+  padding: 1.2rem 1.25rem;
+  border-radius: 0.7rem;
+  border: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+.home-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.home-card-body {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #6b7280;
+}
+.home-ico {
+  font-size: 1.2rem;
+}
+
+html.dark .home-sub,
+html.dark .home-stat span,
+html.dark .home-card-body {
+  color: #9aa4b2;
+}
+html.dark .home-stats {
+  border-top-color: #2a2f3a;
+}
+html.dark .home-btn-ghost {
+  border-color: #2a2f3a;
+}
+html.dark .home-card {
+  background: #14171d;
+  border-color: #262b34;
+}

@@ -19,6 +19,7 @@ doesn't apply — a "🟢 N/A" is fine, empty checkbox lists are noise.
 - [ ] `@exortek/jwk`
 - [ ] `@exortek/jws`
 - [ ] `@exortek/jwt`
+- [ ] `@exortek/jwe`
 - [ ] `@exortek/challenge`
 - [ ] `@exortek/apikey`
 - [ ] `@exortek/magic-link`

@@ -1,6 +1,6 @@
 # @exortek/auth
 
-A framework-agnostic authentication toolkit for Node.js — designed as 20 small packages under one scope; **15 are
+A framework-agnostic authentication toolkit for Node.js — designed as 20 small packages under one scope; **16 are
 published today** (see Shipping below), the rest are planned. Pick the one you need. Built on `node:crypto`.
 
 [![license](https://img.shields.io/github/license/ExorTek/auth?color=blue)](./LICENSE)
@@ -26,6 +26,7 @@ published today** (see Shipping below), the rest are planned. Pick the one you n
 | [`@exortek/ua`](./packages/ua) — User-Agent parsing, device/browser/bot detection, Client Hints, fingerprinting + Express/Fastify middleware + bot-guard |      [![npm](https://img.shields.io/npm/v/@exortek/ua.svg?color=07d600)](https://www.npmjs.com/package/@exortek/ua)      | [auth.memet.dev/ua](https://auth.memet.dev/ua) |
 | [`@exortek/opaque`](./packages/opaque) — opaque reference tokens, RFC 7662 introspection + RFC 7009 revocation HTTP handlers, memory / Redis stores |      [![npm](https://img.shields.io/npm/v/@exortek/opaque.svg?color=07d600)](https://www.npmjs.com/package/@exortek/opaque)      | [auth.memet.dev/opaque](https://auth.memet.dev/opaque) |
 | [`@exortek/passkey`](./packages/passkey) — WebAuthn Level 3 / FIDO2 server verification, all seven attestation formats, MDS3 + AAGUID subpaths, extension I/O |      [![npm](https://img.shields.io/npm/v/@exortek/passkey.svg?color=07d600)](https://www.npmjs.com/package/@exortek/passkey)      | [auth.memet.dev/passkey](https://auth.memet.dev/passkey) |
+| [`@exortek/jwe`](./packages/jwe) — JSON Web Encryption (RFC 7516) — compact + JSON serialisation, RSA-OAEP · ECDH-ES (direct + A128/256KW) · AES-KW · dir over AES-GCM / AES-CBC-HMAC, mandatory alg+enc allowlist, `RSA1_5` refused |      [![npm](https://img.shields.io/npm/v/@exortek/jwe.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jwe)      | [auth.memet.dev/jwe](https://auth.memet.dev/jwe) |
 
 ## The stack
 
@@ -41,7 +42,7 @@ Linked entries are **published on npm**; the rest are **planned** and not yet in
 | 05 | [`@exortek/jwk`](./packages/jwk)           | shipped   | generate / import / export JWK ↔ PEM (EC · RSA · OKP · oct), RFC 7638 + 9278 thumbprints |
 | 06 | [`@exortek/jws`](./packages/jws)           | shipped   | JWS compact + JSON, detached, `b64:false`, HS / RS / PS / ES / EdDSA + secp256k1          |
 | 07 | [`@exortek/jwt`](./packages/jwt)           | shipped   | JWT sign / verify / peek, tokenPair with RFC 6749 §10.4 reuse detection, blacklist stores |
-| 08 | `@exortek/jwe`                             | _planned_ | JWE encrypted payloads (RSA-OAEP, A256KW, dir)                                           |
+| 08 | [`@exortek/jwe`](./packages/jwe)           | shipped   | JWE encrypted payloads — RSA-OAEP, ECDH-ES (direct + A128/256KW), AES-KW, dir over AES-GCM / AES-CBC-HMAC |
 | 09 | [`@exortek/jwks`](./packages/jwks)         | shipped   | JWKS local key set + remote URI fetching, caching, zero-downtime `kid` rotation          |
 | 10 | [`@exortek/session`](./packages/session)   | shipped   | sealed cookies, rotation, revocation, sudo mode, impersonation, Redis pub/sub            |
 | 11 | [`@exortek/security`](./packages/security) | shipped   | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect + defensive HTTP helpers     |
@@ -72,6 +73,7 @@ npm install @exortek/challenge
 npm install @exortek/apikey             # + optional: ioredis or redis, express or fastify
 npm install @exortek/magic-link         # + optional: ioredis or redis
 npm install @exortek/jwks
+npm install @exortek/jwe
 npm install @exortek/ua                 # + optional: express or fastify
 npm install @exortek/opaque             # + optional: ioredis or redis, express or fastify
 npm install @exortek/passkey            # + optional: ioredis or redis, express or fastify

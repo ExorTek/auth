@@ -1,0 +1,40 @@
+---
+title: 'jwe.decode — UNSAFE header inspection'
+sidebarTitle: decode
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwe.decode` / `jwe.decodeProtectedHeader`
+
+Split and base64url-decode a compact JWE **without decrypting it**. Useful for
+reading `alg` / `enc` / `kid` to pick a key before calling
+[`decrypt`](/jwe/decrypt).
+
+<Callout type="error">
+  These never decrypt and never authenticate. **Never gate authorisation on
+  their output** — anything real must go through `decrypt`.
+</Callout>
+
+## Signatures
+
+```ts
+decode(token) → { header, encryptedKey, iv, ciphertext, tag }   // all Buffers except header
+decodeProtectedHeader(token) → Record<string, unknown>
+```
+
+## Example
+
+```js
+import { decode, decodeProtectedHeader } from '@exortek/jwe';
+
+const { alg, enc, kid } = decodeProtectedHeader(token);
+// → { alg: 'ECDH-ES+A256KW', enc: 'A256GCM', kid: 'e1', epk: { … } }
+
+const parts = decode(token);
+parts.encryptedKey.length; // 0 for `dir` and bare `ECDH-ES`
+```
+
+A token that is not five `.`-separated segments raises `INVALID_TOKEN`.
+
+Next: [algorithms →](/jwe/algorithms)

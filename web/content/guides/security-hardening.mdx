@@ -1,0 +1,88 @@
+---
+title: 'Guide — CSRF + security headers'
+description: 'Harden a web app with @exortek/security: double-submit CSRF tokens with __Host- cookies and a secure baseline of response headers (CSP, HSTS, nosniff, and more).'
+sidebarTitle: CSRF + headers
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# CSRF + security headers
+
+Two defences every browser-facing app needs, from [`@exortek/security`](/security):
+**CSRF** protection so a third-party site can't act as your user, and a **secure
+baseline of response headers** so the browser enforces your policy.
+
+## CSRF — double-submit tokens
+
+<Steps>
+
+### Issue — set the token as a `__Host-` cookie
+
+```js
+import { csrf } from '@exortek/security';
+
+const SECRET = process.env.CSRF_SECRET; // ≥ 32 bytes
+
+app.get('*', (req, res, next) => {
+  const token = csrf.generate(SECRET);
+  // __Host- forbids Domain and requires Secure + Path=/ — closes subdomain attacks.
+  res.setHeader('Set-Cookie', `__Host-csrf=${token}; HttpOnly; Secure; SameSite=Strict; Path=/`);
+  res.locals.csrfToken = token; // expose to your template so the form can echo it
+  next();
+});
+```
+
+### Verify — check cookie against header on writes
+
+```js
+function requireCsrf(req, res, next) {
+  const fromCookie = parseCookie(req)['__Host-csrf'];
+  const fromHeader = req.get('x-csrf-token');
+  if (!csrf.verify(fromCookie, fromHeader, SECRET)) {
+    return res.status(403).json({ error: 'csrf check failed' });
+  }
+  next();
+}
+
+app.post('/transfer', requireCsrf, handler);
+```
+
+</Steps>
+
+<Callout type="info">
+  `csrf.verify` is timing-safe and returns `true` only when both values are
+  present, structurally valid, and match. The client reads the cookie and echoes
+  it in the `X-CSRF-Token` header — the classic double-submit pattern.
+</Callout>
+
+## Security headers — a secure baseline
+
+```js
+import { headers } from '@exortek/security';
+
+// Called with no arguments, `headers()` already emits a secure default set
+// (strict CSP, HSTS, nosniff, frame-ancestors, …). Override only what you need.
+const map = headers({
+  hsts: { maxAge: 31_536_000, includeSubDomains: true, preload: true },
+  contentSecurityPolicy: {
+    directives: {
+      scriptSrc: ["'self'", 'https://cdn.example.com'],
+    },
+  },
+  frameguard: 'SAMEORIGIN',
+});
+
+app.use((req, res, next) => {
+  for (const [k, v] of Object.entries(map)) res.setHeader(k, v);
+  next();
+});
+```
+
+## Going further
+
+`@exortek/security` also ships `rateLimit` (fixed-window / token-bucket, memory
+or Redis), `cors`, safe-redirect validation, and webhook-signature verification
+(including Stripe) — plus Fastify and Express adapters. See the
+[package reference](/security).
+
+Next: [Nested JWT — sign then encrypt →](/guides/nested-jwt)

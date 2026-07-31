@@ -1,0 +1,86 @@
+---
+title: '@exortek/jwe — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/jwe`
+
+<Callout type="info">
+  **Hiding JWT claims?** The [Nested JWT guide](/guides/nested-jwt) shows the
+  sign-then-encrypt pattern end to end.
+</Callout>
+
+JSON Web Encryption for Node.js 22+ — RFC 7516, RFC 7518 §4–§5. Where
+[`@exortek/jws`](/jws) signs a payload so anyone with the public key can
+read it, `@exortek/jwe` *encrypts* it so only the holder of the private
+key can. Server-only, zero runtime dependencies, built on `node:crypto`.
+
+Like every JOSE package here, `decrypt` refuses to trust a token's own
+header: the accepted `alg` and `enc` values are a **mandatory allowlist**,
+and `RSA1_5` — the padding-oracle-prone key-management algorithm — has no
+registry entry at all, mirroring how [`@exortek/jws`](/jws) refuses
+`alg: 'none'`.
+
+## Algorithms
+
+| `alg` (key management)                        | `enc` (content encryption)       |
+| --------------------------------------------- | -------------------------------- |
+| `RSA-OAEP`, `RSA-OAEP-256`                    | `A128GCM`, `A192GCM`, `A256GCM`  |
+| `ECDH-ES`, `ECDH-ES+A128KW`, `ECDH-ES+A256KW` | `A128CBC-HS256`, `A256CBC-HS512` |
+| `A128KW`, `A256KW`, `dir`                     |                                  |
+
+`RSA1_5` is intentionally unsupported. ECDH-ES accepts EC (P-256/P-384/P-521)
+and X25519 keys.
+
+## Quick start
+
+```js
+import { jwe } from '@exortek/jwe';
+
+const token = await jwe.encrypt({ userId: 1, scope: 'admin' }, recipientPublicKey, {
+  alg: 'ECDH-ES+A256KW',
+  enc: 'A256GCM',
+  expiresIn: '1h',
+});
+
+const { payload } = await jwe.decrypt(token, recipientPrivateKey, {
+  alg: ['ECDH-ES+A256KW'],
+  enc: ['A256GCM'],
+});
+```
+
+Payloads may be a JSON value, a string, or raw bytes. Keys may be a
+`KeyObject`, a JWK, a PEM string (asymmetric), or raw key material / an
+`oct` JWK (symmetric).
+
+## JSON serialization
+
+`encryptJson` / `decryptJson` produce and consume the General and
+Flattened JSON serializations, including multi-recipient enveloping where
+one ciphertext is unlocked by any one of several recipient keys.
+
+```js
+const encrypted = await jwe.encryptJson(payload, [
+  { key: rsaPublicKey, alg: 'RSA-OAEP-256', kid: 'r1' },
+  { key: ecPublicKey, alg: 'ECDH-ES+A256KW', kid: 'e1' },
+], { enc: 'A256GCM' });
+
+const { payload: out } = await jwe.decryptJson(encrypted, rsaPrivateKey, {
+  alg: ['RSA-OAEP-256', 'ECDH-ES+A256KW'],
+  enc: ['A256GCM'],
+});
+```
+
+## Inspect without decrypting
+
+`decode` and `decodeProtectedHeader` split and base64url-decode a compact
+JWE's five segments **without** decrypting, for reading `alg` / `enc` /
+`kid` before you pick a key. Never gate authorisation on them.
+
+```js
+import { decodeProtectedHeader } from '@exortek/jwe';
+
+const { alg, enc, kid } = decodeProtectedHeader(token);
+```

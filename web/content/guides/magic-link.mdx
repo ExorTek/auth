@@ -1,0 +1,80 @@
+---
+title: 'Guide — Passwordless magic link'
+description: 'Build passwordless email sign-in with @exortek/magic-link: mint a signed, single-use, short-lived link, email it, and consume it on the callback.'
+sidebarTitle: Passwordless magic link
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Passwordless magic link
+
+Sign users in with an emailed link — no password to store or leak. Tokens are
+HMAC-signed, short-lived, and **single-use**; you send the email, the library
+does the crypto and the one-time consume.
+
+<Callout type="warning">
+  Keep `MAGIC_LINK_SECRET` in an environment variable, at least 32 bytes of
+  randomness. Rotating it invalidates every outstanding link.
+</Callout>
+
+<Steps>
+
+### Request — email the link
+
+```js
+import { createMagicLink } from '@exortek/magic-link';
+import { memoryStore } from '@exortek/magic-link/stores';
+
+const SECRET = process.env.MAGIC_LINK_SECRET;
+const store = memoryStore(); // or redisStore(client) across workers
+
+app.post('/auth/magic', async (req, res) => {
+  const { url } = await createMagicLink({
+    secret: SECRET,
+    email: req.body.email,
+    baseUrl: 'https://myapp.com/auth/verify',
+    expiresIn: '15m',
+    redirectTo: '/dashboard',
+    store,
+  });
+
+  await mailer.send(req.body.email, `Sign in: ${url}`); // YOUR mailer
+
+  // Always answer the same way, whether or not the email exists — don't leak
+  // which addresses have accounts.
+  res.json({ ok: true });
+});
+```
+
+### Verify — consume on the callback
+
+```js
+import { verifyMagicLink } from '@exortek/magic-link';
+
+app.get('/auth/verify', async (req, res) => {
+  const result = await verifyMagicLink(req.query.token, { secret: SECRET, store });
+  if (!result.valid) return res.status(401).send(result.reason);
+
+  // result = { valid: true, id, email, redirectTo?, metadata? }
+  const user = await db.users.upsertByEmail(result.email);
+  await startSession(res, user); // e.g. @exortek/session
+
+  res.redirect(result.redirectTo ?? '/');
+});
+```
+
+</Steps>
+
+## Why single-use matters
+
+The token is consumed on first verify, so a link that leaks (email forwarding,
+browser history, a shared inbox) can't be replayed. Combine it with
+`expiresIn` for a tight window, and opt into the per-email rate limit to blunt
+enumeration and spam — see the [package reference](/magic-link).
+
+<Callout type="info">
+  Pass `metadata` to `createMagicLink` to carry intent through the round-trip —
+  e.g. `{ invitedTo: 'team_42' }` — and read it back off the verify result.
+</Callout>
+
+Next: [API key gateway →](/guides/api-keys)

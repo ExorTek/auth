@@ -1,0 +1,86 @@
+---
+title: 'Guide — Opaque tokens + introspection'
+description: 'Issue revocable, opaque reference tokens with @exortek/opaque — random strings whose meaning lives only in your store — with instant revocation and RFC 7662 introspection.'
+sidebarTitle: Opaque tokens
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Opaque tokens + introspection
+
+A JWT carries its claims in the open — anyone can decode it, and you can't
+revoke it before it expires. An **opaque** token from [`@exortek/opaque`](/opaque)
+carries nothing: it's a random string, and only your store knows what it means.
+That makes revocation instant and metadata private.
+
+<Steps>
+
+### Issue — mint a token, keep only its hash
+
+```js
+import { create } from '@exortek/opaque';
+import { memoryStore } from '@exortek/opaque/stores';
+
+const store = memoryStore(); // or redisStore(client) across workers
+
+app.post('/tokens', async (req, res) => {
+  const { token, expiresAt } = await create({
+    format: 'hex',
+    store,
+    expiresIn: '1h',
+    metadata: { userId: req.user.id, scope: 'read write' },
+  });
+
+  // `token` is a random string, shown once. Only its hash lives in the store.
+  res.json({ token, expiresAt });
+});
+```
+
+### Verify — resolve the token on each request
+
+```js
+import { verify } from '@exortek/opaque';
+
+async function requireToken(req, res, next) {
+  const token = (req.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
+  const result = await verify(token, { store });
+  if (!result.valid) return res.status(401).json({ error: result.reason }); // not_found | expired | revoked
+  req.tokenRaw = token;
+  req.user = result.metadata; // { userId, scope }
+  next();
+}
+```
+
+### Revoke — kill it instantly
+
+```js
+import { revoke } from '@exortek/opaque';
+
+app.post('/logout', requireToken, async (req, res) => {
+  await revoke(req.tokenRaw, { store });
+  res.json({ ok: true }); // the next verify returns { valid: false, reason: 'revoked' }
+});
+```
+
+</Steps>
+
+<Callout type="info">
+  Serving a resource server in a different process? `@exortek/opaque` ships
+  ready-made **RFC 7662 introspection** and **RFC 7009 revocation** HTTP handlers
+  so another service can ask "is this token still good?" over HTTP — see the
+  [package reference](/opaque).
+</Callout>
+
+## Opaque vs JWT — when to reach for which
+
+| | Opaque | JWT |
+| --- | --- | --- |
+| Revocation | instant (delete the store row) | wait out `exp`, or maintain a blacklist |
+| Metadata visibility | server-only | readable by anyone holding the token |
+| Verification | a store lookup | a signature check, no I/O |
+| Best for | sessions, API tokens you must revoke | stateless, high-throughput, cross-service |
+
+Reach for opaque when **revocability and privacy** matter more than avoiding a
+store lookup. Need stateless instead? See [JWT access + refresh](/guides/jwt-access-refresh).
+
+Next: [CSRF + security headers →](/guides/security-hardening)

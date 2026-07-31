@@ -1,0 +1,67 @@
+---
+title: 'Comparison — @exortek/auth vs jose, jsonwebtoken, Passport'
+description: 'An honest look at how @exortek/auth is positioned next to jose, jsonwebtoken, and Passport.js — scope, dependencies, secure defaults, and where each one fits.'
+sidebarTitle: Comparison
+---
+
+import { Callout } from 'nextra/components';
+
+# How it compares
+
+The Node ecosystem already has excellent auth libraries. `@exortek/auth` isn't
+trying to replace all of them — it occupies a specific spot: **a broad suite of
+small, standards-based primitives with secure defaults, built on `node:crypto`.**
+
+<Callout type="info">
+  This is a positioning guide, not a takedown. `jose` in particular is a
+  first-rate library — if all you need is JOSE, it's a great choice. The table
+  below is about *scope and defaults*, not quality.
+</Callout>
+
+## At a glance
+
+| | `@exortek/auth` | [`jose`](https://github.com/panva/jose) | [`jsonwebtoken`](https://github.com/auth0/node-jsonwebtoken) | [`passport`](https://www.passportjs.org/) |
+| --- | :---: | :---: | :---: | :---: |
+| Scope | full suite | JOSE only | JWT only | strategy framework |
+| Runtime dependencies | none | none | several | several (+ per-strategy) |
+| Built on `node:crypto` | ✅ | ✅ | partial | varies |
+| Mandatory JWT `alg` allowlist | ✅ | ✅ | opt-in | strategy-dependent |
+| `alg:none` / `RSA1_5` refused | ✅ | ✅ | historically footgun | n/a |
+| Refresh **reuse detection** | ✅ built in | — | — | — |
+| Password hashing (Argon2id…) | ✅ | — | — | — |
+| TOTP / OTP | ✅ | — | — | via strategies |
+| Passkeys / WebAuthn (FIDO2) | ✅ | — | — | via strategies |
+| Sessions (sealed cookies) | ✅ | — | — | via `express-session` |
+| API keys, magic links | ✅ | — | — | — |
+| First-class types | ✅ (JSDoc → `.d.ts`) | ✅ | `@types/*` | `@types/*` |
+
+## Where each one fits
+
+**[`jose`](https://github.com/panva/jose)** — the reference JOSE implementation.
+Focused, zero-dependency, and strict about algorithms. If your problem is purely
+JWK/JWS/JWT/JWE and you're happy assembling the surrounding auth yourself, it's
+an excellent pick. `@exortek/auth`'s JOSE packages cover the same specs and add
+turn-key helpers (e.g. [`tokenPair`](/jwt/token-pair) reuse detection) plus the
+rest of the auth stack in the same house style.
+
+**[`jsonwebtoken`](https://github.com/auth0/node-jsonwebtoken)** — battle-tested
+and everywhere, but it predates a lot of modern secure defaults: the algorithm
+allowlist is opt-in, which has produced a decade of `alg` confusion incidents.
+[`@exortek/jwt`](/jwt) makes the allowlist mandatory and refuses `alg:none`
+outright.
+
+**[`passport`](https://www.passportjs.org/)** — not a primitives library but a
+middleware framework with 500+ strategies. Great when you're wiring up OAuth
+providers and want the strategy ecosystem. `@exortek/auth` sits a layer below:
+plain functions you compose yourself, framework-agnostic, with Express/Fastify
+adapters where a middleware shape helps.
+
+## The design bet
+
+Every `@exortek/*` primitive ships a **high-level helper** so you never
+hand-assemble crypto: `tokenPair` instead of rolling refresh rotation, `enroll`
+instead of stitching TOTP by hand, `passkey` verification instead of parsing
+attestation formats yourself. Secure defaults are the *default* — the insecure
+path usually isn't reachable at all.
+
+See the [Guides](/guides) for what that looks like end to end.

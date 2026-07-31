@@ -99,7 +99,7 @@ Status legend: ✅ shipped to npm · 🛠 on disk, pre-release · ⏳ planned.
 | 05 | `@exortek/jwk`         |   ✅   | JWK — generate, import, export, thumbprint, per RFC 7517 / 7638 / 8037 / 9278       |
 | 06 | `@exortek/jws`         |   ✅   | JWS — sign / verify / detached / b64:false / JSON serialisation per RFC 7515 / 7797  |
 | 07 | `@exortek/jwt`         |   ✅   | JWT — sign / verify with algorithm allowlists + claims validation per RFC 7519      |
-| 08 | `@exortek/jwe`         |   ⏳   | JWE — RSA-OAEP, ECDH-ES, A256KW, dir per RFC 7516                                    |
+| 08 | `@exortek/jwe`         |   ✅   | JWE — RSA-OAEP, ECDH-ES, A256KW, dir per RFC 7516                                    |
 | 09 | `@exortek/jwks`        |   ✅   | JWKS URI fetching, caching, `kid` rotation per RFC 7517 §5                           |
 | 10 | `@exortek/session`     |   ✅   | Sealed-cookie sessions, rotation, revocation, sudo mode, Redis pub/sub              |
 | 11 | `@exortek/security`    |   ✅   | CSRF, rate-limit, helmet-style headers, CORS, safe-redirect, defensive HTTP helpers  |
@@ -239,7 +239,7 @@ Where each protocol is anchored:
 | `jwk`           | RFC 7517 (JWK), RFC 7518 §6 (JWK parameters), RFC 7638 (thumbprint), RFC 8037 (OKP), RFC 8812 (secp256k1), RFC 9278 (thumbprint URI) |
 | `jws`           | RFC 7515 (JWS), RFC 7518 §3 (JWA), RFC 7797 (unencoded payload), RFC 8037, RFC 8812, RFC 8725 (BCP) |
 | `jwt`           | RFC 6749 §10.4 (refresh reuse), RFC 7519 (JWT), RFC 8725 (BCP), RFC 9068 (JWT profile for OAuth2) |
-| `jwe`           | _(planned)_ RFC 7516 (JWE), RFC 7518 §4 (encryption algorithms), RFC 8037 (X25519 / X448) |
+| `jwe`           | RFC 7516 (JWE), RFC 7518 §4–§5 (key management + content encryption), RFC 8725 (BCP) |
 | `jwks`          | RFC 7517 §5 (JWK Set), OpenID Connect Discovery                                |
 | `opaque`        | RFC 7662 (Token Introspection), RFC 7009 (Token Revocation)                   |
 | `paseto`        | _(planned)_ PASETO v4 spec |

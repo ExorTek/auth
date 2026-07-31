@@ -1,5 +1,6 @@
 export default {
   index: 'Introduction',
+  guides: 'Guides',
   crypto: '@exortek/crypto',
   security: '@exortek/security',
   otp: '@exortek/otp',
@@ -8,6 +9,7 @@ export default {
   jwk: '@exortek/jwk',
   jws: '@exortek/jws',
   jwt: '@exortek/jwt',
+  jwe: '@exortek/jwe',
   challenge: '@exortek/challenge',
   apikey: '@exortek/apikey',
   'magic-link': '@exortek/magic-link',
@@ -15,5 +17,6 @@ export default {
   ua: '@exortek/ua',
   opaque: '@exortek/opaque',
   passkey: '@exortek/passkey',
+  comparison: 'Comparison',
   compliance: 'Compliance',
 };

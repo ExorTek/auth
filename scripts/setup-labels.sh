@@ -34,6 +34,7 @@ LABELS=(
   "pkg:jwk|bfd4f2|Concerns @exortek/jwk"
   "pkg:jws|d4c5f9|Concerns @exortek/jws"
   "pkg:jwt|f9d0c4|Concerns @exortek/jwt"
+  "pkg:jwe|d0f0c0|Concerns @exortek/jwe"
   "pkg:challenge|a2eeef|Concerns @exortek/challenge"
   "pkg:apikey|c2e0c6|Concerns @exortek/apikey"
   "pkg:magic-link|fef2c0|Concerns @exortek/magic-link"

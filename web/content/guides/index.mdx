@@ -1,0 +1,56 @@
+---
+title: 'Guides — end-to-end auth flows'
+description: 'Practical, copy-pasteable recipes that combine @exortek/* packages into complete authentication flows: two-factor auth, passwordless magic links, and API key gateways.'
+sidebarTitle: Overview
+---
+
+# Guides
+
+The package references document every export in isolation. These guides do the
+opposite: they wire packages together into **complete, copy-pasteable flows** —
+the kind of thing you actually ship.
+
+Each guide is framework-agnostic. The examples use Express-style
+`req` / `res` handlers, but the `@exortek/*` calls are plain functions — drop
+them into Fastify, a route handler, or a background job unchanged.
+
+## Recipes
+
+- **[Email + password login →](/guides/password-login)** — Argon2id hashing,
+  constant-time verify with silent rehash, and sealed session cookies.
+  Uses [`@exortek/password`](/password) + [`@exortek/session`](/session).
+- **[JWT access + refresh →](/guides/jwt-access-refresh)** — short-lived access
+  tokens, rotating refresh tokens, and RFC 6749 §10.4 reuse detection.
+  Uses [`@exortek/jwt`](/jwt).
+- **[Two-factor auth (TOTP) →](/guides/two-factor)** — enrol an authenticator
+  app, verify 6-digit codes, and fall back to backup codes.
+  Uses [`@exortek/otp`](/otp).
+- **[Passwordless magic link →](/guides/magic-link)** — email a signed,
+  single-use sign-in link and consume it on the way back.
+  Uses [`@exortek/magic-link`](/magic-link).
+- **[API key gateway →](/guides/api-keys)** — issue Stripe-style prefixed keys,
+  store only their hash, and gate routes by scope.
+  Uses [`@exortek/apikey`](/apikey).
+- **[Verify third-party JWTs (JWKS) →](/guides/jwks-verify)** — validate tokens
+  from another service or IdP, and publish your own rotating JWKS.
+  Uses [`@exortek/jwks`](/jwks) + [`@exortek/jwt`](/jwt).
+- **[Passkey (WebAuthn) →](/guides/passkey)** — passwordless, phishing-resistant
+  registration and login ceremonies.
+  Uses [`@exortek/passkey`](/passkey).
+- **[Multi-step auth flow →](/guides/multi-step)** — carry a login across steps
+  (password → MFA) with signed, short-lived challenge tokens.
+  Uses [`@exortek/challenge`](/challenge).
+- **[Opaque tokens →](/guides/opaque-tokens)** — revocable reference tokens whose
+  meaning lives only in your store, with introspection.
+  Uses [`@exortek/opaque`](/opaque).
+- **[Nested JWT (JWE) →](/guides/nested-jwt)** — sign then encrypt so JWT claims
+  stay private in transit while authenticity is still provable.
+  Uses [`@exortek/jwt`](/jwt) + [`@exortek/jwe`](/jwe).
+- **[CSRF + security headers →](/guides/security-hardening)** — double-submit CSRF
+  tokens and a secure baseline of response headers.
+  Uses [`@exortek/security`](/security).
+
+<br />
+
+Want a flow that isn't here yet? Every package page has its own Quick start, and
+the [stack overview](/) shows how they layer.

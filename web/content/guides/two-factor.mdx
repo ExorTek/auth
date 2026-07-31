@@ -1,0 +1,90 @@
+---
+title: 'Guide — Two-factor auth (TOTP)'
+description: 'Add TOTP two-factor authentication with @exortek/otp: enrol an authenticator app via a QR provisioning URI, verify 6-digit codes, and support backup codes.'
+sidebarTitle: Two-factor auth (TOTP)
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Two-factor auth (TOTP)
+
+Add an authenticator-app second factor (Google Authenticator, 1Password, …)
+with [`@exortek/otp`](/otp). RFC 6238 TOTP, backup codes, and a QR provisioning
+URI — you render the QR and store the secret.
+
+<Steps>
+
+### Enrol — mint a secret and show the QR
+
+```js
+import { enroll } from '@exortek/otp';
+
+app.post('/2fa/setup', async (req, res) => {
+  const { secret, uri, backupCodes } = enroll({
+    label: req.user.email, // shown in the authenticator app
+    issuer: 'MyApp',
+  });
+
+  // Persist the secret against the user, and store *hashes* of the backup
+  // codes — never the raw codes. Mark 2FA as "pending" until confirmed.
+  await db.users.update(req.user.id, {
+    totpSecret: secret,
+    totpPending: true,
+    backupCodes: await Promise.all(backupCodes.map(hashCode)),
+  });
+
+  // `uri` is an otpauth:// URL — render it as a QR with any QR library.
+  res.json({ uri, backupCodes }); // show backupCodes once, then discard
+});
+```
+
+### Confirm — verify the first code before enabling
+
+```js
+import { verifyTotp } from '@exortek/otp';
+
+app.post('/2fa/confirm', async (req, res) => {
+  const user = await db.users.find(req.user.id);
+  const ok = await verifyTotp(req.body.code, user.totpSecret, { window: 1 });
+  if (!ok) return res.status(401).json({ error: 'invalid code' });
+
+  await db.users.update(user.id, { totpPending: false, totpEnabled: true });
+  res.json({ enabled: true });
+});
+```
+
+### Challenge — verify at login
+
+```js
+app.post('/login/2fa', async (req, res) => {
+  const user = await db.users.find(req.session.pendingUserId);
+
+  const ok = await verifyTotp(req.body.code, user.totpSecret, { window: 1 });
+  if (ok) return finishLogin(req, res, user);
+
+  // Fall back to a one-time backup code.
+  const match = await consumeBackupCode(user, req.body.code);
+  if (match) return finishLogin(req, res, user);
+
+  res.status(401).json({ error: 'invalid code' });
+});
+```
+
+</Steps>
+
+<Callout type="info">
+  `window: 1` accepts the current 30-second step plus one on either side, which
+  absorbs clock drift. Raise it only if you must — each extra step widens the
+  replay window. `@exortek/otp` also ships opt-in replay defense; see the
+  [package reference](/otp).
+</Callout>
+
+## What to store
+
+| Value | Store as |
+| --- | --- |
+| TOTP `secret` | encrypted at rest (e.g. wrap it with [`@exortek/jwe`](/jwe) `dir`) |
+| backup codes | **hashes only** — treat them like passwords |
+| enabled / pending flags | plain columns |
+
+Next: [Passwordless magic link →](/guides/magic-link)

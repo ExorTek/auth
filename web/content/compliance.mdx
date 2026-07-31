@@ -108,6 +108,10 @@ building blocks (constant-time compare, timing-safe verify).
 | ECDSA (P-256/384/521)  |    ✅    |    ✅     | Available            |
 | Ed25519                |    ✅    |    ✅     | Available            |
 | HKDF-HMAC-SHA-256+     |    ✅    |    ✅     | Default              |
+| Concat KDF (SP 800-56A)|    ✅    |    ✅     | `@exortek/jwe` ECDH-ES |
+| RSA-OAEP (SP 800-56B)  |    ✅    |    ✅     | `@exortek/jwe`       |
+| ECDH (NIST P-curves)   |    ✅    |    ✅     | `@exortek/jwe` (X25519 non-FIPS) |
+| AES Key Wrap (SP 800-38F) | ✅   |    ✅     | `@exortek/jwe` A*KW  |
 
 When Node is started with `--enable-fips` on a FIPS-enabled OpenSSL,
 `@exortek/crypto` inherits the OS restrictions automatically.
@@ -155,6 +159,8 @@ never transmit plaintext passwords over the network.
   `@exortek/opaque`, framework-agnostic handlers (see table above)
 - ✅ **ASVS V2.9 cryptographic authenticators** — `@exortek/passkey`
   (WebAuthn L3 / FIDO2 CTAP2 server verification)
+- ✅ **RFC 7516 JSON Web Encryption (JWE)** — `@exortek/jwe`
+  (RSA-OAEP / ECDH-ES / AES-KW / dir, mandatory `alg` + `enc` allowlist)
 - 🟡 **Observability hooks** for SOC 2 / SIEM — roadmap
 
 ## Reading

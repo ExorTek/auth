@@ -1,0 +1,147 @@
+---
+title: 'Guide — Passkey registration + login'
+description: 'Add passwordless passkeys (WebAuthn / FIDO2) with @exortek/passkey: registration and authentication ceremonies, challenge storage, and what to persist per credential.'
+sidebarTitle: Passkey (WebAuthn)
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Passkey registration + login
+
+Passwordless, phishing-resistant sign-in with [`@exortek/passkey`](/passkey) —
+WebAuthn Level 3 / FIDO2 server verification. Each ceremony is two calls: your
+server issues a challenge (`begin`), the browser talks to the authenticator,
+then your server verifies the response (`finish`).
+
+<Callout type="info">
+  The challenge is single-use and stored in an `IncrStore` — reuse
+  [`@exortek/challenge`](/challenge)'s store so you don't add a dependency.
+</Callout>
+
+## Registration — enrol a passkey
+
+<Steps>
+
+### Begin — issue creation options
+
+```js
+import { registration } from '@exortek/passkey';
+import { memoryIncrStore } from '@exortek/challenge/stores';
+
+const challengeStore = memoryIncrStore();
+const CHALLENGE_SECRET = process.env.PASSKEY_CHALLENGE_SECRET;
+const RP = { id: 'example.com', name: 'Example' };
+
+app.post('/passkey/register/begin', async (req, res) => {
+  const { options, challengeToken } = await registration.begin({
+    rp: RP,
+    user: { id: req.user.id, name: req.user.email, displayName: req.user.name },
+    challengeSecret: CHALLENGE_SECRET,
+    challengeStore,
+  });
+
+  // Send `options` to the browser; keep `challengeToken` for the finish step
+  // (a cookie or short-lived session field is fine — it's signed).
+  res.json({ options, challengeToken });
+});
+```
+
+### Browser — create the credential
+
+```js
+// Client-side: hand `options` to the authenticator, post the result back.
+const credential = await navigator.credentials.create(options);
+await fetch('/passkey/register/finish', {
+  method: 'POST',
+  body: JSON.stringify({ response: credential, challengeToken }),
+});
+```
+
+### Finish — verify and store the credential
+
+```js
+app.post('/passkey/register/finish', async (req, res) => {
+  const { credential } = await registration.finish({
+    response: req.body.response,
+    challengeToken: req.body.challengeToken,
+    expectedRpId: RP.id,
+    expectedOrigin: 'https://example.com',
+    challengeSecret: CHALLENGE_SECRET,
+    challengeStore,
+  });
+
+  // Persist what you need to authenticate later.
+  await db.credentials.create({
+    userId: req.user.id,
+    credentialId: credential.id, // base64url
+    publicKey: credential.publicKey,
+    counter: credential.counter,
+    transports: credential.transports,
+  });
+
+  res.json({ ok: true });
+});
+```
+
+</Steps>
+
+## Login — authenticate with a passkey
+
+<Steps>
+
+### Begin — issue request options
+
+```js
+import { authentication } from '@exortek/passkey';
+
+app.post('/passkey/login/begin', async (req, res) => {
+  // Optionally scope to a known user's credentials; omit for usernameless login.
+  const creds = await db.credentials.byEmail(req.body.email);
+
+  const { options, challengeToken } = await authentication.begin({
+    rpId: RP.id,
+    challengeSecret: CHALLENGE_SECRET,
+    challengeStore,
+    allowCredentials: creds.map(c => ({ id: c.credentialId, transports: c.transports })),
+    userVerification: 'preferred',
+  });
+
+  res.json({ options, challengeToken });
+});
+```
+
+### Finish — verify the assertion
+
+```js
+app.post('/passkey/login/finish', async (req, res) => {
+  const stored = await db.credentials.byId(req.body.response.id);
+  if (!stored) return res.status(401).json({ error: 'unknown credential' });
+
+  const result = await authentication.finish({
+    response: req.body.response,
+    challengeToken: req.body.challengeToken,
+    expectedRpId: RP.id,
+    expectedOrigin: 'https://example.com',
+    challengeSecret: CHALLENGE_SECRET,
+    challengeStore,
+    credential: { id: stored.credentialId, publicKey: stored.publicKey, counter: stored.counter },
+  });
+
+  // Persist the new signature counter to detect cloned authenticators.
+  await db.credentials.update(stored.id, { counter: result.newCounter });
+
+  await startSession(res, stored.userId); // e.g. @exortek/session
+  res.json({ ok: true });
+});
+```
+
+</Steps>
+
+<Callout type="warning">
+  Always verify `expectedRpId` and `expectedOrigin` against your real values, and
+  store the returned signature counter — a counter that goes backwards signals a
+  cloned authenticator. `@exortek/passkey` checks all seven attestation formats
+  and supports MDS3 / AAGUID metadata; see the [package reference](/passkey).
+</Callout>
+
+Next: [Multi-step auth flow →](/guides/multi-step)

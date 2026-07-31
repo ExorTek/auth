@@ -1,0 +1,59 @@
+---
+title: 'JWE algorithms — alg + enc reference'
+sidebarTitle: algorithms
+---
+
+import { Callout } from 'nextra/components';
+
+# Algorithms
+
+A JWE names two algorithms: **`alg`** decides how the Content Encryption Key
+(CEK) is established, and **`enc`** decides how the payload is encrypted under
+that CEK.
+
+## `alg` — key management
+
+| `alg` | Mechanism | Key type |
+| --- | --- | --- |
+| `RSA-OAEP` | RSA-OAEP (SHA-1) wraps a random CEK | RSA (≥ 2048-bit) |
+| `RSA-OAEP-256` | RSA-OAEP (SHA-256) wraps a random CEK | RSA (≥ 2048-bit) |
+| `ECDH-ES` | ECDH + Concat KDF; derived key **is** the CEK | EC P-256/384/521, X25519 |
+| `ECDH-ES+A128KW` | ECDH derives a KEK; `A128KW` wraps a random CEK | EC / X25519 |
+| `ECDH-ES+A256KW` | ECDH derives a KEK; `A256KW` wraps a random CEK | EC / X25519 |
+| `A128KW` | AES Key Wrap (RFC 3394) under a 128-bit KEK | 16-byte secret |
+| `A256KW` | AES Key Wrap (RFC 3394) under a 256-bit KEK | 32-byte secret |
+| `dir` | the supplied symmetric key **is** the CEK, no wrapping | secret of the `enc` size |
+
+<Callout type="warning">
+  **`RSA1_5` is intentionally unsupported.** The PKCS#1 v1.5 padding is prone to
+  Bleichenbacher-style oracles; it has no registry entry, so both `encrypt` and
+  `decrypt` reject it as `UNSUPPORTED_ALGORITHM` — the same posture
+  [`@exortek/jws`](/jws) takes toward `alg: 'none'`. Tracks
+  `draft-ietf-jose-deprecate-none-rsa15`.
+</Callout>
+
+ECDH-ES uses the Concat KDF from RFC 7518 §4.6.2 (SHA-256), with the `enc`
+value as the AlgorithmID for direct mode or the `alg` value for the key-wrap
+variants. The ephemeral public key travels in the protected header as `epk`.
+
+## `enc` — content encryption
+
+| `enc` | Construction | CEK size | IV | Tag |
+| --- | --- | --- | --- | --- |
+| `A128GCM` | AES-128-GCM (AEAD) | 16 B | 12 B | 16 B |
+| `A192GCM` | AES-192-GCM (AEAD) | 24 B | 12 B | 16 B |
+| `A256GCM` | AES-256-GCM (AEAD) | 32 B | 12 B | 16 B |
+| `A128CBC-HS256` | AES-128-CBC + HMAC-SHA-256 (encrypt-then-MAC) | 32 B | 16 B | 16 B |
+| `A256CBC-HS512` | AES-256-CBC + HMAC-SHA-512 (encrypt-then-MAC) | 64 B | 16 B | 32 B |
+
+For AES-CBC-HMAC the CEK splits into a leading MAC key and a trailing ENC key;
+the tag is verified in constant time before any decryption happens.
+
+## Choosing
+
+- **`ECDH-ES+A256KW` + `A256GCM`** — the recommended default for public-key
+  recipients: forward secrecy from the ephemeral key, compact output.
+- **`dir` + `A256GCM`** — fastest when both sides already share a symmetric
+  key; no wrapping overhead.
+- **`RSA-OAEP-256` + `A256GCM`** — when the recipient only has an RSA key.
+- **AES-CBC-HMAC** — for interop with peers that require the RFC "MUST" ciphers.

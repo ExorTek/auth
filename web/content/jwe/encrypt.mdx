@@ -1,0 +1,86 @@
+---
+title: 'jwe.encrypt — produce a compact JWE'
+sidebarTitle: encrypt
+---
+
+import { Callout } from 'nextra/components';
+
+# `jwe.encrypt`
+
+Encrypt a payload and emit a JWE Compact Serialization —
+`protected.encrypted_key.iv.ciphertext.tag`. The protected header is bound
+into the AEAD as Additional Authenticated Data, so tampering with it breaks
+decryption.
+
+```js
+import { encrypt } from '@exortek/jwe';
+
+const token = await encrypt({ userId: 1, role: 'admin' }, recipientPublicKey, {
+  alg: 'ECDH-ES+A256KW',
+  enc: 'A256GCM',
+  expiresIn: '1h',
+});
+```
+
+## Signature
+
+```ts
+encrypt(payload, key, options) → Promise<string>
+```
+
+Both `alg` (key management) and `enc` (content encryption) are **required**.
+See [algorithms](/jwe/algorithms) for the full list. `RSA1_5` has no entry and
+is refused as `UNSUPPORTED_ALGORITHM`.
+
+## Payload
+
+| Type | Encoded as |
+| --- | --- |
+| plain object / array / number / boolean | UTF-8 JSON |
+| `string` | UTF-8 bytes |
+| `Buffer` / `Uint8Array` | raw bytes, round-tripped untouched |
+
+When the payload is a plain object and `expiresIn` is set, an `exp` claim
+(seconds since epoch) is stamped before encryption.
+
+## Key
+
+| `alg` family | Accepts |
+| --- | --- |
+| RSA-OAEP | RSA public key — `KeyObject`, JWK, or PEM (a private key is reduced to public) |
+| ECDH-ES | EC (P-256/384/521) or X25519 public key |
+| A128KW / A256KW | 16- / 32-byte secret — `Buffer` / `Uint8Array`, `oct` JWK, or secret `KeyObject` |
+| dir | symmetric CEK of the exact `enc` size |
+
+## Options
+
+| Option | Type | Notes |
+| --- | --- | --- |
+| `alg` | `string` | **required** — key-management algorithm |
+| `enc` | `string` | **required** — content-encryption algorithm |
+| `kid` | `string` | key id written to the protected header |
+| `header` | `object` | extra protected params; `alg`/`enc`/`kid`/`epk` always win |
+| `expiresIn` | `string \| number` | duration (`'1h'`) or ms; stamps `exp` on object payloads |
+| `apu` / `apv` | `string \| Buffer` | ECDH-ES Agreement PartyU/VInfo (ignored otherwise) |
+
+## Examples
+
+```js
+// Direct symmetric encryption — no key wrapping, fastest.
+import { randomBytes } from 'node:crypto';
+const key = randomBytes(32);
+const t1 = await encrypt({ a: 1 }, key, { alg: 'dir', enc: 'A256GCM' });
+
+// RSA-OAEP-256 to a recipient's public key.
+const t2 = await encrypt({ a: 1 }, rsaPublicKey, { alg: 'RSA-OAEP-256', enc: 'A256GCM' });
+
+// AES Key Wrap under a shared 256-bit KEK.
+const t3 = await encrypt({ a: 1 }, randomBytes(32), { alg: 'A256KW', enc: 'A128CBC-HS256' });
+```
+
+<Callout type="info">
+  ECDH-ES generates a fresh ephemeral key per call and publishes it as `epk`
+  in the protected header — you never manage ephemeral keys yourself.
+</Callout>
+
+Next: [decrypt →](/jwe/decrypt)

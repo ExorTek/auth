@@ -1,0 +1,79 @@
+---
+title: 'Guide — Nested JWT (sign then encrypt)'
+description: 'Hide JWT claims in transit by nesting: sign with @exortek/jwt, then encrypt the token with @exortek/jwe so only the recipient can read it — while authenticity is still provable.'
+sidebarTitle: Nested JWT (JWE)
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Nested JWT — sign then encrypt
+
+A signed JWT proves who issued it, but its claims are **readable by anyone** who
+holds the token (base64url, not encryption). When the payload is sensitive — PII,
+entitlements, internal ids — nest it: sign with [`@exortek/jwt`](/jwt), then
+encrypt the whole token with [`@exortek/jwe`](/jwe). The recipient decrypts,
+then verifies. This is the RFC 7519 §5.2 "Nested JWT" pattern.
+
+<Steps>
+
+### Issue — sign, then encrypt
+
+```js
+import { sign } from '@exortek/jwt';
+import { jwe } from '@exortek/jwe';
+
+// 1) Sign the claims — authenticity.
+const inner = await sign({ sub: 'user-1', ssn: '···', plan: 'enterprise' }, signingKey, {
+  alg: 'ES256',
+  expiresIn: '15m',
+});
+
+// 2) Encrypt the signed token to the recipient's public key — confidentiality.
+const token = await jwe.encrypt(inner, recipientPublicKey, {
+  alg: 'ECDH-ES+A256KW',
+  enc: 'A256GCM',
+  header: { cty: 'JWT' }, // RFC 7519 §5.2 — marks the plaintext as a nested JWT
+});
+```
+
+### Consume — decrypt, then verify
+
+```js
+import { verify } from '@exortek/jwt';
+import { jwe } from '@exortek/jwe';
+
+// 1) Decrypt — only the recipient's private key can. `payload` is the inner
+//    compact JWS string (binary/text round-trips untouched).
+const { payload: inner } = await jwe.decrypt(token, recipientPrivateKey, {
+  alg: ['ECDH-ES+A256KW'],
+  enc: ['A256GCM'],
+});
+const innerJwt = Buffer.isBuffer(inner) ? inner.toString('utf8') : inner;
+
+// 2) Verify the signature and claims — the alg allowlist is mandatory.
+const { payload } = await verify(innerJwt, signingPublicKey, { alg: ['ES256'] });
+// payload = { sub: 'user-1', ssn: '···', plan: 'enterprise', ... }
+```
+
+</Steps>
+
+<Callout type="info">
+  **Order matters: sign *then* encrypt.** Signing first binds the claims to the
+  issuer; encrypting second hides them. Verifying the signature *after* decrypting
+  means a tampered ciphertext fails at the JWE layer (`DECRYPTION_FAILED`) before
+  you ever trust the inner token.
+</Callout>
+
+## When to nest
+
+- **Sensitive claims** — PII, permissions, anything you wouldn't put in a
+  server log now travels encrypted.
+- **Untrusted transport / storage** — a nested JWT in a URL, a cookie, or a
+  third-party queue reveals nothing without the private key.
+- **You still get authenticity** — the inner signature proves the issuer, so the
+  recipient trusts *and* reads it privately.
+
+For the encryption algorithm choices, see the
+[JWE algorithms reference](/jwe/algorithms).
+
+Next: back to the [Guides overview](/guides)
