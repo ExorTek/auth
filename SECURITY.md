@@ -15,6 +15,7 @@ lines are not patched unless the project has an explicit LTS commitment (none do
 | `@exortek/jwk`      | `1.x` — current |
 | `@exortek/jws`      | `1.x` — current |
 | `@exortek/jwt`      | `1.x` — current |
+| `@exortek/jwe`      | `1.x` — current |
 | `@exortek/challenge`| `1.x` — current |
 | `@exortek/apikey`   | `1.x` — current |
 | `@exortek/magic-link` | `1.x` — current |
