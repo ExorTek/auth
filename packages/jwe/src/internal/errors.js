@@ -15,13 +15,11 @@ export const ErrorCode = Object.freeze({
   ENCRYPTION_MISMATCH: 'ENCRYPTION_MISMATCH',
   MISSING_ALG_ALLOWLIST: 'MISSING_ALG_ALLOWLIST',
   MISSING_ENC_ALLOWLIST: 'MISSING_ENC_ALLOWLIST',
+  CRIT_UNSUPPORTED: 'CRIT_UNSUPPORTED',
   DECRYPTION_FAILED: 'DECRYPTION_FAILED',
   KEY_NOT_FOUND: 'KEY_NOT_FOUND',
   TOKEN_TOO_LARGE: 'TOKEN_TOO_LARGE',
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
-  // Scaffold marker — thrown by the encrypt/decrypt/json placeholders until
-  // the encryption core lands. Removed once every surface is implemented.
-  NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
 });
 
 /**
@@ -41,11 +39,11 @@ export class JweError extends BaseError {
     [ErrorCode.INVALID_KEY]: 401,
     [ErrorCode.ALGORITHM_MISMATCH]: 401,
     [ErrorCode.ENCRYPTION_MISMATCH]: 401,
+    [ErrorCode.CRIT_UNSUPPORTED]: 401,
     [ErrorCode.DECRYPTION_FAILED]: 401,
     [ErrorCode.KEY_NOT_FOUND]: 401,
     [ErrorCode.TOKEN_EXPIRED]: 401,
     [ErrorCode.TOKEN_TOO_LARGE]: 413,
-    [ErrorCode.NOT_IMPLEMENTED]: 501,
   };
   static defaultStatus = 500;
 }
