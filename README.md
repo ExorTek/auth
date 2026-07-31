@@ -2,7 +2,7 @@
 
 **Authentication primitives you don't hand-assemble.** A framework-agnostic toolkit for Node.js 22+, built as 20 small
 packages under one scope — password hashing, OTP, sessions, passkeys, API keys, and the full RFC-compliant JOSE stack.
-Every package is built on `node:crypto`, ships secure defaults, and installs on its own. **16 published today**, the
+Every package is built on `node:crypto`, ships secure defaults, and installs on its own. **17 published today**, the
 rest planned.
 
 [![license](https://img.shields.io/github/license/ExorTek/auth?color=blue)](./LICENSE)
@@ -66,6 +66,7 @@ Full reference, guides, and compliance mapping live at **[auth.memet.dev](https:
 | [`@exortek/opaque`](./packages/opaque) — opaque reference tokens, RFC 7662 introspection + RFC 7009 revocation HTTP handlers, memory / Redis stores |      [![npm](https://img.shields.io/npm/v/@exortek/opaque.svg?color=07d600)](https://www.npmjs.com/package/@exortek/opaque)      | [auth.memet.dev/opaque](https://auth.memet.dev/opaque) |
 | [`@exortek/passkey`](./packages/passkey) — WebAuthn Level 3 / FIDO2 server verification, all seven attestation formats, MDS3 + AAGUID subpaths, extension I/O |      [![npm](https://img.shields.io/npm/v/@exortek/passkey.svg?color=07d600)](https://www.npmjs.com/package/@exortek/passkey)      | [auth.memet.dev/passkey](https://auth.memet.dev/passkey) |
 | [`@exortek/jwe`](./packages/jwe) — JSON Web Encryption (RFC 7516) — compact + JSON serialisation, RSA-OAEP · ECDH-ES (direct + A128/256KW) · AES-KW · dir over AES-GCM / AES-CBC-HMAC, mandatory alg+enc allowlist, `RSA1_5` refused |      [![npm](https://img.shields.io/npm/v/@exortek/jwe.svg?color=07d600)](https://www.npmjs.com/package/@exortek/jwe)      | [auth.memet.dev/jwe](https://auth.memet.dev/jwe) |
+| [`@exortek/paseto`](./packages/paseto) — PASETO v4 — `v4.local` (XChaCha20 + keyed BLAKE2b) · `v4.public` (Ed25519), no `alg` header, `tokenPair` with RFC 6749 §10.4 reuse detection, memory / Redis stores |      [![npm](https://img.shields.io/npm/v/@exortek/paseto.svg?color=07d600)](https://www.npmjs.com/package/@exortek/paseto)      | [auth.memet.dev/paseto](https://auth.memet.dev/paseto) |
 
 ## The stack
 
@@ -90,7 +91,7 @@ Linked entries are **published on npm**; the rest are **planned** and not yet in
 | 14 | [`@exortek/magic-link`](./packages/magic-link) | shipped   | passwordless email-link auth — HMAC-signed short-lived tokens with single-use consume    |
 | 15 | [`@exortek/passkey`](./packages/passkey)   | shipped   | WebAuthn Level 3 / FIDO2 server verification — all seven attestation formats + MDS3 + AAGUID |
 | 16 | [`@exortek/opaque`](./packages/opaque)     | shipped   | opaque reference tokens — RFC 7662 introspection + RFC 7009 revocation HTTP handlers      |
-| 17 | `@exortek/paseto`                          | _planned_ | PASETO v4 (`local` / `public`)                                                           |
+| 17 | [`@exortek/paseto`](./packages/paseto)     | shipped   | PASETO v4 — `v4.local` (XChaCha20 + keyed BLAKE2b) / `v4.public` (Ed25519), no `alg` header, tokenPair with reuse detection |
 | 18 | `@exortek/oauth2`                          | _planned_ | OAuth 2.1 client (PKCE) + provider presets                                               |
 | 19 | `@exortek/oidc`                            | _planned_ | OpenID Connect on top of `oauth2`                                                        |
 | 20 | `@exortek/auth`                            | _planned_ | umbrella — re-exports every package above                                                |
@@ -116,6 +117,7 @@ npm install @exortek/jwe
 npm install @exortek/ua                 # + optional: express or fastify
 npm install @exortek/opaque             # + optional: ioredis or redis, express or fastify
 npm install @exortek/passkey            # + optional: ioredis or redis, express or fastify
+npm install @exortek/paseto             # + optional: ioredis or redis
 ```
 
 Node.js **22 or newer**.
