@@ -8,7 +8,7 @@
 [![install size](https://packagephobia.com/badge?p=@exortek/otp)](https://packagephobia.com/result?p=@exortek/otp)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
 [![zero-deps](https://img.shields.io/badge/dependencies-0-brightgreen)](./package.json)
-[![license](https://img.shields.io/npm/l/@exortek/otp.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/otp.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 RFC 4226 HOTP and RFC 6238 TOTP with secure defaults, tunable window / algorithm / digits, opt-in **replay defense** via
 any store exposing an atomic `incr(key, ttlMs)`, unambiguous **backup codes**, and Google-Authenticator-compatible

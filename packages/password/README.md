@@ -8,7 +8,7 @@
 [![node](https://img.shields.io/node/v/@exortek/password.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/password)](https://packagephobia.com/result?p=@exortek/password)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
-[![license](https://img.shields.io/npm/l/@exortek/password.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/password.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 Every password-adjacent primitive a backend needs, in one package: four hash algorithms with automatic verify-time
 routing, a strength meter, CSPRNG-based generator + diceware passphrases, a policy validator, peppering, password

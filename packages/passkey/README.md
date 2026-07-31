@@ -7,7 +7,7 @@
 [![node](https://img.shields.io/node/v/@exortek/passkey.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/passkey)](https://packagephobia.com/result?p=@exortek/passkey)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
-[![license](https://img.shields.io/npm/l/@exortek/passkey.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/passkey.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 📖 **Docs:** [**auth.memet.dev/passkey**](https://auth.memet.dev/passkey)
 
@@ -186,4 +186,4 @@ Every code branches on `err.code` and maps to an HTTP status via `err.status`. F
 
 ## License
 
-MIT © ExorTek — see [LICENSE](./LICENSE).
+MIT © ExorTek — see [LICENSE](https://github.com/ExorTek/auth/blob/master/LICENSE).

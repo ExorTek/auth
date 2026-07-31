@@ -9,7 +9,7 @@
 [![node](https://img.shields.io/node/v/@exortek/session.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/session)](https://packagephobia.com/result?p=@exortek/session)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
-[![license](https://img.shields.io/npm/l/@exortek/session.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/session.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 Every session concern a backend needs, in one package: sealed encrypted cookies, rotation, revocation across
 processes via Redis pub/sub, sudo mode for sensitive actions, impersonation with audit trail, concurrent session

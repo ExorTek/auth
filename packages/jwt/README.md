@@ -7,7 +7,7 @@
 [![node](https://img.shields.io/node/v/@exortek/jwt.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/jwt)](https://packagephobia.com/result?p=@exortek/jwt)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
-[![license](https://img.shields.io/npm/l/@exortek/jwt.svg?color=blue)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@exortek/jwt.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 Sign and verify JSON Web Tokens with the algorithm matrix `jose`
 supports (HS/RS/PS/ES/EdDSA + secp256k1) plus twelve differentiators
@@ -233,4 +233,4 @@ plug into your own code path.
 
 ## License
 
-MIT © ExorTek — see [LICENSE](./LICENSE).
+MIT © ExorTek — see [LICENSE](https://github.com/ExorTek/auth/blob/master/LICENSE).
