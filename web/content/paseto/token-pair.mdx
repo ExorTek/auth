@@ -1,0 +1,79 @@
+---
+title: '@exortek/paseto — Token pair'
+sidebarTitle: Token pair
+---
+
+import { Callout } from 'nextra/components';
+
+# Token pair (access + refresh)
+
+Access + refresh with **reuse detection** — the RFC 6749 §10.4 pattern
+every production login reinvents by hand, here on PASETO tokens. If a
+refresh token is submitted twice outside the network-race grace window,
+the entire family (every refresh tied to that session) is revoked and
+`REFRESH_REUSED` is raised.
+
+<Callout type="info">
+  The access token's purpose is your choice — `access.purpose: 'local'`
+  (v4.local, encrypted; the default and safest for tokens your own
+  services read) or `'public'` (v4.public, signed; when a separate
+  relying party must verify it).
+</Callout>
+
+## Create & rotate
+
+```js
+import { create, rotate, revoke, revokeAll } from '@exortek/paseto/token-pair';
+import { createStore } from '@exortek/paseto/stores';
+import { generateKey } from '@exortek/paseto';
+
+const store = createStore('memory', { gc: { strategy: 'interval' } });
+
+const { accessToken, refreshToken, familyId } = await create(
+  { userId: 1 },
+  {
+    secret: { access: generateKey() },
+    access: { expiresIn: '15m' }, // purpose: 'public' → signed access tokens
+    refresh: { expiresIn: '7d', store }, // opaque by default — random bytes
+  },
+);
+
+// On refresh:
+try {
+  const next = await rotate(refreshToken, {
+    secret: { access: generateKey() },
+    access: { expiresIn: '15m' },
+    refresh: { expiresIn: '7d', store },
+    reuseWindow: 5, // seconds grace for network races
+  });
+} catch (err) {
+  if (err.code === 'REFRESH_REUSED') {
+    // Family was revoked — force re-login.
+  }
+}
+
+// Explicit revocation:
+await revoke(refreshToken, { store });
+await revokeAll(familyId, { store });
+```
+
+## Refresh token shape
+
+By default the refresh token is **opaque** — random bytes, hashed before
+storage, carrying nothing. Set `refresh.opaque: false` to mint a PASETO
+refresh token instead (needs `secret.refresh`); `refresh.purpose`
+selects its purpose. `tokenSize`, `encoding`, and `hashAlgo` / `hashFn`
+tune the opaque form, and a custom `generate()` overrides it entirely.
+
+## Stores
+
+`createStore(kind, options)` returns a refresh registry:
+
+- `memory` — `Map`-backed, with `interval` / `lazy` / `lru` GC.
+- `redis` — `ioredis` or `redis@4`; atomic rotation via a Lua CAS, TTL
+  native. Cross-process reuse detection is safe.
+- `custom` — pass your own `{ impl }` implementing the store shape.
+
+Rotation uses the store's atomic `markUsed` when available (Redis Lua /
+in-memory CAS); custom stores without it fall back to an in-process
+per-key mutex.

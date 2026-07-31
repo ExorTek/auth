@@ -17,6 +17,7 @@ export default {
   ua: '@exortek/ua',
   opaque: '@exortek/opaque',
   passkey: '@exortek/passkey',
+  paseto: '@exortek/paseto',
   comparison: 'Comparison',
   compliance: 'Compliance',
 };

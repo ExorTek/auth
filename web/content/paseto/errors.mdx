@@ -1,0 +1,53 @@
+---
+title: '@exortek/paseto — Errors'
+sidebarTitle: Errors — PasetoError
+---
+
+# Errors — `PasetoError`
+
+Every recoverable failure throws a `PasetoError` carrying a stable
+`code` (from `ErrorCode`) and an HTTP `status`. **Branch on `code`,
+never on the message.**
+
+```js
+import { PasetoError, ErrorCode } from '@exortek/paseto';
+
+try {
+  const data = decrypt(token, key, { issuer: 'api.myapp.com' });
+} catch (err) {
+  if (!(err instanceof PasetoError)) throw err;
+  switch (err.code) {
+    case ErrorCode.TOKEN_EXPIRED:      // refresh or reject
+      break;
+    case ErrorCode.NOT_YET_VALID:      // nbf in the future
+      break;
+    case ErrorCode.DECRYPTION_FAILED:  // wrong key or tampered v4.local
+      break;
+    case ErrorCode.SIGNATURE_INVALID:  // tampered v4.public
+      break;
+    case ErrorCode.CLAIM_MISMATCH:     // iss / sub / aud mismatch
+      break;
+    case ErrorCode.INVALID_TOKEN:      // malformed or wrong purpose
+      break;
+    case ErrorCode.REFRESH_REUSED:     // family revoked — force login
+      break;
+  }
+}
+```
+
+## Codes
+
+| Code                  | Status | Meaning                                                     |
+| --------------------- | :----: | ---------------------------------------------------------- |
+| `INVALID_ARGUMENT`    |  400   | Bad option / payload shape.                                |
+| `UNSUPPORTED_VERSION` |  400   | `generateKey` / `generateKeyPair` given the wrong version. |
+| `INVALID_TOKEN`       |  401   | Malformed token, or wrong purpose for the operation.       |
+| `INVALID_KEY`         |  401   | Key is the wrong size / type.                              |
+| `DECRYPTION_FAILED`   |  401   | v4.local MAC mismatch — wrong key or tampered ciphertext.  |
+| `SIGNATURE_INVALID`   |  401   | v4.public Ed25519 signature check failed.                  |
+| `TOKEN_EXPIRED`       |  401   | `exp` is in the past (beyond `clockTolerance`).            |
+| `NOT_YET_VALID`       |  401   | `nbf` is in the future.                                    |
+| `CLAIM_MISMATCH`      |  401   | Required `iss` / `sub` / `aud` did not match.              |
+| `REVOKED`             |  401   | Refresh token unknown or already revoked.                  |
+| `REFRESH_REUSED`      |  401   | Rotated refresh replayed — family revoked (RFC 6749 §10.4).|
+| `STORE_ERROR`         |  500   | Backing store rejected an operation.                       |

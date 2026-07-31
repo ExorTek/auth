@@ -1,0 +1,118 @@
+---
+title: '@exortek/paseto — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/paseto`
+
+<Callout type="info">
+  **See it end to end:** the [token pair](/paseto/token-pair) page covers
+  access + refresh with reuse detection on PASETO tokens.
+</Callout>
+
+Platform-Agnostic Security Tokens ([PASETO](https://paseto.io)) v4 for
+Node.js 22+. A safer alternative to JWT: a token's `vN.purpose.` prefix
+binds the exact primitive set, so there is **no `alg` header to
+tamper with** — the algorithm-confusion attacks (`alg: none`,
+RS256↔HS256) that headline the JWT CVE list are structurally
+impossible.
+
+| Version     | Purpose | Primitive                                    | Use                    |
+| ----------- | ------- | -------------------------------------------- | ---------------------- |
+| `v4.local`  | encrypt | XChaCha20 + keyed BLAKE2b (encrypt-then-MAC) | recommended — internal |
+| `v4.public` | sign    | Ed25519                                      | recommended — external |
+
+Server-only, **zero runtime dependencies**, built on `node:crypto`
+(keyed BLAKE2b and HChaCha20 are vendored — the platform does not expose
+them). Verified byte-for-byte against the official PASETO v4 test
+vectors.
+
+## Install
+
+```bash
+npm install @exortek/paseto
+```
+
+Optional Redis peer deps only if you use the Redis store for token
+pairs: `npm install ioredis` (or `redis`). Requires **Node.js 22 or
+newer**.
+
+## `v4.local` — symmetric (encrypted)
+
+For tokens your own services both mint and read: the payload is
+confidential, not just authenticated.
+
+```js
+import { generateKey, encrypt, decrypt } from '@exortek/paseto';
+
+const key = generateKey(); // 32-byte symmetric key
+
+const token = encrypt({ userId: 1, role: 'admin' }, key, {
+  expiresIn: '1h',
+  issuer: 'api.myapp.com',
+});
+
+const data = decrypt(token, key, {
+  issuer: 'api.myapp.com',
+  clockTolerance: '10s',
+});
+// → { userId: 1, role: 'admin', iat: '…', exp: '…', iss: 'api.myapp.com' }
+```
+
+## `v4.public` — asymmetric (signed)
+
+When a relying party other than the issuer must verify the token. The
+payload is readable by anyone but tamper-proof via Ed25519.
+
+```js
+import { generateKeyPair, sign, verify } from '@exortek/paseto';
+
+const { secretKey, publicKey } = generateKeyPair();
+
+const token = sign({ userId: 1 }, secretKey, { expiresIn: '1h' });
+const payload = verify(token, publicKey);
+```
+
+`secretKey` is the 64-byte PASETO wire form (`seed ‖ public`); a bare
+32-byte seed and Node `KeyObject`s are also accepted.
+
+## Claims
+
+Registered time claims are **ISO 8601 datetime strings** (`exp` / `nbf`
+/ `iat`) — not JWT's numeric dates. `encrypt` / `sign` accept
+`expiresIn`, `notBefore`, `issuer`, `subject`, `audience`, a `footer`
+(authenticated, not encrypted), and an `assertion` (implicit assertion —
+bound to the token but never stored in it).
+
+`decrypt` / `verify` accept `clockTolerance`, `issuer` / `subject` /
+`audience` equality checks, `ignoreExp` / `ignoreNbf`, and
+`complete: true` to receive `{ payload, footer, version, purpose }`.
+
+## Footers & implicit assertions
+
+A **footer** is authenticated but not encrypted — good for a public
+`kid`. An **implicit assertion** is bound into the signature/MAC but
+travels out of band (e.g. a tenant id): decryption/verification fails
+unless the same assertion is supplied.
+
+```js
+const token = sign(payload, secretKey, { footer: { kid: 'key-2026' } });
+const { footer } = verify(token, publicKey, { complete: true });
+```
+
+## Modules
+
+| Subpath                       | Purpose                                                        |
+| ----------------------------- | ------------------------------------------------------------- |
+| `@exortek/paseto`             | `encrypt` / `decrypt` / `sign` / `verify` / key generation    |
+| `@exortek/paseto/token-pair`  | access + refresh with RFC 6749 §10.4 reuse detection          |
+| `@exortek/paseto/stores`      | `createStore('memory' \| 'redis' \| 'custom', …)`             |
+
+## Why not v3?
+
+v4 is the current recommended version. v3 exists only for FIPS /
+legacy-curve constraints; adding a version is purely additive (purpose
+is bound in the token), so it can land in a minor if there is real
+demand — it is not a breaking change.
