@@ -1,0 +1,92 @@
+---
+title: 'Guide — Verify third-party JWTs with JWKS'
+description: 'Verify JWTs signed by another service (or an IdP) using @exortek/jwks remote key fetching, and publish your own rotating JWKS endpoint with @exortek/jwks local key sets.'
+sidebarTitle: JWKS + third-party JWTs
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Verify third-party JWTs with JWKS
+
+When another service — your own API, or an identity provider — signs JWTs, you
+verify them against its **JWKS** (JSON Web Key Set) rather than a shared secret.
+[`@exortek/jwks`](/jwks) fetches and caches the remote keys and hands
+[`@exortek/jwt`](/jwt) the right one by `kid`.
+
+## As a verifier — trust another service's tokens
+
+```js
+import { createRemoteJWKS } from '@exortek/jwks/remote';
+import { verify } from '@exortek/jwt';
+
+// Build the resolver once and reuse it — it caches keys and coalesces fetches.
+const resolver = createRemoteJWKS('https://auth.example.com/.well-known/jwks.json', {
+  cacheTtl: '5m',
+  staleWhileError: true, // keep working if the provider briefly goes down
+});
+
+async function requireAuth(req, res, next) {
+  const token = (req.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
+  try {
+    const { payload } = await verify(token, resolver, { alg: ['ES256', 'RS256'] });
+    req.user = payload;
+    next();
+  } catch {
+    res.status(401).json({ error: 'invalid token' });
+  }
+}
+```
+
+<Callout type="info">
+  The resolver refetches once on an unknown `kid` (rate-limited), so a
+  provider-side key rotation is picked up automatically — no redeploy. The `alg`
+  allowlist is still **mandatory**; the remote key set doesn't relax it.
+</Callout>
+
+## As an issuer — publish a rotating JWKS
+
+If *you* are the service other people verify, publish your public keys and
+rotate them without downtime.
+
+<Steps>
+
+### Create a key set and sign
+
+```js
+import { createLocalKeySet } from '@exortek/jwks/local';
+import { sign } from '@exortek/jwt';
+
+const ks = await createLocalKeySet([{ alg: 'ES256' }]);
+
+function issue(claims) {
+  const key = ks.getSigningKey('ES256');
+  return sign(claims, key.privateJwk, { kid: key.kid, alg: key.alg, expiresIn: '15m' });
+}
+```
+
+### Serve the public JWKS
+
+```js
+// Verifiers fetch this. Public keys only — private material never leaves.
+app.get('/.well-known/jwks.json', ks.handler());
+```
+
+### Rotate — new key signs, old key still verifies
+
+```js
+// New tokens use the fresh key; tokens signed by the old key keep verifying
+// during its grace period, so nothing breaks mid-flight.
+await ks.rotate({ alg: 'ES256' });
+```
+
+</Steps>
+
+## Why JWKS over a shared secret
+
+- **No secret to share** — verifiers only ever see public keys.
+- **Rotation is a non-event** — publish the new key, retire the old after a grace
+  period; in-flight tokens still verify.
+- **`kid`-based dispatch** — a token names the key that signed it, so multiple
+  live keys coexist.
+
+Next: [Opaque tokens + introspection →](/guides/opaque-tokens)

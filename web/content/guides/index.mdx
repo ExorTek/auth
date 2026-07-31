@@ -31,6 +31,24 @@ them into Fastify, a route handler, or a background job unchanged.
 - **[API key gateway →](/guides/api-keys)** — issue Stripe-style prefixed keys,
   store only their hash, and gate routes by scope.
   Uses [`@exortek/apikey`](/apikey).
+- **[Verify third-party JWTs (JWKS) →](/guides/jwks-verify)** — validate tokens
+  from another service or IdP, and publish your own rotating JWKS.
+  Uses [`@exortek/jwks`](/jwks) + [`@exortek/jwt`](/jwt).
+- **[Passkey (WebAuthn) →](/guides/passkey)** — passwordless, phishing-resistant
+  registration and login ceremonies.
+  Uses [`@exortek/passkey`](/passkey).
+- **[Multi-step auth flow →](/guides/multi-step)** — carry a login across steps
+  (password → MFA) with signed, short-lived challenge tokens.
+  Uses [`@exortek/challenge`](/challenge).
+- **[Opaque tokens →](/guides/opaque-tokens)** — revocable reference tokens whose
+  meaning lives only in your store, with introspection.
+  Uses [`@exortek/opaque`](/opaque).
+- **[Nested JWT (JWE) →](/guides/nested-jwt)** — sign then encrypt so JWT claims
+  stay private in transit while authenticity is still provable.
+  Uses [`@exortek/jwt`](/jwt) + [`@exortek/jwe`](/jwe).
+- **[CSRF + security headers →](/guides/security-hardening)** — double-submit CSRF
+  tokens and a secure baseline of response headers.
+  Uses [`@exortek/security`](/security).
 
 <br />
 
