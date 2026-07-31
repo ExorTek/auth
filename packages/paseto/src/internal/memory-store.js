@@ -1,0 +1,189 @@
+/**
+ * In-process refresh-token registry with configurable GC. `Map`-backed
+ * for O(1) lookups; expiry is enforced on every `has` / `get`, so an
+ * expired record is never returned. The GC strategy only governs how the
+ * map reclaims memory:
+ *
+ *   - `interval` (default) — periodic sweep of expired entries.
+ *   - `lazy` — no sweep; expired entries linger until queried.
+ *   - `lru` — `interval` plus a `maxSize` cap; oldest-inserted evicted.
+ *     Never use `lru` for a revocation registry — eviction silently
+ *     un-revokes.
+ */
+
+import { isFunction } from '@exortek/shared/predicates';
+
+import { PasetoError, ErrorCode } from './errors.js';
+import { parseDurationSeconds } from './duration.js';
+
+/**
+ * @typedef {Object} StoreRecord
+ * @property {number} expiresAt
+ * @property {Record<string, unknown>} [metadata]
+ *
+ * @typedef {Object} MarkUsedResult
+ * @property {boolean} swapped
+ * @property {StoreRecord} record
+ *
+ * @typedef {Object} Store
+ * @property {(key: string, expiresAt: number, metadata?: Record<string, unknown>) => Promise<void>} add
+ * @property {(key: string) => Promise<boolean>} has
+ * @property {(key: string) => Promise<StoreRecord | null>} get
+ * @property {(key: string) => Promise<void>} delete
+ * @property {(filter: Record<string, unknown>) => Promise<number>} deleteAll
+ * @property {(key: string, nowSec: number) => Promise<MarkUsedResult | null>} [markUsed]
+ * @property {() => number} size
+ * @property {() => void} _stop
+ *
+ * @typedef {Object} MemoryConfig
+ * @property {number} [maxSize]
+ * @property {{ strategy?: 'interval' | 'lazy' | 'lru', interval?: string | number, maxSize?: number }} [gc]
+ */
+
+/**
+ * @param {MemoryConfig} [options]
+ * @returns {Store}
+ */
+export function createMemoryStore(options) {
+  const opts = options || {};
+  const gc = opts.gc || {};
+  const strategy = gc.strategy || 'interval';
+  const maxSize = gc.maxSize ?? opts.maxSize ?? Infinity;
+  const intervalMs =
+    strategy === 'interval' || strategy === 'lru'
+      ? Math.max(1000, parseDurationSeconds(gc.interval ?? '5m') * 1000)
+      : 0;
+
+  /** @type {Map<string, StoreRecord>} */
+  const map = new Map();
+  /** @type {NodeJS.Timeout | null} */
+  let timer = null;
+
+  const now = () => Math.floor(Date.now() / 1000);
+
+  const expiredSweep = () => {
+    const t = now();
+    for (const [k, v] of map) {
+      if (v.expiresAt <= t) {
+        map.delete(k);
+      }
+    }
+  };
+
+  const enforceCap = () => {
+    if (map.size <= maxSize) {
+      return;
+    }
+    while (map.size > maxSize) {
+      const oldest = map.keys().next().value;
+      if (oldest === undefined) {
+        break;
+      }
+      map.delete(oldest);
+    }
+  };
+
+  if (intervalMs > 0) {
+    timer = setInterval(() => {
+      expiredSweep();
+      enforceCap();
+    }, intervalMs);
+    if (isFunction(timer.unref)) {
+      timer.unref();
+    }
+  }
+
+  const matches = (record, filter) => {
+    const meta = record.metadata;
+    if (!meta) {
+      return false;
+    }
+    for (const [k, v] of Object.entries(filter)) {
+      if (meta[k] !== v) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  return {
+    async add(key, expiresAt, metadata) {
+      if (typeof key !== 'string' || key.length === 0) {
+        throw new PasetoError(ErrorCode.STORE_ERROR, 'memory-store.add: key must be a non-empty string');
+      }
+      if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) {
+        throw new PasetoError(ErrorCode.STORE_ERROR, 'memory-store.add: expiresAt must be a finite NumericDate');
+      }
+      map.set(key, { expiresAt, ...(metadata ? { metadata } : {}) });
+      if (strategy === 'lru') {
+        enforceCap();
+      }
+    },
+    async has(key) {
+      const record = map.get(key);
+      if (!record) {
+        return false;
+      }
+      if (record.expiresAt <= now()) {
+        map.delete(key);
+        return false;
+      }
+      return true;
+    },
+    async get(key) {
+      const record = map.get(key);
+      if (!record) {
+        return null;
+      }
+      if (record.expiresAt <= now()) {
+        map.delete(key);
+        return null;
+      }
+      return record;
+    },
+    async delete(key) {
+      map.delete(key);
+    },
+    async deleteAll(filter) {
+      if (filter == null || typeof filter !== 'object') {
+        throw new PasetoError(
+          ErrorCode.STORE_ERROR,
+          'memory-store.deleteAll: filter must be an object of metadata key/value pairs',
+        );
+      }
+      let count = 0;
+      for (const [k, record] of map) {
+        if (matches(record, filter)) {
+          map.delete(k);
+          count++;
+        }
+      }
+      return count;
+    },
+    async markUsed(key, nowSec) {
+      const record = map.get(key);
+      if (!record || record.expiresAt <= now()) {
+        if (record) {
+          map.delete(key);
+        }
+        return null;
+      }
+      const meta = record.metadata || {};
+      if (meta.usedAt != null) {
+        return { swapped: false, record };
+      }
+      const updated = { ...record, metadata: { ...meta, usedAt: nowSec } };
+      map.set(key, updated);
+      return { swapped: true, record: updated };
+    },
+    size() {
+      return map.size;
+    },
+    _stop() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    },
+  };
+}
