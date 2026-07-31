@@ -1,0 +1,78 @@
+---
+title: 'Guide — API key gateway'
+description: 'Issue and verify Stripe-style prefixed API keys with @exortek/apikey: show the raw key once, store only its HMAC hash, and gate routes by scope.'
+sidebarTitle: API key gateway
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# API key gateway
+
+Give programmatic clients Stripe-style keys (`sk_live_…`) with
+[`@exortek/apikey`](/apikey). The raw key is shown **once**; only its HMAC hash
+is stored, so a database leak never exposes usable credentials. Routes are
+gated by scope.
+
+<Steps>
+
+### Issue — show the key once
+
+```js
+import { createApiKey } from '@exortek/apikey';
+import { memoryStore } from '@exortek/apikey/stores';
+
+const store = memoryStore(); // or redisStore(client)
+
+app.post('/api-keys', async (req, res) => {
+  const { key, id } = await createApiKey({
+    store,
+    prefix: 'sk_live',
+    userId: req.user.id,
+    scopes: ['read', 'write:posts'],
+    name: 'Production Backend',
+    expiresIn: '1y',
+  });
+
+  // `key` is the ONLY time the raw value exists. Show it, never persist it.
+  res.json({ id, key });
+});
+```
+
+### Verify — gate a route by scope
+
+```js
+import { verifyApiKey } from '@exortek/apikey';
+
+function requireKey(scopes) {
+  return async (req, res, next) => {
+    const header = req.get('authorization') ?? '';
+    const key = header.replace(/^Bearer\s+/i, '');
+
+    const result = await verifyApiKey(key, { store, requiredScopes: scopes });
+    if (!result.valid) return res.status(401).json({ error: result.reason });
+
+    req.apiKey = result; // { id, userId, scopes, ... }
+    next();
+  };
+}
+
+app.get('/api/posts', requireKey(['read']), handler);
+app.post('/api/posts', requireKey(['write:posts']), handler);
+```
+
+</Steps>
+
+<Callout type="info">
+  `@exortek/apikey` also ships ready-made Express and Fastify middleware and a
+  pepper-rotation flow for re-hashing stored keys without downtime — see the
+  [package reference](/apikey).
+</Callout>
+
+## Why hash-on-store
+
+An API key is a bearer credential: whoever holds it is authenticated. Storing
+raw keys means a leaked backup is a full compromise. `@exortek/apikey` keeps
+only an HMAC-SHA256 hash (optionally peppered), so the store can be dumped
+without yielding a single usable key — the same reason you hash passwords.
+
+Next: back to the [Guides overview](/guides)
