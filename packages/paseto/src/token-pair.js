@@ -13,7 +13,7 @@
 
 import { randomBytes } from 'node:crypto';
 
-import { isFunction, isNumber, isString } from '@exortek/shared/predicates';
+import { isFunction, isNumber, isString, isInteger, isNullish } from '@exortek/shared/predicates';
 
 import { PasetoError, ErrorCode } from './internal/errors.js';
 import { assertNonEmptyString, assertObject, invalidArgument } from './internal/guards.js';
@@ -255,7 +255,7 @@ function _assertCreateOptions(options) {
   if (options.refresh.expiresIn === undefined) {
     throw invalidArgument('tokenPair.options.refresh.expiresIn is required');
   }
-  if (options.refresh.store == null || typeof options.refresh.store.add !== 'function') {
+  if (isNullish(options.refresh.store) || !isFunction(options.refresh.store.add)) {
     throw invalidArgument('tokenPair.options.refresh.store must implement the Store shape');
   }
 }
@@ -274,7 +274,7 @@ function _assertCreateOptions(options) {
 async function _generateRefresh(refresh, payload, secret, expiresAtSec) {
   if (isFunction(refresh.generate)) {
     const result = await refresh.generate();
-    if (result == null || typeof result.plaintext !== 'string' || typeof result.storeKey !== 'string') {
+    if (isNullish(result) || !isString(result.plaintext) || !isString(result.storeKey)) {
       throw invalidArgument('refresh.generate: must return { plaintext, storeKey } strings');
     }
     return result;
@@ -289,7 +289,7 @@ async function _generateRefresh(refresh, payload, secret, expiresAtSec) {
     });
   } else {
     const size = refresh.tokenSize ?? 32;
-    if (typeof size !== 'number' || size < 1 || !Number.isFinite(size)) {
+    if (!isInteger(size) || size < 1) {
       throw invalidArgument('refresh.tokenSize must be a positive integer');
     }
     const encoder = resolveEncoding(refresh.encoding);

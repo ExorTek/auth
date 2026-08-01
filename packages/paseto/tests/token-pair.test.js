@@ -120,6 +120,19 @@ test('opaque:false mints a PASETO refresh token', async () => {
   store._stop();
 });
 
+test('fractional refresh.tokenSize is rejected (INVALID_ARGUMENT)', async () => {
+  const store = createStore('memory');
+  await assert.rejects(
+    () =>
+      create(
+        { userId: 1 },
+        { secret: localSecret(), access: { expiresIn: '15m' }, refresh: { expiresIn: '7d', tokenSize: 1.5, store } },
+      ),
+    err => err instanceof PasetoError && err.code === ErrorCode.INVALID_ARGUMENT,
+  );
+  store._stop();
+});
+
 test('missing required options throw INVALID_ARGUMENT', async () => {
   const store = createStore('memory');
   await assert.rejects(

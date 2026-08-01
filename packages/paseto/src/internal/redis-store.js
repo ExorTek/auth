@@ -8,6 +8,15 @@
  * tokens. Large deployments should track family membership out of band.
  */
 
+import {
+  isObject,
+  isNullish,
+  isNonEmptyString,
+  isFiniteNumber,
+  isFunction,
+  isString,
+} from '@exortek/shared/predicates';
+
 import { PasetoError, ErrorCode } from './errors.js';
 
 // Atomically stamp metadata.usedAt if currently null/absent.
@@ -47,7 +56,7 @@ return {1, encoded}
  * @returns {Store}
  */
 export function createRedisStore(options) {
-  if (options == null || typeof options !== 'object' || options.client == null) {
+  if (!isObject(options) || isNullish(options.client)) {
     throw new PasetoError(
       ErrorCode.STORE_ERROR,
       'redis-store: options.client is required (an ioredis or redis@4 instance)',
@@ -62,10 +71,10 @@ export function createRedisStore(options) {
 
   return {
     async add(key, expiresAt, metadata) {
-      if (typeof key !== 'string' || key.length === 0) {
+      if (!isNonEmptyString(key)) {
         throw new PasetoError(ErrorCode.STORE_ERROR, 'redis-store.add: key must be a non-empty string');
       }
-      if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) {
+      if (!isFiniteNumber(expiresAt)) {
         throw new PasetoError(ErrorCode.STORE_ERROR, 'redis-store.add: expiresAt must be a finite NumericDate');
       }
       const ttl = Math.max(1, Math.floor(expiresAt - now()));
@@ -128,7 +137,7 @@ export function createRedisStore(options) {
       }
     },
     async deleteAll(filter) {
-      if (filter == null || typeof filter !== 'object') {
+      if (!isObject(filter)) {
         throw new PasetoError(
           ErrorCode.STORE_ERROR,
           'redis-store.deleteAll: filter must be an object of metadata key/value pairs',
@@ -187,7 +196,13 @@ export function createRedisStore(options) {
     },
     async markUsed(key, nowSec) {
       try {
-        const result = await client.eval(MARK_USED_LUA, 1, build(key), String(nowSec));
+        // ioredis takes positional EVAL args; redis@4 takes an options
+        // object. Using the wrong form throws and silently breaks
+        // rotation atomicity for the mismatched client.
+        const result =
+          dialect === 'ioredis'
+            ? await client.eval(MARK_USED_LUA, 1, build(key), String(nowSec))
+            : await client.eval(MARK_USED_LUA, { keys: [build(key)], arguments: [String(nowSec)] });
         if (result == null) {
           return null;
         }
@@ -231,7 +246,7 @@ export function createRedisStore(options) {
  * @returns {'ioredis' | 'node-redis'}
  */
 function _detectDialect(client) {
-  if (client && (typeof client.scanStream === 'function' || typeof client.status === 'string')) {
+  if (client && (isFunction(client.scanStream) || isString(client.status))) {
     return 'ioredis';
   }
   const name = (client && client.constructor && client.constructor.name) || '';

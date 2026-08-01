@@ -97,6 +97,34 @@ test('redis: node-redis-style client uses options-object EX', async () => {
   assert.equal(setCalls[0].opts.EX > 0, true);
 });
 
+test('redis: markUsed dispatches the right EVAL form per dialect', async () => {
+  // ioredis — positional args
+  const io = {
+    async eval(script, numkeys, key, arg) {
+      this.call = { numkeys, key, arg };
+      return [1, JSON.stringify({ expiresAt: 1, metadata: { usedAt: Number(arg) } })];
+    },
+  };
+  Object.defineProperty(io.constructor, 'name', { value: 'Redis' });
+  const ioStore = createStore('redis', { client: io, keyPrefix: 't:' });
+  const ioRes = await ioStore.markUsed('k', 42);
+  assert.deepEqual(io.call, { numkeys: 1, key: 't:k', arg: '42' });
+  assert.equal(ioRes.swapped, true);
+
+  // node-redis — options object { keys, arguments }
+  class NodeRedisClient {
+    async eval(script, opts) {
+      this.call = opts;
+      return [0, JSON.stringify({ expiresAt: 1, metadata: { usedAt: 7 } })];
+    }
+  }
+  const nr = new NodeRedisClient();
+  const nrStore = createStore('redis', { client: nr, keyPrefix: 't:' });
+  const nrRes = await nrStore.markUsed('k', 42);
+  assert.deepEqual(nr.call, { keys: ['t:k'], arguments: ['42'] });
+  assert.equal(nrRes.swapped, false);
+});
+
 test('redis: missing client raises STORE_ERROR', () => {
   assert.throws(
     () => createStore('redis', /** @type {any} */ ({})),
