@@ -11,6 +11,7 @@
 import { signRaw, verifyRaw } from './internal/v4public.js';
 import { serializePayload, serializeFooter, finalize, toBuffer } from './internal/message.js';
 import { assertNonEmptyString } from './internal/guards.js';
+import { assertTokenSize, DEFAULT_MAX_TOKEN_SIZE } from './internal/size.js';
 
 /**
  * Sign a payload into a `v4.public` token.
@@ -39,6 +40,7 @@ export function sign(payload, secretKey, options = {}) {
  */
 export function verify(token, publicKey, options = {}) {
   assertNonEmptyString(token, 'verify.token');
+  assertTokenSize(token, options.maxTokenSize ?? DEFAULT_MAX_TOKEN_SIZE);
   const { message, footer } = verifyRaw({
     token,
     publicKey,

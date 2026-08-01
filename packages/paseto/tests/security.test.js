@@ -84,6 +84,23 @@ test('malformed tokens (too few / too many segments) are rejected', () => {
   }
 });
 
+test('an over-large token is rejected before any crypto (TOKEN_TOO_LARGE)', () => {
+  const key = generateKey();
+  const huge = `v4.local.${'A'.repeat(9000)}`;
+  assert.throws(
+    () => decrypt(huge, key),
+    err => err instanceof PasetoError && err.code === ErrorCode.TOKEN_TOO_LARGE,
+  );
+  // A tighter maxTokenSize is honoured…
+  const token = encrypt({ a: 1 }, key);
+  assert.throws(
+    () => decrypt(token, key, { maxTokenSize: 8 }),
+    err => err.code === ErrorCode.TOKEN_TOO_LARGE,
+  );
+  // …and the default lets a normal token through.
+  assert.equal(decrypt(token, key).a, 1);
+});
+
 test('a v4.local token is rejected by verify()', () => {
   const { publicKey } = generateKeyPair();
   const local = encrypt({ a: 1 }, generateKey());

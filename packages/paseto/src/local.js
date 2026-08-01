@@ -11,6 +11,7 @@
 import { encryptRaw, decryptRaw } from './internal/v4local.js';
 import { serializePayload, serializeFooter, finalize, toBuffer } from './internal/message.js';
 import { assertNonEmptyString } from './internal/guards.js';
+import { assertTokenSize, DEFAULT_MAX_TOKEN_SIZE } from './internal/size.js';
 
 /**
  * @typedef {import('./internal/claims.js')} _claims
@@ -33,6 +34,7 @@ import { assertNonEmptyString } from './internal/guards.js';
  * @property {string} [subject]                required `sub`
  * @property {string} [audience]               required `aud`
  * @property {string | Uint8Array} [assertion]
+ * @property {number} [maxTokenSize=8192]      reject larger tokens with `TOKEN_TOO_LARGE`
  * @property {boolean} [complete=false]        return `{ payload, footer, version, purpose }`
  */
 
@@ -63,6 +65,7 @@ export function encrypt(payload, key, options = {}) {
  */
 export function decrypt(token, key, options = {}) {
   assertNonEmptyString(token, 'decrypt.token');
+  assertTokenSize(token, options.maxTokenSize ?? DEFAULT_MAX_TOKEN_SIZE);
   const { message, footer } = decryptRaw({
     token,
     key,
