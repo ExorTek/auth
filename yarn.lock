@@ -421,6 +421,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@exortek/oauth2@workspace:packages/oauth2":
+  version: 0.0.0-use.local
+  resolution: "@exortek/oauth2@workspace:packages/oauth2"
+  languageName: unknown
+  linkType: soft
+
 "@exortek/opaque@workspace:packages/opaque":
   version: 0.0.0-use.local
   resolution: "@exortek/opaque@workspace:packages/opaque"
