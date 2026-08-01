@@ -7,6 +7,8 @@
  */
 
 import { parseDuration as sharedParseDuration } from '@exortek/shared/duration';
+import { isNumber, isFiniteNumber, isString } from '@exortek/shared/predicates';
+
 import { invalidArgument } from './guards.js';
 
 const BARE_NUMBER_RE = /^\s*(-?\d+(?:\.\d+)?)\s*$/;
@@ -16,13 +18,13 @@ const BARE_NUMBER_RE = /^\s*(-?\d+(?:\.\d+)?)\s*$/;
  * @returns {number} seconds
  */
 export function parseDurationSeconds(input) {
-  if (typeof input === 'number') {
-    if (!Number.isFinite(input)) {
+  if (isNumber(input)) {
+    if (!isFiniteNumber(input)) {
       throw invalidArgument(`parseDuration: numeric input must be finite; got ${input}`);
     }
     return input;
   }
-  if (typeof input !== 'string') {
+  if (!isString(input)) {
     throw invalidArgument(`parseDuration: expected string or number; got ${typeof input}`);
   }
   const bare = BARE_NUMBER_RE.exec(input);

@@ -5,6 +5,8 @@
  * shape.
  */
 
+import { isObject } from '@exortek/shared/predicates';
+
 import { createMemoryStore } from './internal/memory-store.js';
 import { createRedisStore } from './internal/redis-store.js';
 import { invalidArgument } from './internal/guards.js';
@@ -38,7 +40,7 @@ export function createStore(kind, options) {
       return createRedisStore(/** @type {RedisConfig} */ (options));
     case 'custom': {
       const cfg = /** @type {CustomConfig} */ (options);
-      if (!cfg || typeof cfg.impl !== 'object' || cfg.impl === null) {
+      if (!cfg || !isObject(cfg.impl)) {
         throw invalidArgument('createStore("custom").options.impl must be a Store object');
       }
       return cfg.impl;

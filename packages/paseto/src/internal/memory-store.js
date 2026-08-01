@@ -11,7 +11,7 @@
  *     un-revokes.
  */
 
-import { isFunction } from '@exortek/shared/predicates';
+import { isFunction, isNonEmptyString, isFiniteNumber, isObject } from '@exortek/shared/predicates';
 
 import { PasetoError, ErrorCode } from './errors.js';
 import { parseDurationSeconds } from './duration.js';
@@ -108,10 +108,10 @@ export function createMemoryStore(options) {
 
   return {
     async add(key, expiresAt, metadata) {
-      if (typeof key !== 'string' || key.length === 0) {
+      if (!isNonEmptyString(key)) {
         throw new PasetoError(ErrorCode.STORE_ERROR, 'memory-store.add: key must be a non-empty string');
       }
-      if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) {
+      if (!isFiniteNumber(expiresAt)) {
         throw new PasetoError(ErrorCode.STORE_ERROR, 'memory-store.add: expiresAt must be a finite NumericDate');
       }
       map.set(key, { expiresAt, ...(metadata ? { metadata } : {}) });
@@ -145,7 +145,7 @@ export function createMemoryStore(options) {
       map.delete(key);
     },
     async deleteAll(filter) {
-      if (filter == null || typeof filter !== 'object') {
+      if (!isObject(filter)) {
         throw new PasetoError(
           ErrorCode.STORE_ERROR,
           'memory-store.deleteAll: filter must be an object of metadata key/value pairs',

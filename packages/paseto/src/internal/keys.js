@@ -9,6 +9,8 @@
 
 import { createPrivateKey, createPublicKey, KeyObject } from 'node:crypto';
 
+import { isBytes } from '@exortek/shared/predicates';
+
 import { PasetoError, ErrorCode } from './errors.js';
 
 const b64url = bytes => Buffer.from(bytes).toString('base64url');
@@ -25,7 +27,7 @@ const ED25519_PKCS8_PREFIX = Buffer.from('302e020100300506032b657004220420', 'he
  * @returns {Buffer}
  */
 export function symmetricKey(key) {
-  if (!Buffer.isBuffer(key) && !(key instanceof Uint8Array)) {
+  if (!isBytes(key)) {
     throw new PasetoError(ErrorCode.INVALID_KEY, 'v4.local key must be a 32-byte Buffer or Uint8Array');
   }
   if (key.length !== 32) {
@@ -45,7 +47,7 @@ export function ed25519PrivateKey(key) {
   if (key instanceof KeyObject) {
     return key;
   }
-  if (!Buffer.isBuffer(key) && !(key instanceof Uint8Array)) {
+  if (!isBytes(key)) {
     throw new PasetoError(ErrorCode.INVALID_KEY, 'v4.public secret key must be a KeyObject, Buffer, or Uint8Array');
   }
   let seed;
@@ -77,7 +79,7 @@ export function ed25519PublicKey(key) {
   if (key instanceof KeyObject) {
     return key;
   }
-  if (!Buffer.isBuffer(key) && !(key instanceof Uint8Array)) {
+  if (!isBytes(key)) {
     throw new PasetoError(ErrorCode.INVALID_KEY, 'v4.public public key must be a KeyObject, Buffer, or Uint8Array');
   }
   if (key.length !== 32) {
