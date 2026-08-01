@@ -1,0 +1,102 @@
+---
+title: 'paseto v4.local — encrypt / decrypt'
+sidebarTitle: v4.local
+---
+
+import { Callout } from 'nextra/components';
+
+# `v4.local` — symmetric (encrypted)
+
+`encrypt` / `decrypt` mint and read **encrypted** tokens with a 32-byte
+symmetric key (XChaCha20 + keyed BLAKE2b, encrypt-then-MAC). The payload
+is confidential, not just authenticated — the JWE role without the JWE
+footgun matrix. Use it for tokens your own services both issue and read.
+
+```js
+import { generateKey, encrypt, decrypt } from '@exortek/paseto';
+
+const key = generateKey(); // 32-byte symmetric key
+
+const token = encrypt({ userId: 1, role: 'admin' }, key, {
+  expiresIn: '1h',
+  issuer: 'api.myapp.com',
+});
+
+const data = decrypt(token, key, {
+  issuer: 'api.myapp.com',
+  clockTolerance: '10s',
+});
+// → { userId: 1, role: 'admin', iat: '…', exp: '…', iss: 'api.myapp.com' }
+```
+
+## Keys
+
+`generateKey()` returns 32 random bytes (a `Buffer`). Any 32-byte
+`Buffer` / `Uint8Array` works — load your own from a KMS or env. A
+wrong-length or non-byte key throws `INVALID_KEY`.
+
+## `encrypt(payload, key, options)`
+
+`payload` is an object (JSON-encoded, with claims injected), or a raw
+string / byte buffer (passed through untouched, no claims).
+
+| Option       | Type              | Notes                                            |
+| ------------ | ----------------- | ------------------------------------------------ |
+| `expiresIn`  | string \| number  | Duration → `exp` (e.g. `'1h'`, `900`).           |
+| `notBefore`  | string \| number  | Duration → `nbf`.                                |
+| `iat`        | boolean           | Stamp `iat` = now (default `true`).              |
+| `issuer`     | string            | → `iss`.                                         |
+| `subject`    | string            | → `sub`.                                         |
+| `audience`   | string            | → `aud`.                                         |
+| `jti`        | string            | → `jti`.                                         |
+| `footer`     | object \| string  | Authenticated, **not encrypted** (e.g. `kid`).   |
+| `assertion`  | string \| bytes   | Implicit assertion — bound, not stored.          |
+
+An explicit claim already on the payload always wins over the option.
+
+## `decrypt(token, key, options)`
+
+| Option           | Type              | Notes                                                  |
+| ---------------- | ----------------- | ------------------------------------------------------ |
+| `clockTolerance` | string \| number  | Slack for `exp` / `nbf` (default `0`).                 |
+| `ignoreExp`      | boolean           | Skip `exp` check.                                      |
+| `ignoreNbf`      | boolean           | Skip `nbf` check.                                      |
+| `issuer`         | string            | Required `iss` — else `CLAIM_MISMATCH`.               |
+| `subject`        | string            | Required `sub`.                                        |
+| `audience`       | string            | Required `aud` (matches a string or array member).    |
+| `assertion`      | string \| bytes   | Must match the value bound at encrypt time.            |
+| `maxTokenSize`   | number            | Reject larger tokens (default `8192`, `TOKEN_TOO_LARGE`). |
+| `complete`       | boolean           | Return `{ payload, footer, version, purpose }`.        |
+
+A wrong key or any tampering fails with `DECRYPTION_FAILED` (the MAC is
+compared in constant time).
+
+## Claims
+
+Registered time claims are **ISO 8601 datetime strings**:
+
+```js
+const token = encrypt({ userId: 1 }, key, { expiresIn: '1h' });
+decrypt(token, key);
+// → { userId: 1, iat: '2026-08-01T12:00:00.000Z', exp: '2026-08-01T13:00:00.000Z' }
+```
+
+<Callout type="info">
+  PASETO time claims are ISO 8601 strings, unlike JWT's numeric
+  `NumericDate`. A numeric `exp` is rejected as an invalid claim.
+</Callout>
+
+## Footers & implicit assertions
+
+A **footer** is authenticated but not encrypted — good for a public
+`kid`. An **implicit assertion** is bound into the MAC but travels out of
+band (e.g. a tenant id): decryption fails unless the same assertion is
+supplied.
+
+```js
+const token = encrypt(payload, key, { footer: { kid: 'k1' }, assertion: 'tenant-42' });
+const { footer } = decrypt(token, key, { assertion: 'tenant-42', complete: true });
+```
+
+Read the footer *before* verifying (to pick a key by `kid`) with
+[`decode`](/paseto/decode).

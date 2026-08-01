@@ -7,11 +7,6 @@ import { Callout } from 'nextra/components';
 
 # `@exortek/paseto`
 
-<Callout type="info">
-  **See it end to end:** the [token pair](/paseto/token-pair) page covers
-  access + refresh with reuse detection on PASETO tokens.
-</Callout>
-
 Platform-Agnostic Security Tokens ([PASETO](https://paseto.io)) v4 for
 Node.js 22+. A safer alternative to JWT: a token's `vN.purpose.` prefix
 binds the exact primitive set, so there is **no `alg` header to
@@ -39,89 +34,40 @@ Optional Redis peer deps only if you use the Redis store for token
 pairs: `npm install ioredis` (or `redis`). Requires **Node.js 22 or
 newer**.
 
-## `v4.local` — symmetric (encrypted)
-
-For tokens your own services both mint and read: the payload is
-confidential, not just authenticated.
+## At a glance
 
 ```js
 import { generateKey, encrypt, decrypt } from '@exortek/paseto';
 
-const key = generateKey(); // 32-byte symmetric key
-
-const token = encrypt({ userId: 1, role: 'admin' }, key, {
-  expiresIn: '1h',
-  issuer: 'api.myapp.com',
-});
-
-const data = decrypt(token, key, {
-  issuer: 'api.myapp.com',
-  clockTolerance: '10s',
-});
-// → { userId: 1, role: 'admin', iat: '…', exp: '…', iss: 'api.myapp.com' }
+const key = generateKey();
+const token = encrypt({ userId: 1 }, key, { expiresIn: '1h' });
+const data = decrypt(token, key);
 ```
 
-## `v4.public` — asymmetric (signed)
+- **[v4.local](/paseto/local)** — symmetric, encrypted tokens your own
+  services mint and read.
+- **[v4.public](/paseto/public)** — Ed25519-signed tokens a separate
+  relying party can verify.
+- **[decode](/paseto/decode)** — read the footer (`kid`) without a key.
+- **[tokenPair](/paseto/token-pair)** — access + refresh with reuse
+  detection, over a pluggable **[store](/paseto/stores)**.
 
-When a relying party other than the issuer must verify the token. The
-payload is readable by anyone but tamper-proof via Ed25519.
+## Modules
 
-```js
-import { generateKeyPair, sign, verify } from '@exortek/paseto';
-
-const { secretKey, publicKey } = generateKeyPair();
-
-const token = sign({ userId: 1 }, secretKey, { expiresIn: '1h' });
-const payload = verify(token, publicKey);
-```
-
-`secretKey` is the 64-byte PASETO wire form (`seed ‖ public`); a bare
-32-byte seed and Node `KeyObject`s are also accepted.
+| Subpath                       | Purpose                                                              |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `@exortek/paseto`             | `encrypt` / `decrypt` / `sign` / `verify` / `decode` / key generation |
+| `@exortek/paseto/token-pair`  | access + refresh with RFC 6749 §10.4 reuse detection                |
+| `@exortek/paseto/stores`      | `createStore('memory' \| 'redis' \| 'custom', …)`                   |
 
 ## Claims
 
 Registered time claims are **ISO 8601 datetime strings** (`exp` / `nbf`
-/ `iat`) — not JWT's numeric dates. `encrypt` / `sign` accept
-`expiresIn`, `notBefore`, `issuer`, `subject`, `audience`, a `footer`
-(authenticated, not encrypted), and an `assertion` (implicit assertion —
-bound to the token but never stored in it).
-
-`decrypt` / `verify` accept `clockTolerance`, `issuer` / `subject` /
-`audience` equality checks, `ignoreExp` / `ignoreNbf`, and
-`complete: true` to receive `{ payload, footer, version, purpose }`.
-
-## Footers & implicit assertions
-
-A **footer** is authenticated but not encrypted — good for a public
-`kid`. An **implicit assertion** is bound into the signature/MAC but
-travels out of band (e.g. a tenant id): decryption/verification fails
-unless the same assertion is supplied.
-
-```js
-const token = sign(payload, secretKey, { footer: { kid: 'key-2026' } });
-const { footer } = verify(token, publicKey, { complete: true });
-```
-
-`decode(token)` reads `{ version, purpose, footer }` **without a key**,
-so you can pick the verification key by `kid` before calling `verify`.
-It never returns the payload, and both `decode` and `decrypt` / `verify`
-reject a token over `maxTokenSize` (default 8192 bytes) with
-`TOKEN_TOO_LARGE`.
-
-```js
-import { decode } from '@exortek/paseto';
-
-const { footer } = decode(token); // unverified
-const payload = verify(token, keyring.get(footer.kid));
-```
-
-## Modules
-
-| Subpath                       | Purpose                                                        |
-| ----------------------------- | ------------------------------------------------------------- |
-| `@exortek/paseto`             | `encrypt` / `decrypt` / `sign` / `verify` / `decode` / key generation |
-| `@exortek/paseto/token-pair`  | access + refresh with RFC 6749 §10.4 reuse detection          |
-| `@exortek/paseto/stores`      | `createStore('memory' \| 'redis' \| 'custom', …)`             |
+/ `iat`) — not JWT's numeric dates. Both purposes share the same claim
+options (`expiresIn`, `notBefore`, `issuer`, `subject`, `audience`) and
+the same validation on the way back (`clockTolerance`, `issuer` /
+`subject` / `audience`, `ignoreExp` / `ignoreNbf`). See
+[v4.local](/paseto/local#claims) for the full list.
 
 ## Why not v3?
 

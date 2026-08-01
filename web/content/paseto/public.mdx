@@ -1,0 +1,55 @@
+---
+title: 'paseto v4.public — sign / verify'
+sidebarTitle: v4.public
+---
+
+import { Callout } from 'nextra/components';
+
+# `v4.public` — asymmetric (signed)
+
+`sign` / `verify` mint and check **Ed25519-signed** tokens. The payload
+is authenticated and readable by anyone holding the public key —
+tamper-proof, but not confidential. Use it when a relying party other
+than the issuer must verify the token.
+
+```js
+import { generateKeyPair, sign, verify } from '@exortek/paseto';
+
+const { secretKey, publicKey } = generateKeyPair();
+
+const token = sign({ userId: 1 }, secretKey, { expiresIn: '1h' });
+const payload = verify(token, publicKey);
+```
+
+## Keys
+
+`generateKeyPair()` returns raw keys in PASETO's wire form:
+
+- `secretKey` — 64 bytes (`seed ‖ public`).
+- `publicKey` — 32 bytes.
+
+`sign` also accepts a bare 32-byte seed or a Node `KeyObject`; `verify`
+accepts a 32-byte public key or a `KeyObject`. Anything else throws
+`INVALID_KEY`.
+
+```js
+const seedOnly = secretKey.subarray(0, 32); // 32-byte seed works too
+sign({ ok: true }, seedOnly);
+```
+
+## Options
+
+`sign` takes the same claim + `footer` + `assertion` options as
+[`encrypt`](/paseto/local#encrypt-payload-key-options); `verify` takes
+the same validation options as
+[`decrypt`](/paseto/local#decrypt-token-key-options) (`clockTolerance`,
+`issuer` / `subject` / `audience`, `ignoreExp` / `ignoreNbf`,
+`maxTokenSize`, `complete`).
+
+A tampered token or wrong key fails with `SIGNATURE_INVALID`.
+
+<Callout type="info">
+  Need the `kid` from the footer before you can pick the public key?
+  Read it without verifying via [`decode`](/paseto/decode), then call
+  `verify` with the resolved key.
+</Callout>

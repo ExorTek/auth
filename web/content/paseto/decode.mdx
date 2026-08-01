@@ -1,0 +1,49 @@
+---
+title: 'paseto decode — read the footer'
+sidebarTitle: decode
+---
+
+import { Callout } from 'nextra/components';
+
+# `decode` — unverified inspection
+
+`decode(token)` reads a token's `version`, `purpose`, and `footer`
+**without a key and without authenticating anything**. The footer is
+PASETO's out-of-band metadata channel — authenticated by the MAC /
+signature but readable beforehand — which is exactly what you need to
+pick a verification key by `kid` before calling `verify` / `decrypt`.
+
+```js
+import { decode, verify } from '@exortek/paseto';
+
+const { version, purpose, footer } = decode(token); // no key
+const key = keyring.get(footer.kid);
+const payload = verify(token, key); // now authenticated
+```
+
+<Callout type="warning">
+  **Never gate authorisation on `decode`.** It does not verify the token.
+  The payload is deliberately not returned — encrypted for `v4.local`,
+  unverified for `v4.public` — so you cannot act on it by accident.
+</Callout>
+
+## Return value
+
+| Field     | Type                              | Notes                                             |
+| --------- | --------------------------------- | ------------------------------------------------- |
+| `version` | string                            | `'v4'`.                                            |
+| `purpose` | string                            | `'local'` or `'public'`.                          |
+| `footer`  | object \| string \| `undefined`   | Parsed object when JSON, raw string otherwise, `undefined` when absent. |
+
+Malformed tokens (wrong segment count, unsupported version/purpose)
+throw `INVALID_TOKEN`.
+
+## Size guard
+
+`decode` — like `decrypt` and `verify` — rejects a token larger than
+`maxTokenSize` (default **8192 bytes**) with `TOKEN_TOO_LARGE`, before
+doing any base64 or crypto work. Override per call:
+
+```js
+decode(token, { maxTokenSize: 2048 });
+```

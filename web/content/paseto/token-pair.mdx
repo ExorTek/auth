@@ -67,13 +67,9 @@ tune the opaque form, and a custom `generate()` overrides it entirely.
 
 ## Stores
 
-`createStore(kind, options)` returns a refresh registry:
-
-- `memory` — `Map`-backed, with `interval` / `lazy` / `lru` GC.
-- `redis` — `ioredis` or `redis@4`; atomic rotation via a Lua CAS, TTL
-  native. Cross-process reuse detection is safe.
-- `custom` — pass your own `{ impl }` implementing the store shape.
-
-Rotation uses the store's atomic `markUsed` when available (Redis Lua /
-in-memory CAS); custom stores without it fall back to an in-process
-per-key mutex.
+The refresh registry is a pluggable [store](/paseto/stores) —
+`memory`, `redis`, or `custom`. Rotation uses the store's atomic
+`markUsed` when available (Redis Lua / in-memory CAS), so cross-process
+reuse detection is safe; custom stores without it fall back to an
+in-process per-key mutex. See **[stores](/paseto/stores)** for the GC
+strategies, Redis dialects, and the store shape.
