@@ -73,6 +73,17 @@ test('purpose confusion: a v4.public token is not a v4.local token', () => {
   );
 });
 
+test('malformed tokens (too few / too many segments) are rejected', () => {
+  const key = generateKey();
+  const valid = encrypt({ a: 1 }, key);
+  for (const bad of ['v4.local', 'v4.local.', `${valid}.a.b`, 'not-a-token']) {
+    assert.throws(
+      () => decrypt(bad, key),
+      err => err instanceof PasetoError && err.code === ErrorCode.INVALID_TOKEN,
+    );
+  }
+});
+
 test('a v4.local token is rejected by verify()', () => {
   const { publicKey } = generateKeyPair();
   const local = encrypt({ a: 1 }, generateKey());

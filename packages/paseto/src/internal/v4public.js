@@ -47,8 +47,11 @@ export function signRaw({ message, secretKey, footer = Buffer.alloc(0), implicit
 export function verifyRaw({ token, publicKey, implicit = Buffer.alloc(0) }) {
   const pk = ed25519PublicKey(publicKey);
 
+  // A compact PASETO token is exactly `version.purpose.payload[.footer]`;
+  // base64url never contains '.', so anything outside 3–4 segments is
+  // malformed.
   const parts = token.split('.');
-  if (parts.length < 3 || `${parts[0]}.${parts[1]}.` !== HEADER) {
+  if (parts.length < 3 || parts.length > 4 || `${parts[0]}.${parts[1]}.` !== HEADER) {
     throw new PasetoError(ErrorCode.INVALID_TOKEN, 'not a v4.public token');
   }
   const footer = parts.length >= 4 && parts[3] ? b64.decode(parts[3]) : Buffer.alloc(0);

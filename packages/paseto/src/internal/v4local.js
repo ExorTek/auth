@@ -64,18 +64,23 @@ export function encryptRaw({ message, key, footer = Buffer.alloc(0), implicit = 
 /**
  * Decrypt a `v4.local` token, verifying the MAC in constant time.
  *
+ * The footer is parsed from the token itself (segment 4) and returned;
+ * it is authenticated via the MAC, so tampering fails closed.
+ *
  * @param {object} params
  * @param {string} params.token
  * @param {Uint8Array} params.key
- * @param {Buffer} [params.footer]    expected footer (already decoded)
  * @param {Buffer} [params.implicit]
  * @returns {{ message: Buffer, footer: Buffer }}
  */
 export function decryptRaw({ token, key, implicit = Buffer.alloc(0) }) {
   const k = symmetricKey(key);
 
+  // A compact PASETO token is exactly `version.purpose.payload[.footer]`;
+  // base64url never contains '.', so anything outside 3–4 segments is
+  // malformed.
   const parts = token.split('.');
-  if (parts.length < 3 || `${parts[0]}.${parts[1]}.` !== HEADER) {
+  if (parts.length < 3 || parts.length > 4 || `${parts[0]}.${parts[1]}.` !== HEADER) {
     throw new PasetoError(ErrorCode.INVALID_TOKEN, 'not a v4.local token');
   }
   const footer = parts.length >= 4 && parts[3] ? b64.decode(parts[3]) : Buffer.alloc(0);
