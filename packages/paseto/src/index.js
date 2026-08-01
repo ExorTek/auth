@@ -16,11 +16,12 @@
 
 import { encrypt, decrypt } from './local.js';
 import { sign, verify } from './public.js';
+import { decode } from './decode.js';
 import { generateKey, generateKeyPair } from './keygen.js';
 import { PasetoError, ErrorCode } from './internal/errors.js';
 import { SUPPORTED } from './internal/versions.js';
 
-export { encrypt, decrypt, sign, verify, generateKey, generateKeyPair };
+export { encrypt, decrypt, sign, verify, decode, generateKey, generateKeyPair };
 export { PasetoError, ErrorCode, SUPPORTED };
 
 /**
@@ -33,6 +34,7 @@ export const paseto = Object.freeze({
   decrypt,
   sign,
   verify,
+  decode,
 });
 
 /**

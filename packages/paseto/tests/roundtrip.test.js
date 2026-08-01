@@ -5,7 +5,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { encrypt, decrypt, sign, verify, generateKey, generateKeyPair, PasetoError, ErrorCode } from '../src/index.js';
+import {
+  encrypt,
+  decrypt,
+  sign,
+  verify,
+  decode,
+  generateKey,
+  generateKeyPair,
+  PasetoError,
+  ErrorCode,
+} from '../src/index.js';
 
 // v4.local
 
@@ -56,6 +66,30 @@ test('v4.public accepts a 32-byte seed as the secret key', () => {
   const seedOnly = secretKey.subarray(0, 32);
   const token = sign({ ok: true }, seedOnly);
   assert.equal(verify(token, publicKey).ok, true);
+});
+
+// decode (unverified footer read)
+
+test('decode reads version/purpose/footer without a key', () => {
+  const { secretKey } = generateKeyPair();
+  const token = sign({ userId: 1 }, secretKey, { footer: { kid: 'key-2026' } });
+  const info = decode(token);
+  assert.deepEqual(info, { version: 'v4', purpose: 'public', footer: { kid: 'key-2026' } });
+});
+
+test('decode of a v4.local token exposes the footer but not the encrypted payload', () => {
+  const token = encrypt({ secret: 1 }, generateKey(), { footer: 'ctx-42' });
+  const info = decode(token);
+  assert.equal(info.purpose, 'local');
+  assert.equal(info.footer, 'ctx-42');
+  assert.ok(!('payload' in info));
+});
+
+test('decode rejects malformed tokens', () => {
+  assert.throws(
+    () => decode('v3.local.whatever'),
+    err => err instanceof PasetoError && err.code === ErrorCode.INVALID_TOKEN,
+  );
 });
 
 // implicit assertions
