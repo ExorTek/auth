@@ -43,6 +43,7 @@ try {
 | `UNSUPPORTED_VERSION` |  400   | `generateKey` / `generateKeyPair` given the wrong version. |
 | `INVALID_TOKEN`       |  401   | Malformed token, or wrong purpose for the operation.       |
 | `INVALID_KEY`         |  401   | Key is the wrong size / type.                              |
+| `TOKEN_TOO_LARGE`     |  413   | Token exceeds `maxTokenSize` (default 8192 bytes).         |
 | `DECRYPTION_FAILED`   |  401   | v4.local MAC mismatch — wrong key or tampered ciphertext.  |
 | `SIGNATURE_INVALID`   |  401   | v4.public Ed25519 signature check failed.                  |
 | `TOKEN_EXPIRED`       |  401   | `exp` is in the past (beyond `clockTolerance`).            |

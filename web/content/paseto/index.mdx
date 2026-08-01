@@ -102,11 +102,24 @@ const token = sign(payload, secretKey, { footer: { kid: 'key-2026' } });
 const { footer } = verify(token, publicKey, { complete: true });
 ```
 
+`decode(token)` reads `{ version, purpose, footer }` **without a key**,
+so you can pick the verification key by `kid` before calling `verify`.
+It never returns the payload, and both `decode` and `decrypt` / `verify`
+reject a token over `maxTokenSize` (default 8192 bytes) with
+`TOKEN_TOO_LARGE`.
+
+```js
+import { decode } from '@exortek/paseto';
+
+const { footer } = decode(token); // unverified
+const payload = verify(token, keyring.get(footer.kid));
+```
+
 ## Modules
 
 | Subpath                       | Purpose                                                        |
 | ----------------------------- | ------------------------------------------------------------- |
-| `@exortek/paseto`             | `encrypt` / `decrypt` / `sign` / `verify` / key generation    |
+| `@exortek/paseto`             | `encrypt` / `decrypt` / `sign` / `verify` / `decode` / key generation |
 | `@exortek/paseto/token-pair`  | access + refresh with RFC 6749 §10.4 reuse detection          |
 | `@exortek/paseto/stores`      | `createStore('memory' \| 'redis' \| 'custom', …)`             |
 

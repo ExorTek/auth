@@ -113,6 +113,25 @@ const token = sign(payload, secretKey, { footer: { kid: 'key-2026' } });
 const { footer } = verify(token, publicKey, { complete: true });
 ```
 
+### Reading the footer before verifying (`kid` selection)
+
+`decode` reads a token's `version` / `purpose` / `footer` **without a
+key and without authenticating anything** — the footer is designed for
+exactly this, picking a key by `kid` before you call `verify`. It never
+returns the payload (encrypted for `v4.local`, unverified for
+`v4.public`), so you can't accidentally trust it.
+
+```js
+import { decode } from '@exortek/paseto';
+
+const { purpose, footer } = decode(token); // no key
+const key = keyring.get(footer.kid);
+const payload = verify(token, key);
+```
+
+Decoders reject a token larger than `maxTokenSize` (default 8192 bytes,
+`TOKEN_TOO_LARGE`) before doing any base64 / crypto work.
+
 ## Token pair (refresh + reuse detection)
 
 ```js
@@ -153,7 +172,7 @@ await revokeAll(familyId, { store });
 
 | Subpath                                                                                                      | Purpose                                                                                          |
 | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [`@exortek/paseto`](https://github.com/ExorTek/auth/blob/master/packages/paseto/src/index.js)               | `encrypt`, `decrypt`, `sign`, `verify`, `generateKey`, `generateKeyPair`                         |
+| [`@exortek/paseto`](https://github.com/ExorTek/auth/blob/master/packages/paseto/src/index.js)               | `encrypt`, `decrypt`, `sign`, `verify`, `decode`, `generateKey`, `generateKeyPair`               |
 | [`@exortek/paseto/token-pair`](https://github.com/ExorTek/auth/blob/master/packages/paseto/src/token-pair.js) | `create` / `rotate` / `revoke` / `revokeAll` with RFC 6749 §10.4 reuse detection                |
 | [`@exortek/paseto/stores`](https://github.com/ExorTek/auth/blob/master/packages/paseto/src/stores.js)       | `createStore('memory' \| 'redis' \| 'custom', ...)` with interval / lazy / lru GC strategies    |
 
@@ -183,9 +202,9 @@ try {
 ```
 
 All codes: `INVALID_ARGUMENT`, `INVALID_TOKEN`, `INVALID_KEY`,
-`UNSUPPORTED_VERSION`, `DECRYPTION_FAILED`, `SIGNATURE_INVALID`,
-`TOKEN_EXPIRED`, `NOT_YET_VALID`, `CLAIM_MISMATCH`, `REVOKED`,
-`REFRESH_REUSED`, `STORE_ERROR`.
+`UNSUPPORTED_VERSION`, `TOKEN_TOO_LARGE`, `DECRYPTION_FAILED`,
+`SIGNATURE_INVALID`, `TOKEN_EXPIRED`, `NOT_YET_VALID`, `CLAIM_MISMATCH`,
+`REVOKED`, `REFRESH_REUSED`, `STORE_ERROR`.
 
 ## Why not
 
