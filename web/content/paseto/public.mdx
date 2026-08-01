@@ -40,9 +40,8 @@ sign({ ok: true }, seedOnly);
 ## Options
 
 `sign` takes the same claim + `footer` + `assertion` options as
-[`encrypt`](/paseto/local#encrypt-payload-key-options); `verify` takes
-the same validation options as
-[`decrypt`](/paseto/local#decrypt-token-key-options) (`clockTolerance`,
+[`encrypt`](/paseto/local#encrypt); `verify` takes the same validation
+options as [`decrypt`](/paseto/local#decrypt) (`clockTolerance`,
 `issuer` / `subject` / `audience`, `ignoreExp` / `ignoreNbf`,
 `maxTokenSize`, `complete`).
 

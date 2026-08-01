@@ -35,10 +35,11 @@ const data = decrypt(token, key, {
 `Buffer` / `Uint8Array` works — load your own from a KMS or env. A
 wrong-length or non-byte key throws `INVALID_KEY`.
 
-## `encrypt(payload, key, options)`
+## `encrypt`
 
-`payload` is an object (JSON-encoded, with claims injected), or a raw
-string / byte buffer (passed through untouched, no claims).
+`encrypt(payload, key, options)` — `payload` is an object (JSON-encoded,
+with claims injected), or a raw string / byte buffer (passed through
+untouched, no claims).
 
 | Option       | Type              | Notes                                            |
 | ------------ | ----------------- | ------------------------------------------------ |
@@ -54,7 +55,9 @@ string / byte buffer (passed through untouched, no claims).
 
 An explicit claim already on the payload always wins over the option.
 
-## `decrypt(token, key, options)`
+## `decrypt`
+
+`decrypt(token, key, options)`:
 
 | Option           | Type              | Notes                                                  |
 | ---------------- | ----------------- | ------------------------------------------------------ |

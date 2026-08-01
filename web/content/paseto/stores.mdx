@@ -56,18 +56,22 @@ membership out of band.
 const store = createStore('custom', { impl: myStore });
 ```
 
-`impl` must implement `add` / `has` / `get` / `delete` / `deleteAll`,
-and optionally `markUsed` (atomic compare-and-swap). Without `markUsed`,
-rotation falls back to an in-process per-key mutex — safe in a single
-process, but not across processes.
+`impl` must implement `add` / `has` / `get` / `delete` / `deleteAll`.
+`markUsed` (atomic compare-and-swap) is optional — without it, rotation
+falls back to an in-process per-key mutex, safe in a single process but
+not across processes. `size` and `_stop` are lifecycle helpers the
+built-in stores expose for introspection and timer cleanup; `tokenPair`
+never calls them, so a custom store may omit them.
 
 ## Store shape
 
-| Method                       | Returns                              |
-| ---------------------------- | ------------------------------------ |
-| `add(key, expiresAt, meta)`  | `Promise<void>`                      |
-| `has(key)`                   | `Promise<boolean>`                   |
-| `get(key)`                   | `Promise<{ expiresAt, metadata } \| null>` |
-| `delete(key)`                | `Promise<void>`                      |
-| `deleteAll(filter)`          | `Promise<number>` (count revoked)    |
-| `markUsed(key, nowSec)`      | `Promise<{ swapped, record } \| null>` (optional) |
+| Method                       | Returns                              |                |
+| ---------------------------- | ------------------------------------ | -------------- |
+| `add(key, expiresAt, meta)`  | `Promise<void>`                      | required       |
+| `has(key)`                   | `Promise<boolean>`                   | required       |
+| `get(key)`                   | `Promise<{ expiresAt, metadata } \| null>` | required |
+| `delete(key)`                | `Promise<void>`                      | required       |
+| `deleteAll(filter)`          | `Promise<number>` (count revoked)    | required       |
+| `markUsed(key, nowSec)`      | `Promise<{ swapped, record } \| null>` | optional (CAS) |
+| `size()`                     | `number`                             | optional (built-in) |
+| `_stop()`                    | `void`                               | optional (built-in) |
