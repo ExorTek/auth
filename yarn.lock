@@ -435,6 +435,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@exortek/paseto@workspace:packages/paseto":
+  version: 0.0.0-use.local
+  resolution: "@exortek/paseto@workspace:packages/paseto"
+  languageName: unknown
+  linkType: soft
+
 "@exortek/passkey@workspace:packages/passkey":
   version: 0.0.0-use.local
   resolution: "@exortek/passkey@workspace:packages/passkey"
