@@ -1,0 +1,77 @@
+---
+title: 'paseto.stores — refresh-token adapters'
+sidebarTitle: stores
+---
+
+import { Callout } from 'nextra/components';
+
+# `paseto.stores`
+
+`createStore('memory' | 'redis' | 'custom', …)` — three built-in
+adapters for the refresh-token registry that
+[`tokenPair`](/paseto/token-pair) rides on.
+
+```js
+import { createStore } from '@exortek/paseto/stores';
+```
+
+## `memory` — in-process with configurable GC
+
+```js
+const store = createStore('memory', {
+  gc: { strategy: 'interval', interval: '5m' }, // default
+});
+```
+
+### GC strategies
+
+| Strategy   | How it works                                                              | Use when                              |
+| ---------- | ------------------------------------------------------------------------- | ------------------------------------- |
+| `interval` | `setInterval` sweep (default 5 min); the timer is `unref()`'d.             | Default. High-churn workloads.        |
+| `lazy`     | No sweep — expired entries drop when queried. Zero background CPU.         | Low volume, or you sweep externally.  |
+| `lru`      | `interval` plus a `maxSize` cap; oldest-inserted evicted at capacity.      | Bounded memory.                       |
+
+<Callout type="warning">
+  Never use `lru` for a revocation registry — evicting a record silently
+  un-revokes the token it stood for.
+</Callout>
+
+## `redis` — ioredis or redis@4
+
+```js
+const store = createStore('redis', { client, keyPrefix: 'paseto:rt:' });
+```
+
+Both `ioredis` (`set(k, v, 'EX', ttl)`) and `redis@4`
+(`set(k, v, { EX: ttl })`) are supported; the dialect is detected at
+runtime and can be forced with `dialect: 'ioredis' | 'node-redis'`. TTL
+is native (`EX` seconds), so no interval GC. Rotation is atomic via a Lua
+compare-and-swap `markUsed`, making cross-process reuse detection safe.
+`deleteAll(filter)` uses `SCAN` — large deployments should track family
+membership out of band.
+
+## `custom` — your own backend
+
+```js
+const store = createStore('custom', { impl: myStore });
+```
+
+`impl` must implement `add` / `has` / `get` / `delete` / `deleteAll`.
+`markUsed` (atomic compare-and-swap) is optional — without it, rotation
+falls back to an in-process per-key mutex, safe in a single process but
+not across processes. `size` and `_stop` are lifecycle helpers the
+built-in stores expose for introspection and timer cleanup; `tokenPair`
+never calls them, so a custom store may omit them.
+
+## Store shape
+
+| Method                       | Returns                              |                |
+| ---------------------------- | ------------------------------------ | -------------- |
+| `add(key, expiresAt, meta)`  | `Promise<void>`                      | required       |
+| `has(key)`                   | `Promise<boolean>`                   | required       |
+| `get(key)`                   | `Promise<{ expiresAt, metadata } \| null>` | required |
+| `delete(key)`                | `Promise<void>`                      | required       |
+| `deleteAll(filter)`          | `Promise<number>` (count revoked)    | required       |
+| `markUsed(key, nowSec)`      | `Promise<{ swapped, record } \| null>` | optional (CAS) |
+| `size()`                     | `number`                             | optional (built-in) |
+| `_stop()`                    | `void`                               | optional (built-in) |

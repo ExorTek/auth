@@ -1,5 +1,9 @@
 export default {
   index: 'Overview',
-  'token-pair': 'Token pair',
-  errors: 'Errors — PasetoError',
+  local: 'v4.local — encrypt / decrypt',
+  public: 'v4.public — sign / verify',
+  decode: 'decode — read the footer',
+  'token-pair': 'tokenPair — access + refresh',
+  stores: 'stores — refresh adapters',
+  errors: 'errors — PasetoError',
 };
