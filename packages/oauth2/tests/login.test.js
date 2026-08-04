@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { normalizeLoginConfig, startLogin, completeLogin, signValue, unsignValue } from '../src/middleware/core.js';
+import {
+  normalizeLoginConfig,
+  startLogin,
+  completeLogin,
+  signValue,
+  unsignValue,
+  sealValue,
+  unsealValue,
+} from '../src/middleware/core.js';
 import { mountOAuthLogin } from '../src/middleware/express.js';
 
 const SECRET = 'flow-cookie-secret-value';
@@ -56,6 +64,25 @@ test('web mode: a tampered cookie is rejected', async () => {
     () => completeLogin(cfg, 'google', { state: 'st' }, { cookieValue: started.setCookie.value.slice(0, -2) + 'zz' }),
     /tampered|session/i,
   );
+});
+
+test("seal: 'jwe' encrypts the flow session (confidential, not just signed)", async () => {
+  const secret = 'jwe-seal-secret-derives-a256gcm!';
+  const sealed = await sealValue('flow-session-payload', secret);
+  assert.equal(sealed.split('.').length, 5, 'compact JWE has five parts');
+  assert.ok(!sealed.includes('flow-session-payload'), 'plaintext is not visible');
+  assert.equal(await unsealValue(sealed, secret), 'flow-session-payload');
+  assert.equal(await unsealValue(sealed, 'a-different-wrong-secret-value!!'), undefined);
+
+  const cfg = normalizeLoginConfig({ oauth: fakeOauth(), cookie: { secret }, seal: 'jwe' });
+  const started = await startLogin(cfg, 'google', {});
+  assert.ok(!started.setCookie.value.includes('"state"'), 'the cookie ciphertext hides the session');
+  const done = await completeLogin(cfg, 'google', { state: 'st', code: 'C' }, { cookieValue: started.setCookie.value });
+  assert.equal(done.result.user.sub, 'user-1');
+});
+
+test("seal: 'jwe' requires a secret", () => {
+  assert.throws(() => normalizeLoginConfig({ oauth: fakeOauth(), mode: 'api', seal: 'jwe' }), /secret/i);
 });
 
 test('api mode: session is client-held, no cookie', async () => {
