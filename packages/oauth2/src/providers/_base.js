@@ -4,10 +4,10 @@
  *
  * A preset is thin config: endpoints, capability flags, and a `mapUser`
  * projection. The two engine methods here — {@link buildAuthorization}
- * and {@link handleCallback} — own every cross-cutting security control
- * from the PLAN.md threat matrix, enforced by default with no off-switch
- * (Decision #0). Which rows apply is derived from the provider `kind`
- * (`oidc` vs `oauth2`), never applied blindly.
+ * and {@link handleCallback} — own every cross-cutting security control,
+ * enforced by default with no off-switch. Which controls apply is
+ * derived from the provider `kind` (`oidc` vs `oauth2`), never applied
+ * blindly.
  */
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { isNonEmptyString, isObject, isFunction } from '@exortek/shared/predicates';
@@ -21,8 +21,7 @@ import { createJwksResolver, verifyIdToken } from '../internal/id-token.js';
 
 /**
  * Non-fatal, degraded-but-not-blocked conditions. Surfaced in
- * `warnings[]` so the caller can react without the flow hard-failing
- * (PLAN.md — the warnings channel).
+ * `warnings[]` so the caller can react without the flow hard-failing.
  */
 export const WarningCode = Object.freeze({
   PKCE_UNSUPPORTED: 'PKCE_UNSUPPORTED',
@@ -47,16 +46,19 @@ const DEFAULT_ID_TOKEN_ALGS = ['RS256', 'ES256', 'PS256'];
  * @property {string} [userinfoEndpoint]
  * @property {string} [jwksUri]
  * @property {string} [revocationEndpoint]
- * @property {string} [issuer]                  OIDC issuer (`iss` match)
+ * @property {string | ((claimed: string) => boolean)} [issuer]   OIDC issuer — exact string, or a validator (multi-tenant)
  * @property {string} [expectedIssuer]          overrides `issuer` for the RFC 9207 `iss` param
  * @property {string} [emailEndpoint]           secondary email fetch (github)
  * @property {boolean} [discover]               resolve endpoints from `issuer` discovery
  * @property {boolean} [supportsPkce]           default true
  * @property {string[]} [defaultScopes]
+ * @property {boolean} [autoOpenidScope]        prepend `openid` for OIDC (default true; Apple sets false)
  * @property {string[]} [idTokenAlgs]
  * @property {import('@exortek/jwks').RemoteJWKSOptions} [jwksOptions]  forwarded to the JWKS resolver
+ * @property {'post'|'basic'} [clientAuth]                   client authentication at the token endpoint (default `post`)
  * @property {Record<string,string>} [authorizationParams]  extra static auth-request params
- * @property {Record<string,string>} [tokenHeaders]         extra headers on the token/userinfo calls
+ * @property {Record<string,string>} [tokenHeaders]         extra headers on the token/refresh/revoke calls
+ * @property {Record<string,string>} [userinfoHeaders]      extra headers on the userinfo/email calls (falls back to tokenHeaders)
  * @property {(raw: Record<string, unknown>, claims?: Record<string, unknown>) => NormalizedUserFields} mapUser
  *
  * @typedef {Object} ProviderAppOptions
@@ -183,8 +185,8 @@ export async function buildAuthorization(provider, opts) {
   /** @type {import('../internal/session.js').FlowSession} */
   const session = { provider: provider.id, state, createdAt: Date.now() };
 
-  // Threat #2 — PKCE S256 always, unless the provider genuinely rejects
-  // it, in which case we degrade loudly (Decision #7).
+  // PKCE S256 always, unless the provider genuinely rejects
+  // it, in which case we degrade loudly.
   if (provider.def.supportsPkce === false) {
     warnings.push(
       warn(WarningCode.PKCE_UNSUPPORTED, `${provider.id} does not support PKCE; relying on state + exact redirect_uri`),
@@ -196,14 +198,14 @@ export async function buildAuthorization(provider, opts) {
     session.codeVerifier = pkce.codeVerifier;
   }
 
-  // Threat #5 — OIDC replay nonce.
+  // OIDC replay nonce.
   if (provider.kind === 'oidc') {
     const nonce = randomNonce();
     params.set('nonce', nonce);
     session.nonce = nonce;
   }
 
-  // Threat #18 — bind to the initiating user's session when supplied.
+  // bind to the initiating user's session when supplied.
   if (isNonEmptyString(opts.sessionBinding)) {
     session.sessionBinding = opts.sessionBinding;
   }
@@ -237,7 +239,7 @@ export async function handleCallback(provider, opts) {
   /** @type {Warning[]} */
   const warnings = [];
 
-  // Threat #15 — the provider bounced back an error, not a code.
+  // the provider bounced back an error, not a code.
   if (isNonEmptyString(query.error)) {
     const desc = isNonEmptyString(query.error_description) ? `: ${query.error_description}` : '';
     throw new OAuth2Error(ErrorCode.PROVIDER_ERROR, `${provider.id} returned ${query.error}${desc}`, {
@@ -249,7 +251,7 @@ export async function handleCallback(provider, opts) {
     throw new OAuth2Error(ErrorCode.MISSING_STATE, 'callback has no flow session to validate against');
   }
 
-  // Threat #17 (COAT) — the session must belong to the provider whose
+  // COAT — the session must belong to the provider whose
   // callback this is.
   if (session.provider !== provider.id) {
     throw new OAuth2Error(
@@ -258,12 +260,12 @@ export async function handleCallback(provider, opts) {
     );
   }
 
-  // Threat #1 — CSRF: state generated and verified, constant-time.
+  // CSRF: state generated and verified, constant-time.
   if (!isNonEmptyString(query.state) || !safeEqual(query.state, session.state)) {
     throw new OAuth2Error(ErrorCode.STATE_MISMATCH, 'callback `state` does not match the flow session');
   }
 
-  // Threat #18 — the same user who started the flow must finish it.
+  // the same user who started the flow must finish it.
   if (session.sessionBinding !== undefined) {
     if (!isNonEmptyString(opts.sessionBinding) || !safeEqual(opts.sessionBinding, session.sessionBinding)) {
       throw new OAuth2Error(ErrorCode.SESSION_MISMATCH, 'callback session binding does not match the flow session');
@@ -272,7 +274,7 @@ export async function handleCallback(provider, opts) {
 
   const ep = await resolveEndpoints(provider);
 
-  // Threat #3 — RFC 9207 `iss` response param, exact match when present.
+  // RFC 9207 `iss` response param, exact match when present.
   if (query.iss !== undefined) {
     const expected = provider.def.expectedIssuer ?? ep.issuer;
     if (isNonEmptyString(expected) && query.iss !== expected) {
@@ -284,33 +286,30 @@ export async function handleCallback(provider, opts) {
     throw new OAuth2Error(ErrorCode.PROVIDER_ERROR, `${provider.id} callback is missing the authorization code`);
   }
 
-  // Threat #4 — token exchange replays the exact redirect_uri.
+  // token exchange replays the exact redirect_uri.
   /** @type {Record<string, string>} */
   const tokenParams = {
     grant_type: 'authorization_code',
     code: query.code,
     redirect_uri: redirectUri,
-    client_id: provider.clientId,
   };
   if (session.codeVerifier) {
     tokenParams.code_verifier = session.codeVerifier;
   }
-  if (isNonEmptyString(provider.clientSecret)) {
-    tokenParams.client_secret = provider.clientSecret;
-  }
+  const { params: authedParams, headers: authHeaders } = applyClientAuth(provider, tokenParams);
 
-  const tokens = await postForm(ep.tokenEndpoint, tokenParams, {
-    headers: provider.def.tokenHeaders,
+  const tokens = await postForm(ep.tokenEndpoint, authedParams, {
+    headers: { ...provider.def.tokenHeaders, ...authHeaders },
     errorCode: ErrorCode.TOKEN_EXCHANGE_FAILED,
   });
 
-  // Threat #12 — granted scope narrower than requested → warn, not fail.
+  // granted scope narrower than requested → warn, not fail.
   const narrowed = narrowedScopes(resolveScopes(provider, undefined), tokens.scope);
   if (narrowed.length > 0) {
     warnings.push(warn(WarningCode.SCOPE_NARROWED, `provider did not grant: ${narrowed.join(' ')}`));
   }
 
-  // OIDC id_token verification (threats 5,6,7,8,10,16).
+  // OIDC id_token verification.
   /** @type {Record<string, unknown> | undefined} */
   let idClaims;
   if (provider.kind === 'oidc') {
@@ -342,9 +341,9 @@ export async function handleCallback(provider, opts) {
     const info = await getJson(
       ep.userinfoEndpoint,
       { token: tokens.access_token },
-      { headers: provider.def.tokenHeaders, errorCode: ErrorCode.USERINFO_FAILED },
+      { headers: provider.def.userinfoHeaders ?? provider.def.tokenHeaders, errorCode: ErrorCode.USERINFO_FAILED },
     );
-    // Threat #8 — the userinfo subject must be the id_token subject.
+    // the userinfo subject must be the id_token subject.
     if (idClaims && isNonEmptyString(info.sub) && info.sub !== idClaims.sub) {
       throw new OAuth2Error(ErrorCode.SUB_MISMATCH, 'userinfo sub does not match the id_token sub');
     }
@@ -355,7 +354,7 @@ export async function handleCallback(provider, opts) {
       const emails = await getJson(
         provider.def.emailEndpoint,
         { token: tokens.access_token },
-        { headers: provider.def.tokenHeaders, errorCode: ErrorCode.USERINFO_FAILED },
+        { headers: provider.def.userinfoHeaders ?? provider.def.tokenHeaders, errorCode: ErrorCode.USERINFO_FAILED },
       );
       raw.emails = emails;
     }
@@ -366,7 +365,7 @@ export async function handleCallback(provider, opts) {
     throw new OAuth2Error(ErrorCode.SUB_MISMATCH, `${provider.id} did not yield a stable subject id`);
   }
 
-  // Threat #9 — surface an unverified email rather than trusting it.
+  // surface an unverified email rather than trusting it.
   if (isNonEmptyString(mapped.email) && mapped.emailVerified === false) {
     warnings.push(warn(WarningCode.EMAIL_UNVERIFIED, `${provider.id} reports the email as unverified`));
   }
@@ -385,8 +384,9 @@ export async function handleCallback(provider, opts) {
  */
 function resolveScopes(provider, override) {
   const base = override ?? provider.scope ?? provider.def.defaultScopes ?? [];
-  // OIDC requires `openid` for an id_token to be issued.
-  if (provider.kind === 'oidc' && !base.includes('openid')) {
+  // OIDC issues an id_token off the `openid` scope. A provider that
+  // rejects an explicit `openid` (Apple) opts out with autoOpenidScope.
+  if (provider.kind === 'oidc' && provider.def.autoOpenidScope !== false && !base.includes('openid')) {
     return ['openid', ...base];
   }
   return base;
@@ -408,6 +408,32 @@ function narrowedScopes(requested, grantedScope) {
 /** Length-safe string equality on the UTF-8 bytes. */
 function safeEqual(a, b) {
   return timingSafeEqual(Buffer.from(String(a), 'utf8'), Buffer.from(String(b), 'utf8'));
+}
+
+/**
+ * Apply client authentication to a set of token-endpoint params. The
+ * default is `client_secret_post` (credentials in the body); a provider
+ * can declare `clientAuth: 'basic'` to send HTTP Basic instead (some
+ * providers, e.g. X/Twitter, require it). `client_id` always rides in
+ * the body — providers accept it there regardless of the auth style.
+ *
+ * @param {ResolvedProvider} provider
+ * @param {Record<string,string>} params
+ * @returns {{ params: Record<string,string>, headers: Record<string,string> }}
+ */
+export function applyClientAuth(provider, params) {
+  const out = { ...params, client_id: provider.clientId };
+  /** @type {Record<string,string>} */
+  const headers = {};
+  if (isNonEmptyString(provider.clientSecret)) {
+    if (provider.def.clientAuth === 'basic') {
+      const creds = Buffer.from(`${provider.clientId}:${provider.clientSecret}`).toString('base64');
+      headers.authorization = `Basic ${creds}`;
+    } else {
+      out.client_secret = provider.clientSecret;
+    }
+  }
+  return { params: out, headers };
 }
 
 /**

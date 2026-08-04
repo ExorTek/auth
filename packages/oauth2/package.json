@@ -12,6 +12,66 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./providers/google": {
+      "types": "./dist/providers/google.d.ts",
+      "import": "./dist/providers/google.mjs",
+      "require": "./dist/providers/google.cjs"
+    },
+    "./providers/github": {
+      "types": "./dist/providers/github.d.ts",
+      "import": "./dist/providers/github.mjs",
+      "require": "./dist/providers/github.cjs"
+    },
+    "./providers/microsoft": {
+      "types": "./dist/providers/microsoft.d.ts",
+      "import": "./dist/providers/microsoft.mjs",
+      "require": "./dist/providers/microsoft.cjs"
+    },
+    "./providers/discord": {
+      "types": "./dist/providers/discord.d.ts",
+      "import": "./dist/providers/discord.mjs",
+      "require": "./dist/providers/discord.cjs"
+    },
+    "./providers/facebook": {
+      "types": "./dist/providers/facebook.d.ts",
+      "import": "./dist/providers/facebook.mjs",
+      "require": "./dist/providers/facebook.cjs"
+    },
+    "./providers/linkedin": {
+      "types": "./dist/providers/linkedin.d.ts",
+      "import": "./dist/providers/linkedin.mjs",
+      "require": "./dist/providers/linkedin.cjs"
+    },
+    "./providers/spotify": {
+      "types": "./dist/providers/spotify.d.ts",
+      "import": "./dist/providers/spotify.mjs",
+      "require": "./dist/providers/spotify.cjs"
+    },
+    "./providers/twitch": {
+      "types": "./dist/providers/twitch.d.ts",
+      "import": "./dist/providers/twitch.mjs",
+      "require": "./dist/providers/twitch.cjs"
+    },
+    "./providers/apple": {
+      "types": "./dist/providers/apple.d.ts",
+      "import": "./dist/providers/apple.mjs",
+      "require": "./dist/providers/apple.cjs"
+    },
+    "./providers/twitter": {
+      "types": "./dist/providers/twitter.d.ts",
+      "import": "./dist/providers/twitter.mjs",
+      "require": "./dist/providers/twitter.cjs"
+    },
+    "./providers/okta": {
+      "types": "./dist/providers/okta.d.ts",
+      "import": "./dist/providers/okta.mjs",
+      "require": "./dist/providers/okta.cjs"
+    },
+    "./providers/azure": {
+      "types": "./dist/providers/azure.d.ts",
+      "import": "./dist/providers/azure.mjs",
+      "require": "./dist/providers/azure.cjs"
     }
   },
   "files": [

@@ -1,7 +1,7 @@
 /**
  * `createOAuth` — the central multi-provider hub and the blessed
- * "connect to an auth server" path (PLAN.md Decision #1: no generic
- * `./client`). Providers are imported from their subpaths and passed in
+ * "connect to an auth server" path (no generic low-level client).
+ * Providers are imported from their subpaths and passed in
  * as descriptors; the adapter owns the cross-cutting config (`baseUrl`,
  * `store`, `security` defaults) and drives every provider uniformly by
  * name. There is one API — a single provider is just a one-element
@@ -14,7 +14,7 @@ import { ErrorCode, OAuth2Error } from './internal/errors.js';
 import { resolveRedirectUri } from './internal/redirect-uri.js';
 import { serializeSession, deserializeSession } from './internal/session.js';
 import { postForm } from './internal/http.js';
-import { buildAuthorization, handleCallback, resolveEndpoints } from './providers/_base.js';
+import { buildAuthorization, handleCallback, resolveEndpoints, applyClientAuth } from './providers/_base.js';
 
 const DEFAULT_MAX_AUTH_AGE = '10m';
 
@@ -138,11 +138,14 @@ export function createOAuth(config) {
       }
       const provider = getProvider(name);
       const ep = await resolveEndpoints(provider);
-      return postForm(
-        ep.tokenEndpoint,
-        withClientAuth(provider, { grant_type: 'refresh_token', refresh_token: refreshToken }),
-        { headers: provider.def.tokenHeaders, errorCode: ErrorCode.TOKEN_EXCHANGE_FAILED },
-      );
+      const { params, headers } = applyClientAuth(provider, {
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      });
+      return postForm(ep.tokenEndpoint, params, {
+        headers: { ...provider.def.tokenHeaders, ...headers },
+        errorCode: ErrorCode.TOKEN_EXCHANGE_FAILED,
+      });
     },
 
     /**
@@ -163,12 +166,13 @@ export function createOAuth(config) {
         throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, `provider ${name} has no revocation endpoint`);
       }
       /** @type {Record<string,string>} */
-      const params = { token };
+      const body = { token };
       if (isNonEmptyString(tokenTypeHint)) {
-        params.token_type_hint = tokenTypeHint;
+        body.token_type_hint = tokenTypeHint;
       }
-      return postForm(ep.revocationEndpoint, withClientAuth(provider, params), {
-        headers: provider.def.tokenHeaders,
+      const { params, headers } = applyClientAuth(provider, body);
+      return postForm(ep.revocationEndpoint, params, {
+        headers: { ...provider.def.tokenHeaders, ...headers },
         errorCode: ErrorCode.TOKEN_EXCHANGE_FAILED,
       });
     },
@@ -208,19 +212,6 @@ export function createOAuth(config) {
     }
     throw new OAuth2Error(ErrorCode.MISSING_STATE, 'no session provided and no store configured');
   }
-}
-
-/**
- * @param {ResolvedProvider} provider
- * @param {Record<string,string>} params
- * @returns {Record<string,string>}
- */
-function withClientAuth(provider, params) {
-  const out = { ...params, client_id: provider.clientId };
-  if (isNonEmptyString(provider.clientSecret)) {
-    out.client_secret = provider.clientSecret;
-  }
-  return out;
 }
 
 /** @param {unknown} store @returns {boolean} */

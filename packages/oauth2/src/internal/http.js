@@ -1,7 +1,7 @@
 /**
  * Internal HTTP client for the RP flow — token exchange, userinfo,
  * discovery, revocation. Node 22's global `fetch` (undici) only; no
- * third-party HTTP dependency (PLAN.md, Decision #5).
+ * third-party HTTP dependency.
  *
  * Mirrors the safety patterns of `@exortek/jwks` `remote.js`:
  *   - `AbortController` + `setTimeout` request timeout,
@@ -95,7 +95,9 @@ async function requestJson(url, init, options = {}) {
     });
   }
 
-  return isRecord(body) ? body : {};
+  // Preserve arrays as well as objects — some endpoints (e.g. GitHub's
+  // /user/emails) return a JSON array. Primitives collapse to `{}`.
+  return typeof body === 'object' && body !== null ? body : {};
 }
 
 /**
