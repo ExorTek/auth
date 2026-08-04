@@ -6,6 +6,9 @@ import { ErrorCode, OAuth2Error } from '../src/index.js';
 
 test('public surface is present', () => {
   for (const name of [
+    'createOAuth',
+    'defineProvider',
+    'WarningCode',
     'ErrorCode',
     'OAuth2Error',
     'CODE_CHALLENGE_METHOD',
