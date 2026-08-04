@@ -13,6 +13,21 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.mjs",
+      "require": "./dist/server/index.cjs"
+    },
+    "./server/express": {
+      "types": "./dist/server/middleware/express.d.ts",
+      "import": "./dist/server/express.mjs",
+      "require": "./dist/server/express.cjs"
+    },
+    "./server/fastify": {
+      "types": "./dist/server/middleware/fastify.d.ts",
+      "import": "./dist/server/fastify.mjs",
+      "require": "./dist/server/fastify.cjs"
+    },
     "./providers/google": {
       "types": "./dist/providers/google.d.ts",
       "import": "./dist/providers/google.mjs",

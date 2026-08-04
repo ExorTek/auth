@@ -21,6 +21,11 @@ const providers = [
 export default createConfig(pkg, {
   entries: {
     index: 'src/index.js',
+    // The authorization server (Phase 2) — its own entry so RP-only
+    // consumers never bundle it.
+    'server/index': 'src/server/index.js',
+    'server/express': 'src/server/middleware/express.js',
+    'server/fastify': 'src/server/middleware/fastify.js',
     // One entry per provider so a consumer bundles only what they import.
     ...Object.fromEntries(providers.map(name => [`providers/${name}`, `src/providers/${name}.js`])),
   },
