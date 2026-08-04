@@ -3,13 +3,13 @@
  * hands back for the caller to stash (in a cookie / server store) and
  * hand to `callback()`. It carries everything the callback needs to
  * validate the round-trip: the `state` CSRF nonce, the PKCE
- * `code_verifier`, the OIDC `nonce`, the provider context (threat #17),
- * and an optional caller session binding (threat #18).
+ * `code_verifier`, the OIDC `nonce`, the provider context, and an
+ * optional caller session binding.
  *
  * `serialize` / `deserialize` are the single contract every storage
  * mode goes through. Today that is JSON rendered base64url so it rides
- * a cookie unescaped; a future JWE seal (`@exortek/jwe`, PLAN.md Tier A)
- * swaps in behind exactly this contract with no change to callers.
+ * a cookie unescaped; a future `@exortek/jwe` seal swaps in behind
+ * exactly this contract with no change to callers.
  */
 import { encode as base64urlEncode, decode as base64urlDecode } from '@exortek/shared/base64url';
 import { isNonEmptyString, isObject } from '@exortek/shared/predicates';

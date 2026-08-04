@@ -1,13 +1,13 @@
 /**
  * Derive the `redirect_uri` from the adapter's `baseUrl` + `callback`
- * template (PLAN.md — "redirectUri is derived").
+ * template.
  *
  * The resolved value is the exact string sent on the authorization
  * request *and* replayed at the token exchange. It is never matched by
- * prefix — an open-redirect (threat #4) is only prevented if both legs
- * carry the identical string, so we compute it once here and reuse it.
+ * prefix — an open-redirect is only prevented if both legs carry the
+ * identical string, so we compute it once here and reuse it.
  *
- * Transport is `https` only (threat #14, cleartext transport), with
+ * Transport is `https` only (no cleartext), with
  * loopback (`localhost` / `127.0.0.1` / `[::1]`) exempt so local
  * development works without a certificate.
  */

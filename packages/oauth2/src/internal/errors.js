@@ -13,7 +13,7 @@ export const ErrorCode = Object.freeze({
   // Configuration / argument guards.
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
 
-  // Callback validation — the RFC 9700 threat matrix. Each is thrown by
+  // Callback validation (OAuth 2.0 Security BCP, RFC 9700). Each is thrown by
   // the flow step that detects the corresponding attack.
   MISSING_STATE: 'MISSING_STATE',
   STATE_MISMATCH: 'STATE_MISMATCH',

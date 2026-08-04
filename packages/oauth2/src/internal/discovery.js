@@ -4,7 +4,7 @@
  * `authorization_endpoint` / `token_endpoint` / `jwks_uri` /
  * `userinfo_endpoint` from `/.well-known/openid-configuration` instead
  * of hardcoding them — makes a custom `defineProvider` for Keycloak,
- * Zitadel, Auth0, or Okta a one-liner (PLAN.md Tier A).
+ * Zitadel, Auth0, or Okta a one-liner.
  *
  * Results are cached per issuer for the process lifetime with a TTL;
  * discovery documents are stable and refetched rarely.

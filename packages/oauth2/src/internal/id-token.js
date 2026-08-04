@@ -4,13 +4,13 @@
  * The signature and the standard claims (`iss` / `aud` / `nonce` /
  * `exp` / `nbf` / `iat`) are verified by `@exortek/jwt` against keys
  * resolved from the provider's JWKS through `@exortek/jwks` — we do not
- * reimplement JWT verification (PLAN.md Decision #3). This module adds
+ * reimplement JWT verification. This module adds
  * the OIDC-specific checks `jwt.verify` does not cover:
  *
  *   - `azp` must equal our `client_id` when the token has multiple
- *     audiences (threat #6, cross-client token confusion),
+ *     audiences (cross-client token confusion),
  *   - `at_hash` / `c_hash` bind the access token / authorization code to
- *     the id_token (threat #16),
+ *     the id_token,
  *
  * and translates `@exortek/jwt` failures into this package's stable
  * {@link ErrorCode} surface.
@@ -26,10 +26,10 @@ import { ErrorCode, OAuth2Error } from './errors.js';
 // The strict alg allowlist for provider id_tokens. `none` and the HS*
 // (symmetric) family are excluded structurally — an id_token is signed
 // with the provider's asymmetric key, never a shared secret, so RS/HS
-// confusion (threat #7) is impossible to express here.
+// confusion is impossible to express here.
 const DEFAULT_ALGS = ['RS256', 'ES256', 'PS256', 'RS384', 'ES384', 'RS512', 'ES512', 'EdDSA'];
 
-/** Map an `@exortek/jwt` failure code onto our threat-specific code. */
+/** Map an `@exortek/jwt` failure code onto our specific error code. */
 const JWT_CODE_MAP = {
   INVALID_NONCE: ErrorCode.NONCE_MISMATCH,
   INVALID_AUDIENCE: ErrorCode.AUDIENCE_MISMATCH,
