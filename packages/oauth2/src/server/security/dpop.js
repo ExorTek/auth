@@ -14,7 +14,7 @@
  */
 import { importJWK, thumbprint } from '@exortek/jwk';
 import { verify as jwsVerify, decodeProtectedHeader } from '@exortek/jws';
-import { isNonEmptyString, isObject } from '@exortek/shared/predicates';
+import { isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 
@@ -79,18 +79,21 @@ export async function verifyDpopProof(proof, binding) {
   try {
     header = decodeProtectedHeader(proof);
   } catch {
-    throw invalidProof('DPoP proof is not a well-formed JWT');
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof is not a well-formed JWT');
   }
 
   if (header.typ !== 'dpop+jwt') {
-    throw invalidProof('DPoP proof typ must be dpop+jwt');
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof typ must be dpop+jwt');
   }
   if (!isNonEmptyString(header.alg) || !ALLOWED_ALGS.has(header.alg)) {
-    throw invalidProof(`DPoP proof alg ${JSON.stringify(header.alg)} is not an accepted asymmetric algorithm`);
+    throw new ServerError(
+      ProtocolError.INVALID_DPOP_PROOF,
+      `DPoP proof alg ${JSON.stringify(header.alg)} is not an accepted asymmetric algorithm`,
+    );
   }
   if (!isObject(header.jwk) || isNonEmptyString(header.jwk.d)) {
     // An embedded PRIVATE key (has `d`) is a client blunder / attack.
-    throw invalidProof('DPoP proof must embed a public JWK');
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof must embed a public JWK');
   }
 
   let key;
@@ -99,23 +102,23 @@ export async function verifyDpopProof(proof, binding) {
     key = await importJWK(header.jwk);
     jkt = await thumbprint(header.jwk);
   } catch {
-    throw invalidProof('DPoP proof embeds an unusable JWK');
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof embeds an unusable JWK');
   }
 
   let payload;
   try {
     ({ payload } = await jwsVerify(proof, key, { alg: [header.alg] }));
   } catch {
-    throw invalidProof('DPoP proof signature is invalid');
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof signature is invalid');
   }
 
   // htm / htu bind the proof to THIS request (RFC 9449 §4.3). htu is
   // compared without query or fragment.
   if (payload.htm !== binding.htm) {
-    throw invalidProof('DPoP proof htm does not match the request method');
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof htm does not match the request method');
   }
   if (normalizeHtu(payload.htu) !== normalizeHtu(binding.htu)) {
-    throw invalidProof('DPoP proof htu does not match the request URI');
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof htu does not match the request URI');
   }
   assertFresh(payload.iat);
   assertUnique(payload.jti);
@@ -143,19 +146,19 @@ function normalizeHtu(htu) {
 
 /** @param {unknown} iat */
 function assertFresh(iat) {
-  if (typeof iat !== 'number') {
-    throw invalidProof('DPoP proof is missing iat');
+  if (!isNumber(iat)) {
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof is missing iat');
   }
   const ageMs = Date.now() - iat * 1000;
   if (ageMs > MAX_PROOF_AGE_MS || ageMs < -MAX_PROOF_AGE_MS) {
-    throw invalidProof('DPoP proof iat is outside the acceptable window');
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof iat is outside the acceptable window');
   }
 }
 
 /** @param {unknown} jti */
 function assertUnique(jti) {
   if (!isNonEmptyString(jti)) {
-    throw invalidProof('DPoP proof is missing jti');
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof is missing jti');
   }
   const now = Date.now();
   // Lazy eviction of expired jtis keeps the map bounded without a timer.
@@ -167,14 +170,9 @@ function assertUnique(jti) {
     }
   }
   if (seenJti.has(jti)) {
-    throw invalidProof('DPoP proof jti has already been used (replay)');
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof jti has already been used (replay)');
   }
   seenJti.set(jti, now + MAX_PROOF_AGE_MS);
-}
-
-/** @param {string} message @returns {ServerError} */
-function invalidProof(message) {
-  return new ServerError(ProtocolError.INVALID_DPOP_PROOF, message);
 }
 
 /** Test hook — clear the replay cache between cases. */

@@ -10,7 +10,7 @@
  * `type`. A deployment restricts which `type`s it accepts via the
  * `authorizationDetailsTypes` config; an unlisted type is refused.
  */
-import { isNonEmptyString, isObject } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString, isNullish, isObject } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 
@@ -24,47 +24,47 @@ import { ProtocolError, ServerError } from '../errors.js';
  * @returns {unknown[] | undefined}
  */
 export function validateAuthorizationDetails(raw, options = {}) {
-  if (raw === undefined || raw === null || raw === '') {
+  if (isNullish(raw) || raw === '') {
     return undefined;
   }
+  const state = options.redirectableState;
+  const opts = { redirectable: state !== undefined, state };
 
   let details = raw;
   if (isNonEmptyString(raw)) {
     try {
       details = JSON.parse(raw);
     } catch {
-      throw invalid('authorization_details is not valid JSON', options.redirectableState);
+      throw new ServerError(
+        ProtocolError.INVALID_AUTHORIZATION_DETAILS,
+        'authorization_details is not valid JSON',
+        opts,
+      );
     }
   }
-  if (!Array.isArray(details) || details.length === 0) {
-    throw invalid('authorization_details must be a non-empty JSON array', options.redirectableState);
+  if (!isArray(details) || details.length === 0) {
+    throw new ServerError(
+      ProtocolError.INVALID_AUTHORIZATION_DETAILS,
+      'authorization_details must be a non-empty JSON array',
+      opts,
+    );
   }
 
   for (const entry of details) {
     if (!isObject(entry) || !isNonEmptyString(entry.type)) {
-      throw invalid(
+      throw new ServerError(
+        ProtocolError.INVALID_AUTHORIZATION_DETAILS,
         'each authorization_details entry must be an object with a string "type"',
-        options.redirectableState,
+        opts,
       );
     }
-    if (Array.isArray(options.allowedTypes) && !options.allowedTypes.includes(entry.type)) {
-      throw invalid(
+    if (isArray(options.allowedTypes) && !options.allowedTypes.includes(entry.type)) {
+      throw new ServerError(
+        ProtocolError.INVALID_AUTHORIZATION_DETAILS,
         `authorization_details type ${JSON.stringify(entry.type)} is not supported`,
-        options.redirectableState,
+        opts,
       );
     }
   }
   return details;
-}
-
-/**
- * @param {string} message
- * @param {string | undefined} state
- * @returns {ServerError}
- */
-function invalid(message, state) {
-  return new ServerError(ProtocolError.INVALID_AUTHORIZATION_DETAILS, message, {
-    redirectable: state !== undefined,
-    state,
-  });
 }

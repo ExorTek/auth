@@ -26,7 +26,6 @@ import { ProtocolError, ServerError } from '../errors.js';
 import { readClientCredentials } from '../request.js';
 import { resolveClientKeys } from './client-keys.js';
 
-const INVALID_CLIENT_HEADERS = { 'www-authenticate': 'Basic realm="oauth2"' };
 const JWT_BEARER_ASSERTION = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 const ASSERTION_ALGS = new Set([
   'ES256',
@@ -62,11 +61,11 @@ export async function authenticateClient(req, config) {
   const creds = readClientCredentials(req);
   const clientId = creds?.clientId ?? req.form.client_id;
   if (!isNonEmptyString(clientId)) {
-    throw invalidClient('client authentication required');
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'client authentication required');
   }
   const client = await config.registry.getClient(clientId);
   if (!client) {
-    throw invalidClient(`unknown client ${JSON.stringify(clientId)}`);
+    throw new ServerError(ProtocolError.INVALID_CLIENT, `unknown client ${JSON.stringify(clientId)}`);
   }
 
   // The registered method drives verification — a client can never be
@@ -74,13 +73,13 @@ export async function authenticateClient(req, config) {
   const method = client.tokenEndpointAuthMethod;
   if (method === 'none') {
     if (creds && isNonEmptyString(creds.clientSecret)) {
-      throw invalidClient('public client must not present a client_secret');
+      throw new ServerError(ProtocolError.INVALID_CLIENT, 'public client must not present a client_secret');
     }
     return client;
   }
   if (method === 'client_secret_basic' || method === 'client_secret_post') {
     if (!creds || creds.via !== method) {
-      throw invalidClient(`client must authenticate with ${method}`);
+      throw new ServerError(ProtocolError.INVALID_CLIENT, `client must authenticate with ${method}`);
     }
     verifySecret(creds.clientSecret, client.clientSecret);
     return client;
@@ -89,7 +88,7 @@ export async function authenticateClient(req, config) {
     return authenticateByCertificate(req, client);
   }
   // private_key_jwt / client_secret_jwt registered but presented no assertion.
-  throw invalidClient(`client ${JSON.stringify(client.clientId)} must use ${method}`);
+  throw new ServerError(ProtocolError.INVALID_CLIENT, `client ${JSON.stringify(client.clientId)} must use ${method}`);
 }
 
 /**
@@ -118,12 +117,12 @@ export function certificateConfirmation(req, client) {
  */
 function verifySecret(presented, registered) {
   if (!isNonEmptyString(presented) || !isNonEmptyString(registered)) {
-    throw invalidClient('invalid client credentials');
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'invalid client credentials');
   }
   const a = Buffer.from(presented, 'utf8');
   const b = Buffer.from(registered, 'utf8');
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    throw invalidClient('invalid client credentials');
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'invalid client credentials');
   }
 }
 
@@ -137,11 +136,14 @@ function verifySecret(presented, registered) {
  */
 async function authenticateAssertion(req, config, assertionType) {
   if (assertionType !== JWT_BEARER_ASSERTION) {
-    throw invalidClient(`unsupported client_assertion_type ${JSON.stringify(assertionType)}`);
+    throw new ServerError(
+      ProtocolError.INVALID_CLIENT,
+      `unsupported client_assertion_type ${JSON.stringify(assertionType)}`,
+    );
   }
   const assertion = req.form.client_assertion;
   if (!isNonEmptyString(assertion)) {
-    throw invalidClient('missing client_assertion');
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'missing client_assertion');
   }
 
   // Read the unverified claims only to discover which client (and thus
@@ -150,46 +152,52 @@ async function authenticateAssertion(req, config, assertionType) {
   try {
     unverified = jwtDecode(assertion);
   } catch {
-    throw invalidClient('client_assertion is not a well-formed JWT');
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion is not a well-formed JWT');
   }
   const clientId = unverified?.payload?.sub;
   if (!isNonEmptyString(clientId) || unverified.payload.iss !== clientId) {
-    throw invalidClient('client_assertion iss and sub must both equal the client_id');
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion iss and sub must both equal the client_id');
   }
 
   const client = await config.registry.getClient(clientId);
   if (!client) {
-    throw invalidClient(`unknown client ${JSON.stringify(clientId)}`);
+    throw new ServerError(ProtocolError.INVALID_CLIENT, `unknown client ${JSON.stringify(clientId)}`);
   }
 
+  // Resolve the verification key + alg per the registered method. These
+  // pre-checks throw outside the try below, so the only exception the
+  // catch handles is a genuine verification failure from `jwtVerify`.
   const method = client.tokenEndpointAuthMethod;
   const alg = unverified.header?.alg;
+  /** @type {import('node:crypto').KeyObject | Buffer | Function} */
+  let keyish;
+  if (method === 'client_secret_jwt') {
+    if (alg !== 'HS256') {
+      throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_secret_jwt requires HS256');
+    }
+    keyish = Buffer.from(client.clientSecret, 'utf8');
+  } else if (method === 'private_key_jwt') {
+    if (!isNonEmptyString(alg) || !ASSERTION_ALGS.has(alg)) {
+      throw new ServerError(
+        ProtocolError.INVALID_CLIENT,
+        `private_key_jwt alg ${JSON.stringify(alg)} is not an accepted asymmetric algorithm`,
+      );
+    }
+    keyish = await resolveClientKeys(client);
+  } else {
+    throw new ServerError(
+      ProtocolError.INVALID_CLIENT,
+      `client ${JSON.stringify(clientId)} is not registered for assertion authentication`,
+    );
+  }
+
   let payload;
   try {
-    if (method === 'client_secret_jwt') {
-      if (alg !== 'HS256') {
-        throw invalidClient('client_secret_jwt requires HS256');
-      }
-      ({ payload } = await jwtVerify(assertion, Buffer.from(client.clientSecret, 'utf8'), {
-        alg: ['HS256'],
-        audience: config.issuer,
-      }));
-    } else if (method === 'private_key_jwt') {
-      if (!isNonEmptyString(alg) || !ASSERTION_ALGS.has(alg)) {
-        throw invalidClient(`private_key_jwt alg ${JSON.stringify(alg)} is not an accepted asymmetric algorithm`);
-      }
-      const keys = await resolveClientKeys(client);
-      // aud MUST be the issuer identifier (threat #19) — jwtVerify enforces it.
-      ({ payload } = await jwtVerify(assertion, keys, { alg: [alg], audience: config.issuer }));
-    } else {
-      throw invalidClient(`client ${JSON.stringify(clientId)} is not registered for assertion authentication`);
-    }
+    // aud MUST be the issuer identifier (threat #19) — jwtVerify enforces it.
+    ({ payload } = await jwtVerify(assertion, keyish, { alg: [alg], audience: config.issuer }));
   } catch (err) {
-    if (err instanceof ServerError) {
-      throw err;
-    }
     if (err instanceof JwtError) {
-      throw invalidClient('client_assertion verification failed');
+      throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion verification failed');
     }
     throw err;
   }
@@ -201,7 +209,7 @@ async function authenticateAssertion(req, config, assertionType) {
 /** @param {unknown} jti */
 function assertSingleUse(jti) {
   if (!isNonEmptyString(jti)) {
-    throw invalidClient('client_assertion is missing jti');
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion is missing jti');
   }
   const now = Date.now();
   if (seenAssertionJti.size > 1024) {
@@ -212,7 +220,7 @@ function assertSingleUse(jti) {
     }
   }
   if (seenAssertionJti.has(jti)) {
-    throw invalidClient('client_assertion jti has already been used (replay)');
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion jti has already been used (replay)');
   }
   // Assertions are short-lived; a 5-minute retention covers any sane exp.
   seenAssertionJti.set(jti, now + 300_000);
@@ -228,7 +236,7 @@ function assertSingleUse(jti) {
 async function authenticateByCertificate(req, client) {
   const cert = req.clientCertificate;
   if (!isObject(cert)) {
-    throw invalidClient('mTLS client authentication requires a client certificate');
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'mTLS client authentication requires a client certificate');
   }
 
   if (client.tokenEndpointAuthMethod === 'tls_client_auth') {
@@ -236,7 +244,10 @@ async function authenticateByCertificate(req, client) {
     // expected value (RFC 8705 §2.1).
     const subject = certSubjectString(cert);
     if (!isNonEmptyString(client.tlsClientAuthSubjectDn) || client.tlsClientAuthSubjectDn !== subject) {
-      throw invalidClient('client certificate subject does not match the registered value');
+      throw new ServerError(
+        ProtocolError.INVALID_CLIENT,
+        'client certificate subject does not match the registered value',
+      );
     }
     return client;
   }
@@ -245,11 +256,14 @@ async function authenticateByCertificate(req, client) {
     // client's registered JWKS (RFC 8705 §2.2).
     const thumb = certThumbprint(cert);
     if (!certInJwks(client, thumb)) {
-      throw invalidClient('client certificate is not registered for this client');
+      throw new ServerError(ProtocolError.INVALID_CLIENT, 'client certificate is not registered for this client');
     }
     return client;
   }
-  throw invalidClient(`client ${JSON.stringify(client.clientId)} is not registered for mTLS`);
+  throw new ServerError(
+    ProtocolError.INVALID_CLIENT,
+    `client ${JSON.stringify(client.clientId)} is not registered for mTLS`,
+  );
 }
 
 /**
@@ -259,7 +273,7 @@ async function authenticateByCertificate(req, client) {
 function certThumbprint(cert) {
   const der = /** @type {any} */ (cert).raw;
   if (der === undefined) {
-    throw invalidClient('client certificate has no DER encoding to fingerprint');
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'client certificate has no DER encoding to fingerprint');
   }
   return base64urlEncode(createHash('sha256').update(der).digest());
 }
@@ -276,7 +290,7 @@ function certSubjectString(cert) {
       .map(([k, v]) => `${k}=${v}`)
       .join(',');
   }
-  throw invalidClient('client certificate has no subject');
+  throw new ServerError(ProtocolError.INVALID_CLIENT, 'client certificate has no subject');
 }
 
 /**
@@ -289,12 +303,4 @@ function certInJwks(client, thumb) {
     return client.certificateThumbprint === thumb;
   }
   return false;
-}
-
-/**
- * @param {string} message
- * @returns {ServerError}
- */
-export function invalidClient(message) {
-  return new ServerError(ProtocolError.INVALID_CLIENT, message, { headers: INVALID_CLIENT_HEADERS });
 }

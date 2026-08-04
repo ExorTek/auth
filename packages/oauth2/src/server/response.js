@@ -9,7 +9,7 @@
  */
 import { isNonEmptyString, isObject } from '@exortek/shared/predicates';
 
-import { ServerError } from './errors.js';
+import { ProtocolError, ServerError } from './errors.js';
 
 /**
  * @typedef {Object} ServerResponse
@@ -73,7 +73,19 @@ export function jsonError(err) {
   if (isNonEmptyString(err.errorUri)) {
     payload.error_uri = err.errorUri;
   }
-  return json(err.status ?? 400, payload, err.headers ?? {});
+  // RFC 6749 §5.2: an `invalid_client` failure is answered with a
+  // `WWW-Authenticate` challenge. Applied centrally so every throw site
+  // stays a plain `new ServerError(ProtocolError.INVALID_CLIENT, msg)`.
+  let headers = err.headers ?? {};
+  if (err.code === ProtocolError.INVALID_CLIENT && !hasHeader(headers, 'www-authenticate')) {
+    headers = { ...headers, 'www-authenticate': 'Basic realm="oauth2"' };
+  }
+  return json(err.status ?? 400, payload, headers);
+}
+
+/** @param {Record<string, string>} headers @param {string} name @returns {boolean} */
+function hasHeader(headers, name) {
+  return Object.keys(headers).some(k => k.toLowerCase() === name);
 }
 
 /**

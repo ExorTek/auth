@@ -30,28 +30,29 @@ const CHALLENGE_RE = /^[A-Za-z0-9\-_]{43}$/;
 export function resolvePkceChallenge(params, options) {
   const challenge = params.code_challenge;
   const method = params.code_challenge_method;
+  const opts = { redirectable: true, state: options.redirectableState };
 
   if (!isNonEmptyString(challenge)) {
     if (options.required) {
-      throw redirectable(ProtocolError.INVALID_REQUEST, 'code_challenge is required (PKCE)', options.redirectableState);
+      throw new ServerError(ProtocolError.INVALID_REQUEST, 'code_challenge is required (PKCE)', opts);
     }
     return { codeChallenge: '' };
   }
   // `plain` and any non-S256 method are refused outright.
   if (isNonEmptyString(method) && method !== CODE_CHALLENGE_METHOD) {
-    throw redirectable(
+    throw new ServerError(
       ProtocolError.INVALID_REQUEST,
       `unsupported code_challenge_method ${JSON.stringify(method)}; only S256 is allowed`,
-      options.redirectableState,
+      opts,
     );
   }
   if (!isNonEmptyString(method)) {
     // RFC 7636 defaults an absent method to `plain` — which we reject, so
     // require the client to name S256 explicitly.
-    throw redirectable(ProtocolError.INVALID_REQUEST, 'code_challenge_method must be S256', options.redirectableState);
+    throw new ServerError(ProtocolError.INVALID_REQUEST, 'code_challenge_method must be S256', opts);
   }
   if (!CHALLENGE_RE.test(challenge)) {
-    throw redirectable(ProtocolError.INVALID_REQUEST, 'malformed S256 code_challenge', options.redirectableState);
+    throw new ServerError(ProtocolError.INVALID_REQUEST, 'malformed S256 code_challenge', opts);
   }
   return { codeChallenge: challenge };
 }
@@ -76,14 +77,4 @@ export function verifyCodeVerifier(codeVerifier, boundChallenge) {
   if (!verifyChallenge(codeVerifier, boundChallenge)) {
     throw new ServerError(ProtocolError.INVALID_GRANT, 'code_verifier does not match the code_challenge');
   }
-}
-
-/**
- * @param {string} code
- * @param {string} message
- * @param {string | undefined} state
- * @returns {ServerError}
- */
-function redirectable(code, message, state) {
-  return new ServerError(code, message, { redirectable: true, state });
 }

@@ -11,7 +11,7 @@
  * handler only once the user has authenticated and approved the request.
  * A `null` result is treated as the user declining (`access_denied`).
  */
-import { isNonEmptyString } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString } from '@exortek/shared/predicates';
 
 import { randomState } from '../../internal/state.js';
 import { ProtocolError, ServerError } from '../errors.js';
@@ -40,10 +40,16 @@ export function createAuthorizeHandler(config) {
       const state = isNonEmptyString(params.state) ? params.state : undefined;
 
       if (params.response_type !== 'code') {
-        throw redirectable(ProtocolError.UNSUPPORTED_RESPONSE_TYPE, 'only response_type=code is supported', state);
+        throw new ServerError(ProtocolError.UNSUPPORTED_RESPONSE_TYPE, 'only response_type=code is supported', {
+          redirectable: true,
+          state,
+        });
       }
       if (config.requirePar && !params._fromPar) {
-        throw redirectable(ProtocolError.INVALID_REQUEST, 'this server requires a pushed authorization request', state);
+        throw new ServerError(ProtocolError.INVALID_REQUEST, 'this server requires a pushed authorization request', {
+          redirectable: true,
+          state,
+        });
       }
 
       const challenge = resolvePkceChallenge(params, { required: config.requirePkce, redirectableState: state });
@@ -62,7 +68,10 @@ export function createAuthorizeHandler(config) {
 
       const authn = await config.authenticateUser(req);
       if (!authn || !isNonEmptyString(authn.subject)) {
-        throw redirectable(ProtocolError.ACCESS_DENIED, 'the resource owner did not authorize the request', state);
+        throw new ServerError(ProtocolError.ACCESS_DENIED, 'the resource owner did not authorize the request', {
+          redirectable: true,
+          state,
+        });
       }
 
       const code = randomState();
@@ -177,10 +186,13 @@ function requireRegisteredRedirectUri(redirectUri, client) {
  */
 function resolveScope(raw, config, state) {
   const requested = isNonEmptyString(raw) ? raw.split(/\s+/).filter(Boolean) : [];
-  if (Array.isArray(config.scopes)) {
+  if (isArray(config.scopes)) {
     for (const s of requested) {
       if (!config.scopes.includes(s)) {
-        throw redirectable(ProtocolError.INVALID_SCOPE, `unknown scope ${JSON.stringify(s)}`, state);
+        throw new ServerError(ProtocolError.INVALID_SCOPE, `unknown scope ${JSON.stringify(s)}`, {
+          redirectable: true,
+          state,
+        });
       }
     }
   }
@@ -205,14 +217,4 @@ function validateResourceRedirectable(value, state) {
     }
     throw err;
   }
-}
-
-/**
- * @param {string} code
- * @param {string} message
- * @param {string | undefined} state
- * @returns {ServerError}
- */
-function redirectable(code, message, state) {
-  return new ServerError(code, message, { redirectable: true, state });
 }
