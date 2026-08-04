@@ -12,7 +12,7 @@
  * resource owner; the server brings the security.
  */
 import { parseDuration } from '@exortek/shared/duration';
-import { isNonEmptyString, isObject, isFunction } from '@exortek/shared/predicates';
+import { isArray, isFunction, isNonEmptyString, isObject } from '@exortek/shared/predicates';
 
 import { ErrorCode, OAuth2Error } from '../internal/errors.js';
 import { requireNonEmptyString } from '../internal/guards.js';
@@ -107,7 +107,7 @@ export function createServer(config) {
 
   const registry = resolveRegistry(config.clients);
   const security = isObject(config.security) ? config.security : {};
-  const grantTypes = Array.isArray(config.grants) ? config.grants : DEFAULT_GRANTS;
+  const grantTypes = isArray(config.grants) ? config.grants : DEFAULT_GRANTS;
   const endpoints = resolveEndpoints(issuer, config.endpoints);
 
   const stores = {

@@ -18,6 +18,7 @@
 import { createHash } from 'node:crypto';
 
 import { encode as base64urlEncode } from '@exortek/shared/base64url';
+import { isArray, isNonEmptyString, isObject, isString } from '@exortek/shared/predicates';
 import { verify as jwtVerify } from '@exortek/jwt';
 import { createRemoteJWKS } from '@exortek/jwks';
 
@@ -82,7 +83,7 @@ export async function verifyIdToken(idToken, options) {
       clockTolerance,
     });
   } catch (err) {
-    const mapped = err && typeof err === 'object' && 'code' in err ? JWT_CODE_MAP[err.code] : undefined;
+    const mapped = isObject(err) && 'code' in err ? JWT_CODE_MAP[err.code] : undefined;
     throw new OAuth2Error(
       mapped ?? ErrorCode.ID_TOKEN_INVALID,
       `id_token verification failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -93,7 +94,7 @@ export async function verifyIdToken(idToken, options) {
   const { header, payload } = result;
 
   // Multi-audience tokens must name us as the authorized party.
-  if (Array.isArray(payload.aud) && payload.aud.length > 1 && payload.azp !== clientId) {
+  if (isArray(payload.aud) && payload.aud.length > 1 && payload.azp !== clientId) {
     throw new OAuth2Error(
       ErrorCode.AUDIENCE_MISMATCH,
       'id_token has multiple audiences and azp does not match the client_id',
@@ -101,18 +102,18 @@ export async function verifyIdToken(idToken, options) {
   }
 
   const alg = /** @type {string} */ (header.alg);
-  if (accessToken !== undefined && typeof payload.at_hash === 'string') {
+  if (isString(accessToken) && isString(payload.at_hash)) {
     if (tokenHash(accessToken, alg) !== payload.at_hash) {
       throw new OAuth2Error(ErrorCode.ID_TOKEN_INVALID, 'id_token at_hash does not match the access token');
     }
   }
-  if (code !== undefined && typeof payload.c_hash === 'string') {
+  if (isString(code) && isString(payload.c_hash)) {
     if (tokenHash(code, alg) !== payload.c_hash) {
       throw new OAuth2Error(ErrorCode.ID_TOKEN_INVALID, 'id_token c_hash does not match the authorization code');
     }
   }
 
-  if (typeof payload.sub !== 'string' || payload.sub === '') {
+  if (!isNonEmptyString(payload.sub)) {
     throw new OAuth2Error(ErrorCode.ID_TOKEN_INVALID, 'id_token has no `sub` claim');
   }
 

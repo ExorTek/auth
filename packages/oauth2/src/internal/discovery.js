@@ -9,7 +9,7 @@
  * Results are cached per issuer for the process lifetime with a TTL;
  * discovery documents are stable and refetched rarely.
  */
-import { isNonEmptyString } from '@exortek/shared/predicates';
+import { isNonEmptyString, isUndefined } from '@exortek/shared/predicates';
 import { parseDuration } from '@exortek/shared/duration';
 
 import { ErrorCode, OAuth2Error } from './errors.js';
@@ -44,7 +44,7 @@ export async function discover(issuer, options = {}) {
     throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, 'issuer must be a non-empty string');
   }
 
-  const ttl = options.ttl !== undefined ? parseDuration(options.ttl) : DEFAULT_TTL_MS;
+  const ttl = !isUndefined(options.ttl) ? parseDuration(options.ttl) : DEFAULT_TTL_MS;
   const hit = cache.get(issuer);
   if (hit && Date.now() - hit.at < ttl) {
     return hit.doc;
@@ -57,7 +57,7 @@ export async function discover(issuer, options = {}) {
 
   // RFC 9207 / OIDC: the document's own `issuer` must match the one we
   // asked for, or an attacker could redirect discovery to a rogue AS.
-  if (raw.issuer !== issuer) {
+  if (!isNonEmptyString(raw.issuer) || raw.issuer !== issuer) {
     throw new OAuth2Error(
       ErrorCode.DISCOVERY_FAILED,
       `discovery document issuer ${JSON.stringify(raw.issuer)} does not match requested issuer ${JSON.stringify(issuer)}`,

@@ -11,7 +11,7 @@
  * time — a malformed client is a setup error (`OAuth2Error`
  * `INVALID_ARGUMENT`), never a per-request wire error.
  */
-import { isNonEmptyString, isObject } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString, isObject } from '@exortek/shared/predicates';
 
 import { ErrorCode, OAuth2Error } from '../internal/errors.js';
 import { requireNonEmptyString } from '../internal/guards.js';
@@ -69,7 +69,7 @@ export function defineClient(config) {
   }
   requireNonEmptyString(config.clientId, 'client.clientId');
 
-  if (!Array.isArray(config.redirectUris) || config.redirectUris.length === 0) {
+  if (!isArray(config.redirectUris) || config.redirectUris.length === 0) {
     throw new OAuth2Error(
       ErrorCode.INVALID_ARGUMENT,
       `client ${config.clientId} must declare at least one redirectUri`,
@@ -144,7 +144,7 @@ export function defineClient(config) {
  * @returns {ClientRegistry}
  */
 export function createClientRegistry(clients) {
-  if (!Array.isArray(clients)) {
+  if (!isArray(clients)) {
     throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, 'createServer requires a clients array (or a custom registry)');
   }
   /** @type {Map<string, Client>} */

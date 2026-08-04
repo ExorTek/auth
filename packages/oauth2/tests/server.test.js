@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { verify as jwtVerify } from '@exortek/jwt';
 
-import { buildServer, getAuthorizationCode, dpopClient, post, get, form, body, ISSUER } from './helpers/server.js';
+import { buildServer, getAuthorizationCode, dpopClient, post, get, body, ISSUER } from './helpers/server.js';
 
 test('metadata advertises the AS capabilities (RFC 8414)', async () => {
   const { server } = buildServer();

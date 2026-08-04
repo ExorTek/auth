@@ -4,7 +4,7 @@
  * option gets a stable, branchable failure instead of a downstream
  * `TypeError` from deep inside the crypto layer.
  */
-import { isNonEmptyString, isInteger } from '@exortek/shared/predicates';
+import { isInteger, isNonEmptyString } from '@exortek/shared/predicates';
 
 import { ErrorCode, OAuth2Error } from './errors.js';
 

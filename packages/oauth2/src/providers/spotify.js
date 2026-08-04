@@ -7,6 +7,7 @@
  * spotify({ clientId, clientSecret });
  */
 import { defineProvider } from './_base.js';
+import { isArray } from '@exortek/shared/predicates';
 
 export const spotify = defineProvider({
   id: 'spotify',
@@ -19,6 +20,6 @@ export const spotify = defineProvider({
     sub: raw.id,
     email: raw.email,
     name: raw.display_name,
-    picture: Array.isArray(raw.images) && raw.images[0] ? raw.images[0].url : undefined,
+    picture: isArray(raw.images) && raw.images[0] ? raw.images[0].url : undefined,
   }),
 });

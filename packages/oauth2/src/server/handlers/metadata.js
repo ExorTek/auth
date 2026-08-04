@@ -8,7 +8,7 @@
  * The document is built once from the server config and is cacheable
  * (unlike token responses, which are `no-store`).
  */
-import { isNonEmptyString } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString } from '@exortek/shared/predicates';
 
 /**
  * Assemble the metadata document from the resolved server config. Only
@@ -42,7 +42,7 @@ export function buildMetadata(config) {
   if (isNonEmptyString(config.jwksUri)) {
     doc.jwks_uri = config.jwksUri;
   }
-  if (Array.isArray(scopes) && scopes.length > 0) {
+  if (isArray(scopes) && scopes.length > 0) {
     doc.scopes_supported = scopes;
   }
   if (isNonEmptyString(endpoints.introspection)) {
@@ -59,7 +59,7 @@ export function buildMetadata(config) {
   if (isNonEmptyString(endpoints.deviceAuthorization)) {
     doc.device_authorization_endpoint = endpoints.deviceAuthorization;
   }
-  if (Array.isArray(dpopAlgs) && dpopAlgs.length > 0) {
+  if (isArray(dpopAlgs) && dpopAlgs.length > 0) {
     // RFC 9449 §5.1 — advertise the DPoP proof signing algs we accept.
     doc.dpop_signing_alg_values_supported = dpopAlgs;
   }

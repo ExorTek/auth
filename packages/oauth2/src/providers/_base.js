@@ -10,7 +10,7 @@
  * blindly.
  */
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
-import { isNonEmptyString, isObject, isFunction } from '@exortek/shared/predicates';
+import { isArray, isFunction, isNonEmptyString, isObject } from '@exortek/shared/predicates';
 
 import { ErrorCode, OAuth2Error } from '../internal/errors.js';
 import { createPkcePair } from '../internal/pkce.js';
@@ -94,7 +94,7 @@ export function defineProvider(def) {
       def,
       clientId: appOptions.clientId,
       clientSecret: appOptions.clientSecret,
-      scope: Array.isArray(appOptions.scope) ? appOptions.scope : undefined,
+      scope: isArray(appOptions.scope) ? appOptions.scope : undefined,
       redirectUriOverride: appOptions.redirectUri,
       /** @type {ResolvedEndpoints | null} */
       _endpoints: null,

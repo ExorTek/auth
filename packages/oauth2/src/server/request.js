@@ -12,7 +12,7 @@
  * material (Basic header, body credentials, `client_assertion`, DPoP
  * proof, client TLS cert) for `security/client-auth.js` to resolve.
  */
-import { isObject, isString, isNonEmptyString } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString, isNullish, isObject, isString } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from './errors.js';
 
@@ -80,7 +80,7 @@ function lowerCaseHeaders(headers) {
   }
   for (const [name, value] of Object.entries(headers)) {
     // A repeated header arrives as an array; join per RFC 9110 §5.3.
-    out[name.toLowerCase()] = Array.isArray(value) ? value.join(', ') : String(value);
+    out[name.toLowerCase()] = isArray(value) ? value.join(', ') : String(value);
   }
   return out;
 }
@@ -112,7 +112,7 @@ function queryFromUrl(url) {
  * @returns {Record<string, string>}
  */
 function parseBody(body, contentType) {
-  if (body === undefined || body === null) {
+  if (isNullish(body)) {
     return {};
   }
   if (isObject(body)) {
@@ -161,7 +161,7 @@ function flattenParams(obj) {
   /** @type {Record<string, string>} */
   const out = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (value === undefined || value === null) {
+    if (isNullish(value)) {
       continue;
     }
     out[key] = isString(value) ? value : /** @type {string} */ (/** @type {unknown} */ (value));

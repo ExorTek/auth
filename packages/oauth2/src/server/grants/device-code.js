@@ -6,7 +6,7 @@
  * the code is redeemed exactly once for tokens; a denied or expired
  * request returns the matching error.
  */
-import { isNonEmptyString } from '@exortek/shared/predicates';
+import { isNonEmptyString, isNumber } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 import { buildAccessResponse, refreshAllowed, mintRefreshToken } from './_issue.js';
@@ -38,8 +38,8 @@ export async function deviceCodeGrant(req, ctx) {
   // Rate-limit polling: a device that polls faster than the interval gets
   // `slow_down` and must add 5s to its interval (RFC 8628 §3.5).
   const now = Date.now();
-  const intervalMs = typeof config.deviceInterval === 'number' ? config.deviceInterval * 1000 : DEFAULT_INTERVAL_MS;
-  if (typeof record.lastPolledAt === 'number' && now - record.lastPolledAt < intervalMs) {
+  const intervalMs = isNumber(config.deviceInterval) ? config.deviceInterval * 1000 : DEFAULT_INTERVAL_MS;
+  if (isNumber(record.lastPolledAt) && now - record.lastPolledAt < intervalMs) {
     config.stores.device.update(deviceCode, { lastPolledAt: now });
     throw new ServerError(ProtocolError.SLOW_DOWN, 'polling too fast; increase the interval by 5 seconds');
   }

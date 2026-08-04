@@ -4,7 +4,7 @@
  * client has nothing to authenticate with) and no refresh token is issued
  * (§4.4.3). The access-token `sub` is the client itself.
  */
-import { isNonEmptyString } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 import { resolveTokenAudience } from '../security/resource.js';
@@ -50,11 +50,11 @@ export async function clientCredentialsGrant(req, ctx) {
  */
 function resolveScope(requested, client, config) {
   if (!isNonEmptyString(requested)) {
-    return Array.isArray(client.scope) ? client.scope : [];
+    return isArray(client.scope) ? client.scope : [];
   }
   const asked = requested.split(/\s+/).filter(Boolean);
-  const allowed = Array.isArray(client.scope) ? client.scope : config.scopes;
-  if (Array.isArray(allowed)) {
+  const allowed = isArray(client.scope) ? client.scope : config.scopes;
+  if (isArray(allowed)) {
     for (const s of asked) {
       if (!allowed.includes(s)) {
         throw new ServerError(

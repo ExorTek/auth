@@ -13,6 +13,7 @@
  *   - `JSON.parse` guarded so a malformed body is a typed error, not a
  *     raw `SyntaxError`.
  */
+import { isArray, isFiniteNumber, isObject, isString } from '@exortek/shared/predicates';
 import { ErrorCode, OAuth2Error } from './errors.js';
 
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -69,7 +70,7 @@ async function requestJson(url, init, options = {}) {
   }
 
   const contentLength = Number(res.headers.get('content-length'));
-  if (Number.isFinite(contentLength) && contentLength > maxResponseSize) {
+  if (isFiniteNumber(contentLength) && contentLength > maxResponseSize) {
     throw new OAuth2Error(errorCode, `${url} response exceeds maxResponseSize (${contentLength} > ${maxResponseSize})`);
   }
 
@@ -89,15 +90,15 @@ async function requestJson(url, init, options = {}) {
   if (!res.ok) {
     // OAuth error responses carry a machine-readable `error` field
     // (RFC 6749 §5.2); surface it in the message so callers can see why.
-    const detail = isRecord(body) && typeof body.error === 'string' ? `: ${body.error}` : '';
+    const detail = isObject(body) && isString(body.error) ? `: ${body.error}` : '';
     throw new OAuth2Error(errorCode, `${url} responded with ${res.status}${detail}`, {
-      details: isRecord(body) ? body : undefined,
+      details: isObject(body) ? body : undefined,
     });
   }
 
   // Preserve arrays as well as objects — some endpoints (e.g. GitHub's
   // /user/emails) return a JSON array. Primitives collapse to `{}`.
-  return typeof body === 'object' && body !== null ? body : {};
+  return isObject(body) || isArray(body) ? body : {};
 }
 
 /**
@@ -145,11 +146,6 @@ export function getJson(url, auth = {}, options = {}) {
     { method: 'GET', headers },
     { ...options, errorCode: options.errorCode ?? ErrorCode.USERINFO_FAILED },
   );
-}
-
-/** @param {unknown} value @returns {value is Record<string, unknown>} */
-function isRecord(value) {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /** @param {unknown} err @returns {string} */

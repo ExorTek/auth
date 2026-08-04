@@ -13,7 +13,7 @@
  */
 import { sign, verify, JwtError } from '@exortek/jwt';
 import { parseDuration } from '@exortek/shared/duration';
-import { isNonEmptyString, isObject } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString, isNullish, isObject } from '@exortek/shared/predicates';
 
 import { ErrorCode, OAuth2Error } from '../../internal/errors.js';
 import { requireNonEmptyString } from '../../internal/guards.js';
@@ -48,7 +48,7 @@ export function jwtIssuer(config) {
     throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, 'jwtIssuer requires a config object');
   }
   requireNonEmptyString(config.alg, 'jwtIssuer.alg');
-  if (config.signingKey === undefined || config.signingKey === null) {
+  if (isNullish(config.signingKey)) {
     throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, 'jwtIssuer requires a signingKey');
   }
   const { signingKey, alg, kid } = config;
@@ -71,7 +71,7 @@ export function jwtIssuer(config) {
         client_id: grant.clientId,
         ...(isObject(grant.extra) ? grant.extra : {}),
       };
-      if (Array.isArray(grant.scope) && grant.scope.length > 0) {
+      if (isArray(grant.scope) && grant.scope.length > 0) {
         claims.scope = grant.scope.join(' ');
       }
       const confirmation = resolveConfirmation(grant);
@@ -155,7 +155,7 @@ function resolveConfirmation(grant) {
  * @returns {string | string[]}
  */
 function resolveAudience(grant) {
-  if (Array.isArray(grant.audience) && grant.audience.length > 0) {
+  if (isArray(grant.audience) && grant.audience.length > 0) {
     return grant.audience;
   }
   if (isNonEmptyString(grant.audience)) {

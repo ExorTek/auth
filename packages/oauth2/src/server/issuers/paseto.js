@@ -12,7 +12,7 @@
  */
 import { sign, verify, PasetoError } from '@exortek/paseto';
 import { parseDuration } from '@exortek/shared/duration';
-import { isNonEmptyString, isObject } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString, isNullish, isObject } from '@exortek/shared/predicates';
 
 import { ErrorCode, OAuth2Error } from '../../internal/errors.js';
 import { randomState } from '../../internal/state.js';
@@ -33,7 +33,7 @@ export function pasetoIssuer(config) {
   if (!isObject(config)) {
     throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, 'pasetoIssuer requires a config object');
   }
-  if (config.secretKey === undefined || config.publicKey === undefined) {
+  if (isNullish(config.secretKey) || isNullish(config.publicKey)) {
     throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, 'pasetoIssuer requires secretKey and publicKey');
   }
   const { secretKey, publicKey } = config;
@@ -52,7 +52,7 @@ export function pasetoIssuer(config) {
         client_id: grant.clientId,
         ...(isObject(grant.extra) ? grant.extra : {}),
       };
-      if (Array.isArray(grant.scope) && grant.scope.length > 0) {
+      if (isArray(grant.scope) && grant.scope.length > 0) {
         claims.scope = grant.scope.join(' ');
       }
       if (isNonEmptyString(grant.dpopJkt)) {
@@ -107,7 +107,7 @@ export function pasetoIssuer(config) {
  * @returns {string}
  */
 function audienceString(grant) {
-  if (Array.isArray(grant.audience) && grant.audience.length > 0) {
+  if (isArray(grant.audience) && grant.audience.length > 0) {
     return grant.audience.join(' ');
   }
   if (isNonEmptyString(grant.audience)) {

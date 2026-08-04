@@ -6,7 +6,7 @@
  * code grant starts a new family; the refresh grant rotates within the
  * existing one.
  */
-import { isNonEmptyString } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString } from '@exortek/shared/predicates';
 
 import { randomState } from '../../internal/state.js';
 
@@ -48,7 +48,7 @@ export async function buildAccessResponse(config, grant) {
     token_type: issued.tokenType,
     expires_in: issued.expiresIn,
   };
-  if (Array.isArray(grant.scope) && grant.scope.length > 0) {
+  if (isArray(grant.scope) && grant.scope.length > 0) {
     body.scope = grant.scope.join(' ');
   }
   return body;

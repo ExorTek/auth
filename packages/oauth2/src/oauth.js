@@ -8,7 +8,7 @@
  * `createOAuth`.
  */
 import { parseDuration } from '@exortek/shared/duration';
-import { isNonEmptyString, isObject, isFunction } from '@exortek/shared/predicates';
+import { isArray, isFunction, isNonEmptyString, isObject } from '@exortek/shared/predicates';
 
 import { ErrorCode, OAuth2Error } from './internal/errors.js';
 import { resolveRedirectUri } from './internal/redirect-uri.js';
@@ -43,7 +43,7 @@ export function createOAuth(config) {
   }
   const { baseUrl, callback, store, security = {}, providers } = config;
 
-  if (!Array.isArray(providers) || providers.length === 0) {
+  if (!isArray(providers) || providers.length === 0) {
     throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, 'createOAuth requires a non-empty providers array');
   }
   if (store !== undefined && !isStore(store)) {

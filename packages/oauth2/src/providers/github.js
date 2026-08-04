@@ -10,6 +10,7 @@
  * github({ clientId, clientSecret });
  */
 import { defineProvider } from './_base.js';
+import { isArray, isString } from '@exortek/shared/predicates';
 
 export const github = defineProvider({
   id: 'github',
@@ -22,11 +23,11 @@ export const github = defineProvider({
   tokenHeaders: { 'user-agent': 'exortek-oauth2', accept: 'application/json' },
   userinfoHeaders: { 'user-agent': 'exortek-oauth2', accept: 'application/vnd.github+json' },
   mapUser: raw => {
-    const emails = Array.isArray(raw.emails) ? raw.emails : [];
+    const emails = isArray(raw.emails) ? raw.emails : [];
     const primary = emails.find(e => e && e.primary) ?? emails.find(e => e && e.verified) ?? emails[0];
     return {
       sub: String(raw.id),
-      email: primary?.email ?? (typeof raw.email === 'string' ? raw.email : undefined),
+      email: primary?.email ?? (isString(raw.email) ? raw.email : undefined),
       emailVerified: primary ? primary.verified === true : undefined,
       name: raw.name ?? raw.login,
       picture: raw.avatar_url,

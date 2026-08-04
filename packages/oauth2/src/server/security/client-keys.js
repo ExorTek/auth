@@ -10,7 +10,7 @@
  */
 import { createRemoteJWKS } from '@exortek/jwks';
 import { importJWK } from '@exortek/jwk';
-import { isNonEmptyString, isObject } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString, isObject } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 
@@ -22,7 +22,7 @@ export async function resolveClientKeys(client) {
   if (isNonEmptyString(client.jwksUri)) {
     return createRemoteJWKS(client.jwksUri);
   }
-  if (isObject(client.jwks) && Array.isArray(client.jwks.keys) && client.jwks.keys.length > 0) {
+  if (isObject(client.jwks) && isArray(client.jwks.keys) && client.jwks.keys.length > 0) {
     const entries = await Promise.all(
       client.jwks.keys.map(async jwk => [isNonEmptyString(jwk.kid) ? jwk.kid : undefined, await importJWK(jwk)]),
     );

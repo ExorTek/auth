@@ -9,7 +9,7 @@
  * The endpoint requires client authentication (RFC 7662 §2.1) so it can't
  * be used as an open token oracle.
  */
-import { isNonEmptyString } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 import { normalizeRequest } from '../request.js';
@@ -65,7 +65,7 @@ async function introspectRefresh(config, token) {
     token_type: 'refresh_token',
     client_id: record.clientId,
     sub: record.subject,
-    scope: Array.isArray(record.scope) ? record.scope.join(' ') : undefined,
+    scope: isArray(record.scope) ? record.scope.join(' ') : undefined,
     aud: record.resource,
     iss: config.issuer,
   };
