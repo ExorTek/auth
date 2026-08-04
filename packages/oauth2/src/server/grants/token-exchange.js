@@ -23,6 +23,10 @@ const ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token';
 export async function tokenExchangeGrant(req, ctx) {
   const { config, client } = ctx;
 
+  if (!client.grantTypes.includes('urn:ietf:params:oauth:grant-type:token-exchange')) {
+    throw new ServerError(ProtocolError.UNAUTHORIZED_CLIENT, 'client may not use token exchange');
+  }
+
   const subjectToken = req.form.subject_token;
   const subjectTokenType = req.form.subject_token_type;
   if (!isNonEmptyString(subjectToken) || !isNonEmptyString(subjectTokenType)) {

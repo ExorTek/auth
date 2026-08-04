@@ -142,6 +142,7 @@ export function createServer(config) {
     authorizationCodeTtlMs: parseDuration(security.authorizationCodeTtl ?? DEFAULT_AUTH_CODE_TTL),
     parTtlMs: parseDuration(security.par?.ttl ?? DEFAULT_PAR_TTL),
     authorizationDetailsTypes: config.authorizationDetailsTypes,
+    introspection: isObject(config.introspection) ? config.introspection : {},
     jarm: config.jarm,
     deviceCodeTtlMs: config.device?.ttl !== undefined ? parseDuration(config.device.ttl) : undefined,
     deviceInterval: config.device?.interval,

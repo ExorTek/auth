@@ -21,6 +21,10 @@ const DEFAULT_INTERVAL_MS = 5000;
 export async function deviceCodeGrant(req, ctx) {
   const { config, client } = ctx;
 
+  if (!client.grantTypes.includes('urn:ietf:params:oauth:grant-type:device_code')) {
+    throw new ServerError(ProtocolError.UNAUTHORIZED_CLIENT, 'client may not use the device grant');
+  }
+
   const deviceCode = req.form.device_code;
   if (!isNonEmptyString(deviceCode)) {
     throw new ServerError(ProtocolError.INVALID_REQUEST, 'missing device_code');

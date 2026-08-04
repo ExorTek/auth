@@ -7,7 +7,12 @@
  * `{ active: false }` — never an error, and never leaking why.
  *
  * The endpoint requires client authentication (RFC 7662 §2.1) so it can't
- * be used as an open token oracle.
+ * be used as an open token oracle. By default a client may introspect only
+ * its OWN tokens — a token owned by a different client reads back inactive,
+ * so no client becomes an oracle over another's tokens (or, via `sub`, over
+ * user identities). Deployments where trusted resource servers must
+ * introspect any client's token opt in with
+ * `introspection: { allowCrossClient: true }`.
  */
 import { isArray, isNonEmptyString } from '@exortek/shared/predicates';
 
@@ -30,14 +35,15 @@ export function createIntrospectHandler(config) {
         throw new ServerError(ProtocolError.INVALID_REQUEST, 'the introspection endpoint only accepts POST');
       }
 
-      await authenticateClient(req, config);
+      const client = await authenticateClient(req, config);
 
       const token = req.form.token;
       if (!isNonEmptyString(token)) {
         throw new ServerError(ProtocolError.INVALID_REQUEST, 'missing token');
       }
 
-      const response = (await introspectRefresh(config, token)) ?? (await introspectAccess(config, token));
+      const response =
+        (await introspectRefresh(config, token, client)) ?? (await introspectAccess(config, token, client));
       return json(200, response ?? INACTIVE);
     } catch (err) {
       if (err instanceof ServerError) {
@@ -53,11 +59,16 @@ export function createIntrospectHandler(config) {
  *
  * @param {Record<string, any>} config
  * @param {string} token
+ * @param {import('../clients.js').Client} client
  * @returns {Promise<Record<string, unknown> | undefined>}
  */
-async function introspectRefresh(config, token) {
+async function introspectRefresh(config, token, client) {
   const record = await config.stores.refresh.get(token);
   if (!record || record.used === true || record.revoked === true) {
+    return undefined;
+  }
+  // Own-token only, unless cross-client introspection is opted in.
+  if (!ownsToken(config, client, record.clientId)) {
     return undefined;
   }
   return {
@@ -77,11 +88,15 @@ async function introspectRefresh(config, token) {
  *
  * @param {Record<string, any>} config
  * @param {string} token
+ * @param {import('../clients.js').Client} client
  * @returns {Promise<Record<string, unknown> | undefined>}
  */
-async function introspectAccess(config, token) {
+async function introspectAccess(config, token, client) {
   const { active, claims } = await config.tokens.introspect(token, { issuer: config.issuer });
   if (!active || !claims) {
+    return undefined;
+  }
+  if (!ownsToken(config, client, claims.client_id)) {
     return undefined;
   }
   return {
@@ -98,4 +113,20 @@ async function introspectAccess(config, token) {
     cnf: claims.cnf,
     authorization_details: claims.authorization_details,
   };
+}
+
+/**
+ * Whether `client` may see a token owned by `ownerClientId` — its own
+ * always, any client only when cross-client introspection is enabled.
+ *
+ * @param {Record<string, any>} config
+ * @param {import('../clients.js').Client} client
+ * @param {unknown} ownerClientId
+ * @returns {boolean}
+ */
+function ownsToken(config, client, ownerClientId) {
+  if (config.introspection?.allowCrossClient === true) {
+    return true;
+  }
+  return ownerClientId === client.clientId;
 }

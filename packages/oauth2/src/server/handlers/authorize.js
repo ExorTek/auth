@@ -45,15 +45,22 @@ export function createAuthorizeHandler(config) {
           state,
         });
       }
-      if (config.requirePar && !params._fromPar) {
-        throw new ServerError(ProtocolError.INVALID_REQUEST, 'this server requires a pushed authorization request', {
+      if (!client.responseTypes.includes('code')) {
+        throw new ServerError(ProtocolError.UNAUTHORIZED_CLIENT, 'client is not permitted the code response type', {
+          redirectable: true,
+          state,
+        });
+      }
+      // PAR is required by the server OR by this client's registration.
+      if ((config.requirePar || client.requirePushedAuthorizationRequests === true) && !params._fromPar) {
+        throw new ServerError(ProtocolError.INVALID_REQUEST, 'this client requires a pushed authorization request', {
           redirectable: true,
           state,
         });
       }
 
       const challenge = resolvePkceChallenge(params, { required: config.requirePkce, redirectableState: state });
-      const scope = resolveScope(params.scope, config, state);
+      const scope = resolveScope(params.scope, client, config, state);
 
       // RFC 8707 resource indicator + RFC 9396 authorization_details are
       // validated up front so a malformed request fails before a code is
@@ -174,22 +181,25 @@ function requireRegisteredRedirectUri(redirectUri, client) {
 }
 
 /**
- * Requested scope must be a subset of the server's advertised scopes when
- * a `scopes` allowlist is configured; an unknown scope is `invalid_scope`
- * (RFC 6749 §4.1.2.1). No `scopes` config = the server does not gate on
- * scope here.
+ * Requested scope must be a subset of the server's advertised scopes and,
+ * when the client registers its own `scope`, of that too (RFC 6749
+ * §4.1.2.1). An out-of-bounds scope is `invalid_scope`.
  *
  * @param {string | undefined} raw
+ * @param {import('../clients.js').Client} client
  * @param {Record<string, any>} config
  * @param {string | undefined} state
  * @returns {string[]}
  */
-function resolveScope(raw, config, state) {
+function resolveScope(raw, client, config, state) {
   const requested = isNonEmptyString(raw) ? raw.split(/\s+/).filter(Boolean) : [];
-  if (isArray(config.scopes)) {
+  // The client's registered scope is the tighter ceiling when present;
+  // otherwise the server-wide list gates.
+  const allowed = isArray(client.scope) ? client.scope : config.scopes;
+  if (isArray(allowed)) {
     for (const s of requested) {
-      if (!config.scopes.includes(s)) {
-        throw new ServerError(ProtocolError.INVALID_SCOPE, `unknown scope ${JSON.stringify(s)}`, {
+      if (!allowed.includes(s)) {
+        throw new ServerError(ProtocolError.INVALID_SCOPE, `scope ${JSON.stringify(s)} is not permitted`, {
           redirectable: true,
           state,
         });
