@@ -21,6 +21,10 @@ const providers = [
 export default createConfig(pkg, {
   entries: {
     index: 'src/index.js',
+    // RP social-login middleware — one entry per framework so an Express
+    // app never bundles the Fastify adapter and vice-versa.
+    express: 'src/middleware/express.js',
+    fastify: 'src/middleware/fastify.js',
     // The authorization server (Phase 2) — its own entry so RP-only
     // consumers never bundle it.
     'server/index': 'src/server/index.js',
