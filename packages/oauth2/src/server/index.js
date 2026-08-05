@@ -35,11 +35,13 @@ export { ServerError, ProtocolError } from './errors.js';
 const DEFAULT_GRANTS = ['authorization_code', 'refresh_token', 'client_credentials'];
 const DEFAULT_AUTH_CODE_TTL = '1m';
 const DEFAULT_PAR_TTL = '90s';
+const DEFAULT_REFRESH_TTL = '30d';
 
 /**
  * @typedef {Object} ServerSecurity
  * @property {boolean} [requirePkce=true]         PKCE S256 required on the code grant
  * @property {string|number} [authorizationCodeTtl='1m']
+ * @property {string|number} [refreshTokenTtl='30d']    lifetime of an issued refresh token
  * @property {{ required?: boolean, algs?: string[], nonce?: boolean }} [dpop]   RFC 9449
  * @property {{ required?: boolean, ttl?: string|number }} [par]                 RFC 9126
  * @property {boolean} [fapi]                      FAPI 2.0 profile (bundles PAR + PKCE + DPoP/mTLS + iss)
@@ -141,6 +143,7 @@ export function createServer(config) {
     authenticateUser: config.authenticateUser,
     authorizationCodeTtlMs: parseDuration(security.authorizationCodeTtl ?? DEFAULT_AUTH_CODE_TTL),
     parTtlMs: parseDuration(security.par?.ttl ?? DEFAULT_PAR_TTL),
+    refreshTokenTtlMs: parseDuration(security.refreshTokenTtl ?? DEFAULT_REFRESH_TTL),
     authorizationDetailsTypes: config.authorizationDetailsTypes,
     introspection: isObject(config.introspection) ? config.introspection : {},
     jarm: config.jarm,

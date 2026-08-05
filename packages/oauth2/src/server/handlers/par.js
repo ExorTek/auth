@@ -58,7 +58,7 @@ export function createParHandler(config) {
 
       const params = collectParams(req.form, client.clientId, dpopJkt);
       const requestUri = REQUEST_URI_PREFIX + randomState();
-      config.stores.par.save(requestUri, params, config.parTtlMs);
+      await config.stores.par.save(requestUri, params, config.parTtlMs);
 
       return json(201, {
         request_uri: requestUri,

@@ -28,10 +28,21 @@ import { isObject } from '@exortek/shared/predicates';
  * absent (and evicts it); `consume` additionally deletes on a hit so a
  * record can be redeemed at most once.
  *
+ * A background sweep evicts expired entries so an unredeemed record (a
+ * code/PAR/device request that is never presented) cannot accumulate — a
+ * lazy-only map would leak those forever. The sweep timer is `unref()`ed
+ * so it never keeps the process alive.
+ *
+ * These in-memory maps are single-process by design: they are the
+ * batteries-included default, not the production backing store. A
+ * multi-node deployment injects Redis-backed stores behind the identical
+ * contract (`createServer({ stores })`).
+ *
  * @template V
+ * @param {{ sweepIntervalMs?: number }} [options]
  * @returns {{ set: (k: string, v: V, ttlMs: number) => void, get: (k: string) => V | undefined, consume: (k: string) => V | undefined, delete: (k: string) => void }}
  */
-function createTtlMap() {
+function createTtlMap({ sweepIntervalMs = 60_000 } = {}) {
   /** @type {Map<string, { value: unknown, expiresAt: number }>} */
   const map = new Map();
 
@@ -45,6 +56,19 @@ function createTtlMap() {
       return undefined;
     }
     return entry;
+  }
+
+  const sweep = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of map) {
+      if (entry.expiresAt <= now) {
+        map.delete(key);
+      }
+    }
+  }, sweepIntervalMs);
+  // Do not let the sweep timer hold the event loop open.
+  if (typeof sweep.unref === 'function') {
+    sweep.unref();
   }
 
   return {
@@ -111,6 +135,7 @@ export function createAuthCodeStore() {
  * @property {string} [subject]
  * @property {string} [resource]
  * @property {string} [dpopJkt]
+ * @property {number} [expiresAt]    epoch ms after which the token is expired
  * @property {boolean} [used]        set when rotated away — a later presentation is reuse
  *
  * @typedef {Object} RefreshStore
@@ -128,7 +153,14 @@ export function createRefreshStore() {
       await store.put(record);
     },
     async get(token) {
-      return /** @type {RefreshRecord | null} */ (await store.getById(token));
+      const record = /** @type {RefreshRecord | null} */ (await store.getById(token));
+      // An expired refresh token is treated as absent (the memory record
+      // store has no TTL of its own); a Redis-backed store would let the
+      // key expire instead.
+      if (record && typeof record.expiresAt === 'number' && record.expiresAt <= Date.now()) {
+        return null;
+      }
+      return record;
     },
     // Mark the presented token used and persist its successor. If the
     // presented token was ALREADY used, the caller detects reuse from
@@ -151,8 +183,8 @@ export function createRefreshStore() {
 
 /**
  * @typedef {Object} ParStore
- * @property {(requestUri: string, params: Record<string, unknown>, ttlMs: number) => void} save
- * @property {(requestUri: string) => Record<string, unknown> | undefined} consume
+ * @property {(requestUri: string, params: Record<string, unknown>, ttlMs: number) => void | Promise<void>} save
+ * @property {(requestUri: string) => (Record<string, unknown> | undefined) | Promise<Record<string, unknown> | undefined>} consume
  */
 
 /** @returns {ParStore} */
@@ -176,15 +208,15 @@ export function createParStore() {
  * @property {string} userCode
  * @property {string} clientId
  * @property {string[]} scope
- * @property {'pending' | 'approved' | 'denied'} status
+ * @property {'pending' | 'approved' | 'denied' | 'redeemed'} status
  * @property {string} [subject]           set on approval
  * @property {number} [lastPolledAt]      for slow_down enforcement
  *
  * @typedef {Object} DeviceStore
- * @property {(record: DeviceRecord, ttlMs: number) => void} save
- * @property {(deviceCode: string) => DeviceRecord | undefined} getByDeviceCode
- * @property {(userCode: string) => DeviceRecord | undefined} getByUserCode
- * @property {(deviceCode: string, patch: Partial<DeviceRecord>) => void} update
+ * @property {(record: DeviceRecord, ttlMs: number) => void | Promise<void>} save
+ * @property {(deviceCode: string) => (DeviceRecord | undefined) | Promise<DeviceRecord | undefined>} getByDeviceCode
+ * @property {(userCode: string) => (DeviceRecord | undefined) | Promise<DeviceRecord | undefined>} getByUserCode
+ * @property {(deviceCode: string, patch: Partial<DeviceRecord>) => void | Promise<void>} update
  */
 
 /** @returns {DeviceStore} */
@@ -203,7 +235,17 @@ export function createDeviceStore() {
     },
     getByUserCode(userCode) {
       const deviceCode = userToDevice.get(userCode);
-      return deviceCode ? this.getByDeviceCode(deviceCode) : undefined;
+      if (!deviceCode) {
+        return undefined;
+      }
+      const record = this.getByDeviceCode(deviceCode);
+      // The device record expired out from under the reverse index — drop
+      // the dangling `user_code` mapping so it cannot leak.
+      if (!record) {
+        userToDevice.delete(userCode);
+        return undefined;
+      }
+      return record;
     },
     update(deviceCode, patch) {
       const existing = /** @type {DeviceRecord | undefined} */ (byDeviceCode.get(deviceCode));
@@ -214,6 +256,12 @@ export function createDeviceStore() {
       // original expiry window is unnecessary here since getByDeviceCode
       // already evicts past expiry; a short re-arm is acceptable.
       byDeviceCode.set(deviceCode, { ...existing, ...patch }, DEVICE_REEARM_MS);
+      // Once the code is spent (redeemed/denied), the one-time `user_code`
+      // is done — free the reverse index eagerly rather than waiting for
+      // TTL, so a verified device flow leaves nothing behind.
+      if (patch.status === 'redeemed' || patch.status === 'denied') {
+        userToDevice.delete(existing.userCode);
+      }
     },
   };
 }

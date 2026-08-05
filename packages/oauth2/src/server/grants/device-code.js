@@ -30,7 +30,7 @@ export async function deviceCodeGrant(req, ctx) {
     throw new ServerError(ProtocolError.INVALID_REQUEST, 'missing device_code');
   }
 
-  const record = config.stores.device.getByDeviceCode(deviceCode);
+  const record = await config.stores.device.getByDeviceCode(deviceCode);
   if (!record) {
     // Absent = expired-and-evicted or never issued (RFC 8628 §3.5).
     throw new ServerError(ProtocolError.EXPIRED_TOKEN, 'the device_code is expired or unknown');
@@ -44,10 +44,10 @@ export async function deviceCodeGrant(req, ctx) {
   const now = Date.now();
   const intervalMs = isNumber(config.deviceInterval) ? config.deviceInterval * 1000 : DEFAULT_INTERVAL_MS;
   if (isNumber(record.lastPolledAt) && now - record.lastPolledAt < intervalMs) {
-    config.stores.device.update(deviceCode, { lastPolledAt: now });
+    await config.stores.device.update(deviceCode, { lastPolledAt: now });
     throw new ServerError(ProtocolError.SLOW_DOWN, 'polling too fast; increase the interval by 5 seconds');
   }
-  config.stores.device.update(deviceCode, { lastPolledAt: now });
+  await config.stores.device.update(deviceCode, { lastPolledAt: now });
 
   if (record.status === 'denied') {
     throw new ServerError(ProtocolError.ACCESS_DENIED, 'the user denied the device authorization request');
@@ -66,7 +66,7 @@ export async function deviceCodeGrant(req, ctx) {
   }
 
   // Redeem once: flip to a terminal state so a repeat poll can't re-issue.
-  config.stores.device.update(deviceCode, { status: 'redeemed' });
+  await config.stores.device.update(deviceCode, { status: 'redeemed' });
 
   const body = await buildAccessResponse(config, {
     subject: record.subject,

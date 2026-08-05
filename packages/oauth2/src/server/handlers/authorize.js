@@ -133,7 +133,7 @@ export function createAuthorizeHandler(config) {
 async function resolveRequestParams(req, config) {
   const requestUri = req.query.request_uri;
   if (isNonEmptyString(requestUri)) {
-    const pushed = config.stores.par.consume(requestUri);
+    const pushed = await config.stores.par.consume(requestUri);
     if (!pushed) {
       throw new ServerError(ProtocolError.INVALID_REQUEST, 'request_uri is unknown, expired, or already used');
     }

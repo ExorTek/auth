@@ -84,6 +84,7 @@ export async function mintRefreshToken(config, grant) {
     subject: grant.subject,
     resource: grant.resource,
     dpopJkt: grant.dpopJkt,
+    expiresAt: Date.now() + config.refreshTokenTtlMs,
   });
   return token;
 }

@@ -178,7 +178,7 @@ test('device authorization grant: pending → approved → single redeem (RFC 86
   const pending = body(await server.token(post({ grant_type: DEVICE, device_code: da.device_code, client_id: 'dev' })));
   assert.equal(pending.error, 'authorization_pending');
 
-  server.device.approve(da.user_code, { subject: 'user-42' });
+  await server.device.approve(da.user_code, { subject: 'user-42' });
   const approved = body(
     await server.token(post({ grant_type: DEVICE, device_code: da.device_code, client_id: 'dev' })),
   );
@@ -199,7 +199,7 @@ test('device authorization: user denial surfaces access_denied', async () => {
     device: { interval: 0 },
   });
   const da = body(await server.deviceAuthorization(post({ client_id: 'dev' })));
-  server.device.deny(da.user_code);
+  await server.device.deny(da.user_code);
   const denied = body(await server.token(post({ grant_type: DEVICE, device_code: da.device_code, client_id: 'dev' })));
   assert.equal(denied.error, 'access_denied');
 });

@@ -6,14 +6,15 @@ import { generateKeyPairSync } from 'node:crypto';
 import { sign as jwtSign } from '@exortek/jwt';
 
 import { jwtIssuer } from '../src/server/index.js';
+import { createParStore, createAuthCodeStore } from '../src/server/stores.js';
 import {
   buildServer,
   getAuthorizationCode,
   dpopClient,
   assertionClient,
   post,
+  get,
   body,
-  form,
   ISSUER,
 } from './helpers/server.js';
 
@@ -341,4 +342,67 @@ test('C3: a PAR DPoP proof must bind to the PAR endpoint, not the token endpoint
   // Proof bound to the PAR endpoint → accepted, pre-binds dpop_jkt.
   const ok = await server.par(post(params, { dpop: await dpop.proof('POST', `${ISSUER}/par`) }));
   assert.equal(ok.status, 201);
+});
+
+// BATCH 3 — store contract + eviction
+
+// A Promise-returning (Redis-shaped) store must drive a full PAR round-trip;
+// before D3 the handler spread a Promise and every PAR silently produced {}.
+test('D3: async (Promise-returning) PAR / auth-code stores drive a full flow', async () => {
+  const par = createParStore();
+  const authCode = createAuthCodeStore();
+  // Wrap every method so it returns a Promise, mimicking a Redis backend.
+  const asyncify = store =>
+    Object.fromEntries(Object.entries(store).map(([k, fn]) => [k, async (...args) => fn(...args)]));
+  const { server } = buildServer({
+    security: { par: { required: true } },
+    stores: { par: asyncify(par), authCode: asyncify(authCode) },
+  });
+
+  const pushed = body(
+    await server.par(
+      post({
+        client_id: 'app',
+        client_secret: 's3cret-value-strong',
+        redirect_uri: 'https://app.example.com/cb',
+        response_type: 'code',
+        code_challenge: 'a'.repeat(43),
+        code_challenge_method: 'S256',
+      }),
+    ),
+  );
+  assert.ok(pushed.request_uri.startsWith('urn:ietf:params:oauth:request_uri:'));
+  const authed = await server.authorize(get('/authorize', { request_uri: pushed.request_uri }));
+  assert.ok(new URL(authed.headers.location).searchParams.get('code'));
+});
+
+test('P1: a refresh token past refreshTokenTtl is no longer valid', async () => {
+  const { server } = buildServer({
+    security: { refreshTokenTtl: 1 }, // 1 ms — expired by the time it is presented
+  });
+  const { code, pkce, redirectUri } = await getAuthorizationCode(server, { scope: 'read' });
+  const tok = body(
+    await server.token(
+      post({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        client_id: 'app',
+        client_secret: 's3cret-value-strong',
+        code_verifier: pkce.codeVerifier,
+      }),
+    ),
+  );
+  await new Promise(r => setTimeout(r, 5));
+  const res = body(
+    await server.token(
+      post({
+        grant_type: 'refresh_token',
+        refresh_token: tok.refresh_token,
+        client_id: 'app',
+        client_secret: 's3cret-value-strong',
+      }),
+    ),
+  );
+  assert.equal(res.error, 'invalid_grant');
 });

@@ -59,7 +59,7 @@ export function createDeviceHandler(config) {
       const deviceCode = randomState();
       const userCode = generateUserCode();
 
-      config.stores.device.save({ deviceCode, userCode, clientId, scope, status: 'pending' }, ttlMs);
+      await config.stores.device.save({ deviceCode, userCode, clientId, scope, status: 'pending' }, ttlMs);
 
       const uriComplete = `${verificationUri}?user_code=${encodeURIComponent(userCode)}`;
       return json(200, {
@@ -93,32 +93,32 @@ export function createDeviceApproval(config) {
   return {
     /**
      * @param {string} userCode
-     * @returns {import('../stores.js').DeviceRecord | undefined}
+     * @returns {Promise<import('../stores.js').DeviceRecord | undefined>}
      */
-    getByUserCode(userCode) {
+    async getByUserCode(userCode) {
       return config.stores.device.getByUserCode(userCode);
     },
     /**
      * @param {string} userCode
      * @param {{ subject: string }} approval
      */
-    approve(userCode, approval) {
-      const record = config.stores.device.getByUserCode(userCode);
+    async approve(userCode, approval) {
+      const record = await config.stores.device.getByUserCode(userCode);
       if (!record || record.status !== 'pending') {
         throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, 'no pending device request for this user_code');
       }
       if (!isNonEmptyString(approval?.subject)) {
         throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, 'approve requires a subject');
       }
-      config.stores.device.update(record.deviceCode, { status: 'approved', subject: approval.subject });
+      await config.stores.device.update(record.deviceCode, { status: 'approved', subject: approval.subject });
     },
     /**
      * @param {string} userCode
      */
-    deny(userCode) {
-      const record = config.stores.device.getByUserCode(userCode);
+    async deny(userCode) {
+      const record = await config.stores.device.getByUserCode(userCode);
       if (record && record.status === 'pending') {
-        config.stores.device.update(record.deviceCode, { status: 'denied' });
+        await config.stores.device.update(record.deviceCode, { status: 'denied' });
       }
     },
   };
