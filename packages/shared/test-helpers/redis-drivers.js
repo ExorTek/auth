@@ -57,6 +57,7 @@ try {
       get: (c, key) => c.get(key),
       setWithTTL: (c, key, value, ttlMs) => c.set(key, value, 'PX', ttlMs),
       pttl: (c, key) => c.pttl(key),
+      exists: (c, key) => c.exists(key),
       sadd: (c, key, ...members) => c.sadd(key, ...members),
       smembers: (c, key) => c.smembers(key),
     },
@@ -81,6 +82,7 @@ try {
       get: (c, key) => c.get(key),
       setWithTTL: (c, key, value, ttlMs) => c.set(key, value, { PX: ttlMs }),
       pttl: (c, key) => c.pTTL(key),
+      exists: (c, key) => c.exists(key),
       sadd: (c, key, ...members) => c.sAdd(key, members),
       smembers: (c, key) => c.sMembers(key),
     },
@@ -101,7 +103,7 @@ export const driverNames = DRIVERS.map(d => d.name);
  *   - `ns(sfx)`  — a key prefix unique to this run + driver + suffix, so
  *                  parallel runs against one server cannot collide
  *   - `raw`      — driver-agnostic raw commands (`get`, `setWithTTL`, `pttl`,
- *                  `sadd`, `smembers`) for reaching past the store under test
+ *                  `exists`, `sadd`, `smembers`) for reaching past the store
  *   - `driver`   — the driver name, for driver-specific assertions
  *
  * `options.todo` marks this suite's tests as `todo` for the named drivers —
