@@ -4,17 +4,25 @@
  * mobile / SPA / CLI clients (`mode: 'api'`) — same `createOAuth` core,
  * different transport.
  *
- *   import { mountOAuthLogin } from '@exortek/oauth2/express';
+ * Two ways to use it — pick whichever fits how you like to route:
  *
- *   // Web: GET /auth/:provider → redirect, GET /auth/:provider/callback → user
- *   mountOAuthLogin(app, { oauth, cookie: { secret }, onSuccess: ({ req, res, user }) => {...} });
+ *   import { oauthLogin, mountOAuthLogin } from '@exortek/oauth2/express';
  *
- *   // API: POST /auth/:provider → { authorizeUrl, session }, POST callback → { user, tokens }
- *   mountOAuthLogin(app, { oauth, mode: 'api', secret });
+ *   // (a) Handlers you drop into your OWN routes (passport-style):
+ *   const login = oauthLogin({ oauth, cookie: { secret } });
+ *   app.get('/auth/:provider', login.start);
+ *   app.get('/auth/:provider/callback', login.callback);
+ *
+ *   // (b) One call that registers both routes for you (batteries included):
+ *   mountOAuthLogin(app, { oauth, cookie: { secret } });
+ *
+ * `mountOAuthLogin` is just sugar over `oauthLogin` + `app.get/post`. Both
+ * take the same config; `mode: 'api'` swaps the browser redirect for a
+ * JSON flow (POST) for mobile / SPA / CLI clients.
  *
  * The security (PKCE / state / nonce / `iss` / COAT binding) lives in the
  * core; the adapter only moves the session and shapes the response. The
- * `callbackPath` MUST equal the `callback` template given to createOAuth.
+ * callback route MUST sit at the `callback` template given to createOAuth.
  */
 import { parseCookies, serialiseCookie, serialiseDeleteCookie } from '@exortek/shared/cookie';
 import { isFunction, isObject } from '@exortek/shared/predicates';
@@ -22,20 +30,37 @@ import { isFunction, isObject } from '@exortek/shared/predicates';
 import { normalizeLoginConfig, startLogin, completeLogin, handoff } from './core.js';
 
 /**
- * Register the login + callback routes on an Express app / router.
+ * Build the `{ start, callback }` Express handlers for the login flow —
+ * mount them on your own routes. `method` tells you which verb to use
+ * (`'get'` for web, `'post'` for api), and `loginPath` / `callbackPath`
+ * are the defaults if you want them.
+ *
+ * @param {import('./core.js').LoginConfig} config
+ * @returns {{ start: Function, callback: Function, method: 'get'|'post', loginPath: string, callbackPath: string }}
+ */
+export function oauthLogin(config) {
+  const cfg = normalizeLoginConfig(config);
+  const api = cfg.mode === 'api';
+  return {
+    start: api ? apiStart(cfg) : webStart(cfg),
+    callback: api ? apiCallback(cfg) : webCallback(cfg),
+    method: api ? 'post' : 'get',
+    loginPath: cfg.loginPath,
+    callbackPath: cfg.callbackPath,
+  };
+}
+
+/**
+ * Register the login + callback routes on an Express app / router — the
+ * one-call form of {@link oauthLogin}.
  *
  * @param {any} app
  * @param {import('./core.js').LoginConfig} config
  */
 export function mountOAuthLogin(app, config) {
-  const cfg = normalizeLoginConfig(config);
-  if (cfg.mode === 'api') {
-    app.post(cfg.callbackPath, apiCallback(cfg));
-    app.post(cfg.loginPath, apiStart(cfg));
-  } else {
-    app.get(cfg.callbackPath, webCallback(cfg));
-    app.get(cfg.loginPath, webStart(cfg));
-  }
+  const { start, callback, method, loginPath, callbackPath } = oauthLogin(config);
+  app[method](callbackPath, callback);
+  app[method](loginPath, start);
 }
 
 // WEB (browser redirect + cookie / store)

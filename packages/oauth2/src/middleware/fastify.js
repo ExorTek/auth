@@ -23,18 +23,35 @@ import { normalizeLoginConfig, startLogin, completeLogin } from './core.js';
  * @param {import('./core.js').LoginConfig} options
  */
 async function oauthLoginPluginFn(fastify, options) {
-  const cfg = normalizeLoginConfig(options);
-
+  const { start, callback, method, loginPath, callbackPath } = oauthLogin(options);
   // Route-scoped only: this plugin registers two endpoints and nothing
   // app-wide — no global hook or error handler that would run on (or
   // hijack) the rest of the backend's requests.
-  if (cfg.mode === 'api') {
-    fastify.post(cfg.loginPath, guard(cfg, apiStart(cfg)));
-    fastify.post(cfg.callbackPath, guard(cfg, apiCallback(cfg)));
-  } else {
-    fastify.get(cfg.loginPath, guard(cfg, webStart(cfg)));
-    fastify.get(cfg.callbackPath, guard(cfg, webCallback(cfg)));
-  }
+  fastify[method](loginPath, start);
+  fastify[method](callbackPath, callback);
+}
+
+/**
+ * Build the `{ start, callback }` Fastify handlers for the login flow —
+ * register them on your own routes instead of the whole plugin:
+ *
+ *   const login = oauthLogin({ oauth, cookie: { secret } });
+ *   app.get('/auth/:provider', login.start);
+ *   app.get('/auth/:provider/callback', login.callback);
+ *
+ * @param {import('./core.js').LoginConfig} config
+ * @returns {{ start: Function, callback: Function, method: 'get'|'post', loginPath: string, callbackPath: string }}
+ */
+export function oauthLogin(config) {
+  const cfg = normalizeLoginConfig(config);
+  const api = cfg.mode === 'api';
+  return {
+    start: guard(cfg, api ? apiStart(cfg) : webStart(cfg)),
+    callback: guard(cfg, api ? apiCallback(cfg) : webCallback(cfg)),
+    method: api ? 'post' : 'get',
+    loginPath: cfg.loginPath,
+    callbackPath: cfg.callbackPath,
+  };
 }
 
 function webStart(cfg) {
