@@ -6,6 +6,7 @@
  * Open http://localhost:3000/auth/google to start the flow.
  */
 import Fastify from 'fastify';
+import 'dotenv/config';
 
 import { createOAuth } from '@exortek/oauth2';
 import { google } from '@exortek/oauth2/providers/google';

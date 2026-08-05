@@ -14,6 +14,7 @@
  *   http://localhost:5300/auth/acme/callback
  */
 import express from 'express';
+import 'dotenv/config';
 
 import { createOAuth, defineProvider } from '@exortek/oauth2';
 import { oauthLogin } from '@exortek/oauth2/express';
