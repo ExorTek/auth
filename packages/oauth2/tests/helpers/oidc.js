@@ -38,6 +38,9 @@ export async function makeSigner({ kid = 'test-key-1', alg = 'ES256' } = {}) {
  */
 export async function startStubAS(config) {
   const { publicJwks, token, userinfo, extraDiscovery } = config;
+  // Declared before the handler so the discovery route never hits it in the
+  // temporal dead zone (a request landing between listen() and the assignment).
+  let base = '';
   const server = createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const json = (status, body) => {
@@ -75,7 +78,7 @@ export async function startStubAS(config) {
 
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const { port } = /** @type {import('node:net').AddressInfo} */ (server.address());
-  const base = `http://127.0.0.1:${port}`;
+  base = `http://127.0.0.1:${port}`;
 
   return {
     base,

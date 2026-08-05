@@ -429,8 +429,16 @@ test('C9: an unknown response_mode is rejected (redirectable invalid_request)', 
 test('C9: metadata advertises response_modes_supported per jarm config', async () => {
   const plain = body(await buildServer().server.metadata(get('/.well-known/oauth-authorization-server', {})));
   assert.deepEqual(plain.response_modes_supported, ['query']);
-  const jarm = body(await buildServer({ jarm: { alg: 'ES256' } }).server.metadata(get('/x', {})));
+  // JARM is advertised only when fully configured (a signing key is present);
+  // an under-configured jarm can't sign, so it is treated as absent.
+  const jarmKp = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+  const jarm = body(
+    await buildServer({ jarm: { alg: 'ES256', signingKey: jarmKp.privateKey } }).server.metadata(get('/x', {})),
+  );
   assert.deepEqual(jarm.response_modes_supported, ['query', 'jwt']);
+  // A jarm config without a signing key does not advertise jwt mode.
+  const under = body(await buildServer({ jarm: { alg: 'ES256' } }).server.metadata(get('/x', {})));
+  assert.deepEqual(under.response_modes_supported, ['query']);
 });
 
 test('D1: revoke rejects an unsupported token_type_hint (unsupported_token_type)', async () => {

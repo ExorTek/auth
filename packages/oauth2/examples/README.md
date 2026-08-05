@@ -9,7 +9,7 @@ set them, then `node <file>`.
 
 ## Using a provider preset
 
-The 12 built-in presets (`@exortek/oauth2/providers/*`) — you bring the
+The 18 built-in presets (`@exortek/oauth2/providers/*`) — you bring the
 client id / secret, they bring the endpoints + claim mapping.
 
 | File                        | Framework | Shows                                                          |
