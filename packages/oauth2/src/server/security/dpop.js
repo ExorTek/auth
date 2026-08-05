@@ -12,7 +12,7 @@
  * proof is allowed only when neither the client nor the server requires
  * DPoP — otherwise it is `invalid_dpop_proof`.
  */
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import { importJWK, thumbprint } from '@exortek/jwk';
 import { verify as jwsVerify, decodeProtectedHeader } from '@exortek/jws';
@@ -20,6 +20,7 @@ import { encode as base64urlEncode } from '@exortek/shared/base64url';
 import { isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
+import { createReplayCache } from './replay-cache.js';
 
 // RFC 9449 §4.2 — the proof `alg` must be an asymmetric JWS alg; symmetric
 // and `none` are rejected so the embedded JWK is a real public key.
@@ -38,11 +39,11 @@ const ALLOWED_ALGS = new Set([
 // Proofs are single-use and short-lived; §4.3 recommends a small window.
 const MAX_PROOF_AGE_MS = 60_000;
 
-// Replay cache: a proof `jti` may be used once. Module-level with lazy
-// eviction — a deployment fronting multiple nodes overrides this with a
-// shared store via config.stores if it needs cross-node replay defense.
-/** @type {Map<string, number>} */
-const seenJti = new Map();
+// Replay cache: a proof `jti` may be used once. A deployment fronting
+// multiple nodes overrides this with a shared store if it needs cross-node
+// replay defense. Retention covers the full freshness window (a proof's
+// iat is accepted within ±MAX_PROOF_AGE_MS).
+const seenJti = createReplayCache(2 * MAX_PROOF_AGE_MS);
 
 // Server-provided DPoP nonce (RFC 9449 §8-9). When the server requires a
 // nonce, the client must echo the most recent `DPoP-Nonce` value as the
@@ -137,7 +138,7 @@ export async function resolveDpopBinding(req, config, client, options = {}) {
  * `nonce` claim (if any) for the caller's nonce-challenge check.
  *
  * @param {string} proof
- * @param {{ htm: string, htu: string }} binding
+ * @param {{ htm: string, htu: string, ath?: string }} binding
  * @returns {Promise<{ jkt: string, nonce: string | undefined }>}
  */
 export async function verifyDpopProof(proof, binding) {
@@ -186,10 +187,43 @@ export async function verifyDpopProof(proof, binding) {
   if (normalizeHtu(payload.htu) !== normalizeHtu(binding.htu)) {
     throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof htu does not match the request URI');
   }
+  // At a resource server the proof must bind to the presented access token
+  // via `ath` (RFC 9449 §7.1) — the base64url SHA-256 of the token.
+  if (isNonEmptyString(binding.ath) && payload.ath !== binding.ath) {
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof ath does not match the access token');
+  }
   assertFresh(payload.iat);
   assertUnique(payload.jti);
 
   return { jkt, nonce: isNonEmptyString(payload.nonce) ? payload.nonce : undefined };
+}
+
+/**
+ * Resource-server DPoP check (RFC 9449 §7). A protected resource calls
+ * this with the `DPoP` proof header, the presented access token, and the
+ * token's `cnf.jkt` (from the JWT claim or introspection). It verifies the
+ * proof, that its `ath` binds to this exact token, and that the proving
+ * key is the one the token was issued to — the missing high-level helper
+ * for the resource-server half of DPoP.
+ *
+ * @param {string} proof                          the `DPoP` request header
+ * @param {{ htm: string, htu: string, accessToken: string, cnfJkt: string }} binding
+ * @returns {Promise<{ jkt: string }>}
+ */
+export async function verifyDpopForResource(proof, binding) {
+  if (!isNonEmptyString(proof)) {
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'a DPoP proof is required for this token');
+  }
+  if (!isNonEmptyString(binding?.accessToken)) {
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'verifyDpopForResource requires the access token');
+  }
+  const ath = base64urlEncode(createHash('sha256').update(binding.accessToken).digest());
+  const { jkt } = await verifyDpopProof(proof, { htm: binding.htm, htu: binding.htu, ath });
+  // The proving key must be the key the token is bound to.
+  if (!isNonEmptyString(binding.cnfJkt) || jkt !== binding.cnfJkt) {
+    throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof key does not match the token cnf.jkt');
+  }
+  return { jkt };
 }
 
 /**
@@ -226,19 +260,9 @@ function assertUnique(jti) {
   if (!isNonEmptyString(jti)) {
     throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof is missing jti');
   }
-  const now = Date.now();
-  // Lazy eviction of expired jtis keeps the map bounded without a timer.
-  if (seenJti.size > 1024) {
-    for (const [id, exp] of seenJti) {
-      if (exp <= now) {
-        seenJti.delete(id);
-      }
-    }
-  }
-  if (seenJti.has(jti)) {
+  if (seenJti.seen(jti)) {
     throw new ServerError(ProtocolError.INVALID_DPOP_PROOF, 'DPoP proof jti has already been used (replay)');
   }
-  seenJti.set(jti, now + MAX_PROOF_AGE_MS);
 }
 
 /** Test hook — clear the replay + nonce caches between cases. */

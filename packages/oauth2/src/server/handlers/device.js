@@ -126,11 +126,22 @@ export function createDeviceApproval(config) {
 
 /** @returns {string} an unambiguous `XXXX-XXXX` user code */
 function generateUserCode() {
-  // 8 unbiased characters drawn from CSPRNG bytes (32-byte source).
-  const raw = randomBytes(8);
+  const n = USER_CODE_ALPHABET.length;
+  // Rejection sampling for a UNIFORM draw: a plain `byte % n` is biased
+  // because 256 is not a multiple of 28 — the first `256 % 28` symbols
+  // would come up slightly more often. Discard bytes in the short tail so
+  // every symbol is equally likely.
+  const limit = Math.floor(256 / n) * n;
   let out = '';
-  for (let i = 0; i < 8; i++) {
-    out += USER_CODE_ALPHABET[raw[i] % USER_CODE_ALPHABET.length];
+  while (out.length < 8) {
+    for (const byte of randomBytes(8)) {
+      if (byte < limit) {
+        out += USER_CODE_ALPHABET[byte % n];
+        if (out.length === 8) {
+          break;
+        }
+      }
+    }
   }
   return `${out.slice(0, 4)}-${out.slice(4)}`;
 }

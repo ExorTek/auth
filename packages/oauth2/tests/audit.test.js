@@ -510,3 +510,46 @@ test('D2: an injected store missing a method is rejected at createServer', () =>
     },
   );
 });
+
+// BATCH 5 — performance + additions
+
+test('§4.1: verifyDpopForResource binds a proof to the token (ath + cnf.jkt)', async () => {
+  const { verifyDpopForResource, _clearDpopReplayCache } = await import('../src/server/security/dpop.js');
+  const { sign: jwsSign } = await import('@exortek/jws');
+  const { createHash } = await import('node:crypto');
+  _clearDpopReplayCache();
+  const dpop = await dpopClient();
+  const accessToken = 'the-opaque-or-jwt-access-token';
+  const ath = createHash('sha256').update(accessToken).digest('base64url');
+  const rsUrl = 'https://rs.example.com/resource';
+
+  // A proof with no ath → rejected at the resource server.
+  await assert.rejects(
+    verifyDpopForResource(await dpop.proof('GET', rsUrl), { htm: 'GET', htu: rsUrl, accessToken, cnfJkt: dpop.jkt }),
+    /ath/,
+  );
+
+  // Correct ath + matching cnf.jkt → accepted.
+  const bound = await jwsSign(
+    { jti: `${Math.random()}`, htm: 'GET', htu: rsUrl, iat: Math.floor(Date.now() / 1000), ath },
+    dpop.kp.privateKey,
+    { alg: 'ES256', header: { typ: 'dpop+jwt', jwk: dpop.jwk } },
+  );
+  const res = await verifyDpopForResource(bound, { htm: 'GET', htu: rsUrl, accessToken, cnfJkt: dpop.jkt });
+  assert.equal(res.jkt, dpop.jkt);
+});
+
+test('§4.4: the authorization request is accepted over POST (form_post)', async () => {
+  const { server } = buildServer();
+  const res = await server.authorize(
+    post({
+      client_id: 'app',
+      redirect_uri: 'https://app.example.com/cb',
+      response_type: 'code',
+      state: 's',
+      code_challenge: 'a'.repeat(43),
+      code_challenge_method: 'S256',
+    }),
+  );
+  assert.ok(new URL(res.headers.location).searchParams.get('code'), 'a code is issued for a POST authorize');
+});

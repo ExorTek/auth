@@ -25,6 +25,7 @@ import { isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates
 import { ProtocolError, ServerError } from '../errors.js';
 import { readClientCredentials } from '../request.js';
 import { resolveClientKeys } from './client-keys.js';
+import { createReplayCache } from './replay-cache.js';
 
 const JWT_BEARER_ASSERTION = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 // RFC 7523 §3 requires `exp`; bound its reach so the (process-local,
@@ -44,9 +45,9 @@ const ASSERTION_ALGS = new Set([
   'EdDSA',
 ]);
 
-// Assertion replay cache — a `jti` is single-use within its lifetime.
-/** @type {Map<string, number>} */
-const seenAssertionJti = new Map();
+// Assertion replay cache — a `jti` is single-use within its lifetime. The
+// 5-minute retention matches the accepted assertion lifetime bound above.
+const seenAssertionJti = createReplayCache(MAX_ASSERTION_LIFETIME_MS);
 
 /**
  * Resolve and authenticate the client behind a request.
@@ -225,19 +226,9 @@ function assertSingleUse(jti) {
   if (!isNonEmptyString(jti)) {
     throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion is missing jti');
   }
-  const now = Date.now();
-  if (seenAssertionJti.size > 1024) {
-    for (const [id, exp] of seenAssertionJti) {
-      if (exp <= now) {
-        seenAssertionJti.delete(id);
-      }
-    }
-  }
-  if (seenAssertionJti.has(jti)) {
+  if (seenAssertionJti.seen(jti)) {
     throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion jti has already been used (replay)');
   }
-  // Assertions are short-lived; a 5-minute retention covers any sane exp.
-  seenAssertionJti.set(jti, now + 300_000);
 }
 
 // mTLS (RFC 8705)

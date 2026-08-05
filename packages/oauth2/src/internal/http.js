@@ -74,9 +74,15 @@ async function requestJson(url, init, options = {}) {
     throw new OAuth2Error(errorCode, `${url} response exceeds maxResponseSize (${contentLength} > ${maxResponseSize})`);
   }
 
+  // The whole body is buffered into memory before parsing; `maxResponseSize`
+  // is the cap. Measure BYTES, not UTF-16 code units — `String.length`
+  // undercounts multi-byte characters, so a non-ASCII body could slip past
+  // a byte budget. (The Content-Length pre-check above is the first gate;
+  // this catches a chunked response with no declared length.)
   const text = await res.text();
-  if (text.length > maxResponseSize) {
-    throw new OAuth2Error(errorCode, `${url} response exceeds maxResponseSize (${text.length} > ${maxResponseSize})`);
+  const byteSize = Buffer.byteLength(text, 'utf8');
+  if (byteSize > maxResponseSize) {
+    throw new OAuth2Error(errorCode, `${url} response exceeds maxResponseSize (${byteSize} > ${maxResponseSize})`);
   }
 
   /** @type {unknown} */

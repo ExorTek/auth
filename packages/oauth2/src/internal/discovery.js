@@ -21,6 +21,12 @@ const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 /** @type {Map<string, { at: number, doc: DiscoveryDocument }>} */
 const cache = new Map();
 
+// In-flight fetches, keyed by issuer. A burst of concurrent `discover`
+// calls for the same cold issuer share ONE network request instead of
+// stampeding the discovery endpoint (thundering herd).
+/** @type {Map<string, Promise<DiscoveryDocument>>} */
+const inflight = new Map();
+
 /**
  * @typedef {Object} DiscoveryDocument
  * @property {string} issuer
@@ -50,6 +56,22 @@ export async function discover(issuer, options = {}) {
     return hit.doc;
   }
 
+  // Coalesce concurrent cold fetches for the same issuer onto one promise.
+  const pending = inflight.get(issuer);
+  if (pending) {
+    return pending;
+  }
+  const promise = fetchDocument(issuer, options).finally(() => inflight.delete(issuer));
+  inflight.set(issuer, promise);
+  return promise;
+}
+
+/**
+ * @param {string} issuer
+ * @param {{ timeout?: number }} options
+ * @returns {Promise<DiscoveryDocument>}
+ */
+async function fetchDocument(issuer, options) {
   // The issuer identifier has no trailing slash (OIDC Discovery §4); the
   // well-known path is appended to it directly.
   const url = `${issuer.replace(/\/$/, '')}${WELL_KNOWN}`;
@@ -85,4 +107,5 @@ export async function discover(issuer, options = {}) {
 /** Clear the discovery cache — test hook. */
 export function _clearDiscoveryCache() {
   cache.clear();
+  inflight.clear();
 }

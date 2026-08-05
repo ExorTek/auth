@@ -147,7 +147,12 @@ export function createAuthorizeHandler(config) {
  * @returns {Promise<Record<string, any>>}
  */
 async function resolveRequestParams(req, config) {
-  const requestUri = req.query.request_uri;
+  // RFC 6749 §3.1 allows the authorization request over POST too; Apple's
+  // `response_mode=form_post` relies on it. The parameters then arrive in
+  // the form body rather than the query string.
+  const src = req.method === 'POST' ? req.form : req.query;
+
+  const requestUri = src.request_uri;
   if (isNonEmptyString(requestUri)) {
     const pushed = await config.stores.par.consume(requestUri);
     if (!pushed) {
@@ -156,10 +161,10 @@ async function resolveRequestParams(req, config) {
     return { ...pushed, _fromPar: true };
   }
   // JAR (RFC 9101): a signed request object supersedes the query params.
-  if (isNonEmptyString(req.query.request)) {
-    return verifyRequestObject(req.query.request, req.query.client_id, config);
+  if (isNonEmptyString(src.request)) {
+    return verifyRequestObject(src.request, src.client_id, config);
   }
-  return { ...req.query };
+  return { ...src };
 }
 
 /**
