@@ -47,13 +47,22 @@ async function oauth2ServerPluginFn(fastify, options) {
   };
 
   route('GET', '/.well-known/oauth-authorization-server', server.metadata);
-  route('GET', '/.well-known/openid-configuration', server.metadata);
+  // `/.well-known/openid-configuration` is served only when this server is
+  // an OpenID Provider (an id_token signer is configured) — a plain OAuth
+  // 2.1 AS must not advertise an OIDC discovery document it can't back.
+  if (server?._config?.oidcEnabled === true) {
+    route('GET', '/.well-known/openid-configuration', server.metadata);
+  }
   route('GET', p.authorization, server.authorize);
   route('POST', p.token, server.token);
   route('POST', p.revocation, server.revoke);
   route('POST', p.introspection, server.introspect);
   route('POST', p.par, server.par);
   route('POST', p.deviceAuthorization, server.deviceAuthorization);
+  // Dynamic client registration (RFC 7591) — only when enabled.
+  if (server?._config?.registrationEnabled === true) {
+    route('POST', p.registration, server.register);
+  }
 }
 
 /**
@@ -77,6 +86,7 @@ export function oauth2Handlers(server) {
     introspect: adapt(server.introspect),
     par: adapt(server.par),
     deviceAuthorization: adapt(server.deviceAuthorization),
+    register: adapt(server.register),
   };
 }
 

@@ -25,11 +25,14 @@ import { createRevokeHandler } from './handlers/revoke.js';
 import { createIntrospectHandler } from './handlers/introspect.js';
 import { createParHandler } from './handlers/par.js';
 import { createDeviceHandler, createDeviceApproval } from './handlers/device.js';
+import { createRegisterHandler } from './handlers/register.js';
 import { applyFapiProfile } from './security/fapi.js';
+import { createIdTokenSigner } from './issuers/id-token.js';
 
 export { defineClient, createClientRegistry, AUTH_METHODS } from './clients.js';
 export { jwtIssuer } from './issuers/jwt.js';
 export { pasetoIssuer } from './issuers/paseto.js';
+export { createIdTokenSigner } from './issuers/id-token.js';
 export { ServerError, ProtocolError } from './errors.js';
 export { verifyDpopForResource } from './security/dpop.js';
 export {
@@ -64,6 +67,20 @@ const DEFAULT_REFRESH_TTL = '30d';
  * @property {Partial<Endpoints>} [endpoints]      override the endpoint URLs advertised in metadata
  * @property {Partial<ServerStores>} [stores]      swap in Redis-backed stores
  * @property {ServerSecurity} [security]
+ * @property {OidcConfig} [oidc]                   make this an OpenID Provider (issue id_token on the `openid` scope)
+ * @property {RegistrationConfig} [registration]   enable RFC 7591 dynamic client registration (opt-in)
+ *
+ * @typedef {Object} RegistrationConfig
+ * @property {string} [initialAccessToken]         bearer required to register (secure default; omit only with `open`)
+ * @property {boolean} [open]                      allow unauthenticated registration (NOT recommended)
+ * @property {(req: import('./request.js').ServerRequest) => boolean | Promise<boolean>} [authorize]  custom gate
+ * @property {Partial<import('./clients.js').ClientConfig>} [defaults]  defaults layered under each registration
+ *
+ * @typedef {Object} OidcConfig
+ * @property {import('./issuers/id-token.js').IdTokenSignerConfig} idToken   id_token JWS signer (signingKey + alg)
+ * @property {string} [userinfoEndpoint]           advertised in metadata as `userinfo_endpoint`
+ * @property {string[]} [claimsSupported]          advertised as `claims_supported`
+ * @property {string[]} [subjectTypes]             advertised as `subject_types_supported` (default `['public']`)
  *
  * @typedef {Object} UserAuthn
  * @property {string} subject                      resource-owner identifier → `sub`
@@ -139,6 +156,13 @@ export function createServer(config) {
   // FAPI 2.0 tightens several defaults at once (PLAN Tier C).
   const { fapi, requirePkce, requirePar, dpopRequired } = applyFapiProfile(security);
 
+  // OpenID Connect: the server is an OpenID Provider when an id_token
+  // signer is configured, and a plain OAuth 2.1 AS otherwise. The signer is
+  // a JWS signer independent of the access-token backend (an id_token is
+  // always a JWS, whether access tokens are JWT or PASETO).
+  const oidc = isObject(config.oidc) ? config.oidc : undefined;
+  const idTokenSigner = isObject(oidc?.idToken) ? createIdTokenSigner(oidc.idToken) : undefined;
+
   /** @type {ResolvedServerConfig & { registry, tokens, stores, security, requirePkce, requirePar, dpopRequired, authenticateUser, authorizationCodeTtlMs, parTtlMs, fapi }} */
   const resolved = {
     issuer,
@@ -149,9 +173,13 @@ export function createServer(config) {
     authMethods: collectAuthMethods(grantTypes),
     dpopAlgs: security.dpop?.algs ?? ['ES256', 'RS256', 'EdDSA'],
     requirePar,
+    // OIDC (metadata-facing): the id_token signing alg + advertised OP bits.
+    oidcEnabled: idTokenSigner !== undefined,
+    oidc,
     // Runtime-only fields (not part of the metadata-facing shape):
     registry,
     tokens: config.tokens,
+    idTokenSigner,
     stores,
     security,
     requirePkce,
@@ -168,6 +196,10 @@ export function createServer(config) {
     deviceCodeTtlMs: config.device?.ttl !== undefined ? parseDuration(config.device.ttl) : undefined,
     deviceInterval: config.device?.interval,
     deviceVerificationUri: config.device?.verificationUri,
+    // Dynamic client registration (RFC 7591) is opt-in; enabled when a
+    // `registration` config is present AND the registry can persist.
+    registration: isObject(config.registration) ? config.registration : undefined,
+    registrationEnabled: isObject(config.registration) && isFunction(registry.register),
   };
 
   return {
@@ -191,6 +223,9 @@ export function createServer(config) {
 
     /** Device authorization endpoint (RFC 8628). */
     deviceAuthorization: createDeviceHandler(resolved),
+
+    /** Dynamic client registration endpoint (RFC 7591) — opt-in. */
+    register: createRegisterHandler(resolved),
 
     /**
      * Device-approval API for the host's verification page — look up a
@@ -241,6 +276,7 @@ function resolveEndpoints(issuer, overrides = {}) {
     revocation: overrides.revocation ?? `${base}/revoke`,
     par: overrides.par ?? `${base}/par`,
     deviceAuthorization: overrides.deviceAuthorization ?? `${base}/device_authorization`,
+    registration: overrides.registration ?? `${base}/register`,
   };
 }
 

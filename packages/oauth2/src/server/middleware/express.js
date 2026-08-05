@@ -64,6 +64,7 @@ export function oauth2Handlers(server) {
     introspect: expressHandler(server.introspect),
     par: expressHandler(server.par),
     deviceAuthorization: expressHandler(server.deviceAuthorization),
+    register: expressHandler(server.register),
   };
 }
 
@@ -83,13 +84,22 @@ export function mountOAuth2Server(app, server, options = {}) {
   const p = endpointPaths(server);
   const h = oauth2Handlers(server);
   app.get(`${base}/.well-known/oauth-authorization-server`, h.metadata);
-  app.get(`${base}/.well-known/openid-configuration`, h.metadata);
+  // OIDC discovery is served only when this server is an OpenID Provider
+  // (an id_token signer is configured) — a plain OAuth 2.1 AS must not
+  // advertise an `openid-configuration` it can't back.
+  if (server?._config?.oidcEnabled === true) {
+    app.get(`${base}/.well-known/openid-configuration`, h.metadata);
+  }
   app.get(`${base}${p.authorization}`, h.authorize);
   app.post(`${base}${p.token}`, h.token);
   app.post(`${base}${p.revocation}`, h.revoke);
   app.post(`${base}${p.introspection}`, h.introspect);
   app.post(`${base}${p.par}`, h.par);
   app.post(`${base}${p.deviceAuthorization}`, h.deviceAuthorization);
+  // Dynamic client registration (RFC 7591) — only when enabled.
+  if (server?._config?.registrationEnabled === true) {
+    app.post(`${base}${p.registration}`, h.register);
+  }
 }
 
 /**

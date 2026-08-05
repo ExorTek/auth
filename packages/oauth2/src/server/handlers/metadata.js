@@ -43,8 +43,22 @@ export function buildMetadata(config) {
   if (isNonEmptyString(config.jwksUri)) {
     doc.jwks_uri = config.jwksUri;
   }
-  if (isArray(scopes) && scopes.length > 0) {
-    doc.scopes_supported = scopes;
+
+  // OpenID Provider fields — only when an id_token signer is configured.
+  // `scopes_supported` then always advertises `openid`.
+  const oidcScopes = config.oidcEnabled ? withOpenid(scopes) : scopes;
+  if (isArray(oidcScopes) && oidcScopes.length > 0) {
+    doc.scopes_supported = oidcScopes;
+  }
+  if (config.oidcEnabled) {
+    doc.subject_types_supported = isArray(config.oidc?.subjectTypes) ? config.oidc.subjectTypes : ['public'];
+    doc.id_token_signing_alg_values_supported = [config.idTokenSigner.alg];
+    if (isNonEmptyString(config.oidc?.userinfoEndpoint)) {
+      doc.userinfo_endpoint = config.oidc.userinfoEndpoint;
+    }
+    if (isArray(config.oidc?.claimsSupported) && config.oidc.claimsSupported.length > 0) {
+      doc.claims_supported = config.oidc.claimsSupported;
+    }
   }
   if (isNonEmptyString(endpoints.introspection)) {
     doc.introspection_endpoint = endpoints.introspection;
@@ -60,12 +74,27 @@ export function buildMetadata(config) {
   if (isNonEmptyString(endpoints.deviceAuthorization)) {
     doc.device_authorization_endpoint = endpoints.deviceAuthorization;
   }
+  // RFC 7591 §3 — advertise dynamic registration only when it is enabled.
+  if (config.registrationEnabled && isNonEmptyString(endpoints.registration)) {
+    doc.registration_endpoint = endpoints.registration;
+  }
   if (isArray(dpopAlgs) && dpopAlgs.length > 0) {
     // RFC 9449 §5.1 — advertise the DPoP proof signing algs we accept.
     doc.dpop_signing_alg_values_supported = dpopAlgs;
   }
 
   return doc;
+}
+
+/**
+ * Ensure `openid` heads the advertised scope list (OpenID Providers).
+ *
+ * @param {string[] | undefined} scopes
+ * @returns {string[]}
+ */
+function withOpenid(scopes) {
+  const base = isArray(scopes) ? scopes : [];
+  return base.includes('openid') ? base : ['openid', ...base];
 }
 
 /**
