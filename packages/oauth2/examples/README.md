@@ -19,6 +19,7 @@ client id / secret, they bring the endpoints + claim mapping.
 | `login-api.mjs`             | Express   | `mode: 'api'` — client-held session for mobile / SPA / CLI    |
 | `try-google-express.mjs`    | Express   | **Real Google, browser-clickable**, web **and** api in one page |
 | `try-google-fastify.mjs`    | Fastify   | the same, on Fastify                                           |
+| `connect-api.mjs`           | Express   | "Connect account" — request an API scope, then call Google Drive / GitHub repos with the token |
 
 ```bash
 # Browser-clickable, both modes — no Postman, no manual session/code carry:

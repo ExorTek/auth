@@ -80,11 +80,14 @@ createOAuth({
 // oauth.authorize('ms-corp') / oauth.authorize('ms-any')
 ```
 
-## Rolling your own
+## No preset? Build one — `defineProvider`
 
-`defineProvider` builds a custom preset from the same descriptor the
-built-ins use — endpoints, `defaultScopes`, `mapUser`, an `issuer` string
-or validator, optional `discover: true` for OIDC discovery.
+**You are never limited to the presets.** Any OAuth 2.0 / OIDC provider
+works — `defineProvider` builds a preset from the same descriptor the
+built-ins use, and it plugs into `createOAuth` identically.
+
+An OIDC provider is six lines — point it at the issuer and let discovery
+resolve the endpoints:
 
 ```js
 import { defineProvider } from '@exortek/oauth2';
@@ -97,4 +100,82 @@ export const acme = defineProvider({
   defaultScopes: ['openid', 'email'],
   mapUser: raw => ({ sub: raw.sub, email: raw.email }),
 });
+
+createOAuth({ baseUrl, callback, providers: [acme({ clientId, clientSecret })] });
 ```
+
+A plain OAuth 2.0 provider (no OIDC) just needs the endpoints spelled out
+and a `mapUser` that shapes the provider's profile response:
+
+```js
+export const acme = defineProvider({
+  id: 'acme',
+  kind: 'oauth2',
+  authorizationEndpoint: 'https://acme.com/oauth/authorize',
+  tokenEndpoint: 'https://acme.com/oauth/token',
+  userinfoEndpoint: 'https://api.acme.com/me',
+  defaultScopes: ['profile'],
+  // clientAuth: 'basic', tokenHeaders: { 'user-agent': 'my-app' } // if the provider needs them
+  mapUser: raw => ({ sub: String(raw.id), email: raw.email, name: raw.name }),
+});
+```
+
+This is exactly how the shipped presets are written — nothing is
+special-cased for the built-ins. If a provider we don't ship is common,
+open an issue and it can become a preset; until then your `defineProvider`
+version is a first-class citizen.
+
+## Beyond login — calling their APIs
+
+"Sign in with X" and "connect your X account" are the **same OAuth flow** —
+the only difference is the **scope** you request and that you keep the
+`access_token` (and `refresh_token`) the callback returns. Ask for the
+provider's API scope and use the token against its API:
+
+```js
+// Request the API scope (alongside or instead of the login scopes):
+const { url, session } = await oauth.authorize('google', {
+  scope: ['https://www.googleapis.com/auth/drive.readonly'],
+});
+const { user, tokens } = await oauth.callback('google', query, { session });
+
+// tokens.access_token is a Google API token — call Drive:
+const files = await fetch('https://www.googleapis.com/drive/v3/files', {
+  headers: { authorization: `Bearer ${tokens.access_token}` },
+}).then(r => r.json());
+
+// For long-lived sync, keep tokens.refresh_token and refresh when it lapses:
+const fresh = await oauth.refresh('google', tokens.refresh_token);
+```
+
+The Google preset already sends `access_type=offline` + `prompt=consent`,
+so you get a `refresh_token` for background sync.
+
+<Callout type="info">
+  **GitHub is slightly different** — no `refresh_token` (its tokens are
+  long-lived), and every API call needs a `User-Agent` header. Request the
+  `repo` scope, then:
+
+  ```js
+  const gh = github({ clientId, clientSecret, scope: ['read:user', 'user:email', 'repo'] });
+  // …after callback:
+  const repos = await fetch('https://api.github.com/user/repos', {
+    headers: { authorization: `Bearer ${tokens.access_token}`, 'user-agent': 'my-app' },
+  }).then(r => r.json());
+  ```
+</Callout>
+
+Common "connect for API access" scopes:
+
+| Provider  | Scope to request                                   | Example API call                                              |
+| --------- | -------------------------------------------------- | ------------------------------------------------------------- |
+| Google    | `https://www.googleapis.com/auth/drive.readonly`   | `GET https://www.googleapis.com/drive/v3/files`               |
+| Microsoft | `Files.Read offline_access`                        | `GET https://graph.microsoft.com/v1.0/me/drive/root/children` |
+| GitHub    | `repo` (or `public_repo`)                          | `GET https://api.github.com/user/repos` (+ `User-Agent`)      |
+| GitLab    | `read_api`                                         | `GET https://gitlab.com/api/v4/projects?membership=true`      |
+| Spotify   | `playlist-read-private`                            | `GET https://api.spotify.com/v1/me/playlists`                 |
+| Discord   | `guilds`                                           | `GET https://discord.com/api/users/@me/guilds`                |
+
+Override the preset's `defaultScopes` per call with the `scope` option (as
+above) — the security defaults (PKCE, `state`, `nonce`, `iss`) stay on
+whatever scopes you request.
