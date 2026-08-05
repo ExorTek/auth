@@ -2,11 +2,11 @@
  * Self-contained, browser-clickable demo — NO external provider or
  * credentials. One process stands up:
  *
- *   • a stub OIDC provider on :4000 (auto-consents, signs a real id_token),
- *   • a relying-party app on :3000 using @exortek/oauth2 in BOTH modes.
+ *   - a stub OIDC provider on port 5400 (auto-consents, signs an id_token),
+ *   - a relying-party app on port 5300 using @exortek/oauth2 in both modes.
  *
  *   node examples/demo-local.mjs
- *   open http://localhost:3000
+ *   open http://localhost:5300
  *
  * From the browser:
  *   • "Web mode"  → GET redirect flow, flow session in a signed cookie.
@@ -18,6 +18,7 @@
  */
 import { createServer } from 'node:http';
 import express from 'express';
+import 'dotenv/config';
 
 import { generate } from '@exortek/jwk/generate';
 import { sign as signJwt } from '@exortek/jwt';
@@ -28,7 +29,7 @@ const RP = 'http://localhost:5300';
 const IDP = 'http://localhost:5400';
 const CLIENT_ID = 'demo-client';
 
-// ── Stub OIDC provider (:4000) ────────────────────────────────────────
+// Stub OIDC provider (port 5400).
 const { publicJwk, privateJwk } = await generate('EC', { curve: 'P-256', kid: 'demo', alg: 'ES256', use: 'sig' });
 const pending = new Map(); // code → { nonce, aud, redirectUri }
 
@@ -80,7 +81,7 @@ createServer((req, res) => {
   json(404, { error: 'not_found' });
 }).listen(5400, () => console.log(`stub IdP  → ${IDP}`));
 
-// ── Relying party (:3000) ─────────────────────────────────────────────
+// Relying party (port 5300).
 const localProvider = () =>
   defineProvider({
     id: 'local',
@@ -132,7 +133,7 @@ app.get('/api/auth/:provider/callback', (_req, res) => res.send(bridgePage()));
 app.get('/', (_req, res) => res.send(page(landing())));
 app.listen(5300, () => console.log(`RP app    → ${RP}\n\nopen ${RP}`));
 
-// ── HTML helpers ──────────────────────────────────────────────────────
+// HTML helpers.
 function page(body) {
   return `<!doctype html><meta charset=utf8><title>oauth2 demo</title>
     <style>body{font:16px system-ui;max-width:40rem;margin:4rem auto;padding:0 1rem}a,button{font:inherit}

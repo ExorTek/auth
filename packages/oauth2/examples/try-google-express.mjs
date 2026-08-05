@@ -37,7 +37,7 @@ const oauthApi = createOAuth({ baseUrl: BASE, callback: '/api/auth/{provider}/ca
 const app = express();
 app.use(express.json());
 
-//  WEB MODE — one click, flow session in a signed cookie
+// Web mode: one click, flow session in a signed cookie.
 const web = oauthLogin({
   oauth: oauthWeb,
   mode: 'web',
@@ -52,7 +52,7 @@ const web = oauthLogin({
 app.get('/web/auth/:provider', web.start);
 app.get('/web/auth/:provider/callback', web.callback);
 
-//  API MODE — client holds the session; a bridge page finishes it
+// Api mode: client holds the session; a bridge page finishes it.
 app.post('/api/auth/:provider/start', async (req, res) => {
   const { url, session } = await oauthApi.authorize(req.params.provider);
   res.json({ authorizeUrl: url, session });
@@ -79,7 +79,7 @@ app.listen(PORT, () => {
   console.log(`    ${BASE}/api/auth/google/callback\n`);
 });
 
-// HTML
+// HTML helpers.
 function esc(o) {
   return JSON.stringify(o, null, 2).replace(/</g, '&lt;');
 }

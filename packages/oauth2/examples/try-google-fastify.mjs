@@ -33,7 +33,7 @@ const oauthApi = createOAuth({ baseUrl: BASE, callback: '/api/auth/{provider}/ca
 
 const app = Fastify();
 
-//  WEB MODE — the oauthLogin handlers, mounted on our own routes
+// Web mode: the oauthLogin handlers, mounted on our own routes.
 const web = oauthLogin({
   oauth: oauthWeb,
   mode: 'web',
@@ -51,7 +51,7 @@ const web = oauthLogin({
 app.get('/web/auth/:provider', web.start);
 app.get('/web/auth/:provider/callback', web.callback);
 
-//  API MODE — client-held session + a browser bridge
+// Api mode: client-held session plus a browser bridge.
 app.post('/api/auth/:provider/start', async req => {
   const { url, session } = await oauthApi.authorize(req.params.provider);
   return { authorizeUrl: url, session };
@@ -75,7 +75,7 @@ console.log('  Add these to your Google OAuth client (Authorized redirect URIs):
 console.log(`    ${BASE}/web/auth/google/callback`);
 console.log(`    ${BASE}/api/auth/google/callback\n`);
 
-//  HTML (shared with the Express version)
+// HTML (shared with the Express version).
 function esc(o) {
   return JSON.stringify(o, null, 2).replace(/</g, '&lt;');
 }
