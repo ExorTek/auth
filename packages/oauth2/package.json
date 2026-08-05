@@ -97,6 +97,36 @@
       "types": "./dist/providers/azure.d.ts",
       "import": "./dist/providers/azure.mjs",
       "require": "./dist/providers/azure.cjs"
+    },
+    "./providers/gitlab": {
+      "types": "./dist/providers/gitlab.d.ts",
+      "import": "./dist/providers/gitlab.mjs",
+      "require": "./dist/providers/gitlab.cjs"
+    },
+    "./providers/bitbucket": {
+      "types": "./dist/providers/bitbucket.d.ts",
+      "import": "./dist/providers/bitbucket.mjs",
+      "require": "./dist/providers/bitbucket.cjs"
+    },
+    "./providers/slack": {
+      "types": "./dist/providers/slack.d.ts",
+      "import": "./dist/providers/slack.mjs",
+      "require": "./dist/providers/slack.cjs"
+    },
+    "./providers/reddit": {
+      "types": "./dist/providers/reddit.d.ts",
+      "import": "./dist/providers/reddit.mjs",
+      "require": "./dist/providers/reddit.cjs"
+    },
+    "./providers/amazon": {
+      "types": "./dist/providers/amazon.d.ts",
+      "import": "./dist/providers/amazon.mjs",
+      "require": "./dist/providers/amazon.cjs"
+    },
+    "./providers/salesforce": {
+      "types": "./dist/providers/salesforce.d.ts",
+      "import": "./dist/providers/salesforce.mjs",
+      "require": "./dist/providers/salesforce.cjs"
     }
   },
   "files": [

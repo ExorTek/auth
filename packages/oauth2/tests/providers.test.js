@@ -16,6 +16,12 @@ import { apple } from '../src/providers/apple.js';
 import { twitter } from '../src/providers/twitter.js';
 import { okta } from '../src/providers/okta.js';
 import { azure } from '../src/providers/azure.js';
+import { gitlab } from '../src/providers/gitlab.js';
+import { bitbucket } from '../src/providers/bitbucket.js';
+import { slack } from '../src/providers/slack.js';
+import { reddit } from '../src/providers/reddit.js';
+import { amazon } from '../src/providers/amazon.js';
+import { salesforce } from '../src/providers/salesforce.js';
 
 const CREDS = { clientId: 'id', clientSecret: 'secret' };
 
@@ -33,8 +39,14 @@ test('every preset builds a provider descriptor', () => {
     twitter(CREDS),
     okta({ ...CREDS, issuer: 'https://org.okta.com/oauth2/default' }),
     azure(CREDS),
+    gitlab(CREDS),
+    bitbucket(CREDS),
+    slack(CREDS),
+    reddit(CREDS),
+    amazon(CREDS),
+    salesforce(CREDS),
   ];
-  assert.equal(built.length, 12);
+  assert.equal(built.length, 18);
   for (const p of built) {
     assert.equal(p.__oauth2Provider, true);
     assert.ok(p.id);
@@ -43,8 +55,8 @@ test('every preset builds a provider descriptor', () => {
 });
 
 test('OIDC vs OAuth2 kinds are correct', () => {
-  const oidc = { google, microsoft, linkedin, twitch, apple };
-  const oauth2 = { github, discord, facebook, spotify, twitter };
+  const oidc = { google, microsoft, linkedin, twitch, apple, gitlab, slack, salesforce };
+  const oauth2 = { github, discord, facebook, spotify, twitter, bitbucket, reddit, amazon };
   for (const [, p] of Object.entries(oidc)) {
     assert.equal(p(CREDS).kind, 'oidc');
   }
@@ -109,6 +121,37 @@ test('mapUser normalizes representative payloads', () => {
   // apple: from id_token claims, string 'true' coerced.
   const a = apple(CREDS).def.mapUser({}, { sub: 'a1', email: 'a@x.com', email_verified: 'true' });
   assert.deepEqual(a, { sub: 'a1', email: 'a@x.com', emailVerified: true });
+
+  // bitbucket: primary confirmed email from the `{ values: [...] }` shape.
+  const b = bitbucket(CREDS).def.mapUser({
+    uuid: '{u-1}',
+    display_name: 'Bee',
+    links: { avatar: { href: 'http://av' } },
+    emails: {
+      values: [
+        { email: 'alt@x.com', is_primary: false, is_confirmed: true },
+        { email: 'primary@x.com', is_primary: true, is_confirmed: true },
+      ],
+    },
+  });
+  assert.deepEqual(b, {
+    sub: '{u-1}',
+    email: 'primary@x.com',
+    emailVerified: true,
+    name: 'Bee',
+    picture: 'http://av',
+  });
+
+  // reddit: id → sub, no email, icon query stripped.
+  const r = reddit(CREDS).def.mapUser({ id: 'abc', name: 'spez', icon_img: 'http://i.png?width=256' });
+  assert.deepEqual(r, { sub: 'abc', name: 'spez', picture: 'http://i.png' });
+
+  // amazon: profile fields map straight through.
+  assert.deepEqual(amazon(CREDS).def.mapUser({ user_id: 'amzn1.account.X', email: 'a@x.com', name: 'Al' }), {
+    sub: 'amzn1.account.X',
+    email: 'a@x.com',
+    name: 'Al',
+  });
 });
 
 test('authorize URLs carry the right scopes and params', async () => {

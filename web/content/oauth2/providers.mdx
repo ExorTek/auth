@@ -33,6 +33,12 @@ google({ clientId, clientSecret, scope: ['email', 'profile'] });
 | Spotify           | `@exortek/oauth2/providers/spotify`     | OAuth | `user-read-email`               |
 | Twitch            | `@exortek/oauth2/providers/twitch`      | OIDC  | `openid user:read:email`        |
 | Twitter / X       | `@exortek/oauth2/providers/twitter`     | OAuth | `users.read tweet.read`         |
+| GitLab            | `@exortek/oauth2/providers/gitlab`      | OIDC  | `openid email profile`          |
+| Bitbucket         | `@exortek/oauth2/providers/bitbucket`   | OAuth | `account email`                 |
+| Slack             | `@exortek/oauth2/providers/slack`       | OIDC  | `openid email profile`          |
+| Reddit            | `@exortek/oauth2/providers/reddit`      | OAuth | `identity`                      |
+| Amazon            | `@exortek/oauth2/providers/amazon`      | OAuth | `profile`                       |
+| Salesforce        | `@exortek/oauth2/providers/salesforce`  | OIDC  | `openid email profile`          |
 
 <Callout type="info">
   OIDC presets verify the `id_token` (signature + `iss` / `aud` / `nonce`

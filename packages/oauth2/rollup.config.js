@@ -16,6 +16,12 @@ const providers = [
   'twitter',
   'okta',
   'azure',
+  'gitlab',
+  'bitbucket',
+  'slack',
+  'reddit',
+  'amazon',
+  'salesforce',
 ];
 
 export default createConfig(pkg, {
