@@ -4,11 +4,20 @@ on:
   workflow_dispatch: # manual run: Actions tab → CodeQL → "Run workflow", or `gh workflow run codeql.yml`
   push:
     branches: [master]
+    # Skip the run entirely for changes that touch no analysed source. What is
+    # actually SCANNED is scoped in .github/codeql/codeql-config.yml (only
+    # packages/*/src) — this list just avoids spinning up the job for docs,
+    # changesets, examples, and the docs site.
     paths-ignore: &docs-only
       - '**/*.md'
       - 'docs/**'
+      - 'web/**'
       - '.changeset/**'
       - 'LICENSE'
+      - 'CODE_OF_CONDUCT.md'
+      - 'SECURITY.md'
+      - 'CONTRIBUTING.md'
+      - 'packages/**/examples/**'
   pull_request:
     branches: [master]
     paths-ignore: *docs-only
@@ -28,5 +37,7 @@ jobs:
       - uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
-          queries: security-and-quality
+          # Scope analysis to shipped library source (packages/*/src) so tests,
+          # examples, dist, the docs site, and tooling are never reported on.
+          config-file: ./.github/codeql/codeql-config.yml
       - uses: github/codeql-action/analyze@v4
