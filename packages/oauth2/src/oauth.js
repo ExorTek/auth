@@ -8,7 +8,7 @@
  * `createOAuth`.
  */
 import { parseDuration } from '@exortek/shared/duration';
-import { isArray, isFunction, isNonEmptyString, isObject } from '@exortek/shared/predicates';
+import { isArray, isFunction, isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates';
 
 import { ErrorCode, OAuth2Error } from './internal/errors.js';
 import { resolveRedirectUri } from './internal/redirect-uri.js';
@@ -195,7 +195,7 @@ export function createOAuth(config) {
    */
   async function loadSession(query, options) {
     if (isNonEmptyString(options.session)) {
-      return deserializeSession(options.session);
+      return assertFresh(deserializeSession(options.session));
     }
     if (store) {
       const key = query?.state;
@@ -208,9 +208,27 @@ export function createOAuth(config) {
       }
       // Single-use: consume the stored session so a replayed callback fails.
       await store.delete(key);
-      return deserializeSession(stored);
+      return assertFresh(deserializeSession(stored));
     }
     throw new OAuth2Error(ErrorCode.MISSING_STATE, 'no session provided and no store configured');
+  }
+
+  /**
+   * Reject a session older than `maxAuthAge`. A configured store expires
+   * its own entries, but a client-held session (cookie / `api` mode) has no
+   * server TTL — without this check a captured session replays forever.
+   *
+   * @param {import('./internal/session.js').FlowSession} session
+   * @returns {import('./internal/session.js').FlowSession}
+   */
+  function assertFresh(session) {
+    if (isNumber(session.createdAt) && Date.now() - session.createdAt > maxAuthAgeMs) {
+      throw new OAuth2Error(
+        ErrorCode.SESSION_EXPIRED,
+        'the authorization flow session has expired (max auth age exceeded)',
+      );
+    }
+    return session;
   }
 }
 

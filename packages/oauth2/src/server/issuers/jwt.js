@@ -118,10 +118,17 @@ export function jwtIssuer(config) {
         return { active: false };
       }
       try {
-        const { payload } = await verify(token, verificationKey, {
+        const { header, payload } = await verify(token, verificationKey, {
           alg: [alg],
           issuer: ctx.issuer,
         });
+        // RFC 9068 §4: only an `at+jwt` typed token is an access token.
+        // Refusing any other `typ` stops an id_token / JARM response /
+        // client assertion signed with the same key from introspecting as
+        // an active access token (token-exchange reuses this path).
+        if (header.typ !== 'at+jwt') {
+          return { active: false };
+        }
         return { active: true, claims: payload };
       } catch (err) {
         if (err instanceof JwtError) {

@@ -47,9 +47,10 @@ const seenJti = new Map();
  * @param {import('../request.js').ServerRequest} req
  * @param {Record<string, any>} config
  * @param {import('../clients.js').Client} client
+ * @param {{ htu?: string }} [options]  the endpoint URL the proof must bind to (default the token endpoint)
  * @returns {Promise<{ dpopJkt: string | undefined, nonceHeaders: Record<string, string> }>}
  */
-export async function resolveDpopBinding(req, config, client) {
+export async function resolveDpopBinding(req, config, client, options = {}) {
   const proof = req.header('dpop');
   const required = config.dpopRequired === true || client.dpopBoundAccessTokens === true;
 
@@ -62,7 +63,9 @@ export async function resolveDpopBinding(req, config, client) {
 
   const jkt = await verifyDpopProof(proof, {
     htm: req.method,
-    htu: config.endpoints.token,
+    // The proof binds to the endpoint it was sent to — the token endpoint,
+    // or the PAR endpoint for a `dpop_jkt` pre-binding (RFC 9449 §10.1).
+    htu: isNonEmptyString(options.htu) ? options.htu : config.endpoints.token,
   });
   return { dpopJkt: jkt, nonceHeaders: {} };
 }

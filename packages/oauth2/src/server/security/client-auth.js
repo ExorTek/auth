@@ -20,13 +20,17 @@ import { createHash } from 'node:crypto';
 import { verify as jwtVerify, decode as jwtDecode, JwtError } from '@exortek/jwt';
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { encode as base64urlEncode } from '@exortek/shared/base64url';
-import { isNonEmptyString, isObject } from '@exortek/shared/predicates';
+import { isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 import { readClientCredentials } from '../request.js';
 import { resolveClientKeys } from './client-keys.js';
 
 const JWT_BEARER_ASSERTION = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+// RFC 7523 §3 requires `exp`; bound its reach so the (process-local,
+// opportunistically-evicted) jti replay cache actually covers the token's
+// whole life.
+const MAX_ASSERTION_LIFETIME_MS = 300_000; // 5 minutes
 const ASSERTION_ALGS = new Set([
   'ES256',
   'ES384',
@@ -200,6 +204,16 @@ async function authenticateAssertion(req, config, assertionType) {
       throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion verification failed');
     }
     throw err;
+  }
+
+  // RFC 7523 §3: `exp` is REQUIRED, and a short life keeps the jti replay
+  // cache meaningful. `jwtVerify` enforces exp only when present, so check
+  // presence + bound here.
+  if (!isNumber(payload.exp)) {
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion must set exp');
+  }
+  if (payload.exp * 1000 - Date.now() > MAX_ASSERTION_LIFETIME_MS) {
+    throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion lifetime exceeds the accepted maximum');
   }
 
   assertSingleUse(payload.jti);

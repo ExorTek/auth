@@ -54,7 +54,7 @@ export function createParHandler(config) {
 
       // A DPoP proof at PAR pre-binds the eventual code to the client key
       // (RFC 9449 §10.1) via `dpop_jkt`.
-      const { dpopJkt } = await resolveDpopBinding(req, config, client);
+      const { dpopJkt } = await resolveDpopBinding(req, config, client, { htu: config.endpoints.par });
 
       const params = collectParams(req.form, client.clientId, dpopJkt);
       const requestUri = REQUEST_URI_PREFIX + randomState();

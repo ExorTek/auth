@@ -67,6 +67,10 @@ export function pasetoIssuer(config) {
         audience: audienceString(grant),
         jti,
         expiresIn: expiresInSec,
+        // PASETO has no JWS `typ` header; the authenticated footer marks
+        // this as an access token so introspection can refuse anything
+        // else signed with the same key (mirrors the JWT `at+jwt` check).
+        footer: 'at+jwt',
       });
 
       return {
@@ -87,7 +91,10 @@ export function pasetoIssuer(config) {
         return { active: false };
       }
       try {
-        const payload = verify(token, publicKey, { issuer: ctx.issuer });
+        const { payload, footer } = verify(token, publicKey, { issuer: ctx.issuer, complete: true });
+        if (footer !== 'at+jwt') {
+          return { active: false };
+        }
         return { active: true, claims: /** @type {Record<string, unknown>} */ (payload) };
       } catch (err) {
         if (err instanceof PasetoError) {

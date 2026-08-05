@@ -24,6 +24,7 @@ export const ErrorCode = Object.freeze({
   ID_TOKEN_INVALID: 'ID_TOKEN_INVALID',
   CONTEXT_MISMATCH: 'CONTEXT_MISMATCH',
   SESSION_MISMATCH: 'SESSION_MISMATCH',
+  SESSION_EXPIRED: 'SESSION_EXPIRED',
 
   // The provider returned `error=...` on the callback (e.g. access_denied).
   PROVIDER_ERROR: 'PROVIDER_ERROR',
@@ -56,6 +57,7 @@ export class OAuth2Error extends BaseError {
     [ErrorCode.ID_TOKEN_INVALID]: 400,
     [ErrorCode.CONTEXT_MISMATCH]: 400,
     [ErrorCode.SESSION_MISMATCH]: 400,
+    [ErrorCode.SESSION_EXPIRED]: 400,
     [ErrorCode.PROVIDER_ERROR]: 400,
     [ErrorCode.TOKEN_EXCHANGE_FAILED]: 502,
     [ErrorCode.USERINFO_FAILED]: 502,

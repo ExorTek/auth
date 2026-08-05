@@ -73,6 +73,20 @@ test('stateless authorize → callback round-trip resolves the user', async () =
   assert.equal(user.provider, 'test');
 });
 
+// Audit C1 — a client-held session past `maxAuthAge` must not replay.
+test('a flow session older than maxAuthAge is rejected (audit C1)', async () => {
+  const oauth = mkOAuth({ security: { maxAuthAge: '5m' } });
+  const { session } = await oauth.authorize('test');
+  const parsed = JSON.parse(Buffer.from(session, 'base64url').toString());
+  // Backdate createdAt beyond the window and re-seal the client-held session.
+  parsed.createdAt = Date.now() - 6 * 60 * 1000;
+  const stale = Buffer.from(JSON.stringify(parsed)).toString('base64url');
+  await assert.rejects(oauth.callback('test', { code: 'c', state: parsed.state }, { session: stale }), err => {
+    assert.equal(err.code, ErrorCode.SESSION_EXPIRED);
+    return true;
+  });
+});
+
 test('store-backed round-trip looks the session up by state and is single-use', async () => {
   const map = new Map();
   const store = {
