@@ -245,7 +245,7 @@ Where each protocol is anchored:
 | `paseto`        | PASETO v4 (paseto.io spec), RFC 6749 §10.4 (refresh reuse), RFC 7693 (BLAKE2b) |
 | `session`       | OWASP ASVS 4.0.3 V3, RFC 6265 (Cookies)                                       |
 | `security`      | OWASP ASVS 4.0.3 V13 / V14, RFC 6749 §10 (OAuth2 threats), RFC 7231 §5 (HTTP) |
-| `oauth2`        | _(planned)_ RFC 6749, RFC 7636 (PKCE), RFC 9126 (PAR), RFC 8414 (metadata), RFC 8628 (device) |
+| `oauth2`        | OAuth 2.1 / RFC 9700 (BCP), RFC 6749, RFC 7636 (PKCE), RFC 9207 (iss), RFC 8414 (metadata), RFC 9449 (DPoP), RFC 9126 (PAR), RFC 8707 (resource), RFC 9396 (RAR), RFC 9101 (JAR/JARM), RFC 7523 / 8705 (client auth), RFC 8693 (exchange), RFC 8628 (device), RFC 9068 (JWT profile), FAPI 2.0 |
 | `oidc`          | _(planned)_ OpenID Connect Core 1.0, OpenID Connect Discovery |
 | `passkey`       | W3C WebAuthn Level 3, FIDO2 CTAP2                                             |
 
