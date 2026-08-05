@@ -150,6 +150,10 @@ const server = createServer({
 mountOAuth2Server(app, server); // /authorize /token /revoke /introspect /par /device_authorization + metadata
 ```
 
+Want route-level control? `oauth2Handlers(server)` returns the per-endpoint
+handlers to mount yourself (with your own paths / middleware) — the same factory
+idiom as `oauthLogin`; `mountOAuth2Server` is sugar over it.
+
 Endpoints: authorize / token / revoke / introspect / PAR / device, RFC 8414
 metadata, plus the modern hardening — DPoP (RFC 9449, incl. the nonce
 challenge), PKCE, PAR (RFC 9126), resource indicators (RFC 8707), RAR

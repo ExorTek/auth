@@ -36,6 +36,26 @@ import { oauth2ServerPlugin } from '@exortek/oauth2/server/fastify';
 await app.register(oauth2ServerPlugin, { server });
 ```
 
+### Your own routes — `oauth2Handlers`
+
+Want route-level control (custom paths, per-endpoint middleware like a
+rate limiter)? `oauth2Handlers(server)` returns the per-endpoint handlers
+— mount them yourself (symmetric with `oauthLogin` on the RP side).
+`mountOAuth2Server` / `oauth2ServerPlugin` are just sugar over it.
+
+```js
+import { oauth2Handlers } from '@exortek/oauth2/server/express'; // or /server/fastify
+
+const oauth2 = oauth2Handlers(server);
+app.get('/authorize', oauth2.authorize);
+app.post('/token', rateLimit, oauth2.token); // your middleware, your path
+app.post('/revoke', oauth2.revoke);
+app.post('/introspect', oauth2.introspect);
+app.post('/par', oauth2.par);
+app.post('/device_authorization', oauth2.deviceAuthorization);
+app.get('/.well-known/oauth-authorization-server', oauth2.metadata);
+```
+
 ## Endpoints
 
 Mounted at the path portion of each configured endpoint (RFC 8414

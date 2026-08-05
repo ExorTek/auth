@@ -52,8 +52,13 @@ outright.
 
 **[`passport`](https://www.passportjs.org/)** — not a primitives library but a
 middleware framework with 500+ strategies. Great when you're wiring up OAuth
-providers and want the strategy ecosystem. `@exortek/auth` sits a layer below:
-plain functions you compose yourself, framework-agnostic, with Express/Fastify
+providers and want the strategy ecosystem, but each strategy's quality (PKCE,
+`state`, issuer checks) varies. [`@exortek/oauth2`](/oauth2) is the direct
+alternative: one `createOAuth` flow with ready-made provider presets where mandatory
+PKCE / `state` / `nonce` / exact-redirect / `iss` are non-negotiable defaults —
+plus a full OAuth 2.1 authorization server (DPoP, PAR, JAR/JARM, device, FAPI)
+that `passport` does not cover. `@exortek/auth` sits a layer below: plain
+functions you compose yourself, framework-agnostic, with Express/Fastify
 adapters where a middleware shape helps.
 
 ## The design bet

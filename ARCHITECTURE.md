@@ -109,7 +109,7 @@ Status legend: ✅ shipped to npm · 🛠 on disk, pre-release · ⏳ planned.
 | 15 | `@exortek/passkey`     |   ✅   | WebAuthn Level 3 / FIDO2 server — all seven attestation formats + MDS3 + AAGUID   |
 | 16 | `@exortek/opaque`      |   ✅   | Opaque reference tokens, RFC 7662 introspection + RFC 7009 revocation                |
 | 17 | `@exortek/paseto`      |   ✅   | PASETO v4 — `v4.local` (XChaCha20 + keyed BLAKE2b) + `v4.public` (Ed25519), no `alg` header |
-| 18 | `@exortek/oauth2`      |   ⏳   | OAuth 2.1 client (PKCE) + provider presets                                          |
+| 18 | `@exortek/oauth2`      |   ✅   | OAuth 2.1 — RP flow + provider presets + full authorization server (DPoP · PAR · JAR/JARM · device · token-exchange · FAPI) |
 | 19 | `@exortek/oidc`        |   ⏳   | OpenID Connect on top of `@exortek/oauth2`                                          |
 | 20 | `@exortek/auth`        |   ⏳   | Umbrella — re-exports every package above                                          |
 
