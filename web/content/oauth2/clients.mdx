@@ -1,0 +1,81 @@
+---
+title: '@exortek/oauth2 — Clients'
+sidebarTitle: 'Clients — registration & auth'
+---
+
+import { Callout } from 'nextra/components';
+
+# Clients — registration & authentication
+
+`createServer` takes a `clients` array (or a registry). Each client is
+validated at construction — an unknown `tokenEndpointAuthMethod`, or a
+`private_key_jwt` client with no key, throws immediately.
+
+```js
+createServer({
+  issuer,
+  tokens,
+  authenticateUser,
+  clients: [
+    {
+      clientId: 'web-app',
+      clientSecret: process.env.WEB_APP_SECRET,
+      redirectUris: ['https://app.example.com/cb'],
+      grantTypes: ['authorization_code', 'refresh_token'],
+      scope: ['openid', 'profile', 'orders:read'],
+    },
+  ],
+});
+```
+
+## Fields
+
+| Field                               | Default                             | Notes                                                    |
+| ----------------------------------- | ----------------------------------- | -------------------------------------------------------- |
+| `clientId`                          | —                                   | required                                                 |
+| `clientSecret`                      | —                                   | confidential clients only                                |
+| `redirectUris`                      | —                                   | exact-match allowlist (RFC 6749 §3.1.2 — no wildcards)   |
+| `grantTypes`                        | `['authorization_code','refresh_token']` | the grants this client may use                      |
+| `responseTypes`                     | `['code']`                          | OAuth 2.1 is code-only                                   |
+| `tokenEndpointAuthMethod`           | secret ? `client_secret_basic` : `none` | see below                                            |
+| `scope`                             | server default                      | the ceiling of scopes this client may request            |
+| `jwksUri` / `jwks`                  | —                                   | for `private_key_jwt` / signed request objects           |
+| `dpopBoundAccessTokens`             | `false`                             | require DPoP for this client (RFC 9449 §5.2)             |
+| `requirePushedAuthorizationRequests`| `false`                             | require PAR (RFC 9126)                                    |
+
+<Callout type="warning">
+  These policy fields are **enforced**, not just recorded — a client
+  asking for a grant, response type, or scope outside its registration is
+  rejected (`unauthorized_client` / `invalid_scope`), and a PAR-required
+  client is refused on the front channel.
+</Callout>
+
+## Authentication methods
+
+`tokenEndpointAuthMethod` is one of:
+
+| Method                        | RFC       | How the client proves itself                          |
+| ----------------------------- | --------- | ----------------------------------------------------- |
+| `none`                        | 6749      | public client — PKCE carries the proof                |
+| `client_secret_basic`         | 6749 §2.3 | secret in the `Authorization: Basic` header           |
+| `client_secret_post`          | 6749 §2.3 | secret in the form body                               |
+| `client_secret_jwt`           | 7523      | HS256 assertion signed with the secret                |
+| `private_key_jwt`             | 7523      | asymmetric assertion; key from `jwks` / `jwksUri`     |
+| `tls_client_auth`             | 8705 §2.1 | mTLS, cert subject DN (`tlsClientAuthSubjectDn`)      |
+| `self_signed_tls_client_auth` | 8705 §2.2 | mTLS, `x5t#S256` (`certificateThumbprint`)            |
+
+Assertion-based methods (`*_jwt`) require an `exp`, bound the accepted
+lifetime, and reject a replayed `jti`. mTLS methods also sender-constrain
+the token via `cnf.x5t#S256`.
+
+## A registry instead of an array
+
+For a database of clients, pass a registry — an object with an async
+`getClient(clientId)` — instead of a static array:
+
+```js
+import { createClientRegistry } from '@exortek/oauth2/server';
+
+const registry = createClientRegistry({ getClient: id => db.clients.findById(id) });
+createServer({ /* … */, clients: registry });
+```

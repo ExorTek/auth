@@ -1,0 +1,212 @@
+---
+title: '@exortek/oauth2 — Authorization server'
+sidebarTitle: 'Authorization server'
+---
+
+import { Callout } from 'nextra/components';
+
+# Authorization server — `createServer`
+
+`createServer` is an OAuth 2.1 authorization server: one
+framework-agnostic core returning `{ status, headers, body }` descriptors,
+mounted through a thin Express or Fastify adapter. Secure by default —
+PKCE required, `iss` always returned, redirect URIs exact-matched.
+
+```js
+import { createServer, jwtIssuer } from '@exortek/oauth2/server';
+import { mountOAuth2Server } from '@exortek/oauth2/server/express';
+
+const server = createServer({
+  issuer: 'https://as.example.com',
+  clients: [
+    { clientId: 'app', clientSecret: process.env.APP_SECRET, redirectUris: ['https://app.example.com/cb'] },
+  ],
+  tokens: jwtIssuer({ signingKey, alg: 'ES256' }), // RFC 9068 at+jwt (default backend)
+  authenticateUser: req => resolveLoggedInUser(req), // your login + consent UI
+});
+
+mountOAuth2Server(app, server);
+```
+
+Fastify is the same server as a plugin:
+
+```js
+import { oauth2ServerPlugin } from '@exortek/oauth2/server/fastify';
+
+await app.register(oauth2ServerPlugin, { server });
+```
+
+### Your own routes — `oauth2Handlers`
+
+Want route-level control (custom paths, per-endpoint middleware like a
+rate limiter)? `oauth2Handlers(server)` returns the per-endpoint handlers
+— mount them yourself (symmetric with `oauthLogin` on the RP side).
+`mountOAuth2Server` / `oauth2ServerPlugin` are just sugar over it.
+
+```js
+import { oauth2Handlers } from '@exortek/oauth2/server/express'; // or /server/fastify
+
+const oauth2 = oauth2Handlers(server);
+app.get('/authorize', oauth2.authorize);
+app.post('/token', rateLimit, oauth2.token); // your middleware, your path
+app.post('/revoke', oauth2.revoke);
+app.post('/introspect', oauth2.introspect);
+app.post('/par', oauth2.par);
+app.post('/device_authorization', oauth2.deviceAuthorization);
+app.post('/register', oauth2.register); // only if registration is enabled
+app.get('/.well-known/oauth-authorization-server', oauth2.metadata);
+// app.get('/.well-known/openid-configuration', oauth2.metadata); // OpenID Provider only
+```
+
+## Endpoints
+
+Mounted at the path portion of each configured endpoint (RFC 8414
+metadata stays consistent with where the routes actually live):
+
+| Endpoint                                    | RFC                    |
+| ------------------------------------------- | ---------------------- |
+| `/authorize` (GET + POST form_post)         | 6749 §4.1, OAuth 2.1   |
+| `/token` — code / refresh / client_credentials / device / token-exchange | 6749, 8628, 8693 |
+| `/revoke`                                   | 7009                   |
+| `/introspect`                               | 7662                   |
+| `/par`                                      | 9126                   |
+| `/device_authorization`                     | 8628                   |
+| `/register` (when registration is enabled)  | 7591                   |
+| `/.well-known/oauth-authorization-server`   | 8414                   |
+| `/.well-known/openid-configuration` (OpenID Provider only) | OIDC Discovery |
+
+## Token backends
+
+`jwtIssuer` mints RFC 9068 `at+jwt` access tokens (the blessed default);
+`pasetoIssuer` is a drop-in over PASETO v4.public. Both satisfy the same
+`{ issue, introspect }` contract, so `createServer` is backend-agnostic.
+
+```js
+import { pasetoIssuer } from '@exortek/oauth2/server';
+
+createServer({ /* … */, tokens: pasetoIssuer({ secretKey, publicKey }) });
+```
+
+## OpenID Connect — become an OpenID Provider
+
+The server is a plain OAuth 2.1 AS until you pass an `oidc` config; then it
+is also an **OpenID Provider**. On any request granted the `openid` scope it
+issues a signed `id_token` (carrying `nonce`, `auth_time`, and `at_hash`),
+and it serves `/.well-known/openid-configuration`. Leave `oidc` off and no
+`id_token` is issued and the OIDC discovery document is not served — one
+server, both modes.
+
+```js
+const server = createServer({
+  issuer: 'https://as.example.com',
+  clients,
+  tokens: jwtIssuer({ signingKey, alg: 'ES256' }),
+  authenticateUser: req => resolveLoggedInUser(req), // may return { subject, authTime }
+  oidc: {
+    idToken: { signingKey, alg: 'ES256', kid: 'oidc-1' }, // id_token is always a JWS
+    // userinfoEndpoint, claimsSupported, subjectTypes → advertised in metadata
+  },
+});
+```
+
+<Callout type="info">
+  The `id_token` is always a JWS regardless of the access-token backend, so it
+  has its own signer — a PASETO access-token server still issues JWT id_tokens.
+</Callout>
+
+## Dynamic client registration (RFC 7591)
+
+Opt in with a `registration` config to expose `/register`, where a client
+POSTs its metadata as JSON and receives a minted `client_id` (and, for a
+confidential method, a `client_secret`). It is **initial-access-token gated
+by default** — an open `/register` lets anyone mint clients, so opening it is
+explicit. The registry must be able to persist (`createClientRegistry`
+supports it; a custom registry implements `register`).
+
+```js
+import { createServer, createClientRegistry, jwtIssuer } from '@exortek/oauth2/server';
+
+const server = createServer({
+  issuer: 'https://as.example.com',
+  clients: createClientRegistry([]), // starts empty, grows via /register
+  tokens: jwtIssuer({ signingKey, alg: 'ES256' }),
+  authenticateUser,
+  registration: {
+    initialAccessToken: process.env.REGISTRATION_TOKEN, // required unless `open: true`
+    // open: true,                 // unauthenticated registration (not recommended)
+    // authorize: req => …,        // or a custom gate
+    // defaults: { grantTypes, scope, … },
+  },
+});
+```
+
+```http
+POST /register  Authorization: Bearer <initial-access-token>
+Content-Type: application/json
+
+{ "redirect_uris": ["https://client/cb"], "token_endpoint_auth_method": "client_secret_post" }
+
+→ 201  { "client_id": "…", "client_secret": "…", "client_secret_expires_at": 0, … }
+```
+
+## Modern hardening
+
+<Callout type="info">
+  Every protection is a default, not a flag you remember to set. The FAPI
+  2.0 profile (`security: { fapi: true }`) tightens PAR + PKCE + DPoP/mTLS
+  + `iss` in one switch.
+</Callout>
+
+- **DPoP** (RFC 9449) — sender-constrained tokens via `cnf.jkt`,
+  including the server **nonce challenge** (`security: { dpop: { nonce: true } }`).
+- **PAR** (RFC 9126), **resource indicators** (RFC 8707), **RAR**
+  (RFC 9396), **JAR / JARM** (RFC 9101) — request objects must carry `exp`
+  and are single-use.
+- **Device authorization** (RFC 8628) authenticates confidential clients;
+  introspection reports `token_type: DPoP` for a sender-constrained token.
+- **Client auth** — `none` / `client_secret_basic` / `client_secret_post`
+  / `private_key_jwt` / `client_secret_jwt` (RFC 7523) / mTLS (RFC 8705).
+- **Refresh rotation with reuse detection** — a replayed refresh token
+  burns the whole family (RFC 9700 §4.14).
+
+## Resource-server helper
+
+The protected resource verifies a DPoP-bound token with
+`verifyDpopForResource` — the `ath` (access-token hash) + `cnf.jkt` check
+of RFC 9449 §7:
+
+```js
+import { verifyDpopForResource } from '@exortek/oauth2/server';
+
+await verifyDpopForResource(req.headers.dpop, {
+  htm: req.method,
+  htu: 'https://rs.example.com/resource',
+  accessToken,
+  cnfJkt, // from the token's cnf.jkt claim (or introspection)
+});
+```
+
+## Production stores
+
+The in-memory stores are single-process (batteries included). For a
+cluster, inject the Redis-backed stores behind the identical contract:
+
+```js
+import { createServer } from '@exortek/oauth2/server';
+import {
+  createRedisAuthCodeStore,
+  createRedisRefreshStore,
+  createRedisParStore,
+  createRedisDeviceStore,
+} from '@exortek/oauth2/server';
+
+createServer({
+  /* … */
+  stores: {
+    authCode: createRedisAuthCodeStore(redis),
+    refresh: createRedisRefreshStore(redis),
+    par: createRedisParStore(redis),
+    device: createRedisDeviceStore(redis),
+  },
+});
+```

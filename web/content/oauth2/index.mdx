@@ -1,0 +1,96 @@
+---
+title: '@exortek/oauth2 — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/oauth2`
+
+OAuth 2.1 for Node.js 22+ — both halves of the protocol, secure by
+default. The **relying-party flow** (`createOAuth` + provider presets)
+for logging users in with Google / GitHub / Microsoft / …, and a full
+**authorization server** (`createServer`) for issuing your own tokens.
+
+OAuth's footguns all live in the parts people skip: no PKCE, a `state`
+that is generated but never checked, a `redirect_uri` matched by prefix,
+a token accepted from the wrong issuer. This package makes the
+security-critical bits the default, non-negotiable path — you never
+hand-assemble a login flow out of `crypto.randomBytes` and string
+concatenation.
+
+<Callout type="info">
+  **OAuth 2.1** (`draft-ietf-oauth-v2-1`) folds the mandatory-PKCE /
+  no-implicit-grant / exact-redirect BCPs (RFC 9700) into the base spec.
+  This package tracks that draft.
+</Callout>
+
+Server-only, **zero runtime dependencies**, built on `node:crypto` and
+the `@exortek/*` JOSE stack.
+
+## Install
+
+```bash
+npm install @exortek/oauth2
+```
+
+Optional peers only if you use them: `ioredis` (or `redis`) for the
+Redis-backed authorization-server stores, `express` or `fastify` for the
+mount adapters. Requires **Node.js 22 or newer**.
+
+## At a glance
+
+```js
+import { createOAuth } from '@exortek/oauth2';
+import { google } from '@exortek/oauth2/providers/google';
+
+const oauth = createOAuth({
+  baseUrl: 'https://app.example.com',
+  callback: '/auth/{provider}/callback',
+  providers: [google({ clientId: process.env.GOOGLE_ID, clientSecret: process.env.GOOGLE_SECRET })],
+});
+
+const { url, session } = await oauth.authorize('google'); // redirect the user, stash `session`
+const { user } = await oauth.callback('google', req.query, { session }); // on the callback route
+```
+
+- **[createOAuth](/oauth2/rp-flow)** — the relying-party login flow and
+  the 18 provider presets.
+- **[Login middleware](/oauth2/middleware)** — one-call Express /
+  Fastify routes, `web` and `api` modes for every platform.
+- **[Authorization server](/oauth2/server)** — `createServer`: run your
+  own OAuth 2.1 AS with the modern hardening built in.
+
+## Modules
+
+| Subpath                          | Purpose                                                                 |
+| -------------------------------- | ----------------------------------------------------------------------- |
+| `@exortek/oauth2`                | `createOAuth` RP flow, PKCE, `state` / `nonce`, `OAuth2Error`            |
+| `@exortek/oauth2/providers/*`    | Pre-wired presets (google, github, microsoft, apple, okta, …)           |
+| `@exortek/oauth2/express`        | `mountOAuthLogin` — Express login + callback middleware                  |
+| `@exortek/oauth2/fastify`        | `oauthLoginPlugin` — Fastify login + callback plugin                     |
+| `@exortek/oauth2/server`         | `createServer` + `jwtIssuer` / `pasetoIssuer` + `verifyDpopForResource`  |
+| `@exortek/oauth2/server/express` | `mountOAuth2Server` — mount the AS on Express                            |
+| `@exortek/oauth2/server/fastify` | `oauth2ServerPlugin` — mount the AS on Fastify                           |
+
+## Secure by default
+
+1. **PKCE is mandatory, `S256` only.** `plain` is not implemented — there
+   is no switch that turns the protection off.
+2. **`state` and `nonce` are generated *and* verified.** The round-trip
+   is part of the API, not a checklist item.
+3. **Exact `redirect_uri` and RFC 9207 `iss` matching.** Open-redirect
+   and mix-up attacks are rejected structurally.
+4. **The authorization server ships the modern surface** — DPoP
+   (RFC 9449, incl. the nonce challenge), PAR (RFC 9126), resource
+   indicators (RFC 8707), RAR (RFC 9396), JAR/JARM (RFC 9101),
+   `private_key_jwt` / `client_secret_jwt` (RFC 7523), mTLS (RFC 8705),
+   token exchange (RFC 8693), device grant (RFC 8628), and FAPI 2.0.
+
+## Why not
+
+- **Implicit grant / password grant.** Removed by OAuth 2.1; not a config
+  option here.
+- **`plain` PKCE.** `S256` only.
+- **A browser bundle.** Server-side code; the `redirect_uri` target is
+  your own callback route, not shipped client JS.

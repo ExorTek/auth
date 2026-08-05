@@ -1,0 +1,112 @@
+---
+title: '@exortek/oauth2 — Login middleware'
+sidebarTitle: 'Login middleware'
+---
+
+import { Callout } from 'nextra/components';
+
+# Login middleware
+
+Ready-to-mount login for a `createOAuth` hub — Express and Fastify, same
+config and behaviour. Two interaction modes serve every platform from the
+one backend: `web` (browser redirect + a signed / sealed cookie or the
+`createOAuth` store) and `api` (client-held session for mobile / SPA / CLI,
+RFC 8252 / AppAuth).
+
+## Express
+
+`oauthLogin(config)` returns the `{ start, callback }` handlers — mount
+them on your own routes (the `apiKeyMiddleware` idiom):
+
+```js
+import express from 'express';
+import { oauthLogin } from '@exortek/oauth2/express';
+import { createOAuth } from '@exortek/oauth2';
+import { google } from '@exortek/oauth2/providers/google';
+
+const oauth = createOAuth({
+  baseUrl: 'https://app.example.com',
+  callback: '/auth/{provider}/callback',
+  providers: [google({ clientId: process.env.GOOGLE_ID, clientSecret: process.env.GOOGLE_SECRET })],
+});
+
+const app = express();
+const login = oauthLogin({
+  oauth,
+  cookie: { secret: process.env.SESSION_SECRET },
+  onSuccess: ({ req, res, user }) => res.redirect('/'),
+});
+
+app.get('/auth/:provider', login.start);
+app.get('/auth/:provider/callback', login.callback);
+```
+
+Prefer one call? `mountOAuthLogin` registers both routes for you — it is
+just sugar over `oauthLogin` + `app.get`:
+
+```js
+import { mountOAuthLogin } from '@exortek/oauth2/express';
+
+mountOAuthLogin(app, { oauth, cookie: { secret: process.env.SESSION_SECRET } });
+```
+
+## Fastify
+
+`oauthLoginPlugin` registers the two routes (the `apiKeyPlugin` idiom):
+
+```js
+import Fastify from 'fastify';
+import { oauthLoginPlugin } from '@exortek/oauth2/fastify';
+
+const app = Fastify();
+await app.register(oauthLoginPlugin, {
+  oauth,
+  cookie: { secret: process.env.SESSION_SECRET },
+  onSuccess: ({ request, reply, user }) => reply.redirect('/'),
+});
+```
+
+Route-scoped: the plugin registers exactly two endpoints and nothing
+app-wide — no global hook that runs on the rest of your backend. Want the
+handlers on your own routes instead? `oauthLogin(config)` is exported here
+too, returning `{ start, callback }`.
+
+## `api` mode — mobile / SPA / CLI
+
+Flip `mode: 'api'`: no cookie, the start route returns the opaque session
+as JSON and the client hands it back on the callback (over POST).
+
+```js
+// Express
+const login = oauthLogin({ oauth, mode: 'api', secret: process.env.SESSION_SECRET });
+app.post('/auth/:provider', login.start);       // → { authorizeUrl, session }
+app.post('/auth/:provider/callback', login.callback); // body: { session, ...query } → { user }
+```
+
+<Callout type="info">
+  `login.method` tells you which verb the mode wants (`'get'` for web,
+  `'post'` for api), and `login.loginPath` / `login.callbackPath` carry
+  the configured defaults — handy for mounting dynamically.
+</Callout>
+
+## Options
+
+| Option         | Default                     | Notes                                                    |
+| -------------- | --------------------------- | -------------------------------------------------------- |
+| `oauth`        | —                           | the `createOAuth` hub                                    |
+| `mode`         | `'web'`                     | `'web'` (cookie / store) or `'api'` (client-held)        |
+| `loginPath`    | `/auth/:provider`           | default start route (used by `mountOAuthLogin`)          |
+| `callbackPath` | `/auth/:provider/callback`  | must sit at the `callback` template of `createOAuth`     |
+| `cookie`       | —                           | `{ secret, name, path, secure, sameSite, maxAge }` (web) |
+| `secret`       | —                           | protects the client-held session (`api` mode)            |
+| `seal`         | `'sign'`                    | `'sign'` (HMAC) or `'jwe'` (also encrypts the session)   |
+| `onSuccess`    | redirect / JSON             | `({ req, res, user, tokens })` — Fastify: `{ request, reply, … }` |
+| `onError`      | `next(err)` / 400           | `({ req, res, error })`                                  |
+
+<Callout type="info">
+  `seal: 'jwe'` encrypts the flow session (via `@exortek/jwe`) so the
+  client sees ciphertext — not the `state` / `code_verifier` / `nonce`.
+</Callout>
+
+Runnable Express + Fastify programs live in
+[`packages/oauth2/examples/`](https://github.com/ExorTek/auth/tree/master/packages/oauth2/examples).

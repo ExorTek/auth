@@ -1,0 +1,85 @@
+---
+title: '@exortek/oauth2 — DPoP'
+sidebarTitle: 'DPoP — sender-constrained tokens'
+---
+
+import { Callout } from 'nextra/components';
+
+# DPoP — sender-constrained tokens (RFC 9449)
+
+A stolen bearer token is a bearer token — whoever holds it, uses it. DPoP
+fixes that: the client signs a per-request proof with a private key, and
+the server binds the issued tokens to that key's thumbprint (`cnf.jkt`).
+A token lifted off the wire is then useless without the key.
+
+This is the single biggest 2025–2026 anti-token-theft measure (FAPI 2.0,
+open banking).
+
+## Requiring it
+
+Turn it on server-wide, or per client:
+
+```js
+createServer({
+  /* … */
+  security: { dpop: { required: true } },       // every client must present a proof
+});
+
+// …or just for one client:
+clients: [{ clientId: 'mobile', dpopBoundAccessTokens: true, /* … */ }];
+```
+
+At the token endpoint the proof is validated (type `dpop+jwt`, an
+asymmetric alg, an embedded public JWK, signature, `htm` / `htu`,
+freshness, single-use `jti`) and the issued token carries
+`cnf.jkt` = the key thumbprint. DPoP-bound tokens use the `DPoP` token
+type instead of `Bearer`.
+
+## The nonce challenge
+
+For the strongest anti-replay posture the server can demand a
+server-chosen nonce in the proof (RFC 9449 §8–9):
+
+```js
+security: { dpop: { nonce: true } }
+```
+
+A first request without a valid nonce is answered `400 use_dpop_nonce`
+with a fresh `DPoP-Nonce` header; the client retries with that value as
+the proof's `nonce` claim. The server keeps rotating the nonce, so a
+captured one ages out. The whole handshake is automatic — you only flip
+the flag.
+
+## Resource-server side
+
+The protected resource verifies the proof against the presented access
+token with `verifyDpopForResource` — the `ath` (access-token hash) +
+`cnf.jkt` check of RFC 9449 §7:
+
+```js
+import { verifyDpopForResource } from '@exortek/oauth2/server';
+
+app.get('/orders', async (req, res) => {
+  const { accessToken, cnfJkt } = introspectOrDecode(req); // your token check → its cnf.jkt
+  await verifyDpopForResource(req.headers.dpop, {
+    htm: req.method,
+    htu: 'https://rs.example.com/orders',
+    accessToken,
+    cnfJkt,
+  }); // throws ServerError(invalid_dpop_proof) on a mismatch
+  res.json(await orders(req));
+});
+```
+
+<Callout type="info">
+  `verifyDpopForResource` throws if the proof is missing, the `ath` does
+  not hash to this exact token, or the proving key is not the one the
+  token was issued to — the three ways a lifted token + forged proof fail.
+</Callout>
+
+## PAR pre-binding
+
+A DPoP proof sent at the PAR endpoint pre-binds the eventual code to the
+client key via `dpop_jkt` (RFC 9449 §10.1). The proof's `htu` must be the
+PAR endpoint — the server checks each proof against the endpoint it was
+actually sent to.

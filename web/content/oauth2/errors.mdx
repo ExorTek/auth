@@ -1,0 +1,51 @@
+---
+title: '@exortek/oauth2 — Errors'
+sidebarTitle: 'errors — OAuth2Error'
+---
+
+# Errors
+
+## Relying-party flow — `OAuth2Error`
+
+Every failure in the `createOAuth` flow throws `OAuth2Error` with a
+stable `code` (from `ErrorCode`) and an HTTP `status`. Branch on `code`,
+never on the message.
+
+```js
+import { OAuth2Error, ErrorCode } from '@exortek/oauth2';
+
+try {
+  await oauth.callback('google', req.query, { session });
+} catch (err) {
+  if (!(err instanceof OAuth2Error)) throw err;
+  switch (err.code) {
+    case ErrorCode.STATE_MISMATCH:   // forged / replayed callback
+    case ErrorCode.SESSION_EXPIRED:  // flow session older than maxAuthAge
+    case ErrorCode.ISSUER_MISMATCH:  // RFC 9207 iss did not match
+    case ErrorCode.NONCE_MISMATCH:   // OIDC replay nonce mismatch
+      return res.status(400).send('login failed');
+    default:
+      throw err;
+  }
+}
+```
+
+Callback-validation failures (`STATE_MISMATCH`, `ISSUER_MISMATCH`,
+`NONCE_MISMATCH`, `SESSION_EXPIRED`, …) map to `400`; upstream failures
+talking to the provider (`TOKEN_EXCHANGE_FAILED`, `USERINFO_FAILED`,
+`DISCOVERY_FAILED`, `NETWORK_ERROR`) map to `502`.
+
+## Authorization server — `ServerError` / `ProtocolError`
+
+The `createServer` handlers never throw at the transport boundary — they
+return the RFC 6749 §5.2 wire shape (`{ error, error_description }`) with
+the right status and, for `invalid_client`, a `WWW-Authenticate`
+challenge. Internally they raise `ServerError` with a `ProtocolError`
+code (`invalid_request`, `invalid_grant`, `unauthorized_client`,
+`invalid_dpop_proof`, `use_dpop_nonce`, `unsupported_token_type`, …). An
+unexpected throw is masked as `server_error` at the adapter boundary — no
+stack trace leaks to the client.
+
+```js
+import { ServerError, ProtocolError } from '@exortek/oauth2/server';
+```

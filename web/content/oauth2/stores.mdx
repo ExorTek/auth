@@ -1,0 +1,74 @@
+---
+title: '@exortek/oauth2 — Stores'
+sidebarTitle: 'Stores — memory & Redis'
+---
+
+import { Callout } from 'nextra/components';
+
+# Stores
+
+The authorization server keeps four kinds of short-lived state:
+authorization codes, the refresh-token family, PAR request objects, and
+device-flow records. Each is a swappable store behind a small contract.
+
+## Defaults — in-memory
+
+Omit `stores` and you get in-memory defaults: single-use records on a TTL
+with a background sweep, the refresh family with rotation + reuse
+detection. Perfect for a single process.
+
+<Callout type="warning">
+  The in-memory stores are **single-process** by design. Two nodes behind
+  a load balancer would each have their own map — a code issued on one
+  could not be redeemed on the other. For a cluster, bring Redis.
+</Callout>
+
+## Redis — cluster-safe
+
+Inject the Redis-backed stores behind the identical contract. State lives
+in Redis, so a code issued on one node redeems on any other.
+
+```js
+import { createServer } from '@exortek/oauth2/server';
+import {
+  createRedisAuthCodeStore,
+  createRedisRefreshStore,
+  createRedisParStore,
+  createRedisDeviceStore,
+} from '@exortek/oauth2/server';
+import { createClient } from 'redis';
+
+const redis = createClient({ url: process.env.REDIS_URL });
+await redis.connect();
+
+createServer({
+  /* … */
+  stores: {
+    authCode: createRedisAuthCodeStore(redis),
+    refresh: createRedisRefreshStore(redis),
+    par: createRedisParStore(redis),
+    device: createRedisDeviceStore(redis),
+  },
+});
+```
+
+Works with any client exposing `get / set / del / mget / sadd / srem /
+smembers` — `ioredis`, `node-redis@4+`, and `@upstash/redis` are the
+verified targets. Pass `{ keyPrefix }` to namespace the keys.
+
+## Bring your own
+
+Any object satisfying a store's contract works — a SQL table, a KV
+service, whatever. `createServer` validates the shape at construction, so
+a store missing a method is caught immediately rather than at the first
+request. The four contracts:
+
+| Store      | Methods                                                   |
+| ---------- | -------------------------------------------------------- |
+| `authCode` | `save(code, record, ttl)` · `consume(code)`              |
+| `refresh`  | `save(record)` · `get(token)` · `rotate(old, next)` · `revokeFamily(familyId)` |
+| `par`      | `save(uri, params, ttl)` · `consume(uri)`                |
+| `device`   | `save(record, ttl)` · `getByDeviceCode` · `getByUserCode` · `update` |
+
+Every method may be sync or return a Promise — a Redis-backed
+(Promise-returning) store drops in unchanged.

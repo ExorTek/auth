@@ -171,6 +171,21 @@ never transmit plaintext passwords over the network.
 | RFC 7009 §2.1    | Revocation endpoint MUST authenticate the client                   |   🟡   | Same as introspection — gated by the app                                                         |
 | RFC 6749 §1.4    | Opaque access tokens (bearer, unstructured)                        |   ✅    | `generate` / `create` / `verify` / `revoke`, only the hash lives in the store                    |
 
+## OAuth 2.1 authorization + login (`@exortek/oauth2`)
+
+| §                | Requirement                                                        | Status | How                                                                                              |
+|------------------|--------------------------------------------------------------------|:------:|--------------------------------------------------------------------------------------------------|
+| OAuth 2.1 / RFC 9700 | PKCE required on the code grant, `S256` only                   |   ✅    | PKCE is mandatory and non-configurable; `plain` is not implemented                              |
+| RFC 9700 §4      | Exact `redirect_uri` matching (no prefix / wildcard)               |   ✅    | Registered URIs are exact-matched; a mismatch is never redirected (open-redirect lever)          |
+| RFC 9207         | `iss` returned on the authorization response; verified on callback |   ✅    | AS always returns `iss`; the RP verifies it (string or multi-tenant validator) against mix-up    |
+| RFC 7636         | PKCE code challenge / verifier                                     |   ✅    | `createPkcePair` / `verifyChallenge`, constant-time `S256`                                        |
+| RFC 9449         | DPoP sender-constrained tokens (`cnf.jkt`) + nonce challenge       |   ✅    | Proof validation, `cnf.jkt` binding, `use_dpop_nonce`, and `verifyDpopForResource` for the RS    |
+| RFC 9126         | Pushed Authorization Requests (PAR)                                |   ✅    | `/par` endpoint; per-client / server-wide `require`                                              |
+| RFC 9068         | JWT profile access tokens (`at+jwt`)                               |   ✅    | `jwtIssuer` (default); introspection refuses any non-`at+jwt` typ                                 |
+| RFC 7523 / 8705  | `private_key_jwt` / `client_secret_jwt` / mTLS client auth         |   ✅    | Assertion `exp` required + lifetime-bounded, single-use `jti`; certificate-bound `cnf`            |
+| RFC 7009 / 7662  | Revocation + introspection, no cross-client oracle                 |   ✅    | Revoke is idempotent; introspection denies cross-client by default (`allowCrossClient` opt-in)   |
+| FAPI 2.0         | PAR + PKCE + DPoP/mTLS + `iss` in one profile                      |   ✅    | `security: { fapi: true }` tightens the defaults together                                         |
+
 ## Summary — what we ship today
 
 - ✅ **NIST SP 800-63B AAL2** — memorized secret + OOB OTP paths
@@ -181,6 +196,10 @@ never transmit plaintext passwords over the network.
   (CSPRNG ids, `__Host-` cookies, server-side revocation, rotation)
 - ✅ **RFC 7662 / RFC 7009 OAuth 2 introspection + revocation** —
   `@exortek/opaque`, framework-agnostic handlers (see table above)
+- ✅ **OAuth 2.1 / RFC 9700 + the modern extension stack** —
+  `@exortek/oauth2` (mandatory PKCE, `iss`, DPoP incl. nonce, PAR,
+  RAR, JAR/JARM, resource indicators, token exchange, device grant,
+  FAPI 2.0; RP flow + authorization server; see table above)
 - ✅ **ASVS V2.9 cryptographic authenticators** — `@exortek/passkey`
   (WebAuthn L3 / FIDO2 CTAP2 server verification, all seven
   attestation formats)

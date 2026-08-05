@@ -1,0 +1,18 @@
+name: 'CodeQL config'
+
+# Scope ANALYSIS to the shipped library source only. This is what actually
+# controls what CodeQL extracts and reports on — the workflow's
+# `on.*.paths-ignore` only decides whether the workflow runs, not what it
+# scans. Allowlisting `packages/*/src` means tests, examples, built `dist`,
+# the docs site (`web/`), build tooling, and scripts are never analysed, so
+# findings only ever come from code that actually ships.
+paths:
+  - 'packages/*/src'
+
+# Belt-and-braces: even under `src`, a test file colocated with source (should
+# not happen given the layout, but harmless) is not shipped code.
+paths-ignore:
+  - '**/*.test.js'
+
+queries:
+  - uses: security-and-quality

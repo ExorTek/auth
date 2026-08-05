@@ -18,6 +18,7 @@ export default {
   opaque: '@exortek/opaque',
   passkey: '@exortek/passkey',
   paseto: '@exortek/paseto',
+  oauth2: '@exortek/oauth2',
   comparison: 'Comparison',
   compliance: 'Compliance',
 };

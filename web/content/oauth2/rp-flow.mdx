@@ -1,0 +1,94 @@
+---
+title: '@exortek/oauth2 — createOAuth'
+sidebarTitle: 'createOAuth — the login flow'
+---
+
+import { Callout } from 'nextra/components';
+
+# `createOAuth` — the relying-party flow
+
+`createOAuth` is the high-level "log in with a provider" flow — the
+`passport` replacement. You bring the provider presets and a callback
+route; it owns the PKCE / `state` / `nonce` round-trip and hands you the
+resolved user.
+
+```js
+import { createOAuth } from '@exortek/oauth2';
+import { google } from '@exortek/oauth2/providers/google';
+import { github } from '@exortek/oauth2/providers/github';
+
+const oauth = createOAuth({
+  baseUrl: 'https://app.example.com',
+  callback: '/auth/{provider}/callback',
+  providers: [
+    google({ clientId: process.env.GOOGLE_ID, clientSecret: process.env.GOOGLE_SECRET }),
+    github({ clientId: process.env.GITHUB_ID, clientSecret: process.env.GITHUB_SECRET }),
+  ],
+});
+```
+
+## The two calls
+
+```js
+// 1. Start the flow — redirect the user, stash the opaque session.
+const { url, session, warnings } = await oauth.authorize('google', { scope: ['email'] });
+
+// 2. Finish on the callback route — hand back the session + query params.
+const { user, tokens } = await oauth.callback('google', req.query, { session });
+```
+
+`authorize` returns the provider `url` to redirect to and an opaque
+`session` string carrying the `state`, PKCE `code_verifier`, and OIDC
+`nonce`. Stash it (a signed cookie, or the configured `store`) and give
+it back to `callback`, which verifies the whole round-trip before
+exchanging the code.
+
+<Callout type="warning">
+  The `session` is the CSRF/PKCE binding for the flow. Bind it to the
+  initiating browser (cookie or `sessionBinding`) — a captured session
+  replayed from elsewhere is exactly what `state` defends against.
+</Callout>
+
+## Server-side session store
+
+Pass a `store` (keyed by `state`) and `callback` looks the session up on
+its own — no client-held cookie needed. The session is single-use: a
+replayed callback finds it gone.
+
+```js
+const oauth = createOAuth({
+  baseUrl,
+  callback,
+  providers,
+  store: { set, get, delete: del }, // your Redis / DB adapter
+  security: { maxAuthAge: '10m' },  // a captured session past this is rejected
+});
+
+const { user } = await oauth.callback('google', req.query); // no `session` — looked up by state
+```
+
+## Providers
+
+Every preset pre-wires the endpoints, default scopes, and userinfo
+mapping. Import the ones you use from their subpath:
+
+| Preset                              | Import                                    |
+| ----------------------------------- | ----------------------------------------- |
+| Google, GitHub, Discord, Facebook   | `@exortek/oauth2/providers/<name>`        |
+| LinkedIn, Spotify, Twitch, Twitter  | `@exortek/oauth2/providers/<name>`        |
+| Microsoft / Azure Entra, Apple, Okta | `@exortek/oauth2/providers/<name>`       |
+
+Multi-tenant providers (Entra `common` / `organizations` / `consumers`,
+Okta domains) validate the `iss` with a tenant-aware matcher, never left
+unchecked. Pass an `{ id }` override to register the same provider twice
+for different tenants.
+
+## Refresh & revoke
+
+```js
+const fresh = await oauth.refresh('google', refreshToken); // RFC 6749 §6
+await oauth.revoke('google', token, 'access_token');       // RFC 7009
+```
+
+See **[Login middleware](/oauth2/middleware)** to wire the routes without
+touching `authorize` / `callback` by hand.

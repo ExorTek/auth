@@ -32,23 +32,37 @@ These are the invariants — expect PRs that violate them to be rejected.
 Every package depends on `node:crypto` and its declared peer dependencies —
 nothing else, with no external-dependency exceptions.
 
-### 2. Fully standalone packages (with one sanctioned exception)
+### 2. Fully standalone packages (with sanctioned exceptions)
 
-**New packages do not import from another `@exortek/*` package at runtime.**
+**Leaf packages do not import from another `@exortek/*` package at runtime.**
 Utility duplication (a `base64url` helper in every JOSE package, an
-`ErrorCode` enum per package) is accepted deliberately. A user who installs
-a single package pulls no workspace peers.
+`ErrorCode` enum per package) is accepted deliberately, and the private
+`@exortek/shared` workspace is **bundled** into each package's `dist` rather
+than published — so a user who installs a leaf package pulls no workspace
+peers.
 
-The one sanctioned exception is `@exortek/session`, which imports `seal`,
-`unseal`, and `CryptoError` from `@exortek/crypto`. It was written before
-the standalone policy was formalised and the sealed-cookie primitive was
-too surface-heavy to duplicate. Session's `package.json` declares
-`@exortek/crypto` as a runtime dependency, and installing session pulls
-crypto with it — call this out to anyone marketing "zero dependencies"
-downstream.
+The sanctioned exceptions are packages that compose the published stack and
+cannot reasonably re-bundle it:
+
+- `@exortek/session` imports `seal` / `unseal` / `CryptoError` from
+  `@exortek/crypto`.
+- `@exortek/jwks` imports `@exortek/jwk`.
+- `@exortek/oauth2` composes the JOSE stack — it declares `@exortek/jwt`,
+  `@exortek/jwks`, `@exortek/jwk`, `@exortek/jws`, `@exortek/jwe`, and
+  `@exortek/paseto` as runtime dependencies. Bundling them would duplicate
+  class identities (a bundled `JwtError` would not be `instanceof` a
+  consumer's own `@exortek/jwt`) and bloat every entry, so they are
+  externalised and declared instead.
+
+Each such package declares those `@exortek/*` packages in its `package.json`,
+so installing it pulls them with it — call this out to anyone marketing "zero
+dependencies" downstream. Everything a package uses from the private
+`@exortek/shared` is still bundled, so no unpublished package is ever a
+runtime import.
 
 Every other shipped package (`crypto`, `otp`, `password`, `security`, `jwk`,
-`jws` at time of writing) is fully standalone at runtime.
+`jws`, `jwt`, `jwe`, `paseto` at time of writing) is fully standalone at
+runtime.
 
 The dependency graph below tells you the *semantic* order, not the runtime
 import graph. It is preserved so package authors know which package is
@@ -109,7 +123,7 @@ Status legend: ✅ shipped to npm · 🛠 on disk, pre-release · ⏳ planned.
 | 15 | `@exortek/passkey`     |   ✅   | WebAuthn Level 3 / FIDO2 server — all seven attestation formats + MDS3 + AAGUID   |
 | 16 | `@exortek/opaque`      |   ✅   | Opaque reference tokens, RFC 7662 introspection + RFC 7009 revocation                |
 | 17 | `@exortek/paseto`      |   ✅   | PASETO v4 — `v4.local` (XChaCha20 + keyed BLAKE2b) + `v4.public` (Ed25519), no `alg` header |
-| 18 | `@exortek/oauth2`      |   ⏳   | OAuth 2.1 client (PKCE) + provider presets                                          |
+| 18 | `@exortek/oauth2`      |   ✅   | OAuth 2.1 — RP flow + provider presets + full authorization server (DPoP · PAR · JAR/JARM · device · token-exchange · dynamic registration · opt-in OIDC id_token · FAPI) |
 | 19 | `@exortek/oidc`        |   ⏳   | OpenID Connect on top of `@exortek/oauth2`                                          |
 | 20 | `@exortek/auth`        |   ⏳   | Umbrella — re-exports every package above                                          |
 
@@ -127,7 +141,7 @@ crypto
    │
    ├─── opaque, paseto, password, otp
    │
-   ├─── magic-link, passkey, session, device
+   ├─── magic-link, passkey, session, ua
    │
    ├─── security (csrf, rate-limit, headers, cors, redirect)
    │
@@ -245,7 +259,7 @@ Where each protocol is anchored:
 | `paseto`        | PASETO v4 (paseto.io spec), RFC 6749 §10.4 (refresh reuse), RFC 7693 (BLAKE2b) |
 | `session`       | OWASP ASVS 4.0.3 V3, RFC 6265 (Cookies)                                       |
 | `security`      | OWASP ASVS 4.0.3 V13 / V14, RFC 6749 §10 (OAuth2 threats), RFC 7231 §5 (HTTP) |
-| `oauth2`        | _(planned)_ RFC 6749, RFC 7636 (PKCE), RFC 9126 (PAR), RFC 8414 (metadata), RFC 8628 (device) |
+| `oauth2`        | OAuth 2.1 / RFC 9700 (BCP), RFC 6749, RFC 7636 (PKCE), RFC 9207 (iss), RFC 8414 (metadata), RFC 9449 (DPoP), RFC 9126 (PAR), RFC 8707 (resource), RFC 9396 (RAR), RFC 9101 (JAR/JARM), RFC 7523 / 8705 (client auth), RFC 8693 (exchange), RFC 8628 (device), RFC 7591 (dynamic registration), RFC 9068 (JWT profile), OpenID Connect Core (id_token, opt-in OP mode), FAPI 2.0 |
 | `oidc`          | _(planned)_ OpenID Connect Core 1.0, OpenID Connect Discovery |
 | `passkey`       | W3C WebAuthn Level 3, FIDO2 CTAP2                                             |
 

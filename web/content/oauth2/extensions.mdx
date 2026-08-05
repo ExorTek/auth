@@ -1,0 +1,94 @@
+---
+title: '@exortek/oauth2 — Extensions'
+sidebarTitle: 'Extensions — PAR · RAR · JAR · device'
+---
+
+import { Callout } from 'nextra/components';
+
+# Extensions
+
+The modern OAuth extension surface, all on by default where it is a pure
+security win and opt-in where it changes the request shape.
+
+## PAR — Pushed Authorization Requests (RFC 9126)
+
+The client POSTs the authorization parameters through the authenticated
+back channel and gets a `request_uri` to use at `/authorize`, so the
+params never ride the front channel or browser history.
+
+```js
+security: { par: { required: true } }         // server-wide
+// or per client: requirePushedAuthorizationRequests: true
+```
+
+`POST /par` → `{ request_uri, expires_in }`; the front-channel request
+then carries only `request_uri`. When PAR is required, a plain
+front-channel request is refused.
+
+## Resource indicators (RFC 8707)
+
+The client names the resource server(s) it wants a token for; the issued
+token's `aud` is scoped to them.
+
+```
+GET /authorize?…&resource=https://api.example.com
+```
+
+## RAR — Rich Authorization Requests (RFC 9396)
+
+Fine-grained `authorization_details` (e.g. a payment of a specific
+amount) instead of coarse scopes. Declare the accepted types:
+
+```js
+createServer({ /* … */, authorizationDetailsTypes: ['payment'] });
+```
+
+The details are validated up front and reflected into the token.
+
+## JAR / JARM (RFC 9101)
+
+**JAR** — the request is a signed JWT (`request` / `request_uri`), so the
+parameters are integrity-protected. **JARM** — the authorization
+*response* is a signed JWT (`response_mode=jwt`), so `code` / `state`
+cannot be tampered with in the redirect.
+
+```js
+createServer({ /* … */, jarm: { alg: 'ES256' } }); // advertise + sign JARM responses
+```
+
+<Callout type="info">
+  With `jarm` configured, the metadata advertises
+  `response_modes_supported: ['query', 'jwt']` and an unknown
+  `response_mode` is rejected rather than silently downgraded.
+</Callout>
+
+## Device grant (RFC 8628)
+
+For input-constrained devices (TVs, CLIs). The device polls while the
+user approves on a second screen.
+
+```js
+createServer({ /* … */, device: { verificationUri: 'https://example.com/activate' } });
+
+// Your verification page drives the approval API:
+await server.device.approve(userCode, { subject: 'user-1' });
+await server.device.deny(userCode);
+```
+
+`user_code`s are drawn with rejection sampling from an unambiguous
+alphabet (no `0`/`O`/`1`/`I`), so every code is uniformly likely.
+
+## Token exchange (RFC 8693)
+
+Trade one token for another (delegation / impersonation) via
+`grant_type=urn:ietf:params:oauth:grant-type:token-exchange`. The
+presented `subject_token` is validated through the same introspection
+path, so an `id_token` or JARM response can't be swapped in.
+
+## FAPI 2.0
+
+One switch tightens the whole set — PAR + PKCE + DPoP/mTLS + `iss`:
+
+```js
+security: { fapi: true }
+```

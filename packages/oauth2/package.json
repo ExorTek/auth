@@ -1,0 +1,214 @@
+{
+  "name": "@exortek/oauth2",
+  "version": "0.0.0",
+  "description": "OAuth 2.1 for Node.js 22+ — both halves, secure by default. The relying-party flow (createOAuth + provider presets, mandatory PKCE / state / nonce / iss) and a full authorization server (DPoP incl. nonce, PAR, JAR/JARM, resource indicators, device grant, token exchange, FAPI 2.0) over JWT or PASETO. Server-only, zero non-@exortek/* runtime dependencies, built on node:crypto.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./express": {
+      "types": "./dist/middleware/express.d.ts",
+      "import": "./dist/express.mjs",
+      "require": "./dist/express.cjs"
+    },
+    "./fastify": {
+      "types": "./dist/middleware/fastify.d.ts",
+      "import": "./dist/fastify.mjs",
+      "require": "./dist/fastify.cjs"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.mjs",
+      "require": "./dist/server/index.cjs"
+    },
+    "./server/express": {
+      "types": "./dist/server/middleware/express.d.ts",
+      "import": "./dist/server/express.mjs",
+      "require": "./dist/server/express.cjs"
+    },
+    "./server/fastify": {
+      "types": "./dist/server/middleware/fastify.d.ts",
+      "import": "./dist/server/fastify.mjs",
+      "require": "./dist/server/fastify.cjs"
+    },
+    "./providers/google": {
+      "types": "./dist/providers/google.d.ts",
+      "import": "./dist/providers/google.mjs",
+      "require": "./dist/providers/google.cjs"
+    },
+    "./providers/github": {
+      "types": "./dist/providers/github.d.ts",
+      "import": "./dist/providers/github.mjs",
+      "require": "./dist/providers/github.cjs"
+    },
+    "./providers/microsoft": {
+      "types": "./dist/providers/microsoft.d.ts",
+      "import": "./dist/providers/microsoft.mjs",
+      "require": "./dist/providers/microsoft.cjs"
+    },
+    "./providers/discord": {
+      "types": "./dist/providers/discord.d.ts",
+      "import": "./dist/providers/discord.mjs",
+      "require": "./dist/providers/discord.cjs"
+    },
+    "./providers/facebook": {
+      "types": "./dist/providers/facebook.d.ts",
+      "import": "./dist/providers/facebook.mjs",
+      "require": "./dist/providers/facebook.cjs"
+    },
+    "./providers/linkedin": {
+      "types": "./dist/providers/linkedin.d.ts",
+      "import": "./dist/providers/linkedin.mjs",
+      "require": "./dist/providers/linkedin.cjs"
+    },
+    "./providers/spotify": {
+      "types": "./dist/providers/spotify.d.ts",
+      "import": "./dist/providers/spotify.mjs",
+      "require": "./dist/providers/spotify.cjs"
+    },
+    "./providers/twitch": {
+      "types": "./dist/providers/twitch.d.ts",
+      "import": "./dist/providers/twitch.mjs",
+      "require": "./dist/providers/twitch.cjs"
+    },
+    "./providers/apple": {
+      "types": "./dist/providers/apple.d.ts",
+      "import": "./dist/providers/apple.mjs",
+      "require": "./dist/providers/apple.cjs"
+    },
+    "./providers/twitter": {
+      "types": "./dist/providers/twitter.d.ts",
+      "import": "./dist/providers/twitter.mjs",
+      "require": "./dist/providers/twitter.cjs"
+    },
+    "./providers/okta": {
+      "types": "./dist/providers/okta.d.ts",
+      "import": "./dist/providers/okta.mjs",
+      "require": "./dist/providers/okta.cjs"
+    },
+    "./providers/azure": {
+      "types": "./dist/providers/azure.d.ts",
+      "import": "./dist/providers/azure.mjs",
+      "require": "./dist/providers/azure.cjs"
+    },
+    "./providers/gitlab": {
+      "types": "./dist/providers/gitlab.d.ts",
+      "import": "./dist/providers/gitlab.mjs",
+      "require": "./dist/providers/gitlab.cjs"
+    },
+    "./providers/bitbucket": {
+      "types": "./dist/providers/bitbucket.d.ts",
+      "import": "./dist/providers/bitbucket.mjs",
+      "require": "./dist/providers/bitbucket.cjs"
+    },
+    "./providers/slack": {
+      "types": "./dist/providers/slack.d.ts",
+      "import": "./dist/providers/slack.mjs",
+      "require": "./dist/providers/slack.cjs"
+    },
+    "./providers/reddit": {
+      "types": "./dist/providers/reddit.d.ts",
+      "import": "./dist/providers/reddit.mjs",
+      "require": "./dist/providers/reddit.cjs"
+    },
+    "./providers/amazon": {
+      "types": "./dist/providers/amazon.d.ts",
+      "import": "./dist/providers/amazon.mjs",
+      "require": "./dist/providers/amazon.cjs"
+    },
+    "./providers/salesforce": {
+      "types": "./dist/providers/salesforce.d.ts",
+      "import": "./dist/providers/salesforce.mjs",
+      "require": "./dist/providers/salesforce.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "prepack": "cp ../../LICENSE ./LICENSE"
+  },
+  "keywords": [
+    "backend",
+    "security",
+    "oauth",
+    "oauth2",
+    "oauth2.1",
+    "oidc",
+    "openid",
+    "pkce",
+    "dpop",
+    "par",
+    "jarm",
+    "fapi",
+    "device-flow",
+    "token-exchange",
+    "authorization-server",
+    "authorization-code",
+    "sso",
+    "social-login",
+    "authentication",
+    "node-crypto"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/oauth2#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git",
+    "directory": "packages/oauth2"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "dependencies": {
+    "@exortek/jwe": "workspace:^",
+    "@exortek/jwk": "workspace:^",
+    "@exortek/jwks": "workspace:^",
+    "@exortek/jws": "workspace:^",
+    "@exortek/jwt": "workspace:^",
+    "@exortek/paseto": "workspace:^"
+  },
+  "peerDependencies": {
+    "express": ">=4.0.0",
+    "fastify": ">=4.0.0",
+    "ioredis": ">=5.0.0",
+    "redis": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    },
+    "ioredis": {
+      "optional": true
+    },
+    "redis": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

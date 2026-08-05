@@ -1,0 +1,129 @@
+---
+title: '@exortek/oauth2 — Cookbook'
+sidebarTitle: Cookbook
+---
+
+import { Callout } from 'nextra/components';
+
+# Cookbook
+
+End-to-end recipes. A fully runnable, browser-clickable version of the
+first two (a stub provider so no real credentials are needed) lives in
+[`packages/oauth2/examples/demo-local.mjs`](https://github.com/ExorTek/auth/tree/master/packages/oauth2/examples).
+
+## 1. "Log in with Google" on Express
+
+```js
+import express from 'express';
+import { createOAuth } from '@exortek/oauth2';
+import { google } from '@exortek/oauth2/providers/google';
+import { oauthLogin } from '@exortek/oauth2/express';
+
+const oauth = createOAuth({
+  baseUrl: 'https://app.example.com',
+  callback: '/auth/{provider}/callback',
+  providers: [google({ clientId: process.env.GOOGLE_ID, clientSecret: process.env.GOOGLE_SECRET })],
+});
+
+const app = express();
+const login = oauthLogin({
+  oauth,
+  cookie: { secret: process.env.SESSION_SECRET },
+  onSuccess: async ({ req, res, user }) => {
+    req.session.userId = await upsertUser(user); // your session
+    res.redirect('/');
+  },
+});
+
+app.get('/auth/:provider', login.start);
+app.get('/auth/:provider/callback', login.callback);
+```
+
+## 2. Native app / SPA login (`api` mode)
+
+The client holds the flow session — no cookie.
+
+```js
+const login = oauthLogin({ oauth, mode: 'api', secret: process.env.SESSION_SECRET });
+app.post('/auth/:provider', login.start);        // → { authorizeUrl, session }
+app.post('/auth/:provider/callback', login.callback); // body { session, ...query } → { user }
+```
+
+The app opens `authorizeUrl` in a system browser (RFC 8252), keeps
+`session`, and posts it back with the callback params.
+
+## 3. Run your own authorization server
+
+```js
+import { createServer, jwtIssuer } from '@exortek/oauth2/server';
+import { mountOAuth2Server } from '@exortek/oauth2/server/express';
+
+const server = createServer({
+  issuer: 'https://as.example.com',
+  clients: [{ clientId: 'spa', tokenEndpointAuthMethod: 'none', redirectUris: ['https://spa.example.com/cb'] }],
+  tokens: jwtIssuer({ signingKey, alg: 'ES256' }),
+  authenticateUser: req => resolveLoggedInUser(req),
+});
+
+mountOAuth2Server(app, server);
+```
+
+## 4. Lock it down for a bank (FAPI 2.0 + DPoP nonce)
+
+```js
+createServer({
+  issuer,
+  tokens,
+  authenticateUser,
+  clients,
+  security: {
+    fapi: true,                 // PAR + PKCE + DPoP/mTLS + iss, together
+    dpop: { nonce: true },      // add the server nonce challenge
+  },
+});
+```
+
+## 5. Protect a resource with a DPoP-bound token
+
+```js
+import { verifyDpopForResource } from '@exortek/oauth2/server';
+
+app.get('/orders', async (req, res, next) => {
+  try {
+    const claims = await introspect(req); // → { active, cnf: { jkt } }
+    if (!claims.active) return res.sendStatus(401);
+    await verifyDpopForResource(req.headers.dpop, {
+      htm: req.method,
+      htu: 'https://rs.example.com/orders',
+      accessToken: bearerOf(req),
+      cnfJkt: claims.cnf.jkt,
+    });
+    res.json(await orders(claims.sub));
+  } catch (err) {
+    next(err);
+  }
+});
+```
+
+## 6. Go multi-node (Redis stores)
+
+```js
+import { createRedisAuthCodeStore, createRedisRefreshStore, createRedisParStore, createRedisDeviceStore }
+  from '@exortek/oauth2/server';
+
+createServer({
+  /* … */
+  stores: {
+    authCode: createRedisAuthCodeStore(redis),
+    refresh: createRedisRefreshStore(redis),
+    par: createRedisParStore(redis),
+    device: createRedisDeviceStore(redis),
+  },
+});
+```
+
+<Callout type="info">
+  Every recipe keeps the security defaults — PKCE, `state` / `nonce`,
+  exact redirect + `iss` matching — with no extra wiring. You add
+  hardening, never re-add the basics.
+</Callout>

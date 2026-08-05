@@ -147,6 +147,17 @@ never transmit plaintext passwords over the network.
 | RFC 7009 §2.1    | Revocation endpoint MUST authenticate the client                   |   🟡   | Same as introspection — gated by the app                                                         |
 | RFC 6749 §1.4    | Opaque access tokens (bearer, unstructured)                        |   ✅    | `generate` / `create` / `verify` / `revoke`, only the hash lives in the store                    |
 
+## OAuth 2.1 authorization + login (`@exortek/oauth2`)
+
+| §                | Requirement                                                        | Status | How                                                                                              |
+|------------------|--------------------------------------------------------------------|:------:|--------------------------------------------------------------------------------------------------|
+| OAuth 2.1 / RFC 9700 | PKCE required on the code grant, `S256` only                   |   ✅    | PKCE is mandatory and non-configurable; `plain` is not implemented                              |
+| RFC 9207         | `iss` returned + verified on callback (mix-up defense)             |   ✅    | AS always returns `iss`; RP verifies string or multi-tenant validator                            |
+| RFC 9449         | DPoP sender-constrained tokens + nonce challenge                  |   ✅    | `cnf.jkt` binding, `use_dpop_nonce`, `verifyDpopForResource` for the RS                           |
+| RFC 9126 / 9068  | PAR + JWT-profile (`at+jwt`) access tokens                         |   ✅    | `/par` endpoint; `jwtIssuer` default, non-`at+jwt` refused on introspection                       |
+| RFC 7523 / 8705  | `private_key_jwt` / `client_secret_jwt` / mTLS client auth         |   ✅    | Assertion `exp` required + lifetime-bounded, single-use `jti`; certificate-bound `cnf`            |
+| FAPI 2.0         | PAR + PKCE + DPoP/mTLS + `iss` in one profile                      |   ✅    | `security: { fapi: true }`                                                                        |
+
 ## Summary
 
 - ✅ **NIST SP 800-63B AAL2** — memorized secret + OOB OTP paths
@@ -157,6 +168,9 @@ never transmit plaintext passwords over the network.
   (CSPRNG ids, `__Host-` cookies, server-side revocation, rotation)
 - ✅ **RFC 7662 / RFC 7009 OAuth 2 introspection + revocation** —
   `@exortek/opaque`, framework-agnostic handlers (see table above)
+- ✅ **OAuth 2.1 / RFC 9700 + the modern extension stack** —
+  `@exortek/oauth2` (mandatory PKCE, `iss`, DPoP incl. nonce, PAR,
+  RAR, JAR/JARM, token exchange, device grant, FAPI 2.0)
 - ✅ **ASVS V2.9 cryptographic authenticators** — `@exortek/passkey`
   (WebAuthn L3 / FIDO2 CTAP2 server verification)
 - ✅ **RFC 7516 JSON Web Encryption (JWE)** — `@exortek/jwe`
