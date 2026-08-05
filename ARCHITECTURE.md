@@ -127,7 +127,7 @@ crypto
    │
    ├─── opaque, paseto, password, otp
    │
-   ├─── magic-link, passkey, session, device
+   ├─── magic-link, passkey, session, ua
    │
    ├─── security (csrf, rate-limit, headers, cors, redirect)
    │
