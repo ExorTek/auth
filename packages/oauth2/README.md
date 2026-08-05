@@ -103,25 +103,33 @@ const { user } = await oauth.callback('google', req.query, { session });
 platform from one backend, `mode: 'web'` (browser redirect + signed/sealed
 cookie or store) or `mode: 'api'` (client-held session for mobile / SPA).
 
-```js
-import { mountOAuthLogin } from '@exortek/oauth2/express';
+`oauthLogin` returns the `{ start, callback }` handlers — drop them on your
+own routes (the same factory idiom as `apiKeyMiddleware`):
 
-mountOAuthLogin(app, {
+```js
+import { oauthLogin } from '@exortek/oauth2/express';
+
+const login = oauthLogin({
   oauth,
-  mode: 'web',
   cookie: { secret: process.env.SESSION_SECRET }, // signs the flow session; `seal: 'jwe'` also encrypts it
-  callbackPath: '/auth/:provider/callback', // must match createOAuth's `callback` template
   onSuccess: ({ req, res, user }) => res.redirect('/'),
 });
+
+app.get('/auth/:provider', login.start);
+app.get('/auth/:provider/callback', login.callback); // must match createOAuth's `callback` template
 ```
 
-Fastify is the same flow as a plugin:
+Prefer one call? `mountOAuthLogin(app, { oauth, cookie: { secret } })` registers
+both routes for you. Fastify is the same flow as a plugin:
 
 ```js
 import { oauthLoginPlugin } from '@exortek/oauth2/fastify';
 
 await app.register(oauthLoginPlugin, { oauth, mode: 'api', secret: process.env.SESSION_SECRET });
 ```
+
+Runnable Express + Fastify programs (plus a browser-clickable local demo that
+needs no real provider) live in [`examples/`](./examples).
 
 ## Run an authorization server
 
