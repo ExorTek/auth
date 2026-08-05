@@ -46,6 +46,7 @@ export const WarningCode = Object.freeze({
  * @property {string} [revocationEndpoint]
  * @property {string | ((claimed: string) => boolean)} [issuer]   OIDC issuer — exact string, or a validator (multi-tenant)
  * @property {string} [expectedIssuer]          overrides `issuer` for the RFC 9207 `iss` param
+ * @property {boolean} [requireIssParam]        require the RFC 9207 `iss` response param (a provider known to send it)
  * @property {string} [emailEndpoint]           secondary email fetch (github)
  * @property {boolean} [discover]               resolve endpoints from `issuer` discovery
  * @property {boolean} [supportsPkce]           default true
@@ -110,6 +111,7 @@ export function defineProvider(def) {
  * @property {string} [jwksUri]
  * @property {string} [revocationEndpoint]
  * @property {string} [issuer]
+ * @property {boolean} [issParameterSupported]   the AS returns the RFC 9207 `iss` on the authz response
  */
 
 /**
@@ -140,6 +142,8 @@ export async function resolveEndpoints(provider) {
       jwksUri: def.jwksUri ?? d.jwksUri,
       revocationEndpoint: def.revocationEndpoint ?? d.revocationEndpoint,
       issuer: def.issuer,
+      // The AS told us (via discovery) whether it returns the RFC 9207 `iss`.
+      issParameterSupported: def.requireIssParam === true || d.issParameterSupported === true,
     };
   } else {
     if (!isNonEmptyString(def.authorizationEndpoint) || !isNonEmptyString(def.tokenEndpoint)) {
@@ -152,6 +156,8 @@ export async function resolveEndpoints(provider) {
       jwksUri: def.jwksUri,
       revocationEndpoint: def.revocationEndpoint,
       issuer: def.issuer,
+      // A hardcoded preset opts in when it is known to return RFC 9207 `iss`.
+      issParameterSupported: def.requireIssParam === true,
     };
   }
 
@@ -273,10 +279,23 @@ export async function handleCallback(provider, opts) {
 
   const ep = await resolveEndpoints(provider);
 
-  // RFC 9207 `iss` response param. An exact string is compared directly;
-  // a multi-tenant validator function (Entra common/organizations/
-  // consumers) is RUN against the claimed iss — skipping it would leave
-  // exactly the tenants that most need the check unprotected.
+  // RFC 9207 `iss` response param. When the provider advertises that it
+  // returns `iss` (discovery `authorization_response_iss_parameter_supported`,
+  // or a preset opt-in), its ABSENCE is rejected — otherwise an attacker could
+  // strip `iss` to skip the mix-up check. Providers that never send `iss`
+  // (plain OAuth2 presets) stay protected by the per-provider callback route,
+  // the `state`/session binding, and — for OIDC — the id_token `iss` check.
+  if (ep.issParameterSupported === true && !isNonEmptyString(query.iss)) {
+    throw new OAuth2Error(
+      ErrorCode.ISSUER_MISMATCH,
+      `${provider.id} advertises the iss response parameter but the callback omitted it`,
+    );
+  }
+
+  // An exact string is compared directly; a multi-tenant validator function
+  // (Entra common/organizations/consumers) is RUN against the claimed iss —
+  // skipping it would leave exactly the tenants that most need the check
+  // unprotected.
   if (query.iss !== undefined) {
     const expected = provider.def.expectedIssuer ?? ep.issuer;
     if (isFunction(expected)) {

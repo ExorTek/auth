@@ -151,6 +151,36 @@ test('iss response param mismatch throws ISSUER_MISMATCH', async () => {
   );
 });
 
+test('a provider that advertises iss rejects a callback that omits it (RFC 9207)', async () => {
+  // requireIssParam marks a provider known to return `iss` — an attacker can
+  // no longer strip it to skip the mix-up check.
+  const provider = oidcProvider({ requireIssParam: true });
+  const { session } = await startFlow(provider);
+  await assert.rejects(
+    handleCallback(provider, {
+      redirectUri: REDIRECT,
+      query: { code: 'c', state: session.state }, // no iss
+      session,
+    }),
+    err => {
+      assert.equal(err.code, ErrorCode.ISSUER_MISMATCH);
+      return true;
+    },
+  );
+});
+
+test('a provider that does not advertise iss still accepts an absent iss', async () => {
+  const provider = oidcProvider(); // no requireIssParam
+  grantedScope = 'openid email profile';
+  const { session } = await startFlow(provider);
+  const { user } = await handleCallback(provider, {
+    redirectUri: REDIRECT,
+    query: { code: 'code-1', state: session.state }, // no iss — allowed
+    session,
+  });
+  assert.equal(user.sub, 'user-1');
+});
+
 test('userinfo sub that disagrees with the id_token throws SUB_MISMATCH', async () => {
   const provider = oidcProvider({
     userinfoEndpoint: `${as.base}/userinfo`,

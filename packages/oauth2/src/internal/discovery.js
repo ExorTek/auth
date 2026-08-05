@@ -97,6 +97,10 @@ async function fetchDocument(issuer, options) {
     userinfoEndpoint: isNonEmptyString(raw.userinfo_endpoint) ? raw.userinfo_endpoint : undefined,
     jwksUri: isNonEmptyString(raw.jwks_uri) ? raw.jwks_uri : undefined,
     revocationEndpoint: isNonEmptyString(raw.revocation_endpoint) ? raw.revocation_endpoint : undefined,
+    // RFC 9207: when the AS advertises that it returns `iss` on the
+    // authorization response, we can require it on the callback — a stripped
+    // `iss` then fails instead of silently skipping the mix-up check.
+    issParameterSupported: raw.authorization_response_iss_parameter_supported === true,
     raw,
   };
 
