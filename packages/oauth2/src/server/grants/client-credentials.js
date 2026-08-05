@@ -40,8 +40,10 @@ export async function clientCredentialsGrant(req, ctx) {
 }
 
 /**
- * Scope is bounded by the client's registered `scope` (or the server's
- * advertised `scopes` when the client declares none).
+ * A requested scope is validated against the client's registered `scope` (or
+ * the server's advertised `scopes` when the client declares none). With no
+ * `scope` requested, the client's registered scope is granted — or an empty
+ * scope when it registers none; never the full server scope list by default.
  *
  * @param {string | undefined} requested
  * @param {import('../clients.js').Client} client

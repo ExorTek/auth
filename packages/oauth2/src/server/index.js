@@ -48,8 +48,10 @@ const DEFAULT_PAR_TTL = '90s';
 const DEFAULT_REFRESH_TTL = '30d';
 
 /**
+ * PKCE S256 is always required on the code grant (OAuth 2.1) — there is no
+ * off-switch, so `requirePkce` is intentionally not a knob here.
+ *
  * @typedef {Object} ServerSecurity
- * @property {boolean} [requirePkce=true]         PKCE S256 required on the code grant
  * @property {string|number} [authorizationCodeTtl='1m']
  * @property {string|number} [refreshTokenTtl='30d']    lifetime of an issued refresh token
  * @property {{ required?: boolean, algs?: string[], nonce?: boolean }} [dpop]   RFC 9449
@@ -192,7 +194,10 @@ export function createServer(config) {
     refreshTokenTtlMs: parseDuration(security.refreshTokenTtl ?? DEFAULT_REFRESH_TTL),
     authorizationDetailsTypes: config.authorizationDetailsTypes,
     introspection: isObject(config.introspection) ? config.introspection : {},
-    jarm: config.jarm,
+    // JARM is enabled only when fully configured: without a signing key
+    // `signJarmResponse` can't sign, so advertising / accepting jwt mode would
+    // fail at runtime. An under-configured `jarm` is treated as absent.
+    jarm: isObject(config.jarm) && config.jarm.signingKey !== undefined ? config.jarm : undefined,
     deviceCodeTtlMs: config.device?.ttl !== undefined ? parseDuration(config.device.ttl) : undefined,
     deviceInterval: config.device?.interval,
     deviceVerificationUri: config.device?.verificationUri,

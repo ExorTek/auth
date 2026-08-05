@@ -19,15 +19,16 @@
  * Derive the effective security flags from the base `security` config,
  * applying the FAPI profile when enabled.
  *
- * @param {{ fapi?: boolean, requirePkce?: boolean, par?: { required?: boolean }, dpop?: { required?: boolean } }} security
+ * @param {{ fapi?: boolean, par?: { required?: boolean }, dpop?: { required?: boolean } }} security
  * @returns {{ fapi: boolean, requirePkce: boolean, requirePar: boolean, dpopRequired: boolean }}
  */
 export function applyFapiProfile(security = {}) {
   const fapi = security.fapi === true;
   return {
     fapi,
-    // PKCE is on unless explicitly disabled, and FAPI forces it on.
-    requirePkce: fapi || security.requirePkce !== false,
+    // PKCE S256 is mandatory on the code grant (OAuth 2.1 / Decision #0) —
+    // there is no off-switch, so it is always on regardless of config.
+    requirePkce: true,
     requirePar: fapi || security.par?.required === true,
     dpopRequired: fapi || security.dpop?.required === true,
   };

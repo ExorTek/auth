@@ -27,13 +27,18 @@ export function createReplayCache(retentionMs) {
   let rotatedAt = Date.now();
 
   function rotateIfDue() {
-    if (Date.now() - rotatedAt >= retentionMs) {
-      // Everything in `prev` is older than one full window → expired. Drop
-      // it, promote `live`, and start a fresh live bucket.
-      prev = live;
-      live = new Map();
-      rotatedAt = Date.now();
+    const elapsed = Date.now() - rotatedAt;
+    if (elapsed < retentionMs) {
+      return;
     }
+    // `prev` is older than a full window → expired; drop it and promote
+    // `live`. But after a long idle `live` itself is already older than a
+    // window, so once two windows have elapsed BOTH buckets are stale and
+    // promoting `live` would keep expired ids around another window — clear
+    // both instead.
+    prev = elapsed >= 2 * retentionMs ? new Map() : live;
+    live = new Map();
+    rotatedAt = Date.now();
   }
 
   return {
