@@ -12,10 +12,19 @@
  * duplicated query parameters (RFC 9101 §5).
  */
 import { sign as jwtSign, verify as jwtVerify, decode as jwtDecode, JwtError } from '@exortek/jwt';
-import { isNonEmptyString, isObject } from '@exortek/shared/predicates';
+import { isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 import { resolveClientKeys } from './client-keys.js';
+import { createReplayCache } from './replay-cache.js';
+
+// A JAR request object is short-lived; bound its accepted lifetime so a
+// captured one cannot be replayed indefinitely, and remember its `jti`
+// (when present) for that window so a single-use request object cannot be
+// replayed at all. Module-level / single-process, like the DPoP and
+// client-assertion caches; a multi-node deployment fronts it with PAR.
+const MAX_REQUEST_OBJECT_LIFETIME_MS = 300_000; // 5 minutes
+const seenRequestJti = createReplayCache(MAX_REQUEST_OBJECT_LIFETIME_MS);
 
 const REQUEST_OBJECT_ALGS = new Set([
   'ES256',
@@ -72,6 +81,19 @@ export async function verifyRequestObject(requestJwt, outerClientId, config) {
       throw new ServerError(ProtocolError.INVALID_REQUEST, 'request object signature is invalid');
     }
     throw err;
+  }
+
+  // RFC 9101 §6.1: the request object must carry `exp`. Bound its lifetime
+  // and (when it names a `jti`) reject a reuse — otherwise a front-channel
+  // request object with a far-future / absent exp replays forever.
+  if (!isNumber(payload.exp)) {
+    throw new ServerError(ProtocolError.INVALID_REQUEST, 'request object must set exp');
+  }
+  if (payload.exp * 1000 - Date.now() > MAX_REQUEST_OBJECT_LIFETIME_MS) {
+    throw new ServerError(ProtocolError.INVALID_REQUEST, 'request object lifetime exceeds the accepted maximum');
+  }
+  if (isNonEmptyString(payload.jti) && seenRequestJti.seen(payload.jti)) {
+    throw new ServerError(ProtocolError.INVALID_REQUEST, 'request object jti has already been used (replay)');
   }
 
   // Project the JWT claims onto authorization parameters. `iss` / `aud` /

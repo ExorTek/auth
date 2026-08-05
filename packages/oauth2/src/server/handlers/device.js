@@ -19,6 +19,7 @@ import { ErrorCode, OAuth2Error } from '../../internal/errors.js';
 import { randomState } from '../../internal/state.js';
 import { normalizeRequest } from '../request.js';
 import { json, jsonError } from '../response.js';
+import { authenticateClient } from '../security/client-auth.js';
 
 const DEFAULT_TTL_MS = 600_000; // 10 minutes
 const DEFAULT_INTERVAL_SEC = 5;
@@ -41,16 +42,11 @@ export function createDeviceHandler(config) {
         throw new ServerError(ProtocolError.INVALID_REQUEST, 'the device authorization endpoint only accepts POST');
       }
 
-      // The device grant is used by public clients too, so a plain
-      // client_id identifies the client (RFC 8628 §3.1).
-      const clientId = req.form.client_id;
-      if (!isNonEmptyString(clientId)) {
-        throw new ServerError(ProtocolError.INVALID_REQUEST, 'missing client_id');
-      }
-      const client = await config.registry.getClient(clientId);
-      if (!client) {
-        throw new ServerError(ProtocolError.INVALID_CLIENT, `unknown client ${JSON.stringify(clientId)}`);
-      }
+      // Authenticate the client by its registered method (RFC 8628 §3.1).
+      // A public client (`none`) authenticates by client_id alone; a
+      // confidential client must present its credentials here too — not just
+      // at the later token-endpoint poll.
+      const client = await authenticateClient(req, config);
       if (!client.grantTypes.includes('urn:ietf:params:oauth:grant-type:device_code')) {
         throw new ServerError(ProtocolError.UNAUTHORIZED_CLIENT, 'client may not use the device grant');
       }
@@ -59,7 +55,10 @@ export function createDeviceHandler(config) {
       const deviceCode = randomState();
       const userCode = generateUserCode();
 
-      await config.stores.device.save({ deviceCode, userCode, clientId, scope, status: 'pending' }, ttlMs);
+      await config.stores.device.save(
+        { deviceCode, userCode, clientId: client.clientId, scope, status: 'pending' },
+        ttlMs,
+      );
 
       const uriComplete = `${verificationUri}?user_code=${encodeURIComponent(userCode)}`;
       return json(200, {

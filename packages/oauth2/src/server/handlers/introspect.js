@@ -14,7 +14,7 @@
  * introspect any client's token opt in with
  * `introspection: { allowCrossClient: true }`.
  */
-import { isArray, isNonEmptyString } from '@exortek/shared/predicates';
+import { isArray, isNonEmptyString, isObject } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 import { normalizeRequest } from '../request.js';
@@ -101,7 +101,9 @@ async function introspectAccess(config, token, client) {
   }
   return {
     active: true,
-    token_type: 'Bearer',
+    // A DPoP-bound access token (carries `cnf.jkt`) reads back as `DPoP`,
+    // not `Bearer` — the resource server must present a proof for it.
+    token_type: isObject(claims.cnf) && isNonEmptyString(claims.cnf.jkt) ? 'DPoP' : 'Bearer',
     scope: isNonEmptyString(claims.scope) ? claims.scope : undefined,
     client_id: claims.client_id,
     sub: claims.sub,

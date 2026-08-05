@@ -65,6 +65,13 @@ export async function refreshTokenGrant(req, ctx) {
 
   // Rotate: mint the successor in the same family and mark the presented
   // token used so a later presentation trips the reuse check above.
+  //
+  // The get→check→rotate sequence assumes a single in-flight redemption per
+  // token (the normal client behaviour). It is not a compare-and-set: two
+  // truly-simultaneous redemptions of the SAME token could both pass the
+  // reuse check before either marks it used. The security guarantee that
+  // still holds unconditionally is the important one — any later replay of
+  // the now-rotated token trips reuse detection and burns the family.
   const nextToken = randomState();
   await config.stores.refresh.rotate(presented, {
     token: nextToken,
