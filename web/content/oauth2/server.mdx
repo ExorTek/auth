@@ -1,0 +1,123 @@
+---
+title: '@exortek/oauth2 — Authorization server'
+sidebarTitle: 'Authorization server'
+---
+
+import { Callout } from 'nextra/components';
+
+# Authorization server — `createServer`
+
+`createServer` is an OAuth 2.1 authorization server: one
+framework-agnostic core returning `{ status, headers, body }` descriptors,
+mounted through a thin Express or Fastify adapter. Secure by default —
+PKCE required, `iss` always returned, redirect URIs exact-matched.
+
+```js
+import { createServer, jwtIssuer } from '@exortek/oauth2/server';
+import { mountOAuth2Server } from '@exortek/oauth2/server/express';
+
+const server = createServer({
+  issuer: 'https://as.example.com',
+  clients: [
+    { clientId: 'app', clientSecret: process.env.APP_SECRET, redirectUris: ['https://app.example.com/cb'] },
+  ],
+  tokens: jwtIssuer({ signingKey, alg: 'ES256' }), // RFC 9068 at+jwt (default backend)
+  authenticateUser: req => resolveLoggedInUser(req), // your login + consent UI
+});
+
+mountOAuth2Server(app, server);
+```
+
+Fastify is the same server as a plugin:
+
+```js
+import { oauth2ServerPlugin } from '@exortek/oauth2/server/fastify';
+
+await app.register(oauth2ServerPlugin, { server });
+```
+
+## Endpoints
+
+Mounted at the path portion of each configured endpoint (RFC 8414
+metadata stays consistent with where the routes actually live):
+
+| Endpoint                                    | RFC                    |
+| ------------------------------------------- | ---------------------- |
+| `/authorize` (GET + POST form_post)         | 6749 §4.1, OAuth 2.1   |
+| `/token` — code / refresh / client_credentials / device / token-exchange | 6749, 8628, 8693 |
+| `/revoke`                                   | 7009                   |
+| `/introspect`                               | 7662                   |
+| `/par`                                      | 9126                   |
+| `/device_authorization`                     | 8628                   |
+| `/.well-known/oauth-authorization-server`   | 8414                   |
+
+## Token backends
+
+`jwtIssuer` mints RFC 9068 `at+jwt` access tokens (the blessed default);
+`pasetoIssuer` is a drop-in over PASETO v4.public. Both satisfy the same
+`{ issue, introspect }` contract, so `createServer` is backend-agnostic.
+
+```js
+import { pasetoIssuer } from '@exortek/oauth2/server';
+
+createServer({ /* … */, tokens: pasetoIssuer({ secretKey, publicKey }) });
+```
+
+## Modern hardening
+
+<Callout type="info">
+  Every protection is a default, not a flag you remember to set. The FAPI
+  2.0 profile (`security: { fapi: true }`) tightens PAR + PKCE + DPoP/mTLS
+  + `iss` in one switch.
+</Callout>
+
+- **DPoP** (RFC 9449) — sender-constrained tokens via `cnf.jkt`,
+  including the server **nonce challenge** (`security: { dpop: { nonce: true } }`).
+- **PAR** (RFC 9126), **resource indicators** (RFC 8707), **RAR**
+  (RFC 9396), **JAR / JARM** (RFC 9101).
+- **Client auth** — `none` / `client_secret_basic` / `client_secret_post`
+  / `private_key_jwt` / `client_secret_jwt` (RFC 7523) / mTLS (RFC 8705).
+- **Refresh rotation with reuse detection** — a replayed refresh token
+  burns the whole family (RFC 9700 §4.14).
+
+## Resource-server helper
+
+The protected resource verifies a DPoP-bound token with
+`verifyDpopForResource` — the `ath` (access-token hash) + `cnf.jkt` check
+of RFC 9449 §7:
+
+```js
+import { verifyDpopForResource } from '@exortek/oauth2/server';
+
+await verifyDpopForResource(req.headers.dpop, {
+  htm: req.method,
+  htu: 'https://rs.example.com/resource',
+  accessToken,
+  cnfJkt, // from the token's cnf.jkt claim (or introspection)
+});
+```
+
+## Production stores
+
+The in-memory stores are single-process (batteries included). For a
+cluster, inject the Redis-backed stores behind the identical contract:
+
+```js
+import { createServer } from '@exortek/oauth2/server';
+import {
+  createRedisAuthCodeStore,
+  createRedisRefreshStore,
+  createRedisParStore,
+  createRedisDeviceStore,
+} from '@exortek/oauth2/server';
+
+createServer({
+  /* … */
+  stores: {
+    authCode: createRedisAuthCodeStore(redis),
+    refresh: createRedisRefreshStore(redis),
+    par: createRedisParStore(redis),
+    device: createRedisDeviceStore(redis),
+  },
+});
+```
