@@ -1,0 +1,94 @@
+---
+title: '@exortek/oauth2 — Providers'
+sidebarTitle: 'Providers — the presets'
+---
+
+import { Callout } from 'nextra/components';
+
+# Providers
+
+Each preset pre-wires a provider's endpoints, default scopes, and userinfo
+→ user mapping, so `createOAuth` drives them uniformly. Import only the
+ones you use — every preset is its own subpath, tree-shaken.
+
+```js
+import { google } from '@exortek/oauth2/providers/google';
+import { github } from '@exortek/oauth2/providers/github';
+
+google({ clientId, clientSecret, scope: ['email', 'profile'] });
+```
+
+## Available presets
+
+| Provider          | Import                                  | Kind  | Default scopes                  |
+| ----------------- | --------------------------------------- | ----- | ------------------------------- |
+| Google            | `@exortek/oauth2/providers/google`      | OIDC  | `openid email profile`          |
+| GitHub            | `@exortek/oauth2/providers/github`      | OAuth | `read:user user:email`          |
+| Microsoft / Azure | `@exortek/oauth2/providers/microsoft` · `…/azure` | OIDC | `openid email profile`  |
+| Apple             | `@exortek/oauth2/providers/apple`       | OIDC  | `name email`                    |
+| Okta              | `@exortek/oauth2/providers/okta`        | OIDC  | `openid email profile`          |
+| Discord           | `@exortek/oauth2/providers/discord`     | OAuth | `identify email`                |
+| Facebook          | `@exortek/oauth2/providers/facebook`    | OAuth | `email public_profile`          |
+| LinkedIn          | `@exortek/oauth2/providers/linkedin`    | OIDC  | `openid email profile`          |
+| Spotify           | `@exortek/oauth2/providers/spotify`     | OAuth | `user-read-email`               |
+| Twitch            | `@exortek/oauth2/providers/twitch`      | OIDC  | `openid user:read:email`        |
+| Twitter / X       | `@exortek/oauth2/providers/twitter`     | OAuth | `users.read tweet.read`         |
+
+<Callout type="info">
+  OIDC presets verify the `id_token` (signature + `iss` / `aud` / `nonce`
+  / `azp` / `at_hash`); OAuth-only presets resolve the user from the
+  userinfo endpoint. Either way you get a normalised `{ sub, email, … }`.
+</Callout>
+
+## Options
+
+Every preset takes the same shape:
+
+| Option         | Notes                                                         |
+| -------------- | ------------------------------------------------------------ |
+| `clientId`     | required                                                     |
+| `clientSecret` | required for confidential providers                          |
+| `scope`        | override the preset's `defaultScopes`                        |
+| `redirectUri`  | override the URI derived from `baseUrl` + `callback`         |
+| `id`           | register the same provider twice under a distinct id         |
+| `tenant`       | Entra / Okta only — pin the directory (or `common`, …)       |
+
+## Multi-tenant
+
+Entra `common` / `organizations` / `consumers` (and Okta org domains)
+have a per-directory issuer, so the `iss` is validated with a tenant-aware
+matcher — **never left unchecked** (RFC 9207). Register the same provider
+for two tenants with an `{ id }` override:
+
+```js
+import { microsoft } from '@exortek/oauth2/providers/microsoft';
+
+createOAuth({
+  baseUrl,
+  callback,
+  providers: [
+    microsoft({ id: 'ms-corp', tenant: '<tenant-guid>', clientId, clientSecret }),
+    microsoft({ id: 'ms-any', tenant: 'common', clientId, clientSecret }),
+  ],
+});
+// oauth.authorize('ms-corp') / oauth.authorize('ms-any')
+```
+
+## Rolling your own
+
+`defineProvider` builds a custom preset from the same descriptor the
+built-ins use — endpoints, `defaultScopes`, `mapUser`, an `issuer` string
+or validator, optional `discover: true` for OIDC discovery.
+
+```js
+import { defineProvider } from '@exortek/oauth2';
+
+export const acme = defineProvider({
+  id: 'acme',
+  kind: 'oidc',
+  issuer: 'https://id.acme.com',
+  discover: true, // resolve endpoints from /.well-known/openid-configuration
+  defaultScopes: ['openid', 'email'],
+  mapUser: raw => ({ sub: raw.sub, email: raw.email }),
+});
+```
