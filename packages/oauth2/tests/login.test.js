@@ -134,8 +134,8 @@ test('routes are taken verbatim; callbackPath is not constructed', async () => {
 test('express adapter registers the mode-appropriate routes', () => {
   const registered = [];
   const app = {
-    get: (path, ...h) => registered.push(['GET', path]),
-    post: (path, ...h) => registered.push(['POST', path]),
+    get: path => registered.push(['GET', path]),
+    post: path => registered.push(['POST', path]),
   };
   mountOAuthLogin(app, { oauth: fakeOauth(), cookie: { secret: SECRET } });
   assert.deepEqual(new Set(registered.map(r => r[0])), new Set(['GET']));

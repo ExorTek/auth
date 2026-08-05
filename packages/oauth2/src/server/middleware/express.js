@@ -45,7 +45,33 @@ export function expressHandler(handler) {
 }
 
 /**
- * Register every authorization-server endpoint on an Express app. The
+ * The per-endpoint Express handlers for an authorization server — mount
+ * them on your own routes (symmetric with `oauthLogin` on the RP side):
+ *
+ *   const oauth2 = oauth2Handlers(server);
+ *   app.get('/authorize', oauth2.authorize);
+ *   app.post('/token', rateLimit, oauth2.token); // your own middleware, your own paths
+ *
+ * @param {ReturnType<import('../index.js').createServer>} server
+ * @returns {{ metadata: Function, authorize: Function, token: Function, revoke: Function, introspect: Function, par: Function, deviceAuthorization: Function }}
+ */
+export function oauth2Handlers(server) {
+  return {
+    metadata: expressHandler(server.metadata),
+    authorize: expressHandler(server.authorize),
+    token: expressHandler(server.token),
+    revoke: expressHandler(server.revoke),
+    introspect: expressHandler(server.introspect),
+    par: expressHandler(server.par),
+    deviceAuthorization: expressHandler(server.deviceAuthorization),
+  };
+}
+
+/**
+ * Register every authorization-server endpoint on an Express app — the
+ * one-call form of {@link oauth2Handlers}, mounting each at the path
+ * portion of its configured URL (so a custom `endpoints` override stays
+ * consistent with the advertised metadata and the DPoP `htu`). The
  * discovery document is served from both well-known paths.
  *
  * @param {any} app                              an Express application / router
@@ -54,18 +80,16 @@ export function expressHandler(handler) {
  */
 export function mountOAuth2Server(app, server, options = {}) {
   const base = options.basePath ?? '';
-  // Mount each endpoint at the path portion of its configured URL so a
-  // custom `endpoints` override stays consistent with the advertised
-  // metadata and the DPoP `htu` the core validates against.
   const p = endpointPaths(server);
-  app.get(`${base}/.well-known/oauth-authorization-server`, expressHandler(server.metadata));
-  app.get(`${base}/.well-known/openid-configuration`, expressHandler(server.metadata));
-  app.get(`${base}${p.authorization}`, expressHandler(server.authorize));
-  app.post(`${base}${p.token}`, expressHandler(server.token));
-  app.post(`${base}${p.revocation}`, expressHandler(server.revoke));
-  app.post(`${base}${p.introspection}`, expressHandler(server.introspect));
-  app.post(`${base}${p.par}`, expressHandler(server.par));
-  app.post(`${base}${p.deviceAuthorization}`, expressHandler(server.deviceAuthorization));
+  const h = oauth2Handlers(server);
+  app.get(`${base}/.well-known/oauth-authorization-server`, h.metadata);
+  app.get(`${base}/.well-known/openid-configuration`, h.metadata);
+  app.get(`${base}${p.authorization}`, h.authorize);
+  app.post(`${base}${p.token}`, h.token);
+  app.post(`${base}${p.revocation}`, h.revoke);
+  app.post(`${base}${p.introspection}`, h.introspect);
+  app.post(`${base}${p.par}`, h.par);
+  app.post(`${base}${p.deviceAuthorization}`, h.deviceAuthorization);
 }
 
 /**

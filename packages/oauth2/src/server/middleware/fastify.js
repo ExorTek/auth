@@ -57,6 +57,30 @@ async function oauth2ServerPluginFn(fastify, options) {
 }
 
 /**
+ * The per-endpoint Fastify handlers for an authorization server — register
+ * them on your own routes instead of the whole plugin (symmetric with
+ * `oauthLogin` on the RP side):
+ *
+ *   const oauth2 = oauth2Handlers(server);
+ *   app.get('/authorize', oauth2.authorize);
+ *   app.post('/token', oauth2.token);
+ *
+ * @param {ReturnType<import('../index.js').createServer>} server
+ * @returns {{ metadata: Function, authorize: Function, token: Function, revoke: Function, introspect: Function, par: Function, deviceAuthorization: Function }}
+ */
+export function oauth2Handlers(server) {
+  return {
+    metadata: adapt(server.metadata),
+    authorize: adapt(server.authorize),
+    token: adapt(server.token),
+    revoke: adapt(server.revoke),
+    introspect: adapt(server.introspect),
+    par: adapt(server.par),
+    deviceAuthorization: adapt(server.deviceAuthorization),
+  };
+}
+
+/**
  * The path portion of each configured endpoint URL, so the plugin mounts
  * exactly where the metadata says the endpoint lives.
  *
