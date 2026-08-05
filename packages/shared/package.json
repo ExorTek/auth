@@ -33,7 +33,8 @@
     "./incr-store": "./src/incr-store.js",
     "./redis-helpers": "./src/redis-helpers.js",
     "./record-store": "./src/record-store.js",
-    "./fastify-plugin": "./src/fastify-plugin.js"
+    "./fastify-plugin": "./src/fastify-plugin.js",
+    "./test-helpers/redis-drivers": "./test-helpers/redis-drivers.js"
   },
   "scripts": {
     "build": "echo 'shared has no build step — source consumed via bundler inline'",
