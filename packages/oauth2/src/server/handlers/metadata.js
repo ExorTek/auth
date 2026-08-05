@@ -29,7 +29,8 @@ export function buildMetadata(config) {
     // RFC 8414 requires response_types_supported; this AS is code-only
     // (OAuth 2.1 drops the implicit and hybrid response types).
     response_types_supported: ['code'],
-    response_modes_supported: ['query'],
+    // `jwt` (JARM, RFC 9101) is advertised only when the server can sign it.
+    response_modes_supported: config.jarm ? ['query', 'jwt'] : ['query'],
     grant_types_supported: grantTypes,
     token_endpoint_auth_methods_supported: authMethods,
     // PKCE S256 only — `plain` is never offered (OAuth 2.1 / Decision #0).

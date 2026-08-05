@@ -23,6 +23,7 @@ import { ErrorCode, OAuth2Error } from './errors.js';
  * @property {string} [codeVerifier]    PKCE verifier (absent only when the provider rejects PKCE)
  * @property {string} [nonce]           OIDC replay nonce (OIDC providers only)
  * @property {string} [sessionBinding]  opaque binding to the initiating user's session
+ * @property {string[]} [requestedScope] the scopes this flow requested — basis for the SCOPE_NARROWED warning
  * @property {number} createdAt         epoch ms — lets a store enforce a max age
  */
 

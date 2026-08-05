@@ -17,7 +17,7 @@ import { createPkcePair } from '../internal/pkce.js';
 import { randomState, randomNonce } from '../internal/state.js';
 import { postForm, getJson } from '../internal/http.js';
 import { discover } from '../internal/discovery.js';
-import { createJwksResolver, verifyIdToken } from '../internal/id-token.js';
+import { createJwksResolver, verifyIdToken, DEFAULT_ID_TOKEN_ALGS } from '../internal/id-token.js';
 
 /**
  * Non-fatal, degraded-but-not-blocked conditions. Surfaced in
@@ -28,8 +28,6 @@ export const WarningCode = Object.freeze({
   SCOPE_NARROWED: 'SCOPE_NARROWED',
   EMAIL_UNVERIFIED: 'EMAIL_UNVERIFIED',
 });
-
-const DEFAULT_ID_TOKEN_ALGS = ['RS256', 'ES256', 'PS256'];
 
 /**
  * Define a provider. Returns a factory that a consumer calls with their
@@ -174,16 +172,17 @@ export async function buildAuthorization(provider, opts) {
   const warnings = [];
 
   const state = randomState();
+  const requestedScope = resolveScopes(provider, opts.scope);
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: provider.clientId,
     redirect_uri: opts.redirectUri,
     state,
-    scope: resolveScopes(provider, opts.scope).join(' '),
+    scope: requestedScope.join(' '),
   });
 
   /** @type {import('../internal/session.js').FlowSession} */
-  const session = { provider: provider.id, state, createdAt: Date.now() };
+  const session = { provider: provider.id, state, createdAt: Date.now(), requestedScope };
 
   // PKCE S256 always, unless the provider genuinely rejects
   // it, in which case we degrade loudly.
@@ -274,10 +273,17 @@ export async function handleCallback(provider, opts) {
 
   const ep = await resolveEndpoints(provider);
 
-  // RFC 9207 `iss` response param, exact match when present.
+  // RFC 9207 `iss` response param. An exact string is compared directly;
+  // a multi-tenant validator function (Entra common/organizations/
+  // consumers) is RUN against the claimed iss — skipping it would leave
+  // exactly the tenants that most need the check unprotected.
   if (query.iss !== undefined) {
     const expected = provider.def.expectedIssuer ?? ep.issuer;
-    if (isNonEmptyString(expected) && query.iss !== expected) {
+    if (isFunction(expected)) {
+      if (!expected(query.iss)) {
+        throw new OAuth2Error(ErrorCode.ISSUER_MISMATCH, `callback iss ${JSON.stringify(query.iss)} does not match`);
+      }
+    } else if (isNonEmptyString(expected) && query.iss !== expected) {
       throw new OAuth2Error(ErrorCode.ISSUER_MISMATCH, `callback iss ${JSON.stringify(query.iss)} does not match`);
     }
   }
@@ -303,8 +309,13 @@ export async function handleCallback(provider, opts) {
     errorCode: ErrorCode.TOKEN_EXCHANGE_FAILED,
   });
 
-  // granted scope narrower than requested → warn, not fail.
-  const narrowed = narrowedScopes(resolveScopes(provider, undefined), tokens.scope);
+  // granted scope narrower than requested → warn, not fail. Compare
+  // against the scopes THIS flow actually requested (carried on the
+  // session), not the provider defaults — a caller that widened or
+  // narrowed the request per-authorize would otherwise get a bogus
+  // warning (or none at all).
+  const requested = isArray(session.requestedScope) ? session.requestedScope : resolveScopes(provider, undefined);
+  const narrowed = narrowedScopes(requested, tokens.scope);
   if (narrowed.length > 0) {
     warnings.push(warn(WarningCode.SCOPE_NARROWED, `provider did not grant: ${narrowed.join(' ')}`));
   }

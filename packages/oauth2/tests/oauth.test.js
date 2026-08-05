@@ -115,6 +115,57 @@ test('store-backed round-trip looks the session up by state and is single-use', 
   });
 });
 
+// Audit C8 — a multi-tenant (function) issuer must be RUN against query.iss,
+// not skipped because it is not a plain string.
+test('a function-valued expectedIssuer is enforced against query.iss (audit C8)', async () => {
+  const provider = defineProvider({
+    id: 'fn',
+    kind: 'oauth2',
+    authorizationEndpoint: `${as.base}/authorize`,
+    tokenEndpoint: `${as.base}/token`,
+    userinfoEndpoint: `${as.base}/userinfo`,
+    expectedIssuer: claimed => claimed === as.issuer,
+    mapUser: raw => ({ sub: raw.sub }),
+  })({ clientId: CLIENT_ID, clientSecret: 'secret' });
+  const oauth = createOAuth({
+    baseUrl: 'https://app.com',
+    callback: '/auth/{provider}/callback',
+    providers: [provider],
+  });
+
+  const { session } = await oauth.authorize('fn');
+  const parsed = JSON.parse(Buffer.from(session, 'base64url').toString());
+
+  // A forged iss the validator rejects → mismatch.
+  await assert.rejects(
+    oauth.callback('fn', { code: 'c', state: parsed.state, iss: 'https://evil.example' }, { session }),
+    err => {
+      assert.equal(err.code, ErrorCode.ISSUER_MISMATCH);
+      return true;
+    },
+  );
+  // The genuine iss passes.
+  const ok = await oauth.callback('fn', { code: 'c', state: parsed.state, iss: as.issuer }, { session });
+  assert.equal(ok.user.sub, 'user-1');
+});
+
+// Audit C10 — the SCOPE_NARROWED warning compares against the scopes THIS
+// flow requested, carried on the session, not the provider defaults.
+test('the scope-narrowed warning is measured against the requested scopes (audit C10)', async () => {
+  const oauth = mkOAuth();
+  const { session } = await oauth.authorize('test', { scope: ['email', 'custom_scope'] });
+  const parsed = JSON.parse(Buffer.from(session, 'base64url').toString());
+  idTokenToServe = await signer.mint(
+    { iss: as.issuer, sub: 'user-1', aud: CLIENT_ID, nonce: parsed.nonce },
+    { expiresIn: '5m' },
+  );
+  // The stub grants only 'openid email' — 'custom_scope' was dropped.
+  const { warnings } = await oauth.callback('test', { code: 'c', state: parsed.state }, { session });
+  const narrowed = warnings.find(w => w.code === 'SCOPE_NARROWED');
+  assert.ok(narrowed, 'a narrowing warning is emitted');
+  assert.match(narrowed.message, /custom_scope/);
+});
+
 test('revoke posts to the revocation endpoint', async () => {
   let revoked;
   const { createServer } = await import('node:http');

@@ -51,6 +51,22 @@ export function createAuthorizeHandler(config) {
           state,
         });
       }
+      // response_mode: `query` is the default; `jwt` (JARM) only when the
+      // server is configured for it. An unrecognised mode is rejected
+      // rather than silently downgraded to query.
+      if (isNonEmptyString(params.response_mode)) {
+        const allowed = config.jarm ? ['query', 'jwt'] : ['query'];
+        if (!allowed.includes(params.response_mode)) {
+          throw new ServerError(
+            ProtocolError.INVALID_REQUEST,
+            `unsupported response_mode ${JSON.stringify(params.response_mode)}`,
+            {
+              redirectable: true,
+              state,
+            },
+          );
+        }
+      }
       // PAR is required by the server OR by this client's registration.
       if ((config.requirePar || client.requirePushedAuthorizationRequests === true) && !params._fromPar) {
         throw new ServerError(ProtocolError.INVALID_REQUEST, 'this client requires a pushed authorization request', {
