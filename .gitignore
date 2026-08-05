@@ -43,6 +43,12 @@ Thumbs.db
 # npm pack output (yarn npm pack, yarn pack)
 *.tgz
 
+# This is a Yarn repo — only yarn.lock is committed. Block the other
+# package managers' lockfiles from ever landing (preinstall enforces yarn).
+package-lock.json
+pnpm-lock.yaml
+npm-shrinkwrap.json
+
 
 # Claude Code / personal working notes
 /.claude
