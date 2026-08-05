@@ -70,13 +70,97 @@ const state = randomState(); // 256-bit, base64url — bind to the session
 verifyChallenge(codeVerifier, codeChallenge); // constant-time S256 check
 ```
 
+## Log in with a provider
+
+`createOAuth` is the high-level relying-party flow — the `passport`
+replacement. You bring the provider presets and a callback route; it owns
+the PKCE / `state` / `nonce` round-trip and hands you the resolved user.
+
+```js
+import { createOAuth } from '@exortek/oauth2';
+import { google } from '@exortek/oauth2/providers/google';
+import { github } from '@exortek/oauth2/providers/github';
+
+const oauth = createOAuth({
+  baseUrl: 'https://app.example.com',
+  callback: '/auth/{provider}/callback',
+  providers: [
+    google({ clientId: process.env.GOOGLE_ID, clientSecret: process.env.GOOGLE_SECRET }),
+    github({ clientId: process.env.GITHUB_ID, clientSecret: process.env.GITHUB_SECRET }),
+  ],
+});
+
+// 1. Start — redirect the user, stash the opaque session (cookie / store).
+const { url, session } = await oauth.authorize('google');
+
+// 2. Finish — on the callback route, hand back the session + query params.
+const { user } = await oauth.callback('google', req.query, { session });
+```
+
+### Framework middleware
+
+`mountOAuthLogin` wires the login + callback routes for you — every
+platform from one backend, `mode: 'web'` (browser redirect + signed/sealed
+cookie or store) or `mode: 'api'` (client-held session for mobile / SPA).
+
+```js
+import { mountOAuthLogin } from '@exortek/oauth2/express';
+
+mountOAuthLogin(app, {
+  oauth,
+  mode: 'web',
+  cookie: { secret: process.env.SESSION_SECRET }, // signs the flow session; `seal: 'jwe'` also encrypts it
+  callbackPath: '/auth/:provider/callback', // must match createOAuth's `callback` template
+  onSuccess: ({ req, res, user }) => res.redirect('/'),
+});
+```
+
+Fastify is the same flow as a plugin:
+
+```js
+import { oauthLoginPlugin } from '@exortek/oauth2/fastify';
+
+await app.register(oauthLoginPlugin, { oauth, mode: 'api', secret: process.env.SESSION_SECRET });
+```
+
+## Run an authorization server
+
+`createServer` is the OAuth 2.1 authorization server — one framework-agnostic
+core, mounted through the `./server/express` or `./server/fastify` adapter.
+
+```js
+import { createServer, jwtIssuer } from '@exortek/oauth2/server';
+import { mountOAuth2Server } from '@exortek/oauth2/server/express';
+
+const server = createServer({
+  issuer: 'https://as.example.com',
+  clients: [{ clientId: 'app', clientSecret: process.env.APP_SECRET, redirectUris: ['https://app.example.com/cb'] }],
+  tokens: jwtIssuer({ signingKey, alg: 'ES256' }), // RFC 9068 at+jwt; pasetoIssuer is pluggable
+  authenticateUser: req => resolveLoggedInUser(req), // your login + consent UI
+});
+
+mountOAuth2Server(app, server); // /authorize /token /revoke /introspect /par /device_authorization + metadata
+```
+
+Endpoints: authorize / token / revoke / introspect / PAR / device, RFC 8414
+metadata, plus the modern hardening — DPoP (RFC 9449, incl. the nonce
+challenge), PKCE, PAR (RFC 9126), resource indicators (RFC 8707), RAR
+(RFC 9396), JAR/JARM (RFC 9101), `private_key_jwt` / `client_secret_jwt`
+(RFC 7523), mTLS (RFC 8705), token exchange (RFC 8693), and the FAPI 2.0
+profile. Resource servers get `verifyDpopForResource` for the `ath` /
+`cnf.jkt` check.
+
 ## Modules
 
-| Subpath                     | Status  | Purpose                                                                        |
-| --------------------------- | ------- | ------------------------------------------------------------------------------ |
-| `@exortek/oauth2`           | ✅      | PKCE (RFC 7636), `state` / `nonce` generators, `OAuth2Error` / `ErrorCode`      |
-| `@exortek/oauth2/server`    | ⏳      | `createServer` — authorize / token / revoke / introspect / metadata handlers   |
-| `@exortek/oauth2/providers/*` | ⏳    | Pre-wired presets (google, github, discord, …) with full flow security         |
+| Subpath                          | Status | Purpose                                                                      |
+| -------------------------------- | ------ | ---------------------------------------------------------------------------- |
+| `@exortek/oauth2`                | ✅     | `createOAuth` RP flow, PKCE (RFC 7636), `state` / `nonce`, `OAuth2Error`      |
+| `@exortek/oauth2/express`        | ✅     | `mountOAuthLogin` — Express login + callback middleware (web + api modes)     |
+| `@exortek/oauth2/fastify`        | ✅     | `mountOAuthLogin` — Fastify login + callback plugin                           |
+| `@exortek/oauth2/providers/*`    | ✅     | Pre-wired presets (google, github, microsoft, apple, okta, …)                 |
+| `@exortek/oauth2/server`         | ✅     | `createServer` + `jwtIssuer` / `pasetoIssuer` + `verifyDpopForResource`       |
+| `@exortek/oauth2/server/express` | ✅     | `mountOAuth2Server` — mount the AS on Express                                 |
+| `@exortek/oauth2/server/fastify` | ✅     | `oauth2ServerPlugin` — mount the AS on Fastify                                |
 
 ## Error handling
 
