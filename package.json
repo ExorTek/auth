@@ -44,22 +44,17 @@
     "argon2": "^0.45.1",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
+    "dotenv": "^17.4.2",
     "eslint": "^10.8.0",
     "express": "^5.2.1",
-    "fastify": "^5.10.0",
-    "ioredis": "^5.11.1",
+    "fastify": "^5.11.2",
+    "ioredis": "^6.0.0",
     "prettier": "^3.9.6",
-    "rollup": "^4.62.3",
+    "rollup": "^4.62.4",
     "typescript": "6.0.3"
   },
   "engines": {
     "node": ">=22.0.0"
   },
-  "packageManager": "yarn@4.17.1",
-  "resolutions": {
-    "fast-uri@npm:^3.0.0": "3.1.4",
-    "fast-uri@npm:^3.0.1": "3.1.4",
-    "fast-uri@npm:^4.0.0": "4.1.1",
-    "sharp": "0.35.3"
-  }
+  "packageManager": "yarn@4.17.1"
 }
