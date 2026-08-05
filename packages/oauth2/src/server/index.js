@@ -32,6 +32,12 @@ export { jwtIssuer } from './issuers/jwt.js';
 export { pasetoIssuer } from './issuers/paseto.js';
 export { ServerError, ProtocolError } from './errors.js';
 export { verifyDpopForResource } from './security/dpop.js';
+export {
+  createRedisAuthCodeStore,
+  createRedisRefreshStore,
+  createRedisParStore,
+  createRedisDeviceStore,
+} from './stores/redis.js';
 
 const DEFAULT_GRANTS = ['authorization_code', 'refresh_token', 'client_credentials'];
 const DEFAULT_AUTH_CODE_TTL = '1m';
