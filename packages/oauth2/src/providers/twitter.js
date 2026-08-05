@@ -14,7 +14,9 @@ import { defineProvider } from './_base.js';
 export const twitter = defineProvider({
   id: 'twitter',
   kind: 'oauth2',
-  authorizationEndpoint: 'https://twitter.com/i/oauth2/authorize',
+  // X migrated the authorize URL to the x.com domain (twitter.com still
+  // 302s there, but bind to the canonical host). Token + API are api.x.com.
+  authorizationEndpoint: 'https://x.com/i/oauth2/authorize',
   tokenEndpoint: 'https://api.x.com/2/oauth2/token',
   userinfoEndpoint: 'https://api.x.com/2/users/me?user.fields=profile_image_url,name,username',
   clientAuth: 'basic',
