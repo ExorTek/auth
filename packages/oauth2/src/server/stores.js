@@ -102,6 +102,7 @@ function createTtlMap({ sweepIntervalMs = 60_000 } = {}) {
  * @property {string[]} scope
  * @property {string} [nonce]
  * @property {string} [subject]
+ * @property {number} [authTime]             unix seconds of the authentication event → OIDC `auth_time`
  * @property {string} [resource]
  * @property {unknown} [authorizationDetails]
  * @property {string} [dpopJkt]              DPoP `jkt` bound at the authorize step (RFC 9449 §10)

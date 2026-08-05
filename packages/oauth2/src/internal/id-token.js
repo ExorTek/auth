@@ -124,13 +124,15 @@ export async function verifyIdToken(idToken, options) {
  * OIDC hash-binding value (`at_hash` / `c_hash`): base64url of the
  * left-most half of the hash of the ASCII value, where the hash matches
  * the id_token's signing alg (…256 → SHA-256, …384 → SHA-384, …512 →
- * SHA-512). EdDSA uses SHA-512 (OIDC Core §3.1.3.6, Ed25519).
+ * SHA-512). EdDSA uses SHA-512 (OIDC Core §3.1.3.6, Ed25519). Exported so
+ * the authorization server's id_token signer computes `at_hash` with the
+ * exact same rule the RP side verifies it by.
  *
  * @param {string} value
  * @param {string} alg
  * @returns {string}
  */
-function tokenHash(value, alg) {
+export function tokenHash(value, alg) {
   const bits = alg.endsWith('384') ? 384 : alg.endsWith('512') || alg === 'EdDSA' ? 512 : 256;
   const digest = createHash(`sha${bits}`).update(value, 'ascii').digest();
   return base64urlEncode(digest.subarray(0, digest.length / 2));

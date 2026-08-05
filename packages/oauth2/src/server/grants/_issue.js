@@ -66,6 +66,30 @@ export function refreshAllowed(config, client) {
 }
 
 /**
+ * Mint and attach an OIDC `id_token` to the response body when the server
+ * is an OpenID Provider (`oidc` configured) AND the grant carried the
+ * `openid` scope. A no-op otherwise, so a plain OAuth 2.1 AS is unaffected.
+ *
+ * @param {Record<string, any>} config
+ * @param {Record<string, unknown>} body            the token response being assembled (mutated on issue)
+ * @param {{ subject: string, clientId: string, scope: string[], nonce?: string, authTime?: number }} grant
+ * @returns {Promise<void>}
+ */
+export async function maybeIssueIdToken(config, body, grant) {
+  if (!config.idTokenSigner || !isArray(grant.scope) || !grant.scope.includes('openid')) {
+    return;
+  }
+  body.id_token = await config.idTokenSigner.sign({
+    subject: grant.subject,
+    clientId: grant.clientId,
+    issuer: config.issuer,
+    nonce: grant.nonce,
+    authTime: grant.authTime,
+    accessToken: isNonEmptyString(body.access_token) ? body.access_token : undefined,
+  });
+}
+
+/**
  * Create and persist a new refresh token. `familyId` is supplied to keep
  * a rotation within its family, or omitted to start a new one.
  *

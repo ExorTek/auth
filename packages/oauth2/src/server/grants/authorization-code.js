@@ -10,7 +10,7 @@ import { isNonEmptyString } from '@exortek/shared/predicates';
 import { ProtocolError, ServerError } from '../errors.js';
 import { verifyCodeVerifier } from '../security/pkce.js';
 import { resolveTokenAudience } from '../security/resource.js';
-import { buildAccessResponse, refreshAllowed, mintRefreshToken } from './_issue.js';
+import { buildAccessResponse, refreshAllowed, mintRefreshToken, maybeIssueIdToken } from './_issue.js';
 
 /**
  * @param {import('../request.js').ServerRequest} req
@@ -68,6 +68,17 @@ export async function authorizationCodeGrant(req, ctx) {
     dpopJkt,
     confirmation: ctx.confirmation,
     extra: buildExtraClaims(record),
+  });
+
+  // OIDC: an `openid`-scoped request on an OpenID Provider gets an id_token
+  // bound to the access token (`at_hash`), the request `nonce`, and the
+  // authentication time captured at the authorize step.
+  await maybeIssueIdToken(config, body, {
+    subject: record.subject,
+    clientId: client.clientId,
+    scope: record.scope,
+    nonce: record.nonce,
+    authTime: record.authTime,
   });
 
   if (refreshAllowed(config, client)) {
