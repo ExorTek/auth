@@ -50,6 +50,10 @@ export const ProtocolError = Object.freeze({
   AUTHORIZATION_PENDING: 'authorization_pending',
   SLOW_DOWN: 'slow_down',
   EXPIRED_TOKEN: 'expired_token',
+
+  // RFC 7591 — dynamic client registration.
+  INVALID_CLIENT_METADATA: 'invalid_client_metadata',
+  INVALID_REDIRECT_URI: 'invalid_redirect_uri',
 });
 
 /**

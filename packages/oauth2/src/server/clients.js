@@ -160,6 +160,23 @@ export function createClientRegistry(clients) {
     getClient(clientId) {
       return byId.get(clientId);
     },
+    /**
+     * Persist a newly-registered client (RFC 7591 dynamic registration).
+     * Accepts a raw {@link ClientConfig} — validated + frozen through
+     * {@link defineClient} — so a registration handler cannot store a
+     * malformed client. Rejects a colliding `clientId`.
+     *
+     * @param {ClientConfig} config
+     * @returns {Client}
+     */
+    register(config) {
+      const defined = defineClient(config);
+      if (byId.has(defined.clientId)) {
+        throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, `duplicate clientId ${JSON.stringify(defined.clientId)}`);
+      }
+      byId.set(defined.clientId, defined);
+      return defined;
+    },
   };
 }
 
