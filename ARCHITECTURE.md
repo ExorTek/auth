@@ -32,23 +32,37 @@ These are the invariants — expect PRs that violate them to be rejected.
 Every package depends on `node:crypto` and its declared peer dependencies —
 nothing else, with no external-dependency exceptions.
 
-### 2. Fully standalone packages (with one sanctioned exception)
+### 2. Fully standalone packages (with sanctioned exceptions)
 
-**New packages do not import from another `@exortek/*` package at runtime.**
+**Leaf packages do not import from another `@exortek/*` package at runtime.**
 Utility duplication (a `base64url` helper in every JOSE package, an
-`ErrorCode` enum per package) is accepted deliberately. A user who installs
-a single package pulls no workspace peers.
+`ErrorCode` enum per package) is accepted deliberately, and the private
+`@exortek/shared` workspace is **bundled** into each package's `dist` rather
+than published — so a user who installs a leaf package pulls no workspace
+peers.
 
-The one sanctioned exception is `@exortek/session`, which imports `seal`,
-`unseal`, and `CryptoError` from `@exortek/crypto`. It was written before
-the standalone policy was formalised and the sealed-cookie primitive was
-too surface-heavy to duplicate. Session's `package.json` declares
-`@exortek/crypto` as a runtime dependency, and installing session pulls
-crypto with it — call this out to anyone marketing "zero dependencies"
-downstream.
+The sanctioned exceptions are packages that compose the published stack and
+cannot reasonably re-bundle it:
+
+- `@exortek/session` imports `seal` / `unseal` / `CryptoError` from
+  `@exortek/crypto`.
+- `@exortek/jwks` imports `@exortek/jwk`.
+- `@exortek/oauth2` composes the JOSE stack — it declares `@exortek/jwt`,
+  `@exortek/jwks`, `@exortek/jwk`, `@exortek/jws`, `@exortek/jwe`, and
+  `@exortek/paseto` as runtime dependencies. Bundling them would duplicate
+  class identities (a bundled `JwtError` would not be `instanceof` a
+  consumer's own `@exortek/jwt`) and bloat every entry, so they are
+  externalised and declared instead.
+
+Each such package declares those `@exortek/*` packages in its `package.json`,
+so installing it pulls them with it — call this out to anyone marketing "zero
+dependencies" downstream. Everything a package uses from the private
+`@exortek/shared` is still bundled, so no unpublished package is ever a
+runtime import.
 
 Every other shipped package (`crypto`, `otp`, `password`, `security`, `jwk`,
-`jws` at time of writing) is fully standalone at runtime.
+`jws`, `jwt`, `jwe`, `paseto` at time of writing) is fully standalone at
+runtime.
 
 The dependency graph below tells you the *semantic* order, not the runtime
 import graph. It is preserved so package authors know which package is
