@@ -1,7 +1,7 @@
 {
   "name": "@exortek/oauth2",
   "version": "0.0.0",
-  "description": "OAuth 2.1 for Node.js 22+ — both halves, secure by default. The relying-party flow (createOAuth + provider presets, mandatory PKCE / state / nonce / iss) and a full authorization server (DPoP incl. nonce, PAR, JAR/JARM, resource indicators, device grant, token exchange, FAPI 2.0) over JWT or PASETO. Server-only, zero-dependency, built on node:crypto.",
+  "description": "OAuth 2.1 for Node.js 22+ — both halves, secure by default. The relying-party flow (createOAuth + provider presets, mandatory PKCE / state / nonce / iss) and a full authorization server (DPoP incl. nonce, PAR, JAR/JARM, resource indicators, device grant, token exchange, FAPI 2.0) over JWT or PASETO. Server-only, zero non-@exortek/* runtime dependencies, built on node:crypto.",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -176,6 +176,34 @@
   },
   "bugs": {
     "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "dependencies": {
+    "@exortek/jwe": "workspace:^",
+    "@exortek/jwk": "workspace:^",
+    "@exortek/jwks": "workspace:^",
+    "@exortek/jws": "workspace:^",
+    "@exortek/jwt": "workspace:^",
+    "@exortek/paseto": "workspace:^"
+  },
+  "peerDependencies": {
+    "express": ">=4.0.0",
+    "fastify": ">=4.0.0",
+    "ioredis": ">=5.0.0",
+    "redis": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    },
+    "ioredis": {
+      "optional": true
+    },
+    "redis": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=22.0.0"
