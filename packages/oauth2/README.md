@@ -1,13 +1,12 @@
 # @exortek/oauth2
 
-> OAuth 2.1 for Node.js 22+ — authorization-code + **PKCE (S256)**, `state` / `nonce` CSRF protection, and provider presets. Server-only, zero-dependency, built on `node:crypto`.
+> OAuth 2.1 for Node.js 22+ — authorization-code + **PKCE (S256)**, `state` / `nonce` CSRF protection, and provider presets. Server-only, zero non-`@exortek/*` runtime dependencies, built on `node:crypto`.
 
 [![npm](https://img.shields.io/npm/v/@exortek/oauth2.svg?color=cb3837)](https://www.npmjs.com/package/@exortek/oauth2)
 [![tests](https://github.com/ExorTek/auth/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ExorTek/auth/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/@exortek/oauth2.svg?color=339933)](https://nodejs.org)
 [![install size](https://packagephobia.com/badge?p=@exortek/oauth2)](https://packagephobia.com/result?p=@exortek/oauth2)
 [![types](https://img.shields.io/badge/types-included-3178C6)](./dist/index.d.ts)
-[![zero-deps](https://img.shields.io/badge/dependencies-0-brightgreen)](./package.json)
 [![license](https://img.shields.io/npm/l/@exortek/oauth2.svg?color=blue)](https://github.com/ExorTek/auth/blob/master/LICENSE)
 
 OAuth's footguns all live in the parts people skip: no PKCE, a `state`
@@ -161,6 +160,42 @@ challenge), PKCE, PAR (RFC 9126), resource indicators (RFC 8707), RAR
 (RFC 7523), mTLS (RFC 8705), token exchange (RFC 8693), and the FAPI 2.0
 profile. Resource servers get `verifyDpopForResource` for the `ath` /
 `cnf.jkt` check.
+
+### OpenID Connect (opt-in)
+
+Pass an `oidc` config and the server becomes an OpenID Provider: it issues a
+signed `id_token` (with `nonce`, `auth_time`, `at_hash`) whenever a request is
+granted the `openid` scope, and serves `/.well-known/openid-configuration`.
+Leave it off and the server stays a plain OAuth 2.1 AS — no `id_token`, no OIDC
+discovery document. The `id_token` is always a JWS, independent of whether
+access tokens are JWT or PASETO.
+
+```js
+const server = createServer({
+  issuer: 'https://as.example.com',
+  clients,
+  tokens: jwtIssuer({ signingKey, alg: 'ES256' }),
+  authenticateUser: req => resolveLoggedInUser(req), // may return { subject, authTime }
+  oidc: { idToken: { signingKey, alg: 'ES256' } }, // → OpenID Provider
+});
+```
+
+### Dynamic client registration (RFC 7591, opt-in)
+
+Add a `registration` config to expose `/register`. It is **initial-access-token
+gated by default** (open registration must be explicit) — an open endpoint lets
+anyone mint clients. A registered client is validated + frozen through
+`defineClient` and immediately usable.
+
+```js
+const server = createServer({
+  /* … */
+  clients: createClientRegistry([]), // a registry that can persist new clients
+  registration: { initialAccessToken: process.env.REGISTRATION_TOKEN },
+});
+// POST /register  Authorization: Bearer <token>  { "redirect_uris": ["https://c/cb"], … }
+// → 201 { client_id, client_secret, … }
+```
 
 ## Modules
 

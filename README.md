@@ -93,7 +93,7 @@ Linked entries are **published on npm**; the rest are **planned** and not yet in
 | 15 | [`@exortek/passkey`](./packages/passkey)   | shipped   | WebAuthn Level 3 / FIDO2 server verification — all seven attestation formats + MDS3 + AAGUID |
 | 16 | [`@exortek/opaque`](./packages/opaque)     | shipped   | opaque reference tokens — RFC 7662 introspection + RFC 7009 revocation HTTP handlers      |
 | 17 | [`@exortek/paseto`](./packages/paseto)     | shipped   | PASETO v4 — `v4.local` (XChaCha20 + keyed BLAKE2b) / `v4.public` (Ed25519), no `alg` header, tokenPair with reuse detection |
-| 18 | [`@exortek/oauth2`](./packages/oauth2)     | shipped   | OAuth 2.1 — RP flow + 18 provider presets, login middleware, full authorization server (DPoP · PAR · JAR/JARM · device · token-exchange · FAPI) |
+| 18 | [`@exortek/oauth2`](./packages/oauth2)     | shipped   | OAuth 2.1 — RP flow + 18 provider presets, login middleware, full authorization server (DPoP · PAR · JAR/JARM · device · token-exchange · dynamic registration · opt-in OIDC id_token · FAPI) |
 | 19 | `@exortek/oidc`                            | _planned_ | OpenID Connect on top of `oauth2`                                                        |
 | 20 | `@exortek/auth`                            | _planned_ | umbrella — re-exports every package above                                                |
 
