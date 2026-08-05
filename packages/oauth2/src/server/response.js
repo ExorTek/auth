@@ -127,7 +127,7 @@ export function errorResponse(err, context = {}) {
   if (err instanceof ServerError) {
     return err.redirectable ? redirectError(context.redirectUri, err, context) : jsonError(err);
   }
-  return json(500, { error: 'server_error' });
+  return json(500, { error: ProtocolError.SERVER_ERROR });
 }
 
 // INTERNAL

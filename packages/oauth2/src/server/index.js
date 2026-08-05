@@ -17,7 +17,7 @@ import { isArray, isFunction, isNonEmptyString, isObject } from '@exortek/shared
 import { ErrorCode, OAuth2Error } from '../internal/errors.js';
 import { requireNonEmptyString } from '../internal/guards.js';
 import { resolveRegistry } from './clients.js';
-import { createAuthCodeStore, createRefreshStore, createParStore, createDeviceStore } from './stores.js';
+import { createAuthCodeStore, createRefreshStore, createParStore, createDeviceStore, isStoreShaped } from './stores.js';
 import { createMetadataHandler } from './handlers/metadata.js';
 import { createAuthorizeHandler } from './handlers/authorize.js';
 import { createTokenHandler } from './handlers/token.js';
@@ -113,10 +113,20 @@ export function createServer(config) {
   const endpoints = resolveEndpoints(issuer, config.endpoints);
 
   const stores = {
-    authCode: config.stores?.authCode ?? createAuthCodeStore(),
-    refresh: config.stores?.refresh ?? createRefreshStore(),
-    par: config.stores?.par ?? createParStore(),
-    device: config.stores?.device ?? createDeviceStore(),
+    authCode: resolveStore(config.stores?.authCode, createAuthCodeStore, 'authCode', ['save', 'consume']),
+    refresh: resolveStore(config.stores?.refresh, createRefreshStore, 'refresh', [
+      'save',
+      'get',
+      'rotate',
+      'revokeFamily',
+    ]),
+    par: resolveStore(config.stores?.par, createParStore, 'par', ['save', 'consume']),
+    device: resolveStore(config.stores?.device, createDeviceStore, 'device', [
+      'save',
+      'getByDeviceCode',
+      'getByUserCode',
+      'update',
+    ]),
   };
 
   // FAPI 2.0 tightens several defaults at once (PLAN Tier C).
@@ -139,6 +149,7 @@ export function createServer(config) {
     security,
     requirePkce,
     dpopRequired,
+    dpopNonceRequired: security.dpop?.nonce === true,
     fapi,
     authenticateUser: config.authenticateUser,
     authorizationCodeTtlMs: parseDuration(security.authorizationCodeTtl ?? DEFAULT_AUTH_CODE_TTL),
@@ -187,6 +198,27 @@ export function createServer(config) {
 }
 
 // CONFIG RESOLUTION
+
+/**
+ * Use an injected store if given (validating it exposes the contract the
+ * server calls), otherwise fall back to the in-memory default.
+ *
+ * @template T
+ * @param {T | undefined} injected
+ * @param {() => T} makeDefault
+ * @param {string} name
+ * @param {string[]} methods
+ * @returns {T}
+ */
+function resolveStore(injected, makeDefault, name, methods) {
+  if (injected === undefined) {
+    return makeDefault();
+  }
+  if (!isStoreShaped(injected, methods)) {
+    throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, `stores.${name} must implement ${methods.join(' / ')}`);
+  }
+  return injected;
+}
 
 /**
  * @param {string} issuer

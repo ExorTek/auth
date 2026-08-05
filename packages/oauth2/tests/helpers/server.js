@@ -89,11 +89,21 @@ export async function dpopClient() {
   const kp = generateKeyPairSync('ec', { namedCurve: 'P-256' });
   const jwk = await exportJWK(kp.publicKey);
   const jkt = await thumbprint(jwk);
-  const proof = (htm, htu) =>
-    jwsSign({ jti: `${Math.random()}`, htm, htu, iat: Math.floor(Date.now() / 1000) }, kp.privateKey, {
-      alg: 'ES256',
-      header: { typ: 'dpop+jwt', jwk },
-    });
+  const proof = (htm, htu, nonce) =>
+    jwsSign(
+      {
+        jti: `${Math.random()}`,
+        htm,
+        htu,
+        iat: Math.floor(Date.now() / 1000),
+        ...(nonce ? { nonce } : {}),
+      },
+      kp.privateKey,
+      {
+        alg: 'ES256',
+        header: { typ: 'dpop+jwt', jwk },
+      },
+    );
   return { kp, jwk, jkt, proof };
 }
 

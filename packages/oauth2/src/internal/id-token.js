@@ -28,7 +28,7 @@ import { ErrorCode, OAuth2Error } from './errors.js';
 // (symmetric) family are excluded structurally — an id_token is signed
 // with the provider's asymmetric key, never a shared secret, so RS/HS
 // confusion is impossible to express here.
-const DEFAULT_ALGS = ['RS256', 'ES256', 'PS256', 'RS384', 'ES384', 'RS512', 'ES512', 'EdDSA'];
+export const DEFAULT_ID_TOKEN_ALGS = ['RS256', 'ES256', 'PS256', 'RS384', 'ES384', 'RS512', 'ES512', 'EdDSA'];
 
 /** Map an `@exortek/jwt` failure code onto our specific error code. */
 const JWT_CODE_MAP = {
@@ -70,7 +70,7 @@ export function createJwksResolver(jwksUri, options) {
  * @returns {Promise<{ claims: Record<string, unknown>, header: Record<string, unknown>, sub: string }>}
  */
 export async function verifyIdToken(idToken, options) {
-  const { jwks, issuer, clientId, nonce, clockTolerance, algs = DEFAULT_ALGS, accessToken, code } = options;
+  const { jwks, issuer, clientId, nonce, clockTolerance, algs = DEFAULT_ID_TOKEN_ALGS, accessToken, code } = options;
 
   /** @type {{ header: Record<string, unknown>, payload: Record<string, unknown> }} */
   let result;

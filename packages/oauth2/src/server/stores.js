@@ -19,7 +19,7 @@
  *     (RFC 8628), approved or denied out of band.
  */
 import { createMemoryRecordStore } from '@exortek/shared/record-store';
-import { isObject } from '@exortek/shared/predicates';
+import { isFunction, isNumber, isObject } from '@exortek/shared/predicates';
 
 // TTL PRIMITIVE
 
@@ -137,6 +137,7 @@ export function createAuthCodeStore() {
  * @property {string} [dpopJkt]
  * @property {number} [expiresAt]    epoch ms after which the token is expired
  * @property {boolean} [used]        set when rotated away — a later presentation is reuse
+ * @property {boolean} [revoked]     set when the whole family was burned (reuse detected)
  *
  * @typedef {Object} RefreshStore
  * @property {(record: RefreshRecord) => Promise<void>} save
@@ -157,7 +158,7 @@ export function createRefreshStore() {
       // An expired refresh token is treated as absent (the memory record
       // store has no TTL of its own); a Redis-backed store would let the
       // key expire instead.
-      if (record && typeof record.expiresAt === 'number' && record.expiresAt <= Date.now()) {
+      if (record && isNumber(record.expiresAt) && record.expiresAt <= Date.now()) {
         return null;
       }
       return record;
@@ -276,7 +277,5 @@ const DEVICE_REEARM_MS = 600_000;
  * @returns {boolean}
  */
 export function isStoreShaped(store, methods) {
-  return (
-    isObject(store) && methods.every(m => typeof (/** @type {Record<string, unknown>} */ (store)[m]) === 'function')
-  );
+  return isObject(store) && methods.every(m => isFunction(/** @type {Record<string, unknown>} */ (store)[m]));
 }

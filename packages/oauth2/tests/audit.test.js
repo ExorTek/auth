@@ -7,6 +7,7 @@ import { sign as jwtSign } from '@exortek/jwt';
 
 import { jwtIssuer } from '../src/server/index.js';
 import { createParStore, createAuthCodeStore } from '../src/server/stores.js';
+import { mountOAuth2Server } from '../src/server/middleware/express.js';
 import {
   buildServer,
   getAuthorizationCode,
@@ -405,4 +406,107 @@ test('P1: a refresh token past refreshTokenTtl is no longer valid', async () => 
     ),
   );
   assert.equal(res.error, 'invalid_grant');
+});
+
+// BATCH 4 — correctness polish + dead surface
+
+test('C9: an unknown response_mode is rejected (redirectable invalid_request)', async () => {
+  const { server } = buildServer();
+  const res = await server.authorize(
+    get('/authorize', {
+      client_id: 'app',
+      redirect_uri: 'https://app.example.com/cb',
+      response_type: 'code',
+      state: 's',
+      response_mode: 'fragment',
+      code_challenge: 'a'.repeat(43),
+      code_challenge_method: 'S256',
+    }),
+  );
+  assert.equal(new URL(res.headers.location).searchParams.get('error'), 'invalid_request');
+});
+
+test('C9: metadata advertises response_modes_supported per jarm config', async () => {
+  const plain = body(await buildServer().server.metadata(get('/.well-known/oauth-authorization-server', {})));
+  assert.deepEqual(plain.response_modes_supported, ['query']);
+  const jarm = body(await buildServer({ jarm: { alg: 'ES256' } }).server.metadata(get('/x', {})));
+  assert.deepEqual(jarm.response_modes_supported, ['query', 'jwt']);
+});
+
+test('D1: revoke rejects an unsupported token_type_hint (unsupported_token_type)', async () => {
+  const { server } = buildServer();
+  const res = body(
+    await server.revoke(
+      post({ token: 'whatever', token_type_hint: 'bogus', client_id: 'app', client_secret: 's3cret-value-strong' }),
+    ),
+  );
+  assert.equal(res.error, 'unsupported_token_type');
+});
+
+test('D1: a DPoP nonce challenge is issued, then the retry succeeds', async () => {
+  const dpop = await dpopClient();
+  const { server } = buildServer({ security: { dpop: { nonce: true } } });
+  const { code, pkce, redirectUri } = await getAuthorizationCode(server, { scope: 'read' });
+
+  // First attempt carries a proof but no nonce → use_dpop_nonce + header.
+  const challenge = await server.token(
+    post(
+      {
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        client_id: 'app',
+        client_secret: 's3cret-value-strong',
+        code_verifier: pkce.codeVerifier,
+      },
+      { dpop: await dpop.proof('POST', `${ISSUER}/token`) },
+    ),
+  );
+  assert.equal(body(challenge).error, 'use_dpop_nonce');
+  const nonce = challenge.headers['dpop-nonce'];
+  assert.ok(nonce, 'a DPoP-Nonce header is supplied');
+
+  // The code was NOT consumed on the challenge — retry with the nonce.
+  const ok = body(
+    await server.token(
+      post(
+        {
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: redirectUri,
+          client_id: 'app',
+          client_secret: 's3cret-value-strong',
+          code_verifier: pkce.codeVerifier,
+        },
+        { dpop: await dpop.proof('POST', `${ISSUER}/token`, nonce) },
+      ),
+    ),
+  );
+  assert.ok(ok.access_token);
+  assert.equal(ok.token_type, 'DPoP');
+});
+
+test('D5: the express adapter mounts at the configured endpoint paths', () => {
+  /** @type {Array<[string, string]>} */
+  const routes = [];
+  const app = {
+    get: p => routes.push(['GET', p]),
+    post: p => routes.push(['POST', p]),
+  };
+  const { server } = buildServer({ endpoints: { token: 'https://as.example.com/oauth/token' } });
+  mountOAuth2Server(app, server);
+  assert.ok(
+    routes.some(r => r[0] === 'POST' && r[1] === '/oauth/token'),
+    'token endpoint mounts at its configured path',
+  );
+});
+
+test('D2: an injected store missing a method is rejected at createServer', () => {
+  assert.throws(
+    () => buildServer({ stores: { par: { save() {} } } }),
+    err => {
+      assert.match(err.message, /stores\.par/);
+      return true;
+    },
+  );
 });

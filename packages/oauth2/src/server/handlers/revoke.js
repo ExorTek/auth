@@ -35,6 +35,16 @@ export function createRevokeHandler(config) {
         throw new ServerError(ProtocolError.INVALID_REQUEST, 'missing token');
       }
 
+      // RFC 7009 §2.1: `token_type_hint` is optional, but a value the
+      // server does not support is `unsupported_token_type`.
+      const hint = req.form.token_type_hint;
+      if (isNonEmptyString(hint) && hint !== 'access_token' && hint !== 'refresh_token') {
+        throw new ServerError(
+          ProtocolError.UNSUPPORTED_TOKEN_TYPE,
+          `unsupported token_type_hint ${JSON.stringify(hint)}`,
+        );
+      }
+
       // Only refresh tokens are stateful here. Revoke the family, but only
       // when the token belongs to the caller — a client must not revoke
       // another client's token. Ownership mismatch is silently a no-op

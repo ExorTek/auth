@@ -15,26 +15,32 @@
  * `{ status, headers, body }` response. This adapter only translates
  * to/from Express's native `req`/`res`.
  */
-import { isFunction } from '@exortek/shared/predicates';
+import { isFunction, isString } from '@exortek/shared/predicates';
+
+import { errorResponse } from '../response.js';
 
 /**
  * Wrap a single server handler as an Express `(req, res)` handler.
  *
  * @param {(raw: import('../request.js').RawRequest) => Promise<import('../response.js').ServerResponse>} handler
- * @returns {(req: any, res: any, next: any) => Promise<void>}
+ * @returns {(req: any, res: any) => Promise<void>}
  */
 export function expressHandler(handler) {
-  return async function oauth2ExpressHandler(req, res, next) {
+  return async function oauth2ExpressHandler(req, res) {
+    // An unexpected throw is masked as `server_error` at the boundary
+    // rather than surfaced to Express's default handler (which would leak
+    // a stack trace in development).
+    let out;
     try {
-      const out = await handler(toRawRequest(req));
-      res.status(out.status);
-      for (const [name, value] of Object.entries(out.headers)) {
-        res.setHeader(name, value);
-      }
-      res.send(out.body);
+      out = await handler(toRawRequest(req));
     } catch (err) {
-      next(err);
+      out = errorResponse(err);
     }
+    res.status(out.status);
+    for (const [name, value] of Object.entries(out.headers)) {
+      res.setHeader(name, value);
+    }
+    res.send(out.body);
   };
 }
 
@@ -48,14 +54,50 @@ export function expressHandler(handler) {
  */
 export function mountOAuth2Server(app, server, options = {}) {
   const base = options.basePath ?? '';
+  // Mount each endpoint at the path portion of its configured URL so a
+  // custom `endpoints` override stays consistent with the advertised
+  // metadata and the DPoP `htu` the core validates against.
+  const p = endpointPaths(server);
   app.get(`${base}/.well-known/oauth-authorization-server`, expressHandler(server.metadata));
   app.get(`${base}/.well-known/openid-configuration`, expressHandler(server.metadata));
-  app.get(`${base}/authorize`, expressHandler(server.authorize));
-  app.post(`${base}/token`, expressHandler(server.token));
-  app.post(`${base}/revoke`, expressHandler(server.revoke));
-  app.post(`${base}/introspect`, expressHandler(server.introspect));
-  app.post(`${base}/par`, expressHandler(server.par));
-  app.post(`${base}/device_authorization`, expressHandler(server.deviceAuthorization));
+  app.get(`${base}${p.authorization}`, expressHandler(server.authorize));
+  app.post(`${base}${p.token}`, expressHandler(server.token));
+  app.post(`${base}${p.revocation}`, expressHandler(server.revoke));
+  app.post(`${base}${p.introspection}`, expressHandler(server.introspect));
+  app.post(`${base}${p.par}`, expressHandler(server.par));
+  app.post(`${base}${p.deviceAuthorization}`, expressHandler(server.deviceAuthorization));
+}
+
+/**
+ * The path portion of each configured endpoint URL, so the adapter mounts
+ * exactly where the metadata says the endpoint lives.
+ *
+ * @param {ReturnType<import('../index.js').createServer>} server
+ * @returns {Record<string, string>}
+ */
+export function endpointPaths(server) {
+  const endpoints = server?._config?.endpoints ?? {};
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const [key, url] of Object.entries(endpoints)) {
+    out[key] = pathOf(url);
+  }
+  return out;
+}
+
+/**
+ * @param {unknown} url
+ * @returns {string}
+ */
+function pathOf(url) {
+  if (!isString(url)) {
+    return '/';
+  }
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url.startsWith('/') ? url : `/${url}`;
+  }
 }
 
 /**

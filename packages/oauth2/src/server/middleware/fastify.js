@@ -13,7 +13,9 @@
  * (no encapsulation) without a hard dependency on the npm package.
  */
 import { fastifyPlugin } from '@exortek/shared/fastify-plugin';
-import { isFunction, isObject } from '@exortek/shared/predicates';
+import { isFunction, isObject, isString } from '@exortek/shared/predicates';
+
+import { errorResponse } from '../response.js';
 
 /**
  * @typedef {Object} OAuth2ServerPluginOptions
@@ -31,6 +33,10 @@ async function oauth2ServerPluginFn(fastify, options) {
     throw new TypeError('oauth2ServerPlugin requires { server } from createServer()');
   }
   const base = options.basePath ?? '';
+  // Mount each endpoint at the path portion of its configured URL so a
+  // custom `endpoints` override stays consistent with the advertised
+  // metadata and the DPoP `htu` the core validates against.
+  const p = endpointPaths(server);
 
   const route = (method, path, handler) => {
     fastify.route({
@@ -42,12 +48,44 @@ async function oauth2ServerPluginFn(fastify, options) {
 
   route('GET', '/.well-known/oauth-authorization-server', server.metadata);
   route('GET', '/.well-known/openid-configuration', server.metadata);
-  route('GET', '/authorize', server.authorize);
-  route('POST', '/token', server.token);
-  route('POST', '/revoke', server.revoke);
-  route('POST', '/introspect', server.introspect);
-  route('POST', '/par', server.par);
-  route('POST', '/device_authorization', server.deviceAuthorization);
+  route('GET', p.authorization, server.authorize);
+  route('POST', p.token, server.token);
+  route('POST', p.revocation, server.revoke);
+  route('POST', p.introspection, server.introspect);
+  route('POST', p.par, server.par);
+  route('POST', p.deviceAuthorization, server.deviceAuthorization);
+}
+
+/**
+ * The path portion of each configured endpoint URL, so the plugin mounts
+ * exactly where the metadata says the endpoint lives.
+ *
+ * @param {ReturnType<import('../index.js').createServer>} server
+ * @returns {Record<string, string>}
+ */
+function endpointPaths(server) {
+  const endpoints = server?._config?.endpoints ?? {};
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const [key, url] of Object.entries(endpoints)) {
+    out[key] = pathOf(url);
+  }
+  return out;
+}
+
+/**
+ * @param {unknown} url
+ * @returns {string}
+ */
+function pathOf(url) {
+  if (!isString(url)) {
+    return '/';
+  }
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url.startsWith('/') ? url : `/${url}`;
+  }
 }
 
 /**
@@ -55,14 +93,21 @@ async function oauth2ServerPluginFn(fastify, options) {
  */
 function adapt(handler) {
   return async function oauth2FastifyRoute(request, reply) {
-    const out = await handler({
-      method: request.method,
-      url: request.url,
-      headers: request.headers,
-      query: request.query,
-      body: request.body,
-      clientCertificate: readPeerCertificate(request),
-    });
+    // An unexpected throw is masked as `server_error` at the boundary
+    // rather than surfaced to Fastify's default error serializer.
+    let out;
+    try {
+      out = await handler({
+        method: request.method,
+        url: request.url,
+        headers: request.headers,
+        query: request.query,
+        body: request.body,
+        clientCertificate: readPeerCertificate(request),
+      });
+    } catch (err) {
+      out = errorResponse(err);
+    }
     reply.status(out.status);
     for (const [name, value] of Object.entries(out.headers)) {
       reply.header(name, value);

@@ -12,8 +12,11 @@
  * proof is allowed only when neither the client nor the server requires
  * DPoP — otherwise it is `invalid_dpop_proof`.
  */
+import { randomBytes } from 'node:crypto';
+
 import { importJWK, thumbprint } from '@exortek/jwk';
 import { verify as jwsVerify, decodeProtectedHeader } from '@exortek/jws';
+import { encode as base64urlEncode } from '@exortek/shared/base64url';
 import { isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
@@ -41,6 +44,48 @@ const MAX_PROOF_AGE_MS = 60_000;
 /** @type {Map<string, number>} */
 const seenJti = new Map();
 
+// Server-provided DPoP nonce (RFC 9449 §8-9). When the server requires a
+// nonce, the client must echo the most recent `DPoP-Nonce` value as the
+// proof's `nonce` claim; a missing/stale nonce is answered with
+// `use_dpop_nonce` and a fresh `DPoP-Nonce` header so the client retries.
+// Issued nonces are accepted for a short window (module-level, single-
+// process — a multi-node deployment supplies a shared nonce service).
+const NONCE_TTL_MS = 300_000;
+/** @type {Map<string, number>} nonce → expiry epoch ms */
+const issuedNonces = new Map();
+
+/**
+ * Mint a fresh DPoP nonce, remember it for the acceptance window, and
+ * return the value to hand back in the `DPoP-Nonce` header.
+ *
+ * @returns {string}
+ */
+function issueNonce() {
+  const now = Date.now();
+  if (issuedNonces.size > 1024) {
+    for (const [value, exp] of issuedNonces) {
+      if (exp <= now) {
+        issuedNonces.delete(value);
+      }
+    }
+  }
+  const nonce = base64urlEncode(randomBytes(16));
+  issuedNonces.set(nonce, now + NONCE_TTL_MS);
+  return nonce;
+}
+
+/**
+ * @param {unknown} nonce
+ * @returns {boolean}
+ */
+function isValidNonce(nonce) {
+  if (!isNonEmptyString(nonce)) {
+    return false;
+  }
+  const exp = issuedNonces.get(nonce);
+  return exp !== undefined && exp > Date.now();
+}
+
 /**
  * Resolve the DPoP binding for a token-endpoint request.
  *
@@ -53,6 +98,7 @@ const seenJti = new Map();
 export async function resolveDpopBinding(req, config, client, options = {}) {
   const proof = req.header('dpop');
   const required = config.dpopRequired === true || client.dpopBoundAccessTokens === true;
+  const nonceRequired = config.dpopNonceRequired === true;
 
   if (!isNonEmptyString(proof)) {
     if (required) {
@@ -61,21 +107,38 @@ export async function resolveDpopBinding(req, config, client, options = {}) {
     return { dpopJkt: undefined, nonceHeaders: {} };
   }
 
-  const jkt = await verifyDpopProof(proof, {
+  const { jkt, nonce } = await verifyDpopProof(proof, {
     htm: req.method,
     // The proof binds to the endpoint it was sent to — the token endpoint,
     // or the PAR endpoint for a `dpop_jkt` pre-binding (RFC 9449 §10.1).
     htu: isNonEmptyString(options.htu) ? options.htu : config.endpoints.token,
   });
-  return { dpopJkt: jkt, nonceHeaders: {} };
+
+  // RFC 9449 §8-9: when the server requires a nonce, a proof that omits it
+  // or carries a stale one is answered with `use_dpop_nonce` plus a fresh
+  // `DPoP-Nonce` header, and the client retries with the new value.
+  if (nonceRequired && !isValidNonce(nonce)) {
+    throw new ServerError(
+      ProtocolError.USE_DPOP_NONCE,
+      'a DPoP proof nonce is required; retry with the supplied nonce',
+      {
+        headers: { 'DPoP-Nonce': issueNonce() },
+      },
+    );
+  }
+
+  // On success, hand the client a fresh nonce to use on its next request
+  // (kept rotating so a captured nonce ages out). Only when nonces are on.
+  return { dpopJkt: jkt, nonceHeaders: nonceRequired ? { 'DPoP-Nonce': issueNonce() } : {} };
 }
 
 /**
- * Verify a DPoP proof JWT and return its key thumbprint (`jkt`).
+ * Verify a DPoP proof JWT and return its key thumbprint (`jkt`) plus the
+ * `nonce` claim (if any) for the caller's nonce-challenge check.
  *
  * @param {string} proof
  * @param {{ htm: string, htu: string }} binding
- * @returns {Promise<string>}
+ * @returns {Promise<{ jkt: string, nonce: string | undefined }>}
  */
 export async function verifyDpopProof(proof, binding) {
   let header;
@@ -126,7 +189,7 @@ export async function verifyDpopProof(proof, binding) {
   assertFresh(payload.iat);
   assertUnique(payload.jti);
 
-  return jkt;
+  return { jkt, nonce: isNonEmptyString(payload.nonce) ? payload.nonce : undefined };
 }
 
 /**
@@ -178,7 +241,13 @@ function assertUnique(jti) {
   seenJti.set(jti, now + MAX_PROOF_AGE_MS);
 }
 
-/** Test hook — clear the replay cache between cases. */
+/** Test hook — clear the replay + nonce caches between cases. */
 export function _clearDpopReplayCache() {
   seenJti.clear();
+  issuedNonces.clear();
+}
+
+/** Test hook — mint a nonce as the server would (to seed a proof). */
+export function _issueDpopNonce() {
+  return issueNonce();
 }

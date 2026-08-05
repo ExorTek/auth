@@ -150,9 +150,13 @@ function searchParamsToObject(params) {
 }
 
 /**
- * Coerce a params object to flat strings, dropping absent values. Nested
- * structures (e.g. RAR `authorization_details`) are kept verbatim so the
- * relevant handler can validate them; everything else becomes a string.
+ * Drop absent (null/undefined) values from a params object; every value
+ * that survives is passed through as-is. A string stays a string; a
+ * non-string value (e.g. an already-parsed RAR `authorization_details`
+ * array from a JSON body) is kept verbatim — not stringified — so the
+ * relevant handler can validate its real shape. The `Record<…,string>`
+ * return type reflects the common form-encoded case, not a guarantee that
+ * every value was coerced.
  *
  * @param {Record<string, unknown>} obj
  * @returns {Record<string, string>}
