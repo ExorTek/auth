@@ -43,6 +43,7 @@ LABELS=(
   "pkg:opaque|c9d1d9|Concerns @exortek/opaque"
   "pkg:passkey|9dd6ff|Concerns @exortek/passkey"
   "pkg:paseto|fed7aa|Concerns @exortek/paseto"
+  "pkg:oauth2|b5e7a0|Concerns @exortek/oauth2"
   "pkg:tooling|e4e669|Repo tooling — build, CI, docs site, monorepo config"
 
   "good-first-issue|7057ff|Small, well-scoped — a nice entry point for new contributors"
