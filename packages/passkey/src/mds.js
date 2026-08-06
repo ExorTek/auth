@@ -94,7 +94,6 @@ export function verifyMdsBlob(jwsCompact, options) {
       return new X509Certificate(Buffer.from(b64, 'base64'));
     } catch (err) {
       throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, `mds: x5c[${i}] not a valid certificate (${err.message})`);
-      return null;
     }
   });
   const leaf = chain[0];
