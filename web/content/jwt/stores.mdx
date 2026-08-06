@@ -102,6 +102,12 @@ Every method receives / returns the same shape the built-ins do. Wire
 up MongoDB, SQLite, DynamoDB, Cloudflare KV, or any other backing
 store.
 
+`impl` is validated at construction: `add` / `has` / `get` / `delete` /
+`deleteAll` are required and a missing one raises `INVALID_ARGUMENT`
+immediately (instead of failing later inside a token operation).
+`markUsed` (refresh-token rotation) and `size` are optional — a
+blacklist-only store may omit them.
+
 ## `Store` shape
 
 ```ts

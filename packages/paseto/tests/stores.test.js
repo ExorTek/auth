@@ -139,6 +139,11 @@ test('createStore: custom requires an impl object; unknown kind rejected', () =>
     () => createStore('custom', {}),
     err => err.code === ErrorCode.INVALID_ARGUMENT,
   );
+  // A partial impl (missing has/get/delete/deleteAll) is rejected up front.
+  assert.throws(
+    () => createStore('custom', /** @type {any} */ ({ impl: { add() {} } })),
+    err => err.code === ErrorCode.INVALID_ARGUMENT,
+  );
   assert.throws(
     () => createStore('nope'),
     err => err.code === ErrorCode.INVALID_ARGUMENT,

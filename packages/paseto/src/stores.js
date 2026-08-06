@@ -5,7 +5,11 @@
  * shape.
  */
 
-import { isObject } from '@exortek/shared/predicates';
+import { assertStoreShape } from '@exortek/shared/custom-store';
+
+// Core registry contract every custom impl must satisfy. `markUsed` is only
+// exercised by refresh-token rotation, so a blacklist-only store may omit it.
+const CUSTOM_STORE_REQUIRED = ['add', 'has', 'get', 'delete', 'deleteAll'];
 
 import { createMemoryStore } from './internal/memory-store.js';
 import { createRedisStore } from './internal/redis-store.js';
@@ -39,10 +43,8 @@ export function createStore(kind, options) {
     case 'redis':
       return createRedisStore(/** @type {RedisConfig} */ (options));
     case 'custom': {
-      const cfg = /** @type {CustomConfig} */ (options);
-      if (!cfg || !isObject(cfg.impl)) {
-        throw invalidArgument('createStore("custom").options.impl must be a Store object');
-      }
+      const cfg = /** @type {CustomConfig} */ (options) ?? {};
+      assertStoreShape(cfg.impl, CUSTOM_STORE_REQUIRED, invalidArgument);
       return cfg.impl;
     }
     default:

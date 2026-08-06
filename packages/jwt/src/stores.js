@@ -6,9 +6,14 @@
  * Subpath entry (`@exortek/jwt/stores`).
  */
 
+import { assertStoreShape } from '@exortek/shared/custom-store';
 import { createMemoryStore } from './internal/memory-store.js';
 import { createRedisStore } from './internal/redis-store.js';
 import { invalidArgument } from './internal/guards.js';
+
+// Core blacklist contract every custom impl must satisfy. `markUsed` is only
+// exercised by refresh-token rotation, so a blacklist-only store may omit it.
+const CUSTOM_STORE_REQUIRED = ['add', 'has', 'get', 'delete', 'deleteAll'];
 
 /**
  * @typedef {import('./internal/memory-store.js').Store} Store
@@ -52,10 +57,8 @@ export function createStore(kind, options) {
     case 'redis':
       return createRedisStore(/** @type {RedisConfig} */ (options));
     case 'custom': {
-      const cfg = /** @type {CustomConfig} */ (options);
-      if (!cfg || typeof cfg.impl !== 'object' || cfg.impl === null) {
-        throw invalidArgument('createStore("custom").options.impl must be a Store object');
-      }
+      const cfg = /** @type {CustomConfig} */ (options) ?? {};
+      assertStoreShape(cfg.impl, CUSTOM_STORE_REQUIRED, invalidArgument);
       return cfg.impl;
     }
     default:

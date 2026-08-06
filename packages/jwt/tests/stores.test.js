@@ -122,6 +122,14 @@ test('custom: missing impl raises INVALID_ARGUMENT', () => {
   );
 });
 
+test('custom: impl missing a required method raises INVALID_ARGUMENT', () => {
+  // Only `add` — the store contract needs has/get/delete/deleteAll too.
+  assert.throws(
+    () => createStore('custom', /** @type {any} */ ({ impl: { add() {} } })),
+    err => err instanceof JwtError && err.code === ErrorCode.INVALID_ARGUMENT,
+  );
+});
+
 test('createStore: unknown kind raises INVALID_ARGUMENT', () => {
   assert.throws(
     () => createStore(/** @type {any} */ ('mongodb'), {}),

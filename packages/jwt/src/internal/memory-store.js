@@ -1,9 +1,12 @@
 /**
  * In-process blacklist / refresh-token store with configurable GC.
  *
- * Uses a `Map<string, StoreRecord>` for O(1) lookups. Expiry is always
- * enforced on `has` / `get` — expired records are never returned. The
- * GC strategy only controls how the underlying map reclaims memory:
+ * A thin binding over `@exortek/shared/registry-store` — the Map-backed
+ * implementation, expiry-on-read, and the `interval` / `lazy` / `lru` GC
+ * strategies all live there. This file supplies jwt's error class and its
+ * duration parser, and declares the public store types locally so the
+ * emitted `.d.ts` stays self-contained (no reference to the private,
+ * never-published `@exortek/shared`).
  *
  *   - `interval` (default) — a periodic sweep drops expired entries;
  *     safe under high churn but wakes the event loop at fixed cadence.
@@ -15,7 +18,7 @@
  *     silently un-revokes tokens whose entry got dropped for capacity.
  */
 
-import { isFunction } from '@exortek/shared/predicates';
+import { createMemoryRegistryStore } from '@exortek/shared/registry-store';
 
 import { JwtError, ErrorCode } from './errors.js';
 import { parseDuration } from './duration.js';
@@ -49,145 +52,8 @@ import { parseDuration } from './duration.js';
  * @returns {Store}
  */
 export function createMemoryStore(options) {
-  const opts = options || {};
-  const gc = opts.gc || {};
-  const strategy = gc.strategy || 'interval';
-  const maxSize = gc.maxSize ?? opts.maxSize ?? Infinity;
-  const intervalMs =
-    strategy === 'interval' || strategy === 'lru' ? Math.max(1000, parseDuration(gc.interval ?? '5m') * 1000) : 0;
-
-  /** @type {Map<string, StoreRecord>} */
-  const map = new Map();
-  /** @type {NodeJS.Timeout | null} */
-  let timer = null;
-
-  const now = () => Math.floor(Date.now() / 1000);
-
-  const expiredSweep = () => {
-    const t = now();
-    for (const [k, v] of map) {
-      if (v.expiresAt <= t) {
-        map.delete(k);
-      }
-    }
-  };
-
-  const enforceCap = () => {
-    if (map.size <= maxSize) {
-      return;
-    }
-    // Drop insertion-order oldest until under cap. Map preserves
-    // insertion order (ES2015+).
-    while (map.size > maxSize) {
-      const oldest = map.keys().next().value;
-      if (oldest === undefined) {
-        break;
-      }
-      map.delete(oldest);
-    }
-  };
-
-  if (intervalMs > 0) {
-    timer = setInterval(() => {
-      expiredSweep();
-      enforceCap();
-    }, intervalMs);
-    if (isFunction(timer.unref)) {
-      timer.unref();
-    }
-  }
-
-  const matches = (record, filter) => {
-    const meta = record.metadata;
-    if (!meta) {
-      return false;
-    }
-    for (const [k, v] of Object.entries(filter)) {
-      if (meta[k] !== v) {
-        return false;
-      }
-    }
-    return true;
-  };
-
-  return {
-    async add(key, expiresAt, metadata) {
-      if (typeof key !== 'string' || key.length === 0) {
-        throw new JwtError(ErrorCode.STORE_ERROR, 'memory-store.add: key must be a non-empty string');
-      }
-      if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) {
-        throw new JwtError(ErrorCode.STORE_ERROR, 'memory-store.add: expiresAt must be a finite NumericDate');
-      }
-      map.set(key, { expiresAt, ...(metadata ? { metadata } : {}) });
-      if (strategy === 'lru') {
-        enforceCap();
-      }
-    },
-    async has(key) {
-      const record = map.get(key);
-      if (!record) {
-        return false;
-      }
-      if (record.expiresAt <= now()) {
-        map.delete(key);
-        return false;
-      }
-      return true;
-    },
-    async get(key) {
-      const record = map.get(key);
-      if (!record) {
-        return null;
-      }
-      if (record.expiresAt <= now()) {
-        map.delete(key);
-        return null;
-      }
-      return record;
-    },
-    async delete(key) {
-      map.delete(key);
-    },
-    async deleteAll(filter) {
-      if (filter == null || typeof filter !== 'object') {
-        throw new JwtError(
-          ErrorCode.STORE_ERROR,
-          'memory-store.deleteAll: filter must be an object of metadata key/value pairs',
-        );
-      }
-      let count = 0;
-      for (const [k, record] of map) {
-        if (matches(record, filter)) {
-          map.delete(k);
-          count++;
-        }
-      }
-      return count;
-    },
-    async markUsed(key, nowSec) {
-      const record = map.get(key);
-      if (!record || record.expiresAt <= now()) {
-        if (record) {
-          map.delete(key);
-        }
-        return null;
-      }
-      const meta = record.metadata || {};
-      if (meta.usedAt != null) {
-        return { swapped: false, record };
-      }
-      const updated = { ...record, metadata: { ...meta, usedAt: nowSec } };
-      map.set(key, updated);
-      return { swapped: true, record: updated };
-    },
-    size() {
-      return map.size;
-    },
-    _stop() {
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
-    },
-  };
+  return createMemoryRegistryStore(
+    { StoreError: JwtError, storeErrorCode: ErrorCode.STORE_ERROR, parseIntervalSeconds: parseDuration },
+    options,
+  );
 }

@@ -33,11 +33,14 @@
     "./incr-store": "./src/incr-store.js",
     "./redis-helpers": "./src/redis-helpers.js",
     "./record-store": "./src/record-store.js",
+    "./custom-store": "./src/custom-store.js",
+    "./registry-store": "./src/registry-store.js",
     "./fastify-plugin": "./src/fastify-plugin.js",
     "./test-helpers/redis-drivers": "./test-helpers/redis-drivers.js"
   },
   "scripts": {
     "build": "echo 'shared has no build step — source consumed via bundler inline'",
+    "build:types": "tsc -p tsconfig.types.json",
     "test": "node --test 'tests/**/*.test.js'",
     "typecheck": "echo 'no build, no typecheck'",
     "prepack": "cp ../../LICENSE ./LICENSE"
