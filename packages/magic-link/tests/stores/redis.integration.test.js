@@ -19,21 +19,6 @@ import { forEachRedisDriver } from '@exortek/shared/test-helpers/redis-drivers';
 
 import { redisStore } from '../../src/stores/redis.js';
 
-// `consume` and `incrRate` both issue their Lua call in the ioredis
-// positional form for every client. Fixed in the follow-up commit.
-const WRONG_EVAL_FORM = { todo: { 'node-redis': 'redis dialect branch — fixed in a follow-up' } };
-
-// Separate defect, independent of the driver: the CONSUME script guards with
-// `if record.consumedAt then …`, but cjson maps a JSON null to a *truthy*
-// sentinel, so a record carrying an explicit `consumedAt: null` can never be
-// consumed. Fixed in the same follow-up.
-const CJSON_NULL = {
-  todo: {
-    ioredis: 'cjson.null truthiness in CONSUME — fixed in a follow-up',
-    'node-redis': 'cjson.null truthiness in CONSUME — fixed in a follow-up',
-  },
-};
-
 function newRecord(id, email, extras = {}) {
   return {
     id,
@@ -45,7 +30,7 @@ function newRecord(id, email, extras = {}) {
 }
 
 forEachRedisDriver('magic-link redis store', ({ test, client, ns, raw }) => {
-  test('put + getById + consume atomicity', WRONG_EVAL_FORM, async () => {
+  test('put + getById + consume atomicity', async () => {
     const store = redisStore(client(), { keyPrefix: ns('a') });
     await store.put(newRecord('id1', 'a@x.com'));
 
@@ -59,7 +44,7 @@ forEachRedisDriver('magic-link redis store', ({ test, client, ns, raw }) => {
     assert.ok(after.consumedAt > 0);
   });
 
-  test('a record stored with an explicit consumedAt: null is still consumable', CJSON_NULL, async () => {
+  test('a record stored with an explicit consumedAt: null is still consumable', async () => {
     const store = redisStore(client(), { keyPrefix: ns('b') });
     await store.put(newRecord('id-null', 'a@x.com', { consumedAt: null }));
 
@@ -84,9 +69,7 @@ forEachRedisDriver('magic-link redis store', ({ test, client, ns, raw }) => {
     assert.ok(pttl > 0 && pttl <= 60_000, `expected a bounded TTL, got ${pttl}`);
   });
 
-  // revokeByEmail drives the same CONSUME script per id, so it fails with the
-  // rest of the Lua surface on node-redis.
-  test('listByEmail returns every put and revokeByEmail flips consumedAt', WRONG_EVAL_FORM, async () => {
+  test('listByEmail returns every put and revokeByEmail flips consumedAt', async () => {
     const store = redisStore(client(), { keyPrefix: ns('d') });
     await store.put(newRecord('a', 'u@x.com'));
     await store.put(newRecord('b', 'u@x.com'));
