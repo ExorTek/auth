@@ -46,5 +46,17 @@ export function decode(input) {
       'input is not a valid base64url string — allowed chars: A-Z a-z 0-9 - _ and optional trailing = padding. No + or / (that is standard base64; use base64.decode instead).',
     );
   }
-  return Buffer.from(input, 'base64url');
+  const bytes = Buffer.from(input, 'base64url');
+  // Node ignores the unused low bits of a final base64url character, so
+  // several distinct strings decode to identical bytes ('aGVsbG8', 'aGVsbG9',
+  // 'aGVsbG-' and 'aGVsbG_' are all "hello"). Anything keyed on the encoded
+  // form — a deny list, a dedupe set, a replay cache — would then treat one
+  // value as several. Accept only the canonical spelling.
+  if (bytes.toString('base64url') !== input.replace(/=+$/, '')) {
+    throw new CryptoError(
+      ErrorCode.INVALID_ENCODING,
+      'input is not a canonical base64url encoding — the final character sets bits that decode to nothing. Re-encode the value from its bytes.',
+    );
+  }
+  return bytes;
 }
