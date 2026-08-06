@@ -53,6 +53,8 @@ function fakeClient() {
     async mget(...keys) {
       return keys.map(k => (kv.has(k) ? kv.get(k) : null));
     },
+    // ioredis-shaped: positional EVAL args.
+    status: 'ready',
     async eval(script, _numKeys, ...args) {
       // CONSUME_SCRIPT — flips consumedAt in-place.
       if (script.includes('record.consumedAt = now')) {

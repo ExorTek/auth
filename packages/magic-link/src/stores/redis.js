@@ -12,14 +12,15 @@
  * flips `consumedAt` in-place — atomic across workers, no TOCTOU.
  *
  * Cluster-safe. Works with any client exposing `eval` + `get` + `set`
- * + `del` + `sadd` + `srem` + `smembers` — verified against `ioredis`,
- * `node-redis@4+`, and `@upstash/redis` (HTTP client for edge
- * runtimes).
+ * + `del` + `sadd` + `srem` + `smembers`. `ioredis` and `node-redis` take
+ * their Lua arguments differently, so the script goes out through the
+ * shared dialect-aware helper; both are covered by the integration suite.
  */
 
 import { assertRedisClient } from '@exortek/shared/redis-guard';
 import { isObject, isString } from '@exortek/shared/predicates';
 import { createRedisIncrStore } from '@exortek/shared/incr-store';
+import { evalScript } from '@exortek/shared/redis-helpers';
 import { createRedisRecordStore } from '@exortek/shared/record-store';
 
 import { invalidArgument } from '../internal/guards.js';
@@ -34,7 +35,9 @@ if not raw then
   return 0
 end
 local record = cjson.decode(raw)
-if record.consumedAt then
+-- cjson decodes a JSON null to a truthy sentinel, so a record carrying an
+-- explicit consumedAt of null must not be mistaken for a consumed one.
+if record.consumedAt ~= nil and record.consumedAt ~= cjson.null then
   return 0
 end
 record.consumedAt = now
@@ -92,7 +95,7 @@ export function redisStore(client, options = {}) {
     },
 
     async consume(id) {
-      const raw = await client.eval(CONSUME_SCRIPT, 1, rk(id), String(Date.now()));
+      const raw = await evalScript(client, CONSUME_SCRIPT, [rk(id)], [String(Date.now())]);
       return Number(raw) === 1;
     },
 
