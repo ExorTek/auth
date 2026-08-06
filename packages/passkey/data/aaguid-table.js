@@ -13,11 +13,10 @@
 export const AAGUID_TABLE = Object.freeze({
   // Apple platform authenticators
   'dd4ec289-e01d-41c9-bb89-70fa845d4bf2': { name: 'iCloud Keychain (Managed)' },
-  'fbfc3007-154e-4ecc-8c0b-6e020557d7bd': { name: 'iCloud Keychain' },
+  'fbfc3007-154e-4ecc-8c0b-6e020557d7bd': { name: 'Apple Passwords' },
 
-  // Google Password Manager (multiple entries — hardware / browser / Android)
+  // Google Password Manager
   'ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4': { name: 'Google Password Manager' },
-  'd548826e-79b4-db40-a3d8-11116f7e8349': { name: 'Google Password Manager (Android)' },
 
   // Windows Hello
   '08987058-cadc-4b81-b6e1-30de50dcbe96': { name: 'Windows Hello Hardware Authenticator' },
@@ -32,11 +31,17 @@ export const AAGUID_TABLE = Object.freeze({
   'b92c3f9a-c014-4056-887f-140a2501163b': { name: 'Security Key by Yubico' },
   '149a2021-8ef6-4133-96b8-81f8d5b7f1f5': { name: 'Security Key by Yubico (FW 5.2)' },
 
-  // 1Password
+  // Password managers / platform credential providers
   'bada5566-a7aa-401f-bd96-45619a55120d': { name: '1Password' },
+  'd548826e-79b4-db40-a3d8-11116f7e8349': { name: 'Bitwarden' },
+  '531126d6-e717-415c-9320-3d9aa6981239': { name: 'Dashlane' },
+  '0ea242b4-43c4-4a1b-8b17-dd6d0b6baec6': { name: 'Keeper' },
+  'b84e4048-15dc-4dd0-8640-f4f60813c8af': { name: 'NordPass' },
+  '53414d53-554e-4700-0000-000000000000': { name: 'Samsung Pass' },
 
-  // Bitwarden
-  'd197a58d-4c07-4cff-8180-4e6c8fdd9c05': { name: 'Bitwarden' },
+  // Browser-embedded providers (Chromium passkeys synced to the profile)
+  'adce0002-35bc-c60a-648b-0b25f1f05503': { name: 'Chrome on Mac' },
+  '771b48fd-d3d4-4f74-9232-fc157ab0507a': { name: 'Edge on Mac' },
 });
 
 /** @param {string} aaguid  canonical hyphenated form */
