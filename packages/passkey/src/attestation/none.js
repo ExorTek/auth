@@ -4,7 +4,7 @@
  * (`a0`); anything else violates the spec and is rejected.
  */
 
-import { throwAttestationInvalid } from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
 
 /**
  * @param {object} params
@@ -13,10 +13,13 @@ import { throwAttestationInvalid } from '../errors.js';
  */
 export function verifyNone({ attStmt }) {
   if (!(attStmt instanceof Map)) {
-    throwAttestationInvalid('none attestation: attStmt is not a CBOR map');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'none attestation: attStmt is not a CBOR map');
   }
   if (attStmt.size !== 0) {
-    throwAttestationInvalid(`none attestation: attStmt must be empty, got ${attStmt.size} field(s)`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `none attestation: attStmt must be empty, got ${attStmt.size} field(s)`,
+    );
   }
   return { format: 'none', trustPath: 'no-anchor' };
 }

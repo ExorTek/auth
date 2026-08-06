@@ -13,6 +13,7 @@
 
 import { createPublicKey } from 'node:crypto';
 import { base64url } from '@exortek/crypto/encode';
+import { PasskeyError, ErrorCode } from '../errors.js';
 
 // COSE common labels (RFC 8152 §7.1)
 const LABEL = /** @type {const} */ ({
@@ -157,18 +158,18 @@ function b64u(bytes) {
  */
 export function importCoseKey(coseKey) {
   if (!(coseKey instanceof Map)) {
-    throw new Error('cose: expected a Map (decoded COSE Key)');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'cose: expected a Map (decoded COSE Key)');
   }
 
   const kty = coseKey.get(LABEL.KTY);
   const alg = coseKey.get(LABEL.ALG);
 
   if (typeof alg !== 'number') {
-    throw new Error('cose: missing or non-integer alg (label 3)');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'cose: missing or non-integer alg (label 3)');
   }
   const params = ALGORITHMS[String(alg)];
   if (!params) {
-    throw new Error(`cose: unsupported algorithm ${alg}`);
+    throw new PasskeyError(ErrorCode.UNSUPPORTED_ALGORITHM, `cose: unsupported algorithm ${alg}`);
   }
 
   let jwk;
@@ -179,7 +180,10 @@ export function importCoseKey(coseKey) {
   } else if (kty === KTY.RSA) {
     jwk = rsaToJwk(coseKey);
   } else {
-    throw new Error(`cose: unsupported kty ${String(kty)} (want 1=OKP, 2=EC2, 3=RSA)`);
+    throw new PasskeyError(
+      ErrorCode.PUBLIC_KEY_UNSUPPORTED,
+      `cose: unsupported kty ${String(kty)} (want 1=OKP, 2=EC2, 3=RSA)`,
+    );
   }
 
   // Node's JWK importer performs its own parameter checks — a
@@ -194,19 +198,25 @@ function ec2ToJwk(coseKey, params) {
   const crvId = coseKey.get(EC2.CRV);
   const crv = EC_CURVE[crvId];
   if (!crv) {
-    throw new Error(`cose EC2: unsupported curve ${String(crvId)}`);
+    throw new PasskeyError(ErrorCode.PUBLIC_KEY_UNSUPPORTED, `cose EC2: unsupported curve ${String(crvId)}`);
   }
   if (params.curve && params.curve !== crv) {
-    throw new Error(`cose EC2: curve ${crv} does not match algorithm ${params.name} (expects ${params.curve})`);
+    throw new PasskeyError(
+      ErrorCode.PUBLIC_KEY_UNSUPPORTED,
+      `cose EC2: curve ${crv} does not match algorithm ${params.name} (expects ${params.curve})`,
+    );
   }
   const x = coseKey.get(EC2.X);
   const y = coseKey.get(EC2.Y);
   if (!(x instanceof Uint8Array) || !(y instanceof Uint8Array)) {
-    throw new Error('cose EC2: x and y must be byte strings (compressed points not supported)');
+    throw new PasskeyError(
+      ErrorCode.PUBLIC_KEY_UNSUPPORTED,
+      'cose EC2: x and y must be byte strings (compressed points not supported)',
+    );
   }
   const size = crv === 'P-256' ? 32 : crv === 'P-384' ? 48 : 66;
   if (x.byteLength !== size || y.byteLength !== size) {
-    throw new Error(`cose EC2: ${crv} coordinates must be ${size} bytes each`);
+    throw new PasskeyError(ErrorCode.PUBLIC_KEY_UNSUPPORTED, `cose EC2: ${crv} coordinates must be ${size} bytes each`);
   }
   return { kty: 'EC', crv, x: b64u(x), y: b64u(y) };
 }
@@ -215,23 +225,26 @@ function okpToJwk(coseKey, params) {
   const crvId = coseKey.get(OKP.CRV);
   const crv = OKP_CURVE[crvId];
   if (!crv) {
-    throw new Error(`cose OKP: unsupported curve ${String(crvId)}`);
+    throw new PasskeyError(ErrorCode.PUBLIC_KEY_UNSUPPORTED, `cose OKP: unsupported curve ${String(crvId)}`);
   }
   // Only signature curves land in WebAuthn credential keys.
   if (crv !== 'Ed25519' && crv !== 'Ed448') {
-    throw new Error(`cose OKP: curve ${crv} is not a signature curve`);
+    throw new PasskeyError(ErrorCode.PUBLIC_KEY_UNSUPPORTED, `cose OKP: curve ${crv} is not a signature curve`);
   }
   if (params.curve && params.curve !== crv) {
-    throw new Error(`cose OKP: curve ${crv} does not match algorithm ${params.name} (expects ${params.curve})`);
+    throw new PasskeyError(
+      ErrorCode.PUBLIC_KEY_UNSUPPORTED,
+      `cose OKP: curve ${crv} does not match algorithm ${params.name} (expects ${params.curve})`,
+    );
   }
   const x = coseKey.get(OKP.X);
   if (!(x instanceof Uint8Array)) {
-    throw new Error('cose OKP: x must be a byte string');
+    throw new PasskeyError(ErrorCode.PUBLIC_KEY_UNSUPPORTED, 'cose OKP: x must be a byte string');
   }
   // Ed25519 = 32 bytes; Ed448 = 57 bytes.
   const expected = crv === 'Ed25519' ? 32 : 57;
   if (x.byteLength !== expected) {
-    throw new Error(`cose OKP: ${crv} public key must be ${expected} bytes`);
+    throw new PasskeyError(ErrorCode.PUBLIC_KEY_UNSUPPORTED, `cose OKP: ${crv} public key must be ${expected} bytes`);
   }
   return { kty: 'OKP', crv, x: b64u(x) };
 }
@@ -240,10 +253,13 @@ function rsaToJwk(coseKey) {
   const n = coseKey.get(RSA.N);
   const e = coseKey.get(RSA.E);
   if (!(n instanceof Uint8Array) || !(e instanceof Uint8Array)) {
-    throw new Error('cose RSA: n and e must be byte strings');
+    throw new PasskeyError(ErrorCode.PUBLIC_KEY_UNSUPPORTED, 'cose RSA: n and e must be byte strings');
   }
   if (n.byteLength < MIN_RSA_MODULUS_BYTES) {
-    throw new Error(`cose RSA: modulus is ${n.byteLength * 8} bits, minimum ${MIN_RSA_MODULUS_BYTES * 8}`);
+    throw new PasskeyError(
+      ErrorCode.PUBLIC_KEY_UNSUPPORTED,
+      `cose RSA: modulus is ${n.byteLength * 8} bits, minimum ${MIN_RSA_MODULUS_BYTES * 8}`,
+    );
   }
   // WebAuthn RSA keys are unsigned big-endian integers — Node's JWK
   // importer expects them stripped of a leading zero pad if present,
@@ -260,7 +276,7 @@ function rsaToJwk(coseKey) {
 export function algorithmForId(algId) {
   const params = ALGORITHMS[String(algId)];
   if (!params) {
-    throw new Error(`cose: unsupported algorithm ${algId}`);
+    throw new PasskeyError(ErrorCode.UNSUPPORTED_ALGORITHM, `cose: unsupported algorithm ${algId}`);
   }
   return params;
 }

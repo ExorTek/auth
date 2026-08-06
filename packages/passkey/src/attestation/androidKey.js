@@ -44,7 +44,7 @@ import { importCoseKey, algorithmForId } from '../cose/key.js';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, readChildren, TAG } from '../asn1/der.js';
 import { bytesEqual, concat } from '../internal/bytes.js';
-import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSignatureInvalid } from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
 
 const ANDROID_KEY_OID = '1.3.6.1.4.1.11129.2.1.17';
 
@@ -66,16 +66,22 @@ const CONTEXT_CLASS = 2;
 function readKeyDescriptionFields(certDer) {
   const raw = findExtension(certDer, ANDROID_KEY_OID);
   if (raw === null) {
-    throwAttestationInvalid(`android-key: leaf missing attestation extension (OID ${ANDROID_KEY_OID})`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `android-key: leaf missing attestation extension (OID ${ANDROID_KEY_OID})`,
+    );
   }
   const outer = readTlv(raw);
   if (outer.tag !== TAG.SEQUENCE) {
-    throwAttestationInvalid('android-key: KeyDescription extension is not a SEQUENCE');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-key: KeyDescription extension is not a SEQUENCE');
   }
   const fields = readChildren(outer.contents);
   // Positions 0..7 per KeyDescription. Guard against short inputs.
   if (fields.length < 8) {
-    throwAttestationInvalid(`android-key: KeyDescription has ${fields.length} fields, expected at least 8`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `android-key: KeyDescription has ${fields.length} fields, expected at least 8`,
+    );
   }
   return fields;
 }
@@ -89,7 +95,10 @@ function readKeyDescriptionFields(certDer) {
 function readAttestationChallenge(fields) {
   const challenge = fields[4];
   if (challenge.tag !== TAG.OCTET_STRING) {
-    throwAttestationInvalid('android-key: KeyDescription attestationChallenge is not an OCTET STRING');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'android-key: KeyDescription attestationChallenge is not an OCTET STRING',
+    );
   }
   return challenge.contents;
 }
@@ -105,11 +114,15 @@ function assertNoAllApplications(fields) {
   for (const idx of [6, 7]) {
     const list = fields[idx];
     if (list.tag !== TAG.SEQUENCE) {
-      throwAttestationInvalid(`android-key: KeyDescription AuthorizationList at index ${idx} is not a SEQUENCE`);
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
+        `android-key: KeyDescription AuthorizationList at index ${idx} is not a SEQUENCE`,
+      );
     }
     for (const entry of readChildren(list.contents)) {
       if (entry.tagClass === CONTEXT_CLASS && entry.tagNumber === KM_TAG_ALL_APPLICATIONS) {
-        throwAttestationInvalid(
+        throw new PasskeyError(
+          ErrorCode.ATTESTATION_INVALID,
           'android-key: KeyDescription must not contain allApplications [600] — the key is not RP-scoped',
         );
       }
@@ -146,23 +159,23 @@ function verifySignature(publicKey, algParams, data, signature) {
  */
 export function verifyAndroidKey({ attStmt, authDataBytes, clientDataHash, attestedCredentialData, trustAnchors }) {
   if (!(attStmt instanceof Map)) {
-    throwAttestationInvalid('android-key: attStmt is not a CBOR map');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-key: attStmt is not a CBOR map');
   }
   const alg = attStmt.get('alg');
   const sig = attStmt.get('sig');
   const x5cRaw = attStmt.get('x5c');
   if (typeof alg !== 'number') {
-    throwAttestationInvalid('android-key: attStmt.alg missing or not an integer');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-key: attStmt.alg missing or not an integer');
   }
   if (!(sig instanceof Uint8Array) || sig.byteLength === 0) {
-    throwAttestationInvalid('android-key: attStmt.sig missing or empty');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-key: attStmt.sig missing or empty');
   }
   if (!Array.isArray(x5cRaw) || x5cRaw.length === 0) {
-    throwAttestationInvalid('android-key: attStmt.x5c must be a non-empty array');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-key: attStmt.x5c must be a non-empty array');
   }
   for (const c of x5cRaw) {
     if (!(c instanceof Uint8Array)) {
-      throwAttestationInvalid('android-key: attStmt.x5c entries must be byte strings');
+      throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-key: attStmt.x5c entries must be byte strings');
     }
   }
 
@@ -173,13 +186,19 @@ export function verifyAndroidKey({ attStmt, authDataBytes, clientDataHash, attes
   // 1. Signature verifies with leaf public key over authData || clientDataHash.
   const signed = concat(authDataBytes, clientDataHash);
   if (!verifySignature(leaf.publicKey, algParams, signed, sig)) {
-    throwSignatureInvalid('android-key: signature does not verify against leaf certificate');
+    throw new PasskeyError(
+      ErrorCode.SIGNATURE_INVALID,
+      'android-key: signature does not verify against leaf certificate',
+    );
   }
 
   // 2. Leaf public key MUST byte-equal the credentialPublicKey (SPKI DER).
   const credKey = importCoseKey(attestedCredentialData.credentialPublicKey);
   if (!bytesEqual(new Uint8Array(spkiDer(leaf.publicKey)), new Uint8Array(spkiDer(credKey.publicKey)))) {
-    throwAttestationInvalid('android-key: leaf public key does not match credentialPublicKey (SPKI mismatch)');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'android-key: leaf public key does not match credentialPublicKey (SPKI mismatch)',
+    );
   }
 
   // 3. attestationChallenge in the extension MUST equal clientDataHash,
@@ -187,7 +206,10 @@ export function verifyAndroidKey({ attStmt, authDataBytes, clientDataHash, attes
   const keyDescription = readKeyDescriptionFields(x5cRaw[0]);
   const challenge = readAttestationChallenge(keyDescription);
   if (!bytesEqual(challenge, clientDataHash)) {
-    throwAttestationInvalid('android-key: attestationChallenge in KeyDescription does not equal clientDataHash');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'android-key: attestationChallenge in KeyDescription does not equal clientDataHash',
+    );
   }
   assertNoAllApplications(keyDescription);
 
@@ -198,7 +220,7 @@ export function verifyAndroidKey({ attStmt, authDataBytes, clientDataHash, attes
       verifyChain({ x5c: chain, trustAnchors: toCertificates(trustAnchors) });
       trustPath = 'trust-anchor';
     } catch (err) {
-      throwAttestationTrustAnchorMissing(`android-key: ${err.message}`);
+      throw new PasskeyError(ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING, `android-key: ${err.message}`);
     }
   }
 

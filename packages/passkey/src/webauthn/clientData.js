@@ -20,6 +20,7 @@
  */
 
 import { base64url } from '@exortek/crypto/encode';
+import { PasskeyError, ErrorCode } from '../errors.js';
 
 /**
  * @typedef {'webauthn.create' | 'webauthn.get'} ClientDataType
@@ -41,47 +42,53 @@ const VALID_TYPES = new Set(['webauthn.create', 'webauthn.get']);
  */
 export function parseClientData(bytes) {
   if (!(bytes instanceof Uint8Array)) {
-    throw new Error('clientData: expected Uint8Array');
+    throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, 'clientData: expected Uint8Array');
   }
   let text;
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch (err) {
-    throw new Error(`clientData: not valid UTF-8 (${err.message})`);
+    throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, `clientData: not valid UTF-8 (${err.message})`);
   }
   let parsed;
   try {
     parsed = JSON.parse(text);
   } catch (err) {
-    throw new Error(`clientData: not valid JSON (${err.message})`);
+    throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, `clientData: not valid JSON (${err.message})`);
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('clientData: root must be a JSON object');
+    throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, 'clientData: root must be a JSON object');
   }
 
   const { type, challenge, origin, crossOrigin } = parsed;
 
   if (!VALID_TYPES.has(type)) {
-    throw new Error(`clientData: type "${type}" is not "webauthn.create" or "webauthn.get"`);
+    throw new PasskeyError(
+      ErrorCode.CLIENT_DATA_INVALID,
+      `clientData: type "${type}" is not "webauthn.create" or "webauthn.get"`,
+    );
   }
   if (typeof challenge !== 'string' || challenge.length === 0) {
-    throw new Error('clientData: challenge missing or not a string');
+    throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, 'clientData: challenge missing or not a string');
   }
   if (typeof origin !== 'string' || origin.length === 0) {
-    throw new Error('clientData: origin missing or not a string');
+    throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, 'clientData: origin missing or not a string');
   }
   if (crossOrigin !== undefined && typeof crossOrigin !== 'boolean') {
-    throw new Error('clientData: crossOrigin must be a boolean when present');
+    throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, 'clientData: crossOrigin must be a boolean when present');
   }
 
   let challengeBytes;
   try {
     challengeBytes = new Uint8Array(base64url.decode(challenge));
   } catch (err) {
-    throw new Error(`clientData: challenge is not valid base64url (${err.message})`);
+    throw new PasskeyError(
+      ErrorCode.CLIENT_DATA_INVALID,
+      `clientData: challenge is not valid base64url (${err.message})`,
+    );
   }
   if (challengeBytes.byteLength === 0) {
-    throw new Error('clientData: challenge decoded to zero bytes');
+    throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, 'clientData: challenge decoded to zero bytes');
   }
 
   return {

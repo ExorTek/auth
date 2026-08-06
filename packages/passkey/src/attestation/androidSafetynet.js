@@ -40,7 +40,7 @@ import { createHash, createVerify, X509Certificate } from 'node:crypto';
 import { base64url } from '@exortek/crypto/encode';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { concat } from '../internal/bytes.js';
-import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSignatureInvalid } from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
 
 const LEAF_CN = 'attest.android.com';
 const DEFAULT_TIMESTAMP_WINDOW_MS = 5 * 60_000; // 5 minutes either side
@@ -49,7 +49,10 @@ function decodeBase64UrlToUint8(str, label) {
   try {
     return new Uint8Array(base64url.decode(str));
   } catch (err) {
-    throwAttestationInvalid(`android-safetynet: ${label} is not valid base64url (${err.message})`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `android-safetynet: ${label} is not valid base64url (${err.message})`,
+    );
   }
 }
 
@@ -59,12 +62,18 @@ function decodeJsonSegment(str, label) {
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch (err) {
-    throwAttestationInvalid(`android-safetynet: ${label} is not valid UTF-8 (${err.message})`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `android-safetynet: ${label} is not valid UTF-8 (${err.message})`,
+    );
   }
   try {
     return JSON.parse(text);
   } catch (err) {
-    throwAttestationInvalid(`android-safetynet: ${label} is not valid JSON (${err.message})`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `android-safetynet: ${label} is not valid JSON (${err.message})`,
+    );
   }
 }
 
@@ -99,21 +108,27 @@ export function verifyAndroidSafetynet(params) {
   } = params;
 
   if (!(attStmt instanceof Map)) {
-    throwAttestationInvalid('android-safetynet: attStmt is not a CBOR map');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-safetynet: attStmt is not a CBOR map');
   }
   const ver = attStmt.get('ver');
   const response = attStmt.get('response');
   if (typeof ver !== 'string' || ver.length === 0) {
-    throwAttestationInvalid('android-safetynet: attStmt.ver missing or not a string');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-safetynet: attStmt.ver missing or not a string');
   }
   if (!(response instanceof Uint8Array) || response.byteLength === 0) {
-    throwAttestationInvalid('android-safetynet: attStmt.response missing or not a byte string');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'android-safetynet: attStmt.response missing or not a byte string',
+    );
   }
 
   const responseStr = new TextDecoder('utf-8', { fatal: true }).decode(response);
   const segments = responseStr.split('.');
   if (segments.length !== 3) {
-    throwAttestationInvalid('android-safetynet: response must be a compact JWS with three segments');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'android-safetynet: response must be a compact JWS with three segments',
+    );
   }
   const [headerB64, payloadB64, signatureB64] = segments;
   const header = decodeJsonSegment(headerB64, 'JWS header');
@@ -121,10 +136,16 @@ export function verifyAndroidSafetynet(params) {
   const signature = decodeBase64UrlToUint8(signatureB64, 'JWS signature');
 
   if (header.alg !== 'RS256') {
-    throwAttestationInvalid(`android-safetynet: header.alg must be "RS256" (got "${header.alg}")`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `android-safetynet: header.alg must be "RS256" (got "${header.alg}")`,
+    );
   }
   if (!Array.isArray(header.x5c) || header.x5c.length === 0) {
-    throwAttestationInvalid('android-safetynet: header.x5c must be a non-empty cert array');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'android-safetynet: header.x5c must be a non-empty cert array',
+    );
   }
 
   // Chain — header.x5c is an array of base64-encoded DER certs (RFC 7515 §4.1.6).
@@ -132,7 +153,10 @@ export function verifyAndroidSafetynet(params) {
     try {
       return new X509Certificate(Buffer.from(b64, 'base64'));
     } catch (err) {
-      throwAttestationInvalid(`android-safetynet: header.x5c[${i}] not a valid certificate (${err.message})`);
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
+        `android-safetynet: header.x5c[${i}] not a valid certificate (${err.message})`,
+      );
       return null;
     }
   });
@@ -143,13 +167,17 @@ export function verifyAndroidSafetynet(params) {
   const v = createVerify('RSA-SHA256');
   v.update(signingInput);
   if (!v.verify(leaf.publicKey, signature)) {
-    throwSignatureInvalid('android-safetynet: JWS signature does not verify against leaf certificate');
+    throw new PasskeyError(
+      ErrorCode.SIGNATURE_INVALID,
+      'android-safetynet: JWS signature does not verify against leaf certificate',
+    );
   }
 
   // Nonce check.
   const expectedNonceB64 = createHash('sha256').update(concat(authDataBytes, clientDataHash)).digest('base64');
   if (payload.nonce !== expectedNonceB64) {
-    throwAttestationInvalid(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       `android-safetynet: payload.nonce does not equal base64(SHA-256(authData || clientDataHash))`,
     );
   }
@@ -160,27 +188,33 @@ export function verifyAndroidSafetynet(params) {
   // trailing `.`, so `CN=attest.android.com.attacker.example` slipped
   // through — a subdomain-suffix bypass of the leaf identity gate.
   if (!/(?:^|[,\n])CN=attest\.android\.com(?:$|[,\n])/i.test(leaf.subject)) {
-    throwAttestationInvalid(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       `android-safetynet: leaf subject CN must be "${LEAF_CN}" (got "${leaf.subject.replace(/\n/g, ' ')}")`,
     );
   }
 
   // Integrity flags.
   if (payload.basicIntegrity !== true) {
-    throwAttestationInvalid('android-safetynet: payload.basicIntegrity is not true');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-safetynet: payload.basicIntegrity is not true');
   }
   if (enforceCtsCheck && payload.ctsProfileMatch !== true) {
-    throwAttestationInvalid(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       'android-safetynet: payload.ctsProfileMatch is not true (disable with enforceCtsCheck: false)',
     );
   }
 
   // Timestamp — accept ±window either side of `now`.
   if (typeof payload.timestampMs !== 'number' || !Number.isFinite(payload.timestampMs)) {
-    throwAttestationInvalid('android-safetynet: payload.timestampMs missing or not a finite number');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'android-safetynet: payload.timestampMs missing or not a finite number',
+    );
   }
   if (Math.abs(now - payload.timestampMs) > timestampWindowMs) {
-    throwAttestationInvalid(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       `android-safetynet: payload.timestampMs (${payload.timestampMs}) is outside the ±${timestampWindowMs}ms window from now (${now})`,
     );
   }
@@ -192,7 +226,7 @@ export function verifyAndroidSafetynet(params) {
       verifyChain({ x5c: chain, trustAnchors: toCertificates(trustAnchors) });
       trustPath = 'trust-anchor';
     } catch (err) {
-      throwAttestationTrustAnchorMissing(`android-safetynet: ${err.message}`);
+      throw new PasskeyError(ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING, `android-safetynet: ${err.message}`);
     }
   }
 

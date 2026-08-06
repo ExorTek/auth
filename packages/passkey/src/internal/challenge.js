@@ -14,12 +14,7 @@
 
 import { base64url } from '@exortek/crypto/encode';
 import { createChallenge, verifyChallenge } from '@exortek/challenge';
-import {
-  throwChallengeInvalid,
-  throwChallengeExpired,
-  throwChallengeAlreadyUsed,
-  throwChallengeMismatch,
-} from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
 
 /**
  * Decode a challenge-lib token's payload without verifying the MAC.
@@ -33,17 +28,23 @@ import {
 export function readIssuedJti(token) {
   const parts = token.split('.');
   if (parts.length !== 3) {
-    throwChallengeInvalid('passkey: challenge token has wrong shape (expected <prefix>.<payload>.<mac>)');
+    throw new PasskeyError(
+      ErrorCode.CHALLENGE_INVALID,
+      'passkey: challenge token has wrong shape (expected <prefix>.<payload>.<mac>)',
+    );
   }
   let payload;
   try {
     const raw = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(base64url.decode(parts[1])));
     payload = JSON.parse(raw);
   } catch (err) {
-    throwChallengeInvalid(`passkey: challenge token payload not decodable (${err.message})`);
+    throw new PasskeyError(
+      ErrorCode.CHALLENGE_INVALID,
+      `passkey: challenge token payload not decodable (${err.message})`,
+    );
   }
   if (!payload || typeof payload.jti !== 'string' || payload.jti.length === 0) {
-    throwChallengeInvalid('passkey: challenge token payload missing jti');
+    throw new PasskeyError(ErrorCode.CHALLENGE_INVALID, 'passkey: challenge token payload missing jti');
   }
   return { jti: payload.jti };
 }
@@ -105,14 +106,17 @@ export async function consumePasskeyChallenge(options) {
   });
   if (!result.valid) {
     if (result.reason === 'expired') {
-      throwChallengeExpired(`passkey: challenge expired`);
+      throw new PasskeyError(ErrorCode.CHALLENGE_EXPIRED, `passkey: challenge expired`);
     }
     if (result.reason === 'replay') {
-      throwChallengeAlreadyUsed(`passkey: challenge already used`);
+      throw new PasskeyError(ErrorCode.CHALLENGE_ALREADY_USED, `passkey: challenge already used`);
     }
-    throwChallengeInvalid(`passkey: challenge verify failed (${result.reason})`);
+    throw new PasskeyError(ErrorCode.CHALLENGE_INVALID, `passkey: challenge verify failed (${result.reason})`);
   }
   if (result.payload.jti !== challengeBase64UrlFromClient) {
-    throwChallengeMismatch(`passkey: challenge in clientDataJSON does not match issued challenge`);
+    throw new PasskeyError(
+      ErrorCode.CHALLENGE_MISMATCH,
+      `passkey: challenge in clientDataJSON does not match issued challenge`,
+    );
   }
 }

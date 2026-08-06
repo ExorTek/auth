@@ -20,7 +20,7 @@ import { createHash, X509Certificate } from 'node:crypto';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, readChildren, TAG, contextTag } from '../asn1/der.js';
 import { bytesEqual, concat } from '../internal/bytes.js';
-import { throwAttestationInvalid, throwAttestationTrustAnchorMissing } from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
 
 const APPLE_NONCE_OID = '1.2.840.113635.100.8.2';
 
@@ -35,23 +35,35 @@ const APPLE_NONCE_OID = '1.2.840.113635.100.8.2';
 function readAppleNonce(certDer) {
   const raw = findExtension(certDer, APPLE_NONCE_OID);
   if (raw === null) {
-    throwAttestationInvalid('apple attestation: leaf missing nonce extension (OID 1.2.840.113635.100.8.2)');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'apple attestation: leaf missing nonce extension (OID 1.2.840.113635.100.8.2)',
+    );
   }
   const seq = readTlv(raw);
   if (seq.tag !== TAG.SEQUENCE) {
-    throwAttestationInvalid('apple attestation: nonce extension is not a SEQUENCE');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'apple attestation: nonce extension is not a SEQUENCE');
   }
   const items = readChildren(seq.contents);
   const tagged = items.find(t => t.tag === contextTag(1));
   if (!tagged) {
-    throwAttestationInvalid('apple attestation: nonce extension SEQUENCE missing [1] EXPLICIT OCTET STRING');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'apple attestation: nonce extension SEQUENCE missing [1] EXPLICIT OCTET STRING',
+    );
   }
   const inner = readTlv(tagged.contents);
   if (inner.tag !== TAG.OCTET_STRING) {
-    throwAttestationInvalid('apple attestation: nonce extension inner tag is not OCTET STRING');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'apple attestation: nonce extension inner tag is not OCTET STRING',
+    );
   }
   if (inner.contents.byteLength !== 32) {
-    throwAttestationInvalid(`apple attestation: nonce must be 32 bytes (got ${inner.contents.byteLength})`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `apple attestation: nonce must be 32 bytes (got ${inner.contents.byteLength})`,
+    );
   }
   return inner.contents;
 }
@@ -66,12 +78,15 @@ function readAppleNonce(certDer) {
  */
 function coseEc2ToUncompressed(coseKey) {
   if (coseKey.get(1) !== 2 || coseKey.get(-1) !== 1) {
-    throwAttestationInvalid('apple attestation: credential key must be EC2 / P-256');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'apple attestation: credential key must be EC2 / P-256');
   }
   const x = coseKey.get(-2);
   const y = coseKey.get(-3);
   if (!(x instanceof Uint8Array) || x.byteLength !== 32 || !(y instanceof Uint8Array) || y.byteLength !== 32) {
-    throwAttestationInvalid('apple attestation: credential key x / y must be 32-byte Uint8Arrays');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'apple attestation: credential key x / y must be 32-byte Uint8Arrays',
+    );
   }
   const out = new Uint8Array(65);
   out[0] = 0x04;
@@ -90,11 +105,12 @@ function coseEc2ToUncompressed(coseKey) {
  */
 function leafPublicKeyUncompressed(leaf) {
   if (leaf.publicKey.asymmetricKeyType !== 'ec') {
-    throwAttestationInvalid('apple attestation: leaf public key is not EC');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'apple attestation: leaf public key is not EC');
   }
   const details = leaf.publicKey.asymmetricKeyDetails ?? {};
   if (details.namedCurve !== 'prime256v1') {
-    throwAttestationInvalid(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       `apple attestation: leaf public key curve must be P-256 (got ${details.namedCurve ?? 'unknown'})`,
     );
   }
@@ -102,7 +118,7 @@ function leafPublicKeyUncompressed(leaf) {
   const x = Buffer.from(jwk.x, 'base64url');
   const y = Buffer.from(jwk.y, 'base64url');
   if (x.byteLength !== 32 || y.byteLength !== 32) {
-    throwAttestationInvalid('apple attestation: leaf EC coordinates are not 32 bytes');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'apple attestation: leaf EC coordinates are not 32 bytes');
   }
   const out = new Uint8Array(65);
   out[0] = 0x04;
@@ -122,19 +138,22 @@ function leafPublicKeyUncompressed(leaf) {
  */
 export function verifyApple({ attStmt, authDataBytes, clientDataHash, attestedCredentialData, trustAnchors }) {
   if (!(attStmt instanceof Map)) {
-    throwAttestationInvalid('apple attestation: attStmt is not a CBOR map');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'apple attestation: attStmt is not a CBOR map');
   }
   const x5cRaw = attStmt.get('x5c');
   if (!Array.isArray(x5cRaw) || x5cRaw.length === 0) {
-    throwAttestationInvalid('apple attestation: x5c must be a non-empty array');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'apple attestation: x5c must be a non-empty array');
   }
   for (const c of x5cRaw) {
     if (!(c instanceof Uint8Array)) {
-      throwAttestationInvalid('apple attestation: x5c entries must be byte strings');
+      throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'apple attestation: x5c entries must be byte strings');
     }
   }
   if (attStmt.has('sig')) {
-    throwAttestationInvalid('apple attestation: attStmt must not carry a sig field (§8.8 has no signature)');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'apple attestation: attStmt must not carry a sig field (§8.8 has no signature)',
+    );
   }
 
   // Nonce check: SHA-256(authData || clientDataHash) must equal the
@@ -142,7 +161,8 @@ export function verifyApple({ attStmt, authDataBytes, clientDataHash, attestedCr
   const expectedNonce = new Uint8Array(createHash('sha256').update(concat(authDataBytes, clientDataHash)).digest());
   const certNonce = readAppleNonce(x5cRaw[0]);
   if (!bytesEqual(expectedNonce, certNonce)) {
-    throwAttestationInvalid(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       'apple attestation: nonce in leaf extension does not equal SHA-256(authData || clientDataHash)',
     );
   }
@@ -154,7 +174,10 @@ export function verifyApple({ attStmt, authDataBytes, clientDataHash, attestedCr
   const leafKey = leafPublicKeyUncompressed(leaf);
   const credKey = coseEc2ToUncompressed(attestedCredentialData.credentialPublicKey);
   if (!bytesEqual(leafKey, credKey)) {
-    throwAttestationInvalid('apple attestation: leaf public key does not match credential public key');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'apple attestation: leaf public key does not match credential public key',
+    );
   }
 
   let trustPath = 'no-anchor';
@@ -163,7 +186,7 @@ export function verifyApple({ attStmt, authDataBytes, clientDataHash, attestedCr
       verifyChain({ x5c: chain, trustAnchors: toCertificates(trustAnchors) });
       trustPath = 'trust-anchor';
     } catch (err) {
-      throwAttestationTrustAnchorMissing(`apple attestation: ${err.message}`);
+      throw new PasskeyError(ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING, `apple attestation: ${err.message}`);
     }
   }
 

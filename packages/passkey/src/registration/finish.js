@@ -25,16 +25,7 @@ import { readClientExtensionResults, readAuthenticatorExtensions } from '../weba
 import { importCoseKey, DEFAULT_SUPPORTED_ALGORITHMS } from '../cose/key.js';
 import { consumePasskeyChallenge } from '../internal/challenge.js';
 import { getVerifier } from '../attestation/index.js';
-import {
-  throwInvalidArgument,
-  throwClientDataInvalid,
-  throwOriginMismatch,
-  throwRpIdMismatch,
-  throwAuthDataInvalid,
-  throwUnsupportedAlgorithm,
-  throwPublicKeyUnsupported,
-  throwAttestationTrustAnchorMissing,
-} from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
 
 /**
  * Resolve the per-format options blob a caller supplied via
@@ -59,12 +50,18 @@ export function resolveAttestationOptions(fmt, attestationOptions) {
 
 function decodeB64uField(value, field) {
   if (typeof value !== 'string' || value.length === 0) {
-    throwInvalidArgument(`registration.finish: response.${field} must be a base64url string`);
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      `registration.finish: response.${field} must be a base64url string`,
+    );
   }
   try {
     return new Uint8Array(base64url.decode(value));
   } catch (err) {
-    throwInvalidArgument(`registration.finish: response.${field} is not valid base64url (${err.message})`);
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      `registration.finish: response.${field} is not valid base64url (${err.message})`,
+    );
   }
 }
 
@@ -134,7 +131,7 @@ function decodeB64uField(value, field) {
  */
 export async function finish(params) {
   if (!params || typeof params !== 'object') {
-    throwInvalidArgument('registration.finish: options object required');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.finish: options object required');
   }
   const {
     response,
@@ -156,25 +153,34 @@ export async function finish(params) {
   } = params;
 
   if (!response || typeof response !== 'object' || !response.response) {
-    throwInvalidArgument('registration.finish: response must be a WebAuthn PublicKeyCredential-shaped object');
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      'registration.finish: response must be a WebAuthn PublicKeyCredential-shaped object',
+    );
   }
   if (response.type !== undefined && response.type !== 'public-key') {
-    throwInvalidArgument(`registration.finish: response.type must be 'public-key' (got "${response.type}")`);
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      `registration.finish: response.type must be 'public-key' (got "${response.type}")`,
+    );
   }
   // WebAuthn transports `id` as the base64url of `rawId`; a client
   // that sends mismatched values is malformed (SimpleWebAuthn rejects
   // the same way). Only enforced when both are present.
   if (typeof response.id === 'string' && typeof response.rawId === 'string' && response.id !== response.rawId) {
-    throwInvalidArgument('registration.finish: response.id must equal response.rawId (base64url mismatch)');
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      'registration.finish: response.id must equal response.rawId (base64url mismatch)',
+    );
   }
   if (typeof challengeToken !== 'string' || challengeToken.length === 0) {
-    throwInvalidArgument('registration.finish: challengeToken is required');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.finish: challengeToken is required');
   }
   if (!expectedRpId) {
-    throwInvalidArgument('registration.finish: expectedRpId is required');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.finish: expectedRpId is required');
   }
   if (!expectedOrigin) {
-    throwInvalidArgument('registration.finish: expectedOrigin is required');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.finish: expectedOrigin is required');
   }
 
   const clientDataJSON = decodeB64uField(response.response.clientDataJSON, 'response.clientDataJSON');
@@ -185,16 +191,23 @@ export async function finish(params) {
   try {
     clientData = parseClientData(clientDataJSON);
   } catch (err) {
-    throwClientDataInvalid(`registration.finish: ${err.message}`);
+    throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, `registration.finish: ${err.message}`);
   }
   if (clientData.type !== 'webauthn.create') {
-    throwClientDataInvalid(`registration.finish: clientData.type must be "webauthn.create", got "${clientData.type}"`);
+    throw new PasskeyError(
+      ErrorCode.CLIENT_DATA_INVALID,
+      `registration.finish: clientData.type must be "webauthn.create", got "${clientData.type}"`,
+    );
   }
   if (!matchesOrigin(clientData.origin, expectedOrigin)) {
-    throwOriginMismatch(`registration.finish: origin "${clientData.origin}" not in expectedOrigin`);
+    throw new PasskeyError(
+      ErrorCode.ORIGIN_MISMATCH,
+      `registration.finish: origin "${clientData.origin}" not in expectedOrigin`,
+    );
   }
   if (clientData.crossOrigin && !allowCrossOriginCeremony) {
-    throwClientDataInvalid(
+    throw new PasskeyError(
+      ErrorCode.CLIENT_DATA_INVALID,
       'registration.finish: clientDataJSON.crossOrigin=true — set allowCrossOriginCeremony to accept cross-origin ceremonies',
     );
   }
@@ -216,33 +229,45 @@ export async function finish(params) {
   try {
     attestationObject = decode(attestationObjectBytes);
   } catch (err) {
-    throwAuthDataInvalid(`registration.finish: attestationObject CBOR: ${err.message}`);
+    throw new PasskeyError(ErrorCode.AUTH_DATA_INVALID, `registration.finish: attestationObject CBOR: ${err.message}`);
   }
   if (!(attestationObject instanceof Map)) {
-    throwAuthDataInvalid('registration.finish: attestationObject must be a CBOR map');
+    throw new PasskeyError(ErrorCode.AUTH_DATA_INVALID, 'registration.finish: attestationObject must be a CBOR map');
   }
   const fmt = attestationObject.get('fmt');
   const authDataBytes = attestationObject.get('authData');
   const attStmt = attestationObject.get('attStmt');
   if (typeof fmt !== 'string' || fmt.length === 0) {
-    throwAuthDataInvalid('registration.finish: attestationObject.fmt missing or not a string');
+    throw new PasskeyError(
+      ErrorCode.AUTH_DATA_INVALID,
+      'registration.finish: attestationObject.fmt missing or not a string',
+    );
   }
   if (!(authDataBytes instanceof Uint8Array)) {
-    throwAuthDataInvalid('registration.finish: attestationObject.authData missing or not bytes');
+    throw new PasskeyError(
+      ErrorCode.AUTH_DATA_INVALID,
+      'registration.finish: attestationObject.authData missing or not bytes',
+    );
   }
   if (!(attStmt instanceof Map)) {
-    throwAuthDataInvalid('registration.finish: attestationObject.attStmt missing or not a CBOR map');
+    throw new PasskeyError(
+      ErrorCode.AUTH_DATA_INVALID,
+      'registration.finish: attestationObject.attStmt missing or not a CBOR map',
+    );
   }
 
   const authData = parseAuthData(authDataBytes);
   if (!authData.attestedCredentialData) {
-    throwAuthDataInvalid('registration.finish: authenticator data has no attested credential data (AT flag not set)');
+    throw new PasskeyError(
+      ErrorCode.AUTH_DATA_INVALID,
+      'registration.finish: authenticator data has no attested credential data (AT flag not set)',
+    );
   }
 
   // RP ID check
   const rpMatch = matchRpId(authData.rpIdHash, expectedRpId);
   if (!rpMatch) {
-    throwRpIdMismatch(`registration.finish: rpIdHash does not match any expected RP ID`);
+    throw new PasskeyError(ErrorCode.RP_ID_MISMATCH, `registration.finish: rpIdHash does not match any expected RP ID`);
   }
 
   // Flag policy — enforceFlags throws PasskeyError with the specific
@@ -253,7 +278,8 @@ export async function finish(params) {
   // Algorithm allowlist
   const credAlg = authData.attestedCredentialData.credentialPublicKey.get(3);
   if (!supportedAlgorithms.includes(credAlg)) {
-    throwUnsupportedAlgorithm(
+    throw new PasskeyError(
+      ErrorCode.UNSUPPORTED_ALGORITHM,
       `registration.finish: credential algorithm ${credAlg} is not in supportedAlgorithms [${supportedAlgorithms.join(', ')}]`,
     );
   }
@@ -280,7 +306,8 @@ export async function finish(params) {
   // never had a chain to anchor. Opt in with `requireTrustAnchor` to
   // turn that silent gap into a hard failure.
   if (requireTrustAnchor && fmt !== 'none' && attestationReport.trustPath === 'no-anchor') {
-    throwAttestationTrustAnchorMissing(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING,
       `registration.finish: attestation format "${fmt}" was not verified against any trust anchor ` +
         `(pass trustAnchors["${fmt}"], or drop requireTrustAnchor to accept unanchored attestation)`,
     );
@@ -292,7 +319,10 @@ export async function finish(params) {
   try {
     importedKey = importCoseKey(authData.attestedCredentialData.credentialPublicKey);
   } catch (err) {
-    throwPublicKeyUnsupported(`registration.finish: credential public key could not be imported (${err.message})`);
+    throw new PasskeyError(
+      ErrorCode.PUBLIC_KEY_UNSUPPORTED,
+      `registration.finish: credential public key could not be imported (${err.message})`,
+    );
   }
 
   return {

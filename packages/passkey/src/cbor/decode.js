@@ -31,6 +31,8 @@
  *   - half / single / double floats → `number`
  */
 
+import { PasskeyError, ErrorCode } from '../errors.js';
+
 class Cursor {
   /**
    * @param {Uint8Array} bytes
@@ -43,7 +45,10 @@ class Cursor {
 
   need(n) {
     if (this.pos + n > this.bytes.byteLength) {
-      throw new Error(`cbor: unexpected end of input (want ${n} bytes at offset ${this.pos})`);
+      throw new PasskeyError(
+        ErrorCode.DECODE_ERROR,
+        `cbor: unexpected end of input (want ${n} bytes at offset ${this.pos})`,
+      );
     }
   }
 
@@ -143,9 +148,9 @@ function readArgument(c, info) {
     return c.readU64();
   }
   if (info === 31) {
-    throw new Error('cbor: indefinite-length items are not supported');
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'cbor: indefinite-length items are not supported');
   }
-  throw new Error(`cbor: reserved additional-info value ${info}`);
+  throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: reserved additional-info value ${info}`);
 }
 
 /**
@@ -177,7 +182,7 @@ const MAX_DEPTH = 32;
  */
 function readItem(c, depth = 0) {
   if (depth > MAX_DEPTH) {
-    throw new Error(`cbor: nesting depth exceeds ${MAX_DEPTH}`);
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: nesting depth exceeds ${MAX_DEPTH}`);
   }
   const initial = c.readU8();
   const major = initial >> 5;
@@ -201,7 +206,7 @@ function readItem(c, depth = 0) {
     // Byte string.
     const len = readArgument(c, info);
     if (typeof len === 'bigint') {
-      throw new Error(`cbor: byte string length ${len} exceeds Number.MAX_SAFE_INTEGER`);
+      throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: byte string length ${len} exceeds Number.MAX_SAFE_INTEGER`);
     }
     return c.readBytes(len);
   }
@@ -210,7 +215,7 @@ function readItem(c, depth = 0) {
     // Text string — decoded strictly (invalid UTF-8 throws).
     const len = readArgument(c, info);
     if (typeof len === 'bigint') {
-      throw new Error(`cbor: text string length ${len} exceeds Number.MAX_SAFE_INTEGER`);
+      throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: text string length ${len} exceeds Number.MAX_SAFE_INTEGER`);
     }
     const raw = c.readBytes(len);
     return new TextDecoder('utf-8', { fatal: true }).decode(raw);
@@ -220,7 +225,7 @@ function readItem(c, depth = 0) {
     // Array.
     const len = readArgument(c, info);
     if (typeof len === 'bigint') {
-      throw new Error(`cbor: array length ${len} exceeds Number.MAX_SAFE_INTEGER`);
+      throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: array length ${len} exceeds Number.MAX_SAFE_INTEGER`);
     }
     const out = new Array(len);
     for (let i = 0; i < len; i += 1) {
@@ -233,7 +238,7 @@ function readItem(c, depth = 0) {
     // Map — return as `Map` so int keys survive.
     const len = readArgument(c, info);
     if (typeof len === 'bigint') {
-      throw new Error(`cbor: map length ${len} exceeds Number.MAX_SAFE_INTEGER`);
+      throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: map length ${len} exceeds Number.MAX_SAFE_INTEGER`);
     }
     const out = new Map();
     for (let i = 0; i < len; i += 1) {
@@ -243,7 +248,7 @@ function readItem(c, depth = 0) {
         // Duplicate keys are legal CBOR but not deterministic — for a
         // security-critical parser we reject rather than silently pick
         // one, matching the RFC 8949 §5.6 "strict decoder" guidance.
-        throw new Error(`cbor: duplicate map key ${String(key)}`);
+        throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: duplicate map key ${String(key)}`);
       }
       out.set(key, value);
     }
@@ -251,12 +256,12 @@ function readItem(c, depth = 0) {
   }
 
   if (major === 6) {
-    throw new Error(`cbor: tags (major type 6) are not supported`);
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: tags (major type 6) are not supported`);
   }
 
   // Major type 7 — floats + simple values.
   if (info < 20) {
-    throw new Error(`cbor: reserved simple value ${info}`);
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: reserved simple value ${info}`);
   }
   if (info === 20) {
     return false;
@@ -274,7 +279,7 @@ function readItem(c, depth = 0) {
     const simple = c.readU8();
     // Simple values 32–255 are unassigned; 0–19 and 32+ are legal
     // slots but WebAuthn never uses them.
-    throw new Error(`cbor: unsupported simple value ${simple}`);
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: unsupported simple value ${simple}`);
   }
   if (info === 25) {
     return c.readF16();
@@ -285,7 +290,7 @@ function readItem(c, depth = 0) {
   if (info === 27) {
     return c.readF64();
   }
-  throw new Error(`cbor: reserved additional-info value ${info} in major type 7`);
+  throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: reserved additional-info value ${info} in major type 7`);
 }
 
 /**
@@ -298,12 +303,15 @@ function readItem(c, depth = 0) {
  */
 export function decode(bytes) {
   if (!(bytes instanceof Uint8Array)) {
-    throw new Error('cbor.decode: expected Uint8Array');
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'cbor.decode: expected Uint8Array');
   }
   const c = new Cursor(bytes);
   const value = readItem(c);
   if (c.pos !== bytes.byteLength) {
-    throw new Error(`cbor: ${bytes.byteLength - c.pos} trailing byte(s) after top-level item`);
+    throw new PasskeyError(
+      ErrorCode.DECODE_ERROR,
+      `cbor: ${bytes.byteLength - c.pos} trailing byte(s) after top-level item`,
+    );
   }
   return value;
 }
@@ -319,7 +327,7 @@ export function decode(bytes) {
  */
 export function decodeWithLength(bytes) {
   if (!(bytes instanceof Uint8Array)) {
-    throw new Error('cbor.decodeWithLength: expected Uint8Array');
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'cbor.decodeWithLength: expected Uint8Array');
   }
   const c = new Cursor(bytes);
   const value = readItem(c);

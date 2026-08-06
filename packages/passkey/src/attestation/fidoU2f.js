@@ -24,7 +24,7 @@
 
 import { createVerify, X509Certificate } from 'node:crypto';
 import { verifyChain, toCertificates } from '../x509/chain.js';
-import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSignatureInvalid } from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
 
 /**
  * @param {object} params
@@ -37,16 +37,19 @@ import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSigna
  */
 export function verifyFidoU2f({ attStmt, authDataBytes, clientDataHash, attestedCredentialData, trustAnchors }) {
   if (!(attStmt instanceof Map)) {
-    throwAttestationInvalid('fido-u2f attestation: attStmt is not a CBOR map');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'fido-u2f attestation: attStmt is not a CBOR map');
   }
   const x5cRaw = attStmt.get('x5c');
   const sig = attStmt.get('sig');
 
   if (!Array.isArray(x5cRaw) || x5cRaw.length !== 1 || !(x5cRaw[0] instanceof Uint8Array)) {
-    throwAttestationInvalid('fido-u2f attestation: x5c must be a single-element array of bytes (§8.6 step 1)');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'fido-u2f attestation: x5c must be a single-element array of bytes (§8.6 step 1)',
+    );
   }
   if (!(sig instanceof Uint8Array) || sig.byteLength === 0) {
-    throwAttestationInvalid('fido-u2f attestation: attStmt.sig missing or empty');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'fido-u2f attestation: attStmt.sig missing or empty');
   }
 
   // Credential key must be ES256 / P-256 — the format has no alg
@@ -58,12 +61,16 @@ export function verifyFidoU2f({ attStmt, authDataBytes, clientDataHash, attested
   const x = coseKey.get(-2);
   const y = coseKey.get(-3);
   if (kty !== 2 || alg !== -7 || crv !== 1) {
-    throwAttestationInvalid(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       `fido-u2f attestation: credential public key must be EC2 / ES256 / P-256 (got kty=${kty}, alg=${alg}, crv=${crv})`,
     );
   }
   if (!(x instanceof Uint8Array) || x.byteLength !== 32 || !(y instanceof Uint8Array) || y.byteLength !== 32) {
-    throwAttestationInvalid('fido-u2f attestation: credential public key x / y must be 32-byte coordinates');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'fido-u2f attestation: credential public key x / y must be 32-byte coordinates',
+    );
   }
 
   // Build the U2F Raw Message: 0x00 || rpIdHash || clientDataHash ||
@@ -96,7 +103,8 @@ export function verifyFidoU2f({ attStmt, authDataBytes, clientDataHash, attested
   // `.publicKey.asymmetricKeyDetails.namedCurve`.
   const details = leaf.publicKey.asymmetricKeyDetails ?? {};
   if (leaf.publicKey.asymmetricKeyType !== 'ec' || details.namedCurve !== 'prime256v1') {
-    throwAttestationInvalid(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       `fido-u2f attestation: attestation certificate must carry an EC P-256 public key (got ${leaf.publicKey.asymmetricKeyType} / ${details.namedCurve ?? 'unknown curve'})`,
     );
   }
@@ -105,7 +113,10 @@ export function verifyFidoU2f({ attStmt, authDataBytes, clientDataHash, attested
   v.update(signed);
   const ok = v.verify({ key: leaf.publicKey, dsaEncoding: 'der' }, sig);
   if (!ok) {
-    throwSignatureInvalid('fido-u2f attestation: signature does not verify against leaf certificate');
+    throw new PasskeyError(
+      ErrorCode.SIGNATURE_INVALID,
+      'fido-u2f attestation: signature does not verify against leaf certificate',
+    );
   }
 
   let trustPath = 'no-anchor';
@@ -114,7 +125,7 @@ export function verifyFidoU2f({ attStmt, authDataBytes, clientDataHash, attested
       verifyChain({ x5c: [leaf], trustAnchors: toCertificates(trustAnchors) });
       trustPath = 'trust-anchor';
     } catch (err) {
-      throwAttestationTrustAnchorMissing(`fido-u2f attestation: ${err.message}`);
+      throw new PasskeyError(ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING, `fido-u2f attestation: ${err.message}`);
     }
   }
 

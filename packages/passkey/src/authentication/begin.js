@@ -7,7 +7,7 @@
 import { base64url } from '@exortek/crypto/encode';
 import { issuePasskeyChallenge } from '../internal/challenge.js';
 import { buildAuthenticationExtensions } from '../webauthn/extensions.js';
-import { throwInvalidArgument } from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
 
 const HINT_VALUES = new Set(['security-key', 'client-device', 'hybrid']);
 const UV_VALUES = new Set(['required', 'preferred', 'discouraged']);
@@ -33,30 +33,37 @@ const UV_VALUES = new Set(['required', 'preferred', 'discouraged']);
  */
 export async function begin(params) {
   if (!params || typeof params !== 'object') {
-    throwInvalidArgument('authentication.begin: options object required');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.begin: options object required');
   }
   const rpId = params.rpId;
   if (!rpId || (typeof rpId !== 'string' && !Array.isArray(rpId))) {
-    throwInvalidArgument('authentication.begin: rpId (string or string[]) is required');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.begin: rpId (string or string[]) is required');
   }
   if (!params.challengeSecret) {
-    throwInvalidArgument('authentication.begin: challengeSecret is required');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.begin: challengeSecret is required');
   }
   if (!params.challengeStore || typeof params.challengeStore.incr !== 'function') {
-    throwInvalidArgument('authentication.begin: challengeStore (an IncrStore) is required');
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      'authentication.begin: challengeStore (an IncrStore) is required',
+    );
   }
   if (params.userVerification !== undefined && !UV_VALUES.has(params.userVerification)) {
-    throwInvalidArgument(
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
       `authentication.begin: userVerification must be 'required' | 'preferred' | 'discouraged' (got "${params.userVerification}")`,
     );
   }
   if (params.hints !== undefined) {
     if (!Array.isArray(params.hints)) {
-      throwInvalidArgument('authentication.begin: hints must be an array');
+      throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.begin: hints must be an array');
     }
     for (const h of params.hints) {
       if (!HINT_VALUES.has(h)) {
-        throwInvalidArgument(`authentication.begin: hint "${h}" not one of security-key | client-device | hybrid`);
+        throw new PasskeyError(
+          ErrorCode.INVALID_ARGUMENT,
+          `authentication.begin: hint "${h}" not one of security-key | client-device | hybrid`,
+        );
       }
     }
   }

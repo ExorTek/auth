@@ -25,24 +25,22 @@ import { readClientExtensionResults, readAuthenticatorExtensions } from '../weba
 import { importCoseKey, algorithmForId } from '../cose/key.js';
 import { consumePasskeyChallenge } from '../internal/challenge.js';
 import { concat } from '../internal/bytes.js';
-import {
-  throwInvalidArgument,
-  throwClientDataInvalid,
-  throwOriginMismatch,
-  throwRpIdMismatch,
-  throwSignatureInvalid,
-  throwCounterRollback,
-  throwPublicKeyUnsupported,
-} from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
 
 function decodeB64uField(value, field) {
   if (typeof value !== 'string' || value.length === 0) {
-    throwInvalidArgument(`authentication.finish: response.${field} must be a base64url string`);
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      `authentication.finish: response.${field} must be a base64url string`,
+    );
   }
   try {
     return new Uint8Array(base64url.decode(value));
   } catch (err) {
-    throwInvalidArgument(`authentication.finish: response.${field} is not valid base64url (${err.message})`);
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      `authentication.finish: response.${field} is not valid base64url (${err.message})`,
+    );
   }
 }
 
@@ -59,11 +57,15 @@ function importCredentialKey(credential) {
     try {
       imported = importCoseKey(credential.publicKeyCose);
     } catch (err) {
-      throwPublicKeyUnsupported(`authentication.finish: stored credential public key is unusable (${err.message})`);
+      throw new PasskeyError(
+        ErrorCode.PUBLIC_KEY_UNSUPPORTED,
+        `authentication.finish: stored credential public key is unusable (${err.message})`,
+      );
     }
     return { publicKey: imported.publicKey, algorithm: imported.algorithm };
   }
-  throwInvalidArgument(
+  throw new PasskeyError(
+    ErrorCode.INVALID_ARGUMENT,
     'authentication.finish: credential must expose either `publicKey` (Node KeyObject) or `publicKeyCose` (COSE Map)',
   );
 }
@@ -105,7 +107,7 @@ function importCredentialKey(credential) {
  */
 export async function finish(params) {
   if (!params || typeof params !== 'object') {
-    throwInvalidArgument('authentication.finish: options object required');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.finish: options object required');
   }
   const {
     response,
@@ -124,21 +126,33 @@ export async function finish(params) {
   } = params;
 
   if (!response || typeof response !== 'object' || !response.response) {
-    throwInvalidArgument('authentication.finish: response must be a WebAuthn PublicKeyCredential-shaped object');
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      'authentication.finish: response must be a WebAuthn PublicKeyCredential-shaped object',
+    );
   }
   if (response.type !== undefined && response.type !== 'public-key') {
-    throwInvalidArgument(`authentication.finish: response.type must be 'public-key' (got "${response.type}")`);
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      `authentication.finish: response.type must be 'public-key' (got "${response.type}")`,
+    );
   }
   // `id` is the base64url of `rawId`; reject a client that disagrees
   // with itself (matches SimpleWebAuthn). Only when both are present.
   if (typeof response.id === 'string' && typeof response.rawId === 'string' && response.id !== response.rawId) {
-    throwInvalidArgument('authentication.finish: response.id must equal response.rawId (base64url mismatch)');
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      'authentication.finish: response.id must equal response.rawId (base64url mismatch)',
+    );
   }
   if (!challengeToken) {
-    throwInvalidArgument('authentication.finish: challengeToken is required');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.finish: challengeToken is required');
   }
   if (!credential || typeof credential !== 'object' || typeof credential.counter !== 'number') {
-    throwInvalidArgument('authentication.finish: credential must include the stored counter (number)');
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      'authentication.finish: credential must include the stored counter (number)',
+    );
   }
 
   const clientDataJSON = decodeB64uField(response.response.clientDataJSON, 'response.clientDataJSON');
@@ -152,16 +166,23 @@ export async function finish(params) {
   try {
     clientData = parseClientData(clientDataJSON);
   } catch (err) {
-    throwClientDataInvalid(`authentication.finish: ${err.message}`);
+    throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, `authentication.finish: ${err.message}`);
   }
   if (clientData.type !== 'webauthn.get') {
-    throwClientDataInvalid(`authentication.finish: clientData.type must be "webauthn.get" (got "${clientData.type}")`);
+    throw new PasskeyError(
+      ErrorCode.CLIENT_DATA_INVALID,
+      `authentication.finish: clientData.type must be "webauthn.get" (got "${clientData.type}")`,
+    );
   }
   if (!matchesOrigin(clientData.origin, expectedOrigin)) {
-    throwOriginMismatch(`authentication.finish: origin "${clientData.origin}" not in expectedOrigin`);
+    throw new PasskeyError(
+      ErrorCode.ORIGIN_MISMATCH,
+      `authentication.finish: origin "${clientData.origin}" not in expectedOrigin`,
+    );
   }
   if (clientData.crossOrigin && !allowCrossOriginCeremony) {
-    throwClientDataInvalid(
+    throw new PasskeyError(
+      ErrorCode.CLIENT_DATA_INVALID,
       'authentication.finish: clientDataJSON.crossOrigin=true — set allowCrossOriginCeremony to accept cross-origin ceremonies',
     );
   }
@@ -180,7 +201,10 @@ export async function finish(params) {
 
   const rpMatch = matchRpId(authData.rpIdHash, expectedRpId);
   if (!rpMatch) {
-    throwRpIdMismatch('authentication.finish: rpIdHash does not match any expected RP ID');
+    throw new PasskeyError(
+      ErrorCode.RP_ID_MISMATCH,
+      'authentication.finish: rpIdHash does not match any expected RP ID',
+    );
   }
 
   enforceFlags(authData.flags, { requireUserVerification, requireBackupEligible, requireBackedUp });
@@ -201,7 +225,10 @@ export async function finish(params) {
     ok = v.verify({ key: publicKey, ...algParams.verifyOptions }, signature);
   }
   if (!ok) {
-    throwSignatureInvalid('authentication.finish: signature does not verify against stored credential public key');
+    throw new PasskeyError(
+      ErrorCode.SIGNATURE_INVALID,
+      'authentication.finish: signature does not verify against stored credential public key',
+    );
   }
 
   // Counter monotonicity (WebAuthn L3 §7.2 step 21). Some
@@ -211,7 +238,8 @@ export async function finish(params) {
   if (authData.signCount === 0 && credential.counter === 0) {
     // OK — permitted no-counter case.
   } else if (authData.signCount <= credential.counter) {
-    throwCounterRollback(
+    throw new PasskeyError(
+      ErrorCode.COUNTER_ROLLBACK,
       `authentication.finish: counter did not increase (stored=${credential.counter}, received=${authData.signCount}) — possible cloned authenticator`,
     );
   }
