@@ -25,6 +25,7 @@ import { assertNonEmptyString, invalidArgument } from './internal/guards.js';
  * @property {Record<string, string>} [headers]      extra headers sent on the fetch request
  * @property {(header: { kid: string, alg?: string }, error: Error) => void} [onInvalidKey] called when a key cannot be resolved (kid not found or alg mismatch)
  * @property {number}         [maxResponseSize=1048576] max bytes accepted from the JWKS endpoint (default 1 MB)
+ * @property {(hostname: string, url: URL) => boolean} [allowHost] gate on the destination host; return false to refuse the URI
  */
 
 /**
@@ -53,6 +54,7 @@ export function createRemoteJWKS(uri, options = {}) {
     headers: extraHeaders,
     onInvalidKey,
     maxResponseSize = 1_048_576,
+    allowHost,
   } = options;
 
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
@@ -64,6 +66,19 @@ export function createRemoteJWKS(uri, options = {}) {
 
   if (onInvalidKey !== undefined && !isFunction(onInvalidKey)) {
     throw invalidArgument('createRemoteJWKS.options.onInvalidKey must be a function');
+  }
+
+  // Where the URI is chosen by someone other than the operator — a client
+  // registering its own `jwks_uri`, for instance — the destination is worth
+  // constraining. The URI is fixed for the lifetime of the resolver, so one
+  // check here covers every fetch it will make.
+  if (allowHost !== undefined) {
+    if (!isFunction(allowHost)) {
+      throw invalidArgument('createRemoteJWKS.options.allowHost must be a function');
+    }
+    if (!allowHost(parsed.hostname, parsed)) {
+      throw invalidArgument(`createRemoteJWKS.uri host ${JSON.stringify(parsed.hostname)} is not allowed`);
+    }
   }
 
   const cacheTtl = parseDuration(cacheTtlInput);

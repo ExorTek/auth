@@ -57,6 +57,7 @@ const DEFAULT_REFRESH_TTL = '30d';
  * @property {{ required?: boolean, algs?: string[], nonce?: boolean }} [dpop]   RFC 9449
  * @property {{ required?: boolean, ttl?: string|number }} [par]                 RFC 9126
  * @property {boolean} [fapi]                      FAPI 2.0 profile (bundles PAR + PKCE + DPoP/mTLS + iss)
+ * @property {(hostname: string, url: URL) => boolean} [allowJwksHost]  gate the hosts the server will fetch a client's `jwks_uri` from; return false to refuse. Recommended wherever dynamic client registration is enabled, since the URI is then chosen by the registrant.
  *
  * @typedef {Object} ServerConfig
  * @property {string} issuer                       AS issuer identifier (https, no trailing slash)
