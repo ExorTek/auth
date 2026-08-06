@@ -227,5 +227,8 @@ export function mask(key) {
 }
 
 // Re-export node's raw timing-safe for tests that want to sanity-check
-// against the primitive directly — not part of the public surface.
-export { nodeTimingSafeEqual as _nodeTimingSafeEqual, isBytes as _isBytes };
+// against the primitive directly — not part of the public surface. Bound to
+// local consts (not `export { x as _x }`) so the declaration bundler has a
+// local definition to emit rather than a dangling re-export of an external.
+export const _nodeTimingSafeEqual = nodeTimingSafeEqual;
+export const _isBytes = isBytes;
