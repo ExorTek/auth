@@ -16,11 +16,25 @@ import { ProtocolError, ServerError } from '../errors.js';
 
 /**
  * @param {import('../clients.js').Client} client
+ * @param {{ allowJwksHost?: (hostname: string, url: URL) => boolean }} [options]
+ *   `allowJwksHost` gates the destination of a `jwksUri` fetch. A client's
+ *   `jwks_uri` is client-supplied — under open or token-gated dynamic
+ *   registration it is chosen by whoever registered — so a deployment can
+ *   constrain which hosts the server will reach out to.
  * @returns {Promise<Function>} a `keyish` resolver for `jwt.verify`
  */
-export async function resolveClientKeys(client) {
+export async function resolveClientKeys(client, options = {}) {
   if (isNonEmptyString(client.jwksUri)) {
-    return createRemoteJWKS(client.jwksUri);
+    try {
+      return createRemoteJWKS(client.jwksUri, {
+        ...(options.allowJwksHost ? { allowHost: options.allowJwksHost } : {}),
+      });
+    } catch (err) {
+      throw new ServerError(
+        ProtocolError.INVALID_CLIENT,
+        `client jwks_uri was refused: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
   if (isObject(client.jwks) && isArray(client.jwks.keys) && client.jwks.keys.length > 0) {
     const entries = await Promise.all(

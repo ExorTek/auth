@@ -188,7 +188,7 @@ async function authenticateAssertion(req, config, assertionType) {
         `private_key_jwt alg ${JSON.stringify(alg)} is not an accepted asymmetric algorithm`,
       );
     }
-    keyish = await resolveClientKeys(client);
+    keyish = await resolveClientKeys(client, { allowJwksHost: config.security?.allowJwksHost });
   } else {
     throw new ServerError(
       ProtocolError.INVALID_CLIENT,

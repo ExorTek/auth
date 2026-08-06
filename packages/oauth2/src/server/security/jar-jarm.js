@@ -74,7 +74,7 @@ export async function verifyRequestObject(requestJwt, outerClientId, config) {
 
   let payload;
   try {
-    const keys = await resolveClientKeys(client);
+    const keys = await resolveClientKeys(client, { allowJwksHost: config.security?.allowJwksHost });
     payload = (await jwtVerify(requestJwt, keys, { alg: [alg], audience: config.issuer })).payload;
   } catch (err) {
     if (err instanceof JwtError) {

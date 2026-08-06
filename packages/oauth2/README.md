@@ -227,6 +227,12 @@ const server = createServer({
   /* … */
   clients: createClientRegistry([]), // a registry that can persist new clients
   registration: { initialAccessToken: process.env.REGISTRATION_TOKEN },
+  security: {
+    // A registered client supplies its own `jwks_uri`, and the server fetches
+    // it to verify `private_key_jwt` assertions and JAR request objects.
+    // Constrain where those fetches may go.
+    allowJwksHost: hostname => hostname.endsWith('.partner.example.com'),
+  },
 });
 // POST /register  Authorization: Bearer <token>  { "redirect_uris": ["https://c/cb"], … }
 // → 201 { client_id, client_secret, … }

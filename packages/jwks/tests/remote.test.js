@@ -436,3 +436,34 @@ describe('LRU eviction', () => {
     assert.equal(key1.type, 'public');
   });
 });
+
+describe('createRemoteJWKS — host policy', () => {
+  test('refuses a URI whose host the policy rejects', () => {
+    assert.throws(
+      () =>
+        createRemoteJWKS('https://internal.svc.local/jwks', {
+          allowHost: hostname => hostname.endsWith('.example.com'),
+        }),
+      err => err instanceof JwksError && /not allowed/i.test(err.message),
+    );
+  });
+
+  test('accepts a URI the policy allows, and passes the parsed URL through', () => {
+    const seen = [];
+    const resolver = createRemoteJWKS('https://idp.example.com/jwks', {
+      allowHost: (hostname, url) => {
+        seen.push([hostname, url.protocol]);
+        return true;
+      },
+    });
+    assert.equal(typeof resolver, 'function');
+    assert.deepEqual(seen, [['idp.example.com', 'https:']]);
+  });
+
+  test('rejects a non-function policy', () => {
+    assert.throws(
+      () => createRemoteJWKS('https://idp.example.com/jwks', { allowHost: 'nope' }),
+      err => err instanceof JwksError,
+    );
+  });
+});
