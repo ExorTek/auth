@@ -10,7 +10,7 @@
  * throw `UNSUPPORTED_ATTESTATION_FORMAT` with a clear message.
  */
 
-import { throwUnsupportedAttestationFormat } from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
 import { verifyNone } from './none.js';
 import { verifyPacked } from './packed.js';
 import { verifyFidoU2f } from './fidoU2f.js';
@@ -39,6 +39,9 @@ export function getVerifier(fmt) {
     case 'tpm':
       return verifyTpm;
     default:
-      throwUnsupportedAttestationFormat(`attestation format "${fmt}" is not supported yet`);
+      throw new PasskeyError(
+        ErrorCode.UNSUPPORTED_ATTESTATION_FORMAT,
+        `attestation format "${fmt}" is not supported yet`,
+      );
   }
 }

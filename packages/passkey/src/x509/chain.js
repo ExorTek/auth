@@ -29,6 +29,8 @@
  */
 
 import { X509Certificate } from 'node:crypto';
+import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isArray } from '@exortek/shared/predicates';
 
 /**
  * Coerce an input into an `X509Certificate`. Accepts:
@@ -43,10 +45,13 @@ export function toCertificate(input) {
   if (input instanceof X509Certificate) {
     return input;
   }
-  if (typeof input === 'string' || input instanceof Uint8Array) {
+  if (isString(input) || input instanceof Uint8Array) {
     return new X509Certificate(input);
   }
-  throw new Error('x509.toCertificate: expected X509Certificate, Uint8Array, Buffer, or PEM string');
+  throw new PasskeyError(
+    ErrorCode.INVALID_ARGUMENT,
+    'x509.toCertificate: expected X509Certificate, Uint8Array, Buffer, or PEM string',
+  );
 }
 
 /**
@@ -56,8 +61,8 @@ export function toCertificate(input) {
  * @returns {X509Certificate[]}
  */
 export function toCertificates(inputs) {
-  if (!Array.isArray(inputs)) {
-    throw new Error('x509.toCertificates: expected array');
+  if (!isArray(inputs)) {
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'x509.toCertificates: expected array');
   }
   return inputs.map(toCertificate);
 }
@@ -111,7 +116,8 @@ function isAnchor(cert, anchorFingerprints) {
  */
 function assertIssuerIsCa(signer, position) {
   if (signer.ca !== true) {
-    throw new Error(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       `x509.verifyChain: issuer of certificate ${position} is not a CA (basicConstraints cA must be TRUE): ${signer.subject.replace(/\n/g, ' ')}`,
     );
   }
@@ -149,13 +155,16 @@ export function verifyChain({ x5c, trustAnchors, now = new Date() }) {
   const anchors = toCertificates(trustAnchors);
 
   if (chain.length === 0) {
-    throw new Error('x509.verifyChain: x5c is empty');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'x509.verifyChain: x5c is empty');
   }
   if (anchors.length === 0) {
-    throw new Error('x509.verifyChain: trustAnchors is empty — no chain would ever terminate');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING,
+      'x509.verifyChain: trustAnchors is empty — no chain would ever terminate',
+    );
   }
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
-    throw new Error('x509.verifyChain: `now` must be a valid Date');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'x509.verifyChain: `now` must be a valid Date');
   }
 
   const anchorFingerprints = new Set(anchors.map(c => c.fingerprint256));
@@ -167,7 +176,8 @@ export function verifyChain({ x5c, trustAnchors, now = new Date() }) {
     // parse the certificate's ASN.1 GeneralizedTime / UTCTime for
     // us. We target Node 22+, so they're always available.
     if (now < current.validFromDate || now > current.validToDate) {
-      throw new Error(
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
         `x509.verifyChain: certificate ${i} outside validity window at ${now.toISOString()} (${current.validFrom} – ${current.validTo})`,
       );
     }
@@ -187,7 +197,10 @@ export function verifyChain({ x5c, trustAnchors, now = new Date() }) {
     if (i + 1 < chain.length) {
       signer = chain[i + 1];
       if (!current.checkIssued(signer)) {
-        throw new Error(`x509.verifyChain: certificate ${i} not issued by certificate ${i + 1} (DN mismatch)`);
+        throw new PasskeyError(
+          ErrorCode.ATTESTATION_INVALID,
+          `x509.verifyChain: certificate ${i} not issued by certificate ${i + 1} (DN mismatch)`,
+        );
       }
       assertIssuerIsCa(signer, i);
     } else {
@@ -198,7 +211,8 @@ export function verifyChain({ x5c, trustAnchors, now = new Date() }) {
         // certificate is self-signed and not itself in `anchors`,
         // `findIssuerAnchor` cannot find any candidate (its issuer
         // DN only ever matches its own subject), and we throw here.
-        throw new Error(
+        throw new PasskeyError(
+          ErrorCode.ATTESTATION_INVALID,
           `x509.verifyChain: no trust anchor terminates chain (leaf-most orphan subject: ${current.subject.replace(/\n/g, ' ')})`,
         );
       }
@@ -206,7 +220,10 @@ export function verifyChain({ x5c, trustAnchors, now = new Date() }) {
     }
 
     if (!current.verify(signer.publicKey)) {
-      throw new Error(`x509.verifyChain: certificate ${i} signature does not verify against its issuer`);
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
+        `x509.verifyChain: certificate ${i} signature does not verify against its issuer`,
+      );
     }
   }
 

@@ -14,13 +14,8 @@
  * Bits 1 and 5 are reserved.
  */
 
-import {
-  throwAuthDataInvalid,
-  throwBackedUpRequired,
-  throwBackupEligibleRequired,
-  throwUserPresenceRequired,
-  throwUserVerificationRequired,
-} from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
+import { isInteger } from '@exortek/shared/predicates';
 
 export const FLAG_MASK = Object.freeze({
   UP: 0x01,
@@ -49,8 +44,8 @@ export const FLAG_MASK = Object.freeze({
  * @returns {AuthFlags}
  */
 export function decodeFlags(byte) {
-  if (!Number.isInteger(byte) || byte < 0 || byte > 0xff) {
-    throw new Error(`flags: expected a byte (0..255), got ${byte}`);
+  if (!isInteger(byte) || byte < 0 || byte > 0xff) {
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, `flags: expected a byte (0..255), got ${byte}`);
   }
   return {
     raw: byte,
@@ -94,20 +89,29 @@ export function deviceTypeFromFlags(flags) {
  */
 export function enforceFlags(flags, policy = {}) {
   if (!flags.up) {
-    throwUserPresenceRequired('flags: User Present bit (UP) is required and was not set');
+    throw new PasskeyError(
+      ErrorCode.USER_PRESENCE_REQUIRED,
+      'flags: User Present bit (UP) is required and was not set',
+    );
   }
   if (policy.requireUserVerification && !flags.uv) {
-    throwUserVerificationRequired('flags: User Verification required but UV bit not set');
+    throw new PasskeyError(
+      ErrorCode.USER_VERIFICATION_REQUIRED,
+      'flags: User Verification required but UV bit not set',
+    );
   }
   if (policy.requireBackupEligible && !flags.be) {
-    throwBackupEligibleRequired('flags: backup-eligible credential required but BE bit not set');
+    throw new PasskeyError(
+      ErrorCode.BACKUP_ELIGIBLE_REQUIRED,
+      'flags: backup-eligible credential required but BE bit not set',
+    );
   }
   if (policy.requireBackedUp && !flags.bs) {
-    throwBackedUpRequired('flags: backed-up state required but BS bit not set');
+    throw new PasskeyError(ErrorCode.BACKED_UP_REQUIRED, 'flags: backed-up state required but BS bit not set');
   }
   // Spec sanity: BS=1 implies BE=1 (a credential can't be backed
   // up without being eligible for backup). WebAuthn L3 §6.1.3.
   if (flags.bs && !flags.be) {
-    throwAuthDataInvalid('flags: BS=1 with BE=0 is not a valid combination');
+    throw new PasskeyError(ErrorCode.AUTH_DATA_INVALID, 'flags: BS=1 with BE=0 is not a valid combination');
   }
 }

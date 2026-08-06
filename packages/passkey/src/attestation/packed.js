@@ -21,7 +21,8 @@ import { importCoseKey, algorithmForId } from '../cose/key.js';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, TAG } from '../asn1/der.js';
 import { bytesEqual, concat } from '../internal/bytes.js';
-import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSignatureInvalid } from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
+import { isArray } from '@exortek/shared/predicates';
 
 const AAGUID_OID = '1.3.6.1.4.1.45724.1.1.4';
 
@@ -40,7 +41,10 @@ function readCertAaguid(certDer) {
   }
   const inner = readTlv(outer);
   if (inner.tag !== TAG.OCTET_STRING || inner.contents.byteLength !== 16) {
-    throwAttestationInvalid('packed attestation: AAGUID extension is not a 16-byte OCTET STRING');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'packed attestation: AAGUID extension is not a 16-byte OCTET STRING',
+    );
   }
   return inner.contents;
 }
@@ -61,17 +65,17 @@ function readCertAaguid(certDer) {
  */
 export function verifyPacked({ attStmt, authDataBytes, clientDataHash, attestedCredentialData, trustAnchors }) {
   if (!(attStmt instanceof Map)) {
-    throwAttestationInvalid('packed attestation: attStmt is not a CBOR map');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'packed attestation: attStmt is not a CBOR map');
   }
   const alg = attStmt.get('alg');
   const sig = attStmt.get('sig');
   const x5cRaw = attStmt.get('x5c');
 
   if (typeof alg !== 'number') {
-    throwAttestationInvalid('packed attestation: attStmt.alg missing or not an integer');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'packed attestation: attStmt.alg missing or not an integer');
   }
   if (!(sig instanceof Uint8Array) || sig.byteLength === 0) {
-    throwAttestationInvalid('packed attestation: attStmt.sig missing or empty');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'packed attestation: attStmt.sig missing or empty');
   }
 
   const algParams = algorithmForId(alg);
@@ -82,24 +86,28 @@ export function verifyPacked({ attStmt, authDataBytes, clientDataHash, attestedC
     // alg MUST match credentialPublicKey.alg (WebAuthn L3 §8.2 step 3.1).
     const credAlg = attestedCredentialData.credentialPublicKey.get(3);
     if (credAlg !== alg) {
-      throwAttestationInvalid(
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
         `packed self-attestation: attStmt.alg (${alg}) does not match credentialPublicKey.alg (${credAlg})`,
       );
     }
     const { publicKey } = importCoseKey(attestedCredentialData.credentialPublicKey);
     if (!verifySignature(publicKey, algParams, signed, sig)) {
-      throwSignatureInvalid('packed self-attestation: signature does not verify against credential public key');
+      throw new PasskeyError(
+        ErrorCode.SIGNATURE_INVALID,
+        'packed self-attestation: signature does not verify against credential public key',
+      );
     }
     return { format: 'packed', trustPath: 'self' };
   }
 
   // Full attestation with x5c.
-  if (!Array.isArray(x5cRaw) || x5cRaw.length === 0) {
-    throwAttestationInvalid('packed attestation: attStmt.x5c must be a non-empty array');
+  if (!isArray(x5cRaw) || x5cRaw.length === 0) {
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'packed attestation: attStmt.x5c must be a non-empty array');
   }
   for (const c of x5cRaw) {
     if (!(c instanceof Uint8Array)) {
-      throwAttestationInvalid('packed attestation: x5c entries must be byte strings');
+      throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'packed attestation: x5c entries must be byte strings');
     }
   }
   const chain = x5cRaw.map(der => new X509Certificate(der));
@@ -107,7 +115,10 @@ export function verifyPacked({ attStmt, authDataBytes, clientDataHash, attestedC
 
   // Signature verifies with the leaf certificate's public key.
   if (!verifySignature(leaf.publicKey, algParams, signed, sig)) {
-    throwSignatureInvalid('packed attestation: signature does not verify against leaf certificate');
+    throw new PasskeyError(
+      ErrorCode.SIGNATURE_INVALID,
+      'packed attestation: signature does not verify against leaf certificate',
+    );
   }
 
   // AAGUID extension: if present, must match authData.aaguid.
@@ -116,7 +127,10 @@ export function verifyPacked({ attStmt, authDataBytes, clientDataHash, attestedC
   if (certAaguid !== null) {
     aaguidExtensionOk = bytesEqual(certAaguid, attestedCredentialData.aaguid);
     if (!aaguidExtensionOk) {
-      throwAttestationInvalid('packed attestation: cert AAGUID extension does not match authData AAGUID');
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
+        'packed attestation: cert AAGUID extension does not match authData AAGUID',
+      );
     }
   }
 
@@ -127,12 +141,16 @@ export function verifyPacked({ attStmt, authDataBytes, clientDataHash, attestedC
   // rejecting minor formatting differences.
   const subject = leaf.subject.replace(/\r/g, '');
   if (!/OU=Authenticator Attestation/i.test(subject)) {
-    throwAttestationInvalid(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       `packed attestation: leaf subject missing "OU=Authenticator Attestation" per §8.2 step 2.3 (got: ${subject.replace(/\n/g, ' ')})`,
     );
   }
   if (leaf.ca === true) {
-    throwAttestationInvalid('packed attestation: leaf basicConstraints CA must be FALSE (§8.2 step 2.3)');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'packed attestation: leaf basicConstraints CA must be FALSE (§8.2 step 2.3)',
+    );
   }
 
   // Chain verification against RP-supplied anchors.
@@ -142,7 +160,7 @@ export function verifyPacked({ attStmt, authDataBytes, clientDataHash, attestedC
       verifyChain({ x5c: chain, trustAnchors: toCertificates(trustAnchors) });
       trustPath = 'trust-anchor';
     } catch (err) {
-      throwAttestationTrustAnchorMissing(`packed attestation: ${err.message}`);
+      throw new PasskeyError(ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING, `packed attestation: ${err.message}`);
     }
   }
 

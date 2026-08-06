@@ -48,7 +48,8 @@ import { algorithmForId } from '../cose/key.js';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, readChildren, decodeOid, TAG } from '../asn1/der.js';
 import { bytesEqual, concat } from '../internal/bytes.js';
-import { throwAttestationInvalid, throwAttestationTrustAnchorMissing, throwSignatureInvalid } from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
+import { isArray } from '@exortek/shared/predicates';
 
 const TPM_GENERATED_VALUE = 0xff544347;
 const TPM_ST_ATTEST_CERTIFY = 0x8017;
@@ -81,7 +82,10 @@ class Reader {
   }
   need(n) {
     if (this.pos + n > this.bytes.byteLength) {
-      throwAttestationInvalid(`tpm: TPM struct truncated (need ${n} at offset ${this.pos})`);
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
+        `tpm: TPM struct truncated (need ${n} at offset ${this.pos})`,
+      );
     }
   }
   u16() {
@@ -123,7 +127,10 @@ function parsePubArea(bytes) {
   const nameAlgTpm = r.u16();
   const nameAlg = TPM_HASH_ALG[nameAlgTpm];
   if (!nameAlg) {
-    throwAttestationInvalid(`tpm: pubArea nameAlg 0x${nameAlgTpm.toString(16)} not supported`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `tpm: pubArea nameAlg 0x${nameAlgTpm.toString(16)} not supported`,
+    );
   }
   r.u32(); // objectAttributes — we don't use it beyond parsing
   r.b16(); // authPolicy
@@ -132,10 +139,10 @@ function parsePubArea(bytes) {
   if (type === TPM_ALG_RSA) {
     // TPMS_RSA_PARMS
     if (r.u16() !== TPM_ALG_NULL) {
-      throwAttestationInvalid('tpm: pubArea RSA symmetric alg must be TPM_ALG_NULL');
+      throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: pubArea RSA symmetric alg must be TPM_ALG_NULL');
     }
     if (r.u16() !== TPM_ALG_NULL) {
-      throwAttestationInvalid('tpm: pubArea RSA scheme must be TPM_ALG_NULL');
+      throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: pubArea RSA scheme must be TPM_ALG_NULL');
     }
     const keyBits = r.u16();
     let exponent = r.u32();
@@ -144,39 +151,49 @@ function parsePubArea(bytes) {
     }
     const modulus = r.b16();
     if (modulus.byteLength * 8 !== keyBits) {
-      throwAttestationInvalid(
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
         `tpm: pubArea RSA keyBits (${keyBits}) does not match modulus length (${modulus.byteLength * 8})`,
       );
     }
     if (modulus.byteLength < 256) {
       // 2048-bit floor — matches @exortek/passkey COSE key import.
-      throwAttestationInvalid(`tpm: pubArea RSA modulus is ${modulus.byteLength * 8} bits, minimum 2048`);
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
+        `tpm: pubArea RSA modulus is ${modulus.byteLength * 8} bits, minimum 2048`,
+      );
     }
     key = { kind: 'rsa', modulus, exponent };
   } else if (type === TPM_ALG_ECC) {
     if (r.u16() !== TPM_ALG_NULL) {
-      throwAttestationInvalid('tpm: pubArea ECC symmetric alg must be TPM_ALG_NULL');
+      throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: pubArea ECC symmetric alg must be TPM_ALG_NULL');
     }
     if (r.u16() !== TPM_ALG_NULL) {
-      throwAttestationInvalid('tpm: pubArea ECC scheme must be TPM_ALG_NULL');
+      throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: pubArea ECC scheme must be TPM_ALG_NULL');
     }
     const curveId = r.u16();
     const curveName = TPM_ECC_CURVE[curveId];
     if (!curveName) {
-      throwAttestationInvalid(`tpm: pubArea ECC curveID 0x${curveId.toString(16)} not supported`);
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
+        `tpm: pubArea ECC curveID 0x${curveId.toString(16)} not supported`,
+      );
     }
     if (r.u16() !== TPM_ALG_NULL) {
-      throwAttestationInvalid('tpm: pubArea ECC KDF scheme must be TPM_ALG_NULL');
+      throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: pubArea ECC KDF scheme must be TPM_ALG_NULL');
     }
     const x = r.b16();
     const y = r.b16();
     key = { kind: 'ec', curve: curveName, x, y };
   } else {
-    throwAttestationInvalid(`tpm: pubArea type 0x${type.toString(16)} not supported (want RSA 0x0001 or ECC 0x0023)`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `tpm: pubArea type 0x${type.toString(16)} not supported (want RSA 0x0001 or ECC 0x0023)`,
+    );
   }
 
   if (r.remaining() !== 0) {
-    throwAttestationInvalid(`tpm: pubArea has ${r.remaining()} trailing byte(s)`);
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, `tpm: pubArea has ${r.remaining()} trailing byte(s)`);
   }
 
   return { type, nameAlgTpm, nameAlg, key };
@@ -189,13 +206,17 @@ function parseCertInfo(bytes) {
   const r = new Reader(bytes);
   const magic = r.u32();
   if (magic !== TPM_GENERATED_VALUE) {
-    throwAttestationInvalid(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       `tpm: certInfo magic must be TPM_GENERATED_VALUE (0xff544347), got 0x${magic.toString(16)}`,
     );
   }
   const type = r.u16();
   if (type !== TPM_ST_ATTEST_CERTIFY) {
-    throwAttestationInvalid(`tpm: certInfo type must be TPM_ST_ATTEST_CERTIFY (0x8017), got 0x${type.toString(16)}`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `tpm: certInfo type must be TPM_ST_ATTEST_CERTIFY (0x8017), got 0x${type.toString(16)}`,
+    );
   }
   const qualifiedSigner = r.b16();
   const extraData = r.b16();
@@ -206,7 +227,7 @@ function parseCertInfo(bytes) {
   const name = r.b16();
   const qualifiedName = r.b16();
   if (r.remaining() !== 0) {
-    throwAttestationInvalid(`tpm: certInfo has ${r.remaining()} trailing byte(s)`);
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, `tpm: certInfo has ${r.remaining()} trailing byte(s)`);
   }
   return { magic, type, qualifiedSigner, extraData, name, qualifiedName };
 }
@@ -232,15 +253,21 @@ function comparePubAreaToCose(pubKey, coseKey) {
   const kty = coseKey.get(1);
   if (pubKey.kind === 'rsa') {
     if (kty !== 3) {
-      throwAttestationInvalid('tpm: pubArea is RSA but credentialPublicKey is not (COSE kty != 3)');
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
+        'tpm: pubArea is RSA but credentialPublicKey is not (COSE kty != 3)',
+      );
     }
     const n = coseKey.get(-1);
     const e = coseKey.get(-2);
     if (!(n instanceof Uint8Array) || !(e instanceof Uint8Array)) {
-      throwAttestationInvalid('tpm: credentialPublicKey RSA n/e must be byte strings');
+      throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: credentialPublicKey RSA n/e must be byte strings');
     }
     if (!bytesEqual(n, pubKey.modulus)) {
-      throwAttestationInvalid('tpm: pubArea RSA modulus does not match credentialPublicKey');
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
+        'tpm: pubArea RSA modulus does not match credentialPublicKey',
+      );
     }
     // COSE exponent is big-endian bytes; TPM parsed exponent as u32.
     let coseExp = 0;
@@ -248,24 +275,31 @@ function comparePubAreaToCose(pubKey, coseKey) {
       coseExp = (coseExp << 8) | e[i];
     }
     if (coseExp !== pubKey.exponent) {
-      throwAttestationInvalid(
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
         `tpm: pubArea RSA exponent (${pubKey.exponent}) does not match credentialPublicKey (${coseExp})`,
       );
     }
   } else {
     // EC
     if (kty !== 2) {
-      throwAttestationInvalid('tpm: pubArea is ECC but credentialPublicKey is not (COSE kty != 2)');
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
+        'tpm: pubArea is ECC but credentialPublicKey is not (COSE kty != 2)',
+      );
     }
     const crvId = coseKey.get(-1);
     const crv = { 1: 'P-256', 2: 'P-384', 3: 'P-521' }[crvId];
     if (crv !== pubKey.curve) {
-      throwAttestationInvalid(`tpm: pubArea ECC curve ${pubKey.curve} does not match credentialPublicKey (${crv})`);
+      throw new PasskeyError(
+        ErrorCode.ATTESTATION_INVALID,
+        `tpm: pubArea ECC curve ${pubKey.curve} does not match credentialPublicKey (${crv})`,
+      );
     }
     const x = coseKey.get(-2);
     const y = coseKey.get(-3);
     if (!bytesEqual(x, pubKey.x) || !bytesEqual(y, pubKey.y)) {
-      throwAttestationInvalid('tpm: pubArea ECC x/y do not match credentialPublicKey');
+      throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: pubArea ECC x/y do not match credentialPublicKey');
     }
   }
 }
@@ -283,7 +317,7 @@ function assertAikProfile(leaf, leafDer) {
   // basicConstraints CA:FALSE — Node exposes this via
   // `.ca` (boolean) since Node 20+.
   if (leaf.ca === true) {
-    throwAttestationInvalid('tpm: AIK cert basicConstraints CA must be FALSE');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: AIK cert basicConstraints CA must be FALSE');
   }
   // extendedKeyUsage MUST include TCG-KP-AIK (2.23.133.8.3).
   // Node's `.extKeyUsage` is unreliable across versions for non-
@@ -292,22 +326,26 @@ function assertAikProfile(leaf, leafDer) {
   // SEQUENCE OF OBJECT IDENTIFIER.
   const ekuExt = findExtension(leafDer, '2.5.29.37');
   if (ekuExt === null) {
-    throwAttestationInvalid('tpm: AIK cert missing extendedKeyUsage extension');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: AIK cert missing extendedKeyUsage extension');
   }
   const ekuSeq = readTlv(ekuExt);
   if (ekuSeq.tag !== TAG.SEQUENCE) {
-    throwAttestationInvalid('tpm: AIK cert extendedKeyUsage is not a SEQUENCE');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: AIK cert extendedKeyUsage is not a SEQUENCE');
   }
   const purposes = readChildren(ekuSeq.contents)
     .filter(t => t.tag === TAG.OBJECT_IDENTIFIER)
     .map(t => decodeOid(t.contents));
   if (!purposes.includes(AIK_EKU_OID)) {
-    throwAttestationInvalid(`tpm: AIK cert extendedKeyUsage must include ${AIK_EKU_OID} (TCG-KP-AIK)`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `tpm: AIK cert extendedKeyUsage must include ${AIK_EKU_OID} (TCG-KP-AIK)`,
+    );
   }
   // Subject sequence MUST be empty (TCG data lives in SAN). Node's
   // .subject returns an empty string when the RDN sequence is empty.
   if (leaf.subject && leaf.subject.replace(/\s+/g, '').length > 0) {
-    throwAttestationInvalid(
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
       `tpm: AIK cert subject must be empty per TCG profile (got "${leaf.subject.replace(/\n/g, ' ')}")`,
     );
   }
@@ -316,7 +354,10 @@ function assertAikProfile(leaf, leafDer) {
   // OID is 2.5.29.17.
   const san = findExtension(leafDer, '2.5.29.17');
   if (san === null) {
-    throwAttestationInvalid('tpm: AIK cert missing subjectAlternativeName (TCG vendor info)');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'tpm: AIK cert missing subjectAlternativeName (TCG vendor info)',
+    );
   }
   // Deep parse of the SAN's directoryName TCG attributes (manufacturer,
   // model, firmwareVersion) is a follow-up — we accept presence for now.
@@ -347,7 +388,7 @@ function verifySignature(publicKey, algParams, data, signature) {
  */
 export function verifyTpm({ attStmt, authDataBytes, clientDataHash, attestedCredentialData, trustAnchors }) {
   if (!(attStmt instanceof Map)) {
-    throwAttestationInvalid('tpm: attStmt is not a CBOR map');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: attStmt is not a CBOR map');
   }
   const ver = attStmt.get('ver');
   const alg = attStmt.get('alg');
@@ -357,24 +398,27 @@ export function verifyTpm({ attStmt, authDataBytes, clientDataHash, attestedCred
   const certInfo = attStmt.get('certInfo');
 
   if (ver !== '2.0') {
-    throwAttestationInvalid(`tpm: attStmt.ver must be "2.0" (got "${ver}")`);
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, `tpm: attStmt.ver must be "2.0" (got "${ver}")`);
   }
   if (typeof alg !== 'number') {
-    throwAttestationInvalid('tpm: attStmt.alg missing or not an integer');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: attStmt.alg missing or not an integer');
   }
   if (!(sig instanceof Uint8Array) || sig.byteLength === 0) {
-    throwAttestationInvalid('tpm: attStmt.sig missing or empty');
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: attStmt.sig missing or empty');
   }
-  if (!Array.isArray(x5cRaw) || x5cRaw.length === 0) {
-    throwAttestationInvalid('tpm: attStmt.x5c must be a non-empty array');
+  if (!isArray(x5cRaw) || x5cRaw.length === 0) {
+    throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: attStmt.x5c must be a non-empty array');
   }
   for (const c of x5cRaw) {
     if (!(c instanceof Uint8Array)) {
-      throwAttestationInvalid('tpm: attStmt.x5c entries must be byte strings');
+      throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'tpm: attStmt.x5c entries must be byte strings');
     }
   }
   if (!(pubArea instanceof Uint8Array) || !(certInfo instanceof Uint8Array)) {
-    throwAttestationInvalid('tpm: attStmt.pubArea and attStmt.certInfo must be byte strings');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'tpm: attStmt.pubArea and attStmt.certInfo must be byte strings',
+    );
   }
 
   const algParams = algorithmForId(alg);
@@ -392,24 +436,33 @@ export function verifyTpm({ attStmt, authDataBytes, clientDataHash, attestedCred
   const attToBeSigned = concat(authDataBytes, clientDataHash);
   const digestAlg = (algParams.nodeAlgorithm ?? '').replace(/^RSA-/, '').toLowerCase();
   if (!digestAlg) {
-    throwAttestationInvalid(`tpm: signature alg ${algParams.name} has no separate digest for extraData check`);
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `tpm: signature alg ${algParams.name} has no separate digest for extraData check`,
+    );
   }
   const expectedExtraData = createHash(digestAlg).update(attToBeSigned).digest();
   if (!bytesEqual(new Uint8Array(expectedExtraData), parsedCert.extraData)) {
-    throwAttestationInvalid('tpm: certInfo.extraData does not equal hash(authData || clientDataHash)');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'tpm: certInfo.extraData does not equal hash(authData || clientDataHash)',
+    );
   }
 
   // 4. attested.name check.
   const expectedName = computeName(pubArea, parsedPub.nameAlg, parsedPub.nameAlgTpm);
   if (!bytesEqual(expectedName, parsedCert.name)) {
-    throwAttestationInvalid('tpm: certInfo.attested.name does not equal nameAlg || Hash_nameAlg(pubArea)');
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'tpm: certInfo.attested.name does not equal nameAlg || Hash_nameAlg(pubArea)',
+    );
   }
 
   // 5. Signature verifies with AIK leaf public key over certInfo bytes.
   const chain = x5cRaw.map(der => new X509Certificate(der));
   const leaf = chain[0];
   if (!verifySignature(leaf.publicKey, algParams, certInfo, sig)) {
-    throwSignatureInvalid('tpm: signature does not verify against AIK leaf certificate');
+    throw new PasskeyError(ErrorCode.SIGNATURE_INVALID, 'tpm: signature does not verify against AIK leaf certificate');
   }
 
   // 6. AIK cert profile.
@@ -422,7 +475,7 @@ export function verifyTpm({ attStmt, authDataBytes, clientDataHash, attestedCred
       verifyChain({ x5c: chain, trustAnchors: toCertificates(trustAnchors) });
       trustPath = 'trust-anchor';
     } catch (err) {
-      throwAttestationTrustAnchorMissing(`tpm: ${err.message}`);
+      throw new PasskeyError(ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING, `tpm: ${err.message}`);
     }
   }
 

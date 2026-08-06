@@ -33,6 +33,9 @@ export const ErrorCode = Object.freeze({
   // Extensions / MDS
   EXTENSION_INVALID: 'EXTENSION_INVALID',
   MDS_BLOB_INVALID: 'MDS_BLOB_INVALID',
+
+  // Low-level decoding (CBOR / ASN.1 DER)
+  DECODE_ERROR: 'DECODE_ERROR',
 });
 
 export class PasskeyError extends BaseError {
@@ -59,40 +62,7 @@ export class PasskeyError extends BaseError {
     [ErrorCode.UNSUPPORTED_ATTESTATION_FORMAT]: 400,
     [ErrorCode.EXTENSION_INVALID]: 400,
     [ErrorCode.MDS_BLOB_INVALID]: 400,
+    [ErrorCode.DECODE_ERROR]: 400,
   };
   static defaultStatus = 500;
 }
-
-// Factory helpers — every ErrorCode has one to enforce
-// "no dead codes" per feedback_error_code_must_actually_throw.
-const factory = code => (message, options) => new PasskeyError(code, message, options);
-const throwFactory = code => (message, options) => {
-  throw new PasskeyError(code, message, options);
-};
-
-export const throwInvalidArgument = throwFactory(ErrorCode.INVALID_ARGUMENT);
-export const throwChallengeMismatch = throwFactory(ErrorCode.CHALLENGE_MISMATCH);
-export const throwChallengeExpired = throwFactory(ErrorCode.CHALLENGE_EXPIRED);
-export const throwChallengeAlreadyUsed = throwFactory(ErrorCode.CHALLENGE_ALREADY_USED);
-export const throwChallengeInvalid = throwFactory(ErrorCode.CHALLENGE_INVALID);
-export const throwOriginMismatch = throwFactory(ErrorCode.ORIGIN_MISMATCH);
-export const throwRpIdMismatch = throwFactory(ErrorCode.RP_ID_MISMATCH);
-export const throwClientDataInvalid = throwFactory(ErrorCode.CLIENT_DATA_INVALID);
-export const throwAuthDataInvalid = throwFactory(ErrorCode.AUTH_DATA_INVALID);
-export const throwUserVerificationRequired = throwFactory(ErrorCode.USER_VERIFICATION_REQUIRED);
-export const throwUserPresenceRequired = throwFactory(ErrorCode.USER_PRESENCE_REQUIRED);
-export const throwBackupEligibleRequired = throwFactory(ErrorCode.BACKUP_ELIGIBLE_REQUIRED);
-export const throwBackedUpRequired = throwFactory(ErrorCode.BACKED_UP_REQUIRED);
-export const throwSignatureInvalid = throwFactory(ErrorCode.SIGNATURE_INVALID);
-export const throwCounterRollback = throwFactory(ErrorCode.COUNTER_ROLLBACK);
-export const throwPublicKeyUnsupported = throwFactory(ErrorCode.PUBLIC_KEY_UNSUPPORTED);
-export const throwUnsupportedAlgorithm = throwFactory(ErrorCode.UNSUPPORTED_ALGORITHM);
-export const throwAttestationInvalid = throwFactory(ErrorCode.ATTESTATION_INVALID);
-export const throwAttestationTrustAnchorMissing = throwFactory(ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING);
-export const throwUnsupportedAttestationFormat = throwFactory(ErrorCode.UNSUPPORTED_ATTESTATION_FORMAT);
-export const throwExtensionInvalid = throwFactory(ErrorCode.EXTENSION_INVALID);
-export const throwMdsBlobInvalid = throwFactory(ErrorCode.MDS_BLOB_INVALID);
-
-// Non-throwing constructors, for cases where the caller needs to
-// attach a `cause` / `details` before throwing.
-export const invalidArgument = factory(ErrorCode.INVALID_ARGUMENT);

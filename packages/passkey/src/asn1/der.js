@@ -19,6 +19,9 @@
  *     is in `tagNumber`; universal low-tag TLVs are unaffected.
  */
 
+import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString } from '@exortek/shared/predicates';
+
 // Universal tag constants (X.680 §8.6).
 export const TAG = Object.freeze({
   BOOLEAN: 0x01,
@@ -44,7 +47,7 @@ export const TAG = Object.freeze({
  */
 export function contextTag(n) {
   if (n < 0 || n > 30) {
-    throw new Error(`der: context tag ${n} out of range`);
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, `der: context tag ${n} out of range`);
   }
   return 0xa0 | n;
 }
@@ -70,10 +73,10 @@ export function contextTag(n) {
  */
 export function readTlv(bytes, offset = 0) {
   if (!(bytes instanceof Uint8Array)) {
-    throw new Error('der: expected Uint8Array');
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: expected Uint8Array');
   }
   if (offset < 0 || offset >= bytes.byteLength) {
-    throw new Error(`der: offset ${offset} out of range (len ${bytes.byteLength})`);
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, `der: offset ${offset} out of range (len ${bytes.byteLength})`);
   }
 
   let pos = offset;
@@ -86,30 +89,30 @@ export function readTlv(bytes, offset = 0) {
     // High-tag-number form: the real number is a base-128 big-endian
     // run, continuation bit set on every byte but the last.
     if (pos >= bytes.byteLength) {
-      throw new Error('der: truncated in high-tag-number form');
+      throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: truncated in high-tag-number form');
     }
     if ((bytes[pos] & 0x7f) === 0) {
       // A leading byte of 0x80 encodes a redundant zero — forbidden
       // (X.690 §8.1.2.4.2c), and 0x1f 0x00 would mean "use low form".
-      throw new Error('der: non-minimal high-tag-number encoding');
+      throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: non-minimal high-tag-number encoding');
     }
     tagNumber = 0;
     let count = 0;
     let b;
     do {
       if (pos >= bytes.byteLength) {
-        throw new Error('der: truncated in high-tag-number form');
+        throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: truncated in high-tag-number form');
       }
       b = bytes[pos++];
       tagNumber = tagNumber * 128 + (b & 0x7f);
       count += 1;
       if (count > 4) {
-        throw new Error('der: high-tag-number too large');
+        throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: high-tag-number too large');
       }
     } while ((b & 0x80) !== 0);
   }
   if (pos >= bytes.byteLength) {
-    throw new Error('der: truncated after tag');
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: truncated after tag');
   }
 
   // Length: short form if MSB clear (0..127), long form otherwise
@@ -117,7 +120,7 @@ export function readTlv(bytes, offset = 0) {
   const firstLen = bytes[pos++];
   let length;
   if (firstLen === 0x80) {
-    throw new Error('der: indefinite length is not permitted');
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: indefinite length is not permitted');
   } else if (firstLen < 0x80) {
     length = firstLen;
   } else {
@@ -125,10 +128,10 @@ export function readTlv(bytes, offset = 0) {
     if (nBytes === 0 || nBytes > 4) {
       // Zero-length long form is reserved for future use; more than
       // 4 bytes wouldn't fit a sensible payload.
-      throw new Error(`der: unsupported long-form length count ${nBytes}`);
+      throw new PasskeyError(ErrorCode.DECODE_ERROR, `der: unsupported long-form length count ${nBytes}`);
     }
     if (pos + nBytes > bytes.byteLength) {
-      throw new Error('der: truncated inside long-form length');
+      throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: truncated inside long-form length');
     }
     // Accumulate with multiplication, not a signed `<<` shift: a
     // 4-byte length with the top bit set would overflow int32 and go
@@ -141,7 +144,10 @@ export function readTlv(bytes, offset = 0) {
   }
 
   if (pos + length > bytes.byteLength) {
-    throw new Error(`der: TLV declares ${length} bytes but only ${bytes.byteLength - pos} available`);
+    throw new PasskeyError(
+      ErrorCode.DECODE_ERROR,
+      `der: TLV declares ${length} bytes but only ${bytes.byteLength - pos} available`,
+    );
   }
 
   const contents = bytes.subarray(pos, pos + length);
@@ -158,7 +164,7 @@ export function readTlv(bytes, offset = 0) {
  */
 export function readChildren(contents) {
   if (!(contents instanceof Uint8Array)) {
-    throw new Error('der: expected Uint8Array');
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: expected Uint8Array');
   }
   const out = [];
   let pos = 0;
@@ -181,7 +187,10 @@ export function readChildren(contents) {
 export function intoSequence(bytes, expectedTag = TAG.SEQUENCE) {
   const t = readTlv(bytes);
   if (t.tag !== expectedTag) {
-    throw new Error(`der: expected tag 0x${expectedTag.toString(16)}, got 0x${t.tag.toString(16)}`);
+    throw new PasskeyError(
+      ErrorCode.DECODE_ERROR,
+      `der: expected tag 0x${expectedTag.toString(16)}, got 0x${t.tag.toString(16)}`,
+    );
   }
   return readChildren(t.contents);
 }
@@ -200,7 +209,7 @@ export function intoSequence(bytes, expectedTag = TAG.SEQUENCE) {
  */
 export function decodeOid(contents) {
   if (!(contents instanceof Uint8Array) || contents.byteLength === 0) {
-    throw new Error('der: OID must be a non-empty Uint8Array');
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: OID must be a non-empty Uint8Array');
   }
 
   const first = contents[0];
@@ -214,7 +223,7 @@ export function decodeOid(contents) {
     // Reject leading 0x80 in a multi-byte subidentifier — that would
     // encode a redundant leading zero, forbidden by X.690 §8.19.2.
     if (!started && b === 0x80) {
-      throw new Error('der: OID subidentifier has non-minimal encoding (leading 0x80)');
+      throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: OID subidentifier has non-minimal encoding (leading 0x80)');
     }
     started = true;
     acc = (acc << 7n) | BigInt(b & 0x7f);
@@ -225,7 +234,7 @@ export function decodeOid(contents) {
     }
   }
   if (started) {
-    throw new Error('der: OID truncated (last byte has continuation bit set)');
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: OID truncated (last byte has continuation bit set)');
   }
 
   return parts.join('.');
@@ -243,16 +252,16 @@ export function encodeOid(oid) {
   const parts = oid.split('.').map(p => {
     const n = BigInt(p);
     if (n < 0n) {
-      throw new Error(`der: OID part ${p} is negative`);
+      throw new PasskeyError(ErrorCode.DECODE_ERROR, `der: OID part ${p} is negative`);
     }
     return n;
   });
   if (parts.length < 2) {
-    throw new Error('der: OID needs at least two components');
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: OID needs at least two components');
   }
   const [a, b] = parts;
   if (a > 2n || (a < 2n && b >= 40n)) {
-    throw new Error(`der: OID head ${a}.${b} violates X.690 constraints`);
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, `der: OID head ${a}.${b} violates X.690 constraints`);
   }
   const out = [Number(a * 40n + b)];
   for (let i = 2; i < parts.length; i += 1) {
@@ -316,13 +325,13 @@ export function encodeOid(oid) {
  * @returns {Uint8Array | null}
  */
 export function findExtension(certDer, oid) {
-  if (typeof oid !== 'string') {
-    throw new Error('der.findExtension: oid must be a string');
+  if (!isString(oid)) {
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der.findExtension: oid must be a string');
   }
 
   const [tbs] = intoSequence(certDer, TAG.SEQUENCE);
   if (!tbs || tbs.tag !== TAG.SEQUENCE) {
-    throw new Error('der: certificate first element is not TBSCertificate');
+    throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der: certificate first element is not TBSCertificate');
   }
   const tbsFields = readChildren(tbs.contents);
 
@@ -353,7 +362,7 @@ export function findExtension(certDer, oid) {
     // last element.
     const last = parts[parts.length - 1];
     if (last.tag !== TAG.OCTET_STRING) {
-      throw new Error(`der: extension ${oid} extnValue is not an OCTET STRING`);
+      throw new PasskeyError(ErrorCode.DECODE_ERROR, `der: extension ${oid} extnValue is not an OCTET STRING`);
     }
     return last.contents;
   }

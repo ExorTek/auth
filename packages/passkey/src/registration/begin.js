@@ -15,7 +15,8 @@ import { base64url } from '@exortek/crypto/encode';
 import { issuePasskeyChallenge } from '../internal/challenge.js';
 import { buildRegistrationExtensions } from '../webauthn/extensions.js';
 import { DEFAULT_SUPPORTED_ALGORITHMS } from '../cose/key.js';
-import { throwInvalidArgument } from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isFunction, isArray, isObject } from '@exortek/shared/predicates';
 
 const HINT_VALUES = new Set(['security-key', 'client-device', 'hybrid']);
 const ATTESTATION_VALUES = new Set(['none', 'direct', 'enterprise']);
@@ -41,39 +42,46 @@ const ATTESTATION_VALUES = new Set(['none', 'direct', 'enterprise']);
  * }>}
  */
 export async function begin(params) {
-  if (!params || typeof params !== 'object') {
-    throwInvalidArgument('registration.begin: options object required');
+  if (!isObject(params)) {
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.begin: options object required');
   }
   const rp = params.rp;
   const user = params.user;
-  if (!rp || typeof rp.id !== 'string' || typeof rp.name !== 'string') {
-    throwInvalidArgument('registration.begin: rp.id and rp.name are required strings');
+  if (!rp || !isString(rp.id) || !isString(rp.name)) {
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.begin: rp.id and rp.name are required strings');
   }
-  if (!user || typeof user.id !== 'string' || typeof user.name !== 'string' || typeof user.displayName !== 'string') {
-    throwInvalidArgument('registration.begin: user.id / .name / .displayName are required strings');
+  if (!user || !isString(user.id) || !isString(user.name) || !isString(user.displayName)) {
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      'registration.begin: user.id / .name / .displayName are required strings',
+    );
   }
   if (!params.challengeSecret) {
-    throwInvalidArgument('registration.begin: challengeSecret is required');
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.begin: challengeSecret is required');
   }
-  if (!params.challengeStore || typeof params.challengeStore.incr !== 'function') {
-    throwInvalidArgument('registration.begin: challengeStore (an IncrStore) is required');
+  if (!params.challengeStore || !isFunction(params.challengeStore.incr)) {
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.begin: challengeStore (an IncrStore) is required');
   }
 
   const attestation = params.attestation ?? 'none';
   if (!ATTESTATION_VALUES.has(attestation)) {
-    throwInvalidArgument(
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
       `registration.begin: attestation must be 'none' | 'direct' | 'enterprise' (got "${attestation}")`,
     );
   }
 
   const hints = params.hints;
   if (hints !== undefined) {
-    if (!Array.isArray(hints)) {
-      throwInvalidArgument('registration.begin: hints must be an array');
+    if (!isArray(hints)) {
+      throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.begin: hints must be an array');
     }
     for (const h of hints) {
       if (!HINT_VALUES.has(h)) {
-        throwInvalidArgument(`registration.begin: hint "${h}" is not one of security-key | client-device | hybrid`);
+        throw new PasskeyError(
+          ErrorCode.INVALID_ARGUMENT,
+          `registration.begin: hint "${h}" is not one of security-key | client-device | hybrid`,
+        );
       }
     }
   }

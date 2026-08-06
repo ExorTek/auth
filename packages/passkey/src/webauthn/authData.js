@@ -17,6 +17,7 @@
  */
 
 import { decodeWithLength } from '../cbor/decode.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
 import { decodeFlags } from './flags.js';
 
 const MIN_AUTH_DATA = 37; // rpIdHash 32 + flags 1 + counter 4
@@ -32,7 +33,10 @@ const MAX_CRED_ID_LEN = 1023; // CTAP2 §11.2.2 limit — anything larger is mal
  */
 export function formatAaguid(aaguid) {
   if (!(aaguid instanceof Uint8Array) || aaguid.byteLength !== AAGUID_LEN) {
-    throw new Error(`authData: AAGUID must be a 16-byte Uint8Array (got ${aaguid?.byteLength})`);
+    throw new PasskeyError(
+      ErrorCode.AUTH_DATA_INVALID,
+      `authData: AAGUID must be a 16-byte Uint8Array (got ${aaguid?.byteLength})`,
+    );
   }
   const hex = Array.from(aaguid, b => b.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
@@ -70,10 +74,13 @@ export function formatAaguid(aaguid) {
  */
 export function parseAuthData(bytes) {
   if (!(bytes instanceof Uint8Array)) {
-    throw new Error('authData: expected Uint8Array');
+    throw new PasskeyError(ErrorCode.AUTH_DATA_INVALID, 'authData: expected Uint8Array');
   }
   if (bytes.byteLength < MIN_AUTH_DATA) {
-    throw new Error(`authData: too short — need at least ${MIN_AUTH_DATA} bytes, got ${bytes.byteLength}`);
+    throw new PasskeyError(
+      ErrorCode.AUTH_DATA_INVALID,
+      `authData: too short — need at least ${MIN_AUTH_DATA} bytes, got ${bytes.byteLength}`,
+    );
   }
 
   const rpIdHash = bytes.subarray(0, 32);
@@ -88,7 +95,10 @@ export function parseAuthData(bytes) {
 
   if (flags.at) {
     if (bytes.byteLength < pos + AAGUID_LEN + 2) {
-      throw new Error('authData: AT flag set but attested credential data is truncated');
+      throw new PasskeyError(
+        ErrorCode.AUTH_DATA_INVALID,
+        'authData: AT flag set but attested credential data is truncated',
+      );
     }
     const aaguid = bytes.subarray(pos, pos + AAGUID_LEN);
     pos += AAGUID_LEN;
@@ -96,13 +106,19 @@ export function parseAuthData(bytes) {
     const credIdLen = new DataView(bytes.buffer, bytes.byteOffset + pos, 2).getUint16(0, false);
     pos += 2;
     if (credIdLen === 0) {
-      throw new Error('authData: attested credential data credentialIdLength is 0');
+      throw new PasskeyError(ErrorCode.AUTH_DATA_INVALID, 'authData: attested credential data credentialIdLength is 0');
     }
     if (credIdLen > MAX_CRED_ID_LEN) {
-      throw new Error(`authData: credentialIdLength ${credIdLen} exceeds CTAP2 §11.2.2 max of ${MAX_CRED_ID_LEN}`);
+      throw new PasskeyError(
+        ErrorCode.AUTH_DATA_INVALID,
+        `authData: credentialIdLength ${credIdLen} exceeds CTAP2 §11.2.2 max of ${MAX_CRED_ID_LEN}`,
+      );
     }
     if (bytes.byteLength < pos + credIdLen) {
-      throw new Error(`authData: credentialId declares ${credIdLen} bytes but only ${bytes.byteLength - pos} left`);
+      throw new PasskeyError(
+        ErrorCode.AUTH_DATA_INVALID,
+        `authData: credentialId declares ${credIdLen} bytes but only ${bytes.byteLength - pos} left`,
+      );
     }
 
     const credentialId = bytes.subarray(pos, pos + credIdLen);
@@ -112,7 +128,7 @@ export function parseAuthData(bytes) {
     // decodeWithLength reports how many bytes the key consumed.
     const { value: pubKeyValue, bytesRead: keyBytes } = decodeWithLength(bytes.subarray(pos));
     if (!(pubKeyValue instanceof Map)) {
-      throw new Error('authData: credentialPublicKey is not a CBOR map');
+      throw new PasskeyError(ErrorCode.AUTH_DATA_INVALID, 'authData: credentialPublicKey is not a CBOR map');
     }
     const credentialPublicKey = pubKeyValue;
     const credentialPublicKeyBytes = bytes.subarray(pos, pos + keyBytes);
@@ -130,18 +146,21 @@ export function parseAuthData(bytes) {
   let extensions = null;
   if (flags.ed) {
     if (pos >= bytes.byteLength) {
-      throw new Error('authData: ED flag set but extensions block missing');
+      throw new PasskeyError(ErrorCode.AUTH_DATA_INVALID, 'authData: ED flag set but extensions block missing');
     }
     const { value: extValue, bytesRead: extBytes } = decodeWithLength(bytes.subarray(pos));
     if (!(extValue instanceof Map)) {
-      throw new Error('authData: extensions is not a CBOR map');
+      throw new PasskeyError(ErrorCode.AUTH_DATA_INVALID, 'authData: extensions is not a CBOR map');
     }
     extensions = extValue;
     pos += extBytes;
   }
 
   if (pos !== bytes.byteLength) {
-    throw new Error(`authData: ${bytes.byteLength - pos} trailing byte(s) after parse`);
+    throw new PasskeyError(
+      ErrorCode.AUTH_DATA_INVALID,
+      `authData: ${bytes.byteLength - pos} trailing byte(s) after parse`,
+    );
   }
 
   return {

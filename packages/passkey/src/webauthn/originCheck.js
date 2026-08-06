@@ -14,22 +14,25 @@
  * strings — no URL parsing on those.
  */
 
+import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isArray } from '@exortek/shared/predicates';
+
 /**
  * @param {string} actual
  * @param {string | string[] | RegExp} expected
  * @returns {boolean}
  */
 export function matchesOrigin(actual, expected) {
-  if (typeof actual !== 'string') {
-    throw new Error('originCheck: actual must be a string');
+  if (!isString(actual)) {
+    throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'originCheck: actual must be a string');
   }
-  if (typeof expected === 'string') {
+  if (isString(expected)) {
     return actual === expected;
   }
-  if (Array.isArray(expected)) {
+  if (isArray(expected)) {
     for (const candidate of expected) {
-      if (typeof candidate !== 'string') {
-        throw new Error('originCheck: expected[] entries must all be strings');
+      if (!isString(candidate)) {
+        throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'originCheck: expected[] entries must all be strings');
       }
       if (actual === candidate) {
         return true;
@@ -46,5 +49,5 @@ export function matchesOrigin(actual, expected) {
       expected.global || expected.sticky ? new RegExp(expected.source, expected.flags.replace(/[gy]/g, '')) : expected;
     return stateless.test(actual);
   }
-  throw new Error('originCheck: expected must be string, string[], or RegExp');
+  throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'originCheck: expected must be string, string[], or RegExp');
 }

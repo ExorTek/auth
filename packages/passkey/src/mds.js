@@ -22,13 +22,14 @@
 import { createVerify, X509Certificate } from 'node:crypto';
 import { base64url } from '@exortek/crypto/encode';
 import { verifyChain, toCertificates } from './x509/chain.js';
-import { throwMdsBlobInvalid, throwAttestationTrustAnchorMissing } from './errors.js';
+import { PasskeyError, ErrorCode } from './errors.js';
+import { isString, isArray, isObject } from '@exortek/shared/predicates';
 
 function decodeBase64UrlBytes(str, label) {
   try {
     return new Uint8Array(base64url.decode(str));
   } catch (err) {
-    throwMdsBlobInvalid(`mds: ${label} is not valid base64url (${err.message})`);
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, `mds: ${label} is not valid base64url (${err.message})`);
   }
 }
 
@@ -38,12 +39,12 @@ function decodeJsonSegment(str, label) {
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch (err) {
-    throwMdsBlobInvalid(`mds: ${label} is not valid UTF-8 (${err.message})`);
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, `mds: ${label} is not valid UTF-8 (${err.message})`);
   }
   try {
     return JSON.parse(text);
   } catch (err) {
-    throwMdsBlobInvalid(`mds: ${label} is not valid JSON (${err.message})`);
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, `mds: ${label} is not valid JSON (${err.message})`);
   }
 }
 
@@ -67,15 +68,15 @@ function decodeJsonSegment(str, label) {
  * }}
  */
 export function verifyMdsBlob(jwsCompact, options) {
-  if (typeof jwsCompact !== 'string' || jwsCompact.length === 0) {
-    throwMdsBlobInvalid('mds: jwsCompact must be a non-empty string');
+  if (!isString(jwsCompact) || jwsCompact.length === 0) {
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: jwsCompact must be a non-empty string');
   }
-  if (!options || !Array.isArray(options.rootAnchors) || options.rootAnchors.length === 0) {
-    throwMdsBlobInvalid('mds: rootAnchors (non-empty array) is required');
+  if (!options || !isArray(options.rootAnchors) || options.rootAnchors.length === 0) {
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: rootAnchors (non-empty array) is required');
   }
   const parts = jwsCompact.split('.');
   if (parts.length !== 3) {
-    throwMdsBlobInvalid('mds: JWS must have three segments');
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: JWS must have three segments');
   }
   const [headerB64, payloadB64, sigB64] = parts;
   const header = decodeJsonSegment(headerB64, 'header');
@@ -83,16 +84,16 @@ export function verifyMdsBlob(jwsCompact, options) {
   const sig = decodeBase64UrlBytes(sigB64, 'signature');
 
   if (header.alg !== 'RS256' && header.alg !== 'ES256') {
-    throwMdsBlobInvalid(`mds: header.alg must be RS256 or ES256 (got "${header.alg}")`);
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, `mds: header.alg must be RS256 or ES256 (got "${header.alg}")`);
   }
-  if (!Array.isArray(header.x5c) || header.x5c.length === 0) {
-    throwMdsBlobInvalid('mds: header.x5c must be a non-empty array');
+  if (!isArray(header.x5c) || header.x5c.length === 0) {
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: header.x5c must be a non-empty array');
   }
   const chain = header.x5c.map((b64, i) => {
     try {
       return new X509Certificate(Buffer.from(b64, 'base64'));
     } catch (err) {
-      throwMdsBlobInvalid(`mds: x5c[${i}] not a valid certificate (${err.message})`);
+      throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, `mds: x5c[${i}] not a valid certificate (${err.message})`);
       return null;
     }
   });
@@ -105,7 +106,7 @@ export function verifyMdsBlob(jwsCompact, options) {
   v.update(signingInput);
   const opts = header.alg === 'ES256' ? { key: leaf.publicKey, dsaEncoding: 'der' } : leaf.publicKey;
   if (!v.verify(opts, sig)) {
-    throwMdsBlobInvalid('mds: JWS signature does not verify against leaf certificate');
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: JWS signature does not verify against leaf certificate');
   }
 
   // Chain terminates at an RP-supplied root.
@@ -116,14 +117,14 @@ export function verifyMdsBlob(jwsCompact, options) {
       now: options.now ? new Date(options.now) : undefined,
     });
   } catch (err) {
-    throwAttestationTrustAnchorMissing(`mds: ${err.message}`);
+    throw new PasskeyError(ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING, `mds: ${err.message}`);
   }
 
-  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.entries)) {
-    throwMdsBlobInvalid('mds: payload.entries must be an array');
+  if (!isObject(payload) || !isArray(payload.entries)) {
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: payload.entries must be an array');
   }
   if (typeof payload.no !== 'number') {
-    throwMdsBlobInvalid('mds: payload.no must be a number');
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: payload.no must be a number');
   }
   // nextUpdate is a plain YYYY-MM-DD string. We do not enforce
   // freshness ourselves — callers who care compare Date.now() to it.
@@ -138,8 +139,8 @@ export function verifyMdsBlob(jwsCompact, options) {
  * @returns {Record<string, { name: string, statement: object }>}
  */
 export function buildAaguidIndex(mdsPayload) {
-  if (!mdsPayload || !Array.isArray(mdsPayload.entries)) {
-    throwMdsBlobInvalid('mds: buildAaguidIndex requires a payload with .entries');
+  if (!mdsPayload || !isArray(mdsPayload.entries)) {
+    throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: buildAaguidIndex requires a payload with .entries');
   }
   const out = {};
   for (const entry of mdsPayload.entries) {
@@ -148,7 +149,7 @@ export function buildAaguidIndex(mdsPayload) {
       continue;
     }
     const aaguid = statement.aaguid || entry.aaguid;
-    if (typeof aaguid !== 'string' || aaguid.length === 0) {
+    if (!isString(aaguid) || aaguid.length === 0) {
       continue;
     }
     const name = statement.description ?? aaguid;

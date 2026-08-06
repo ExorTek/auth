@@ -27,17 +27,18 @@
  */
 
 import { base64url } from '@exortek/crypto/encode';
-import { throwExtensionInvalid } from '../errors.js';
+import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isBoolean, isInteger, isObject } from '@exortek/shared/predicates';
 
 function b64u(bytes) {
   if (!(bytes instanceof Uint8Array)) {
-    throw new Error('extensions: expected Uint8Array to encode');
+    throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions: expected Uint8Array to encode');
   }
   return base64url.encode(bytes);
 }
 
 function decodeB64u(str) {
-  if (typeof str !== 'string') {
+  if (!isString(str)) {
     return null;
   }
   try {
@@ -68,14 +69,17 @@ export function buildRegistrationExtensions(input = {}) {
   const out = { ...input };
   if (input.credProps !== undefined) {
     if (input.credProps !== true) {
-      throw new Error('extensions.credProps must be `true` when present');
+      throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.credProps must be `true` when present');
     }
     out.credProps = true;
   }
   if (input.largeBlob !== undefined) {
     const { support } = input.largeBlob;
     if (support !== 'preferred' && support !== 'required') {
-      throw new Error("extensions.largeBlob.support must be 'preferred' or 'required'");
+      throw new PasskeyError(
+        ErrorCode.EXTENSION_INVALID,
+        "extensions.largeBlob.support must be 'preferred' or 'required'",
+      );
     }
     out.largeBlob = { support };
   }
@@ -84,21 +88,24 @@ export function buildRegistrationExtensions(input = {}) {
   }
   if (input.hmacCreateSecret !== undefined) {
     if (input.hmacCreateSecret !== true) {
-      throw new Error('extensions.hmacCreateSecret must be `true` when present');
+      throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.hmacCreateSecret must be `true` when present');
     }
     out.hmacCreateSecret = true;
   }
   if (input.minPinLength !== undefined) {
     if (input.minPinLength !== true) {
-      throw new Error('extensions.minPinLength must be `true` when present');
+      throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.minPinLength must be `true` when present');
     }
     out.minPinLength = true;
   }
   if (input.credentialProtectionPolicy !== undefined && ![1, 2, 3].includes(input.credentialProtectionPolicy)) {
-    throw new Error('extensions.credentialProtectionPolicy must be 1, 2, or 3 (CTAP2 §12.1)');
+    throw new PasskeyError(
+      ErrorCode.EXTENSION_INVALID,
+      'extensions.credentialProtectionPolicy must be 1, 2, or 3 (CTAP2 §12.1)',
+    );
   }
-  if (input.appidExclude !== undefined && typeof input.appidExclude !== 'string') {
-    throw new Error('extensions.appidExclude must be a string');
+  if (input.appidExclude !== undefined && !isString(input.appidExclude)) {
+    throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.appidExclude must be a string');
   }
   return out;
 }
@@ -120,7 +127,7 @@ export function buildAuthenticationExtensions(input = {}) {
     const lb = {};
     if (input.largeBlob.read !== undefined) {
       if (input.largeBlob.read !== true) {
-        throw new Error('extensions.largeBlob.read must be `true` when present');
+        throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.largeBlob.read must be `true` when present');
       }
       lb.read = true;
     }
@@ -128,7 +135,10 @@ export function buildAuthenticationExtensions(input = {}) {
       lb.write = b64u(input.largeBlob.write);
     }
     if (lb.read && lb.write !== undefined) {
-      throw new Error('extensions.largeBlob: read and write are mutually exclusive per WebAuthn L3 §10.5');
+      throw new PasskeyError(
+        ErrorCode.EXTENSION_INVALID,
+        'extensions.largeBlob: read and write are mutually exclusive per WebAuthn L3 §10.5',
+      );
     }
     out.largeBlob = lb;
   }
@@ -138,19 +148,25 @@ export function buildAuthenticationExtensions(input = {}) {
   if (input.hmacGetSecret !== undefined) {
     const { salt1, salt2 } = input.hmacGetSecret;
     if (!(salt1 instanceof Uint8Array) || salt1.byteLength !== 32) {
-      throw new Error('extensions.hmacGetSecret.salt1 must be a 32-byte Uint8Array (CTAP2 §12.5)');
+      throw new PasskeyError(
+        ErrorCode.EXTENSION_INVALID,
+        'extensions.hmacGetSecret.salt1 must be a 32-byte Uint8Array (CTAP2 §12.5)',
+      );
     }
     const out2 = { salt1: b64u(salt1) };
     if (salt2 !== undefined) {
       if (!(salt2 instanceof Uint8Array) || salt2.byteLength !== 32) {
-        throw new Error('extensions.hmacGetSecret.salt2 must be a 32-byte Uint8Array');
+        throw new PasskeyError(
+          ErrorCode.EXTENSION_INVALID,
+          'extensions.hmacGetSecret.salt2 must be a 32-byte Uint8Array',
+        );
       }
       out2.salt2 = b64u(salt2);
     }
     out.hmacGetSecret = out2;
   }
-  if (input.appid !== undefined && typeof input.appid !== 'string') {
-    throw new Error('extensions.appid must be a string');
+  if (input.appid !== undefined && !isString(input.appid)) {
+    throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.appid must be a string');
   }
   return out;
 }
@@ -172,12 +188,15 @@ function encodePrfInput(prf) {
 
 function encodePrfValues({ first, second }) {
   if (!(first instanceof Uint8Array)) {
-    throw new Error('extensions.prf.eval.first must be a Uint8Array');
+    throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.prf.eval.first must be a Uint8Array');
   }
   const out = { first: b64u(first) };
   if (second !== undefined) {
     if (!(second instanceof Uint8Array)) {
-      throw new Error('extensions.prf.eval.second must be a Uint8Array when present');
+      throw new PasskeyError(
+        ErrorCode.EXTENSION_INVALID,
+        'extensions.prf.eval.second must be a Uint8Array when present',
+      );
     }
     out.second = b64u(second);
   }
@@ -204,25 +223,25 @@ export function readClientExtensionResults(results) {
   if (results === undefined || results === null) {
     return {};
   }
-  if (typeof results !== 'object' || Array.isArray(results)) {
-    throwExtensionInvalid('extensions: clientExtensionResults must be an object');
+  if (!isObject(results)) {
+    throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions: clientExtensionResults must be an object');
   }
 
   const out = {};
 
-  if (typeof results.credProps === 'object' && results.credProps !== null) {
+  if (isObject(results.credProps)) {
     out.credProps = { rk: results.credProps.rk === true };
   }
 
-  if (typeof results.largeBlob === 'object' && results.largeBlob !== null) {
+  if (isObject(results.largeBlob)) {
     const lb = {};
-    if (typeof results.largeBlob.supported === 'boolean') {
+    if (isBoolean(results.largeBlob.supported)) {
       lb.supported = results.largeBlob.supported;
     }
-    if (typeof results.largeBlob.blob === 'string') {
+    if (isString(results.largeBlob.blob)) {
       const decoded = decodeB64u(results.largeBlob.blob);
       if (!decoded) {
-        throwExtensionInvalid('extensions.largeBlob.blob is not valid base64url');
+        throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.largeBlob.blob is not valid base64url');
       }
       lb.blob = decoded;
     }
@@ -232,24 +251,24 @@ export function readClientExtensionResults(results) {
     out.largeBlob = lb;
   }
 
-  if (typeof results.prf === 'object' && results.prf !== null) {
+  if (isObject(results.prf)) {
     const prf = {};
-    if (typeof results.prf.enabled === 'boolean') {
+    if (isBoolean(results.prf.enabled)) {
       prf.enabled = results.prf.enabled;
     }
-    if (typeof results.prf.results === 'object' && results.prf.results !== null) {
+    if (isObject(results.prf.results)) {
       const r = {};
-      if (typeof results.prf.results.first === 'string') {
+      if (isString(results.prf.results.first)) {
         const first = decodeB64u(results.prf.results.first);
         if (!first) {
-          throwExtensionInvalid('extensions.prf.results.first is not valid base64url');
+          throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.prf.results.first is not valid base64url');
         }
         r.first = first;
       }
-      if (typeof results.prf.results.second === 'string') {
+      if (isString(results.prf.results.second)) {
         const second = decodeB64u(results.prf.results.second);
         if (!second) {
-          throwExtensionInvalid('extensions.prf.results.second is not valid base64url');
+          throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.prf.results.second is not valid base64url');
         }
         r.second = second;
       }
@@ -258,10 +277,10 @@ export function readClientExtensionResults(results) {
     out.prf = prf;
   }
 
-  if (typeof results.appid === 'boolean') {
+  if (isBoolean(results.appid)) {
     out.appid = results.appid;
   }
-  if (typeof results.appidExclude === 'boolean') {
+  if (isBoolean(results.appidExclude)) {
     out.appidExclude = results.appidExclude;
   }
 
@@ -281,7 +300,7 @@ export function readAuthenticatorExtensions(map) {
     return {};
   }
   if (!(map instanceof Map)) {
-    throwExtensionInvalid('extensions: authenticator extensions must be a Map');
+    throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions: authenticator extensions must be a Map');
   }
 
   const out = {};
@@ -300,7 +319,7 @@ export function readAuthenticatorExtensions(map) {
   // CTAP2 §12.4 minPinLength: uint.
   if (map.has('minPinLength')) {
     const v = map.get('minPinLength');
-    if (typeof v === 'number' && Number.isInteger(v) && v >= 0) {
+    if (typeof v === 'number' && isInteger(v) && v >= 0) {
       out.minPinLength = v;
     }
   }
@@ -317,7 +336,7 @@ export function readAuthenticatorExtensions(map) {
   // extensions come back untouched under `raw`.
   const raw = {};
   for (const [k, v] of map) {
-    raw[typeof k === 'string' ? k : String(k)] = v;
+    raw[isString(k) ? k : String(k)] = v;
   }
   out.raw = raw;
 
