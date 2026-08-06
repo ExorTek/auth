@@ -1,7 +1,16 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bindAsserts, defineGuards } from '../src/asserts.js';
+import * as A from '../src/asserts.js';
+
+// This suite exercises the whole guard set, so it binds all of them. A
+// consuming package imports only the factories it calls — that is what lets
+// a bundler drop the rest.
+function bindAll(wrap) {
+  return Object.fromEntries(
+    Object.entries(A).map(([name, make]) => [name.slice(4, 5).toLowerCase() + name.slice(5), make(wrap)]),
+  );
+}
 import { object, string, number, optional } from '../src/validate.js';
 
 class FakePackageError extends Error {
@@ -12,9 +21,9 @@ class FakePackageError extends Error {
   }
 }
 
-const g = bindAsserts((m, extra) => new FakePackageError('INVALID_ARGUMENT', m, extra));
+const g = bindAll((m, extra) => new FakePackageError('INVALID_ARGUMENT', m, extra));
 
-describe('bindAsserts — error identity', () => {
+describe('guard factories — error identity', () => {
   test('failures throw the bound class, not plain Error', () => {
     try {
       g.assertPositiveInt(-1, 'x');
@@ -27,7 +36,7 @@ describe('bindAsserts — error identity', () => {
 
   test('two bindings are independent', () => {
     class OtherError extends Error {}
-    const other = bindAsserts(m => new OtherError(m));
+    const other = { assertString: A.makeAssertString(m => new OtherError(m)) };
     assert.throws(() => other.assertString(42, 'x'), OtherError);
     assert.throws(() => g.assertString(42, 'x'), FakePackageError);
   });
@@ -46,33 +55,7 @@ describe('bindAsserts — error identity', () => {
   });
 });
 
-describe('defineGuards — one-line binding sugar', () => {
-  const dg = defineGuards(FakePackageError, 'INVALID_ARGUMENT');
-
-  test('returns the same surface as bindAsserts', () => {
-    assert.equal(typeof dg.assertString, 'function');
-    assert.equal(typeof dg.invalidArgument, 'function');
-    assert.equal(typeof dg.parse, 'function');
-  });
-
-  test('failures throw the bound class with the given code', () => {
-    try {
-      dg.assertString(42, 'x');
-      assert.fail('should have thrown');
-    } catch (err) {
-      assert.ok(err instanceof FakePackageError);
-      assert.equal(err.code, 'INVALID_ARGUMENT');
-    }
-  });
-
-  test('invalidArgument through defineGuards also carries cause', () => {
-    const cause = new Error('root');
-    const err = dg.invalidArgument('wrapping', { cause });
-    assert.equal(err.cause, cause);
-  });
-});
-
-describe('bindAsserts — hint option', () => {
+describe('guard factories — hint option', () => {
   test('hint is appended after an em-dash', () => {
     assert.throws(
       () => g.assertBytes('not bytes', 'ciphertext', { hint: 'pass the exact bytes returned by encrypt()' }),

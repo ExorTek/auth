@@ -179,29 +179,37 @@ packages/<name>/
 
 ### Argument guards — bind once, import from local `internal/guards.js`
 
-Every package binds `@exortek/shared/asserts` to its own typed error class
-exactly once, in `src/internal/guards.js`, and every call site imports the
-bound helpers from that local file — **never from `@exortek/shared/asserts`
-directly**. This keeps `err instanceof <Package>Error` working for every
-argument-shape failure, without every call site paying wrap boilerplate.
+Every package binds the `@exortek/shared/asserts` factories it needs to its own
+typed error class exactly once, in `src/internal/guards.js`, and every call site
+imports the bound helpers from that local file — **never from
+`@exortek/shared/asserts` directly**. This keeps `err instanceof <Package>Error`
+working for every argument-shape failure, without every call site paying wrap
+boilerplate.
 
 ```js
-// packages/<pkg>/src/internal/guards.js  — 5 lines
-import { defineGuards } from '@exortek/shared/asserts';
+// packages/<pkg>/src/internal/guards.js
+import { makeAssertString, makeAssertPositiveInt, makeInvalidArgument } from '@exortek/shared/asserts';
 import { CryptoError, ErrorCode } from '../errors.js';
-export const { assertString, assertPositiveInt, invalidArgument, parse } =
-  defineGuards(CryptoError, ErrorCode.INVALID_ARGUMENT);
+
+const wrap = (message, extra) => new CryptoError(ErrorCode.INVALID_ARGUMENT, message, extra);
+
+export const assertString = makeAssertString(wrap);
+export const assertPositiveInt = makeAssertPositiveInt(wrap);
+export const invalidArgument = makeInvalidArgument(wrap);
 ```
 
 Rules:
 
-- Only re-export the assert names the package's own callsites use — the
-  destructure list is not "everything shared exports".
+- **Import only the factories the package's own call sites use.** This is not
+  style — each `make…` import is what a bundler keys on, so an unused import
+  ships dead code into every subpath bundle. The predecessor of this API handed
+  back one object holding every guard, and `assertBoolean` reached fifteen
+  published packages without a single call site.
 - `invalidArgument(msg, { cause })` for the `throw invalidArgument('…')` sites
-  that don't fit the `X must be Y` shape (canonicalisation errors,
-  cross-field constraint failures).
-- `parse(schema, input, path)` is the bridge from
-  `@exortek/shared/validate` schemas — same bound error, one call.
+  that don't fit the `X must be Y` shape (canonicalisation errors, cross-field
+  constraint failures).
+- `parse(schema, input, path)` is the bridge from `@exortek/shared/validate`
+  schemas — same bound error, one call.
 - **Path-naming convention** for the assert `name` argument:
   `<publicFn>[.options|.config][.<field>]` — e.g. `'createUser.name'`,
   `'scrypt.options.r'`, `'pepper.wrap.password'`. Keep it short; the stack
