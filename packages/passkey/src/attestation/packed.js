@@ -22,6 +22,7 @@ import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, TAG } from '../asn1/der.js';
 import { bytesEqual, concat } from '../internal/bytes.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isArray } from '@exortek/shared/predicates';
 
 const AAGUID_OID = '1.3.6.1.4.1.45724.1.1.4';
 
@@ -101,7 +102,7 @@ export function verifyPacked({ attStmt, authDataBytes, clientDataHash, attestedC
   }
 
   // Full attestation with x5c.
-  if (!Array.isArray(x5cRaw) || x5cRaw.length === 0) {
+  if (!isArray(x5cRaw) || x5cRaw.length === 0) {
     throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'packed attestation: attStmt.x5c must be a non-empty array');
   }
   for (const c of x5cRaw) {

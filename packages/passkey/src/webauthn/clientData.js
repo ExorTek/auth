@@ -21,6 +21,7 @@
 
 import { base64url } from '@exortek/crypto/encode';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isBoolean, isObject } from '@exortek/shared/predicates';
 
 /**
  * @typedef {'webauthn.create' | 'webauthn.get'} ClientDataType
@@ -56,7 +57,7 @@ export function parseClientData(bytes) {
   } catch (err) {
     throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, `clientData: not valid JSON (${err.message})`);
   }
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+  if (!isObject(parsed)) {
     throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, 'clientData: root must be a JSON object');
   }
 
@@ -68,13 +69,13 @@ export function parseClientData(bytes) {
       `clientData: type "${type}" is not "webauthn.create" or "webauthn.get"`,
     );
   }
-  if (typeof challenge !== 'string' || challenge.length === 0) {
+  if (!isString(challenge) || challenge.length === 0) {
     throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, 'clientData: challenge missing or not a string');
   }
-  if (typeof origin !== 'string' || origin.length === 0) {
+  if (!isString(origin) || origin.length === 0) {
     throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, 'clientData: origin missing or not a string');
   }
-  if (crossOrigin !== undefined && typeof crossOrigin !== 'boolean') {
+  if (crossOrigin !== undefined && !isBoolean(crossOrigin)) {
     throw new PasskeyError(ErrorCode.CLIENT_DATA_INVALID, 'clientData: crossOrigin must be a boolean when present');
   }
 

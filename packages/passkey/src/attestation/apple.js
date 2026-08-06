@@ -21,6 +21,7 @@ import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, readChildren, TAG, contextTag } from '../asn1/der.js';
 import { bytesEqual, concat } from '../internal/bytes.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isArray } from '@exortek/shared/predicates';
 
 const APPLE_NONCE_OID = '1.2.840.113635.100.8.2';
 
@@ -141,7 +142,7 @@ export function verifyApple({ attStmt, authDataBytes, clientDataHash, attestedCr
     throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'apple attestation: attStmt is not a CBOR map');
   }
   const x5cRaw = attStmt.get('x5c');
-  if (!Array.isArray(x5cRaw) || x5cRaw.length === 0) {
+  if (!isArray(x5cRaw) || x5cRaw.length === 0) {
     throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'apple attestation: x5c must be a non-empty array');
   }
   for (const c of x5cRaw) {

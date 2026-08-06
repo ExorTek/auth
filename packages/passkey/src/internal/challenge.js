@@ -15,6 +15,7 @@
 import { base64url } from '@exortek/crypto/encode';
 import { createChallenge, verifyChallenge } from '@exortek/challenge';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString } from '@exortek/shared/predicates';
 
 /**
  * Decode a challenge-lib token's payload without verifying the MAC.
@@ -43,7 +44,7 @@ export function readIssuedJti(token) {
       `passkey: challenge token payload not decodable (${err.message})`,
     );
   }
-  if (!payload || typeof payload.jti !== 'string' || payload.jti.length === 0) {
+  if (!payload || !isString(payload.jti) || payload.jti.length === 0) {
     throw new PasskeyError(ErrorCode.CHALLENGE_INVALID, 'passkey: challenge token payload missing jti');
   }
   return { jti: payload.jti };

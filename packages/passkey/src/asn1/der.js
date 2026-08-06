@@ -20,6 +20,7 @@
  */
 
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString } from '@exortek/shared/predicates';
 
 // Universal tag constants (X.680 §8.6).
 export const TAG = Object.freeze({
@@ -324,7 +325,7 @@ export function encodeOid(oid) {
  * @returns {Uint8Array | null}
  */
 export function findExtension(certDer, oid) {
-  if (typeof oid !== 'string') {
+  if (!isString(oid)) {
     throw new PasskeyError(ErrorCode.DECODE_ERROR, 'der.findExtension: oid must be a string');
   }
 

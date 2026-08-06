@@ -26,9 +26,10 @@ import { importCoseKey, algorithmForId } from '../cose/key.js';
 import { consumePasskeyChallenge } from '../internal/challenge.js';
 import { concat } from '../internal/bytes.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isObject } from '@exortek/shared/predicates';
 
 function decodeB64uField(value, field) {
-  if (typeof value !== 'string' || value.length === 0) {
+  if (!isString(value) || value.length === 0) {
     throw new PasskeyError(
       ErrorCode.INVALID_ARGUMENT,
       `authentication.finish: response.${field} must be a base64url string`,
@@ -48,7 +49,7 @@ function importCredentialKey(credential) {
   // The RP stores whatever we handed back at register-time —
   // typically the COSE Map. Accept either the raw COSE map or a
   // pre-imported KeyObject (via credential.publicKey).
-  if (credential.publicKey && typeof credential.publicKey === 'object' && 'export' in credential.publicKey) {
+  if (isObject(credential.publicKey) && 'export' in credential.publicKey) {
     // Node's KeyObject exposes an `export` method — treat as ready.
     return { publicKey: credential.publicKey, algorithm: credential.algorithm };
   }
@@ -106,7 +107,7 @@ function importCredentialKey(credential) {
  * }>}
  */
 export async function finish(params) {
-  if (!params || typeof params !== 'object') {
+  if (!isObject(params)) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.finish: options object required');
   }
   const {
@@ -125,7 +126,7 @@ export async function finish(params) {
     challengePrefix,
   } = params;
 
-  if (!response || typeof response !== 'object' || !response.response) {
+  if (!isObject(response) || !response.response) {
     throw new PasskeyError(
       ErrorCode.INVALID_ARGUMENT,
       'authentication.finish: response must be a WebAuthn PublicKeyCredential-shaped object',
@@ -139,7 +140,7 @@ export async function finish(params) {
   }
   // `id` is the base64url of `rawId`; reject a client that disagrees
   // with itself (matches SimpleWebAuthn). Only when both are present.
-  if (typeof response.id === 'string' && typeof response.rawId === 'string' && response.id !== response.rawId) {
+  if (isString(response.id) && isString(response.rawId) && response.id !== response.rawId) {
     throw new PasskeyError(
       ErrorCode.INVALID_ARGUMENT,
       'authentication.finish: response.id must equal response.rawId (base64url mismatch)',
@@ -148,7 +149,7 @@ export async function finish(params) {
   if (!challengeToken) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.finish: challengeToken is required');
   }
-  if (!credential || typeof credential !== 'object' || typeof credential.counter !== 'number') {
+  if (!isObject(credential) || typeof credential.counter !== 'number') {
     throw new PasskeyError(
       ErrorCode.INVALID_ARGUMENT,
       'authentication.finish: credential must include the stored counter (number)',

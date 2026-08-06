@@ -32,6 +32,7 @@
  */
 
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isBigInt } from '@exortek/shared/predicates';
 
 class Cursor {
   /**
@@ -159,7 +160,7 @@ function readArgument(c, info) {
  * lose precision.
  */
 function normaliseInt(v) {
-  if (typeof v === 'bigint') {
+  if (isBigInt(v)) {
     if (v <= BigInt(Number.MAX_SAFE_INTEGER) && v >= BigInt(Number.MIN_SAFE_INTEGER)) {
       return Number(v);
     }
@@ -196,7 +197,7 @@ function readItem(c, depth = 0) {
   if (major === 1) {
     // Negative integer — value = -1 - argument.
     const arg = readArgument(c, info);
-    if (typeof arg === 'bigint') {
+    if (isBigInt(arg)) {
       return normaliseInt(-1n - arg);
     }
     return -1 - arg;
@@ -205,7 +206,7 @@ function readItem(c, depth = 0) {
   if (major === 2) {
     // Byte string.
     const len = readArgument(c, info);
-    if (typeof len === 'bigint') {
+    if (isBigInt(len)) {
       throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: byte string length ${len} exceeds Number.MAX_SAFE_INTEGER`);
     }
     return c.readBytes(len);
@@ -214,7 +215,7 @@ function readItem(c, depth = 0) {
   if (major === 3) {
     // Text string — decoded strictly (invalid UTF-8 throws).
     const len = readArgument(c, info);
-    if (typeof len === 'bigint') {
+    if (isBigInt(len)) {
       throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: text string length ${len} exceeds Number.MAX_SAFE_INTEGER`);
     }
     const raw = c.readBytes(len);
@@ -224,7 +225,7 @@ function readItem(c, depth = 0) {
   if (major === 4) {
     // Array.
     const len = readArgument(c, info);
-    if (typeof len === 'bigint') {
+    if (isBigInt(len)) {
       throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: array length ${len} exceeds Number.MAX_SAFE_INTEGER`);
     }
     const out = new Array(len);
@@ -237,7 +238,7 @@ function readItem(c, depth = 0) {
   if (major === 5) {
     // Map — return as `Map` so int keys survive.
     const len = readArgument(c, info);
-    if (typeof len === 'bigint') {
+    if (isBigInt(len)) {
       throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: map length ${len} exceeds Number.MAX_SAFE_INTEGER`);
     }
     const out = new Map();

@@ -12,6 +12,7 @@
 import { createHash } from 'node:crypto';
 import { PasskeyError, ErrorCode } from '../errors.js';
 import { bytesEqual } from '../internal/bytes.js';
+import { isString, isArray } from '@exortek/shared/predicates';
 
 /**
  * @param {string} rpId
@@ -30,12 +31,12 @@ export function matchRpId(rpIdHash, expectedRpId) {
   if (!(rpIdHash instanceof Uint8Array) || rpIdHash.byteLength !== 32) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'rpIdMatch: rpIdHash must be a 32-byte Uint8Array');
   }
-  const candidates = Array.isArray(expectedRpId) ? expectedRpId : [expectedRpId];
+  const candidates = isArray(expectedRpId) ? expectedRpId : [expectedRpId];
   if (candidates.length === 0) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'rpIdMatch: expectedRpId list is empty');
   }
   for (const candidate of candidates) {
-    if (typeof candidate !== 'string' || candidate.length === 0) {
+    if (!isString(candidate) || candidate.length === 0) {
       throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'rpIdMatch: expectedRpId entries must be non-empty strings');
     }
     if (bytesEqual(rpIdHash, sha256(candidate))) {

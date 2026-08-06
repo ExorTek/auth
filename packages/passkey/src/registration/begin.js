@@ -16,6 +16,7 @@ import { issuePasskeyChallenge } from '../internal/challenge.js';
 import { buildRegistrationExtensions } from '../webauthn/extensions.js';
 import { DEFAULT_SUPPORTED_ALGORITHMS } from '../cose/key.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isFunction, isArray, isObject } from '@exortek/shared/predicates';
 
 const HINT_VALUES = new Set(['security-key', 'client-device', 'hybrid']);
 const ATTESTATION_VALUES = new Set(['none', 'direct', 'enterprise']);
@@ -41,15 +42,15 @@ const ATTESTATION_VALUES = new Set(['none', 'direct', 'enterprise']);
  * }>}
  */
 export async function begin(params) {
-  if (!params || typeof params !== 'object') {
+  if (!isObject(params)) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.begin: options object required');
   }
   const rp = params.rp;
   const user = params.user;
-  if (!rp || typeof rp.id !== 'string' || typeof rp.name !== 'string') {
+  if (!rp || !isString(rp.id) || !isString(rp.name)) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.begin: rp.id and rp.name are required strings');
   }
-  if (!user || typeof user.id !== 'string' || typeof user.name !== 'string' || typeof user.displayName !== 'string') {
+  if (!user || !isString(user.id) || !isString(user.name) || !isString(user.displayName)) {
     throw new PasskeyError(
       ErrorCode.INVALID_ARGUMENT,
       'registration.begin: user.id / .name / .displayName are required strings',
@@ -58,7 +59,7 @@ export async function begin(params) {
   if (!params.challengeSecret) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.begin: challengeSecret is required');
   }
-  if (!params.challengeStore || typeof params.challengeStore.incr !== 'function') {
+  if (!params.challengeStore || !isFunction(params.challengeStore.incr)) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.begin: challengeStore (an IncrStore) is required');
   }
 
@@ -72,7 +73,7 @@ export async function begin(params) {
 
   const hints = params.hints;
   if (hints !== undefined) {
-    if (!Array.isArray(hints)) {
+    if (!isArray(hints)) {
       throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.begin: hints must be an array');
     }
     for (const h of hints) {

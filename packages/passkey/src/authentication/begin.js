@@ -8,6 +8,7 @@ import { base64url } from '@exortek/crypto/encode';
 import { issuePasskeyChallenge } from '../internal/challenge.js';
 import { buildAuthenticationExtensions } from '../webauthn/extensions.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isFunction, isArray, isObject } from '@exortek/shared/predicates';
 
 const HINT_VALUES = new Set(['security-key', 'client-device', 'hybrid']);
 const UV_VALUES = new Set(['required', 'preferred', 'discouraged']);
@@ -32,17 +33,17 @@ const UV_VALUES = new Set(['required', 'preferred', 'discouraged']);
  * }>}
  */
 export async function begin(params) {
-  if (!params || typeof params !== 'object') {
+  if (!isObject(params)) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.begin: options object required');
   }
   const rpId = params.rpId;
-  if (!rpId || (typeof rpId !== 'string' && !Array.isArray(rpId))) {
+  if (!rpId || (!isString(rpId) && !isArray(rpId))) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.begin: rpId (string or string[]) is required');
   }
   if (!params.challengeSecret) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.begin: challengeSecret is required');
   }
-  if (!params.challengeStore || typeof params.challengeStore.incr !== 'function') {
+  if (!params.challengeStore || !isFunction(params.challengeStore.incr)) {
     throw new PasskeyError(
       ErrorCode.INVALID_ARGUMENT,
       'authentication.begin: challengeStore (an IncrStore) is required',
@@ -55,7 +56,7 @@ export async function begin(params) {
     );
   }
   if (params.hints !== undefined) {
-    if (!Array.isArray(params.hints)) {
+    if (!isArray(params.hints)) {
       throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'authentication.begin: hints must be an array');
     }
     for (const h of params.hints) {
@@ -68,7 +69,7 @@ export async function begin(params) {
     }
   }
 
-  const primaryRpId = Array.isArray(rpId) ? rpId[0] : rpId;
+  const primaryRpId = isArray(rpId) ? rpId[0] : rpId;
   const timeout = params.timeoutMs ?? 60_000;
   const extensions = buildAuthenticationExtensions(params.extensions ?? {});
 

@@ -15,6 +15,7 @@
  */
 
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isInteger } from '@exortek/shared/predicates';
 
 export const FLAG_MASK = Object.freeze({
   UP: 0x01,
@@ -43,7 +44,7 @@ export const FLAG_MASK = Object.freeze({
  * @returns {AuthFlags}
  */
 export function decodeFlags(byte) {
-  if (!Number.isInteger(byte) || byte < 0 || byte > 0xff) {
+  if (!isInteger(byte) || byte < 0 || byte > 0xff) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, `flags: expected a byte (0..255), got ${byte}`);
   }
   return {

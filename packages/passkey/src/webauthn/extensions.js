@@ -28,6 +28,7 @@
 
 import { base64url } from '@exortek/crypto/encode';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isBoolean, isInteger, isObject } from '@exortek/shared/predicates';
 
 function b64u(bytes) {
   if (!(bytes instanceof Uint8Array)) {
@@ -37,7 +38,7 @@ function b64u(bytes) {
 }
 
 function decodeB64u(str) {
-  if (typeof str !== 'string') {
+  if (!isString(str)) {
     return null;
   }
   try {
@@ -103,7 +104,7 @@ export function buildRegistrationExtensions(input = {}) {
       'extensions.credentialProtectionPolicy must be 1, 2, or 3 (CTAP2 §12.1)',
     );
   }
-  if (input.appidExclude !== undefined && typeof input.appidExclude !== 'string') {
+  if (input.appidExclude !== undefined && !isString(input.appidExclude)) {
     throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.appidExclude must be a string');
   }
   return out;
@@ -164,7 +165,7 @@ export function buildAuthenticationExtensions(input = {}) {
     }
     out.hmacGetSecret = out2;
   }
-  if (input.appid !== undefined && typeof input.appid !== 'string') {
+  if (input.appid !== undefined && !isString(input.appid)) {
     throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.appid must be a string');
   }
   return out;
@@ -222,22 +223,22 @@ export function readClientExtensionResults(results) {
   if (results === undefined || results === null) {
     return {};
   }
-  if (typeof results !== 'object' || Array.isArray(results)) {
+  if (!isObject(results)) {
     throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions: clientExtensionResults must be an object');
   }
 
   const out = {};
 
-  if (typeof results.credProps === 'object' && results.credProps !== null) {
+  if (isObject(results.credProps)) {
     out.credProps = { rk: results.credProps.rk === true };
   }
 
-  if (typeof results.largeBlob === 'object' && results.largeBlob !== null) {
+  if (isObject(results.largeBlob)) {
     const lb = {};
-    if (typeof results.largeBlob.supported === 'boolean') {
+    if (isBoolean(results.largeBlob.supported)) {
       lb.supported = results.largeBlob.supported;
     }
-    if (typeof results.largeBlob.blob === 'string') {
+    if (isString(results.largeBlob.blob)) {
       const decoded = decodeB64u(results.largeBlob.blob);
       if (!decoded) {
         throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.largeBlob.blob is not valid base64url');
@@ -250,21 +251,21 @@ export function readClientExtensionResults(results) {
     out.largeBlob = lb;
   }
 
-  if (typeof results.prf === 'object' && results.prf !== null) {
+  if (isObject(results.prf)) {
     const prf = {};
-    if (typeof results.prf.enabled === 'boolean') {
+    if (isBoolean(results.prf.enabled)) {
       prf.enabled = results.prf.enabled;
     }
-    if (typeof results.prf.results === 'object' && results.prf.results !== null) {
+    if (isObject(results.prf.results)) {
       const r = {};
-      if (typeof results.prf.results.first === 'string') {
+      if (isString(results.prf.results.first)) {
         const first = decodeB64u(results.prf.results.first);
         if (!first) {
           throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.prf.results.first is not valid base64url');
         }
         r.first = first;
       }
-      if (typeof results.prf.results.second === 'string') {
+      if (isString(results.prf.results.second)) {
         const second = decodeB64u(results.prf.results.second);
         if (!second) {
           throw new PasskeyError(ErrorCode.EXTENSION_INVALID, 'extensions.prf.results.second is not valid base64url');
@@ -276,10 +277,10 @@ export function readClientExtensionResults(results) {
     out.prf = prf;
   }
 
-  if (typeof results.appid === 'boolean') {
+  if (isBoolean(results.appid)) {
     out.appid = results.appid;
   }
-  if (typeof results.appidExclude === 'boolean') {
+  if (isBoolean(results.appidExclude)) {
     out.appidExclude = results.appidExclude;
   }
 
@@ -318,7 +319,7 @@ export function readAuthenticatorExtensions(map) {
   // CTAP2 §12.4 minPinLength: uint.
   if (map.has('minPinLength')) {
     const v = map.get('minPinLength');
-    if (typeof v === 'number' && Number.isInteger(v) && v >= 0) {
+    if (typeof v === 'number' && isInteger(v) && v >= 0) {
       out.minPinLength = v;
     }
   }
@@ -335,7 +336,7 @@ export function readAuthenticatorExtensions(map) {
   // extensions come back untouched under `raw`.
   const raw = {};
   for (const [k, v] of map) {
-    raw[typeof k === 'string' ? k : String(k)] = v;
+    raw[isString(k) ? k : String(k)] = v;
   }
   out.raw = raw;
 

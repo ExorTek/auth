@@ -15,6 +15,7 @@
  */
 
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isArray } from '@exortek/shared/predicates';
 
 /**
  * @param {string} actual
@@ -22,15 +23,15 @@ import { PasskeyError, ErrorCode } from '../errors.js';
  * @returns {boolean}
  */
 export function matchesOrigin(actual, expected) {
-  if (typeof actual !== 'string') {
+  if (!isString(actual)) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'originCheck: actual must be a string');
   }
-  if (typeof expected === 'string') {
+  if (isString(expected)) {
     return actual === expected;
   }
-  if (Array.isArray(expected)) {
+  if (isArray(expected)) {
     for (const candidate of expected) {
-      if (typeof candidate !== 'string') {
+      if (!isString(candidate)) {
         throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'originCheck: expected[] entries must all be strings');
       }
       if (actual === candidate) {

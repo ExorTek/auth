@@ -25,6 +25,7 @@
 import { createVerify, X509Certificate } from 'node:crypto';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isArray } from '@exortek/shared/predicates';
 
 /**
  * @param {object} params
@@ -42,7 +43,7 @@ export function verifyFidoU2f({ attStmt, authDataBytes, clientDataHash, attested
   const x5cRaw = attStmt.get('x5c');
   const sig = attStmt.get('sig');
 
-  if (!Array.isArray(x5cRaw) || x5cRaw.length !== 1 || !(x5cRaw[0] instanceof Uint8Array)) {
+  if (!isArray(x5cRaw) || x5cRaw.length !== 1 || !(x5cRaw[0] instanceof Uint8Array)) {
     throw new PasskeyError(
       ErrorCode.ATTESTATION_INVALID,
       'fido-u2f attestation: x5c must be a single-element array of bytes (§8.6 step 1)',

@@ -45,6 +45,7 @@ import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, readChildren, TAG } from '../asn1/der.js';
 import { bytesEqual, concat } from '../internal/bytes.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isArray } from '@exortek/shared/predicates';
 
 const ANDROID_KEY_OID = '1.3.6.1.4.1.11129.2.1.17';
 
@@ -170,7 +171,7 @@ export function verifyAndroidKey({ attStmt, authDataBytes, clientDataHash, attes
   if (!(sig instanceof Uint8Array) || sig.byteLength === 0) {
     throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-key: attStmt.sig missing or empty');
   }
-  if (!Array.isArray(x5cRaw) || x5cRaw.length === 0) {
+  if (!isArray(x5cRaw) || x5cRaw.length === 0) {
     throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-key: attStmt.x5c must be a non-empty array');
   }
   for (const c of x5cRaw) {

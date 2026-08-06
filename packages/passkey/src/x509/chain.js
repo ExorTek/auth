@@ -30,6 +30,7 @@
 
 import { X509Certificate } from 'node:crypto';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isArray } from '@exortek/shared/predicates';
 
 /**
  * Coerce an input into an `X509Certificate`. Accepts:
@@ -44,7 +45,7 @@ export function toCertificate(input) {
   if (input instanceof X509Certificate) {
     return input;
   }
-  if (typeof input === 'string' || input instanceof Uint8Array) {
+  if (isString(input) || input instanceof Uint8Array) {
     return new X509Certificate(input);
   }
   throw new PasskeyError(
@@ -60,7 +61,7 @@ export function toCertificate(input) {
  * @returns {X509Certificate[]}
  */
 export function toCertificates(inputs) {
-  if (!Array.isArray(inputs)) {
+  if (!isArray(inputs)) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'x509.toCertificates: expected array');
   }
   return inputs.map(toCertificate);

@@ -23,6 +23,7 @@ import { createVerify, X509Certificate } from 'node:crypto';
 import { base64url } from '@exortek/crypto/encode';
 import { verifyChain, toCertificates } from './x509/chain.js';
 import { PasskeyError, ErrorCode } from './errors.js';
+import { isString, isArray, isObject } from '@exortek/shared/predicates';
 
 function decodeBase64UrlBytes(str, label) {
   try {
@@ -67,10 +68,10 @@ function decodeJsonSegment(str, label) {
  * }}
  */
 export function verifyMdsBlob(jwsCompact, options) {
-  if (typeof jwsCompact !== 'string' || jwsCompact.length === 0) {
+  if (!isString(jwsCompact) || jwsCompact.length === 0) {
     throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: jwsCompact must be a non-empty string');
   }
-  if (!options || !Array.isArray(options.rootAnchors) || options.rootAnchors.length === 0) {
+  if (!options || !isArray(options.rootAnchors) || options.rootAnchors.length === 0) {
     throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: rootAnchors (non-empty array) is required');
   }
   const parts = jwsCompact.split('.');
@@ -85,7 +86,7 @@ export function verifyMdsBlob(jwsCompact, options) {
   if (header.alg !== 'RS256' && header.alg !== 'ES256') {
     throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, `mds: header.alg must be RS256 or ES256 (got "${header.alg}")`);
   }
-  if (!Array.isArray(header.x5c) || header.x5c.length === 0) {
+  if (!isArray(header.x5c) || header.x5c.length === 0) {
     throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: header.x5c must be a non-empty array');
   }
   const chain = header.x5c.map((b64, i) => {
@@ -119,7 +120,7 @@ export function verifyMdsBlob(jwsCompact, options) {
     throw new PasskeyError(ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING, `mds: ${err.message}`);
   }
 
-  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.entries)) {
+  if (!isObject(payload) || !isArray(payload.entries)) {
     throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: payload.entries must be an array');
   }
   if (typeof payload.no !== 'number') {
@@ -138,7 +139,7 @@ export function verifyMdsBlob(jwsCompact, options) {
  * @returns {Record<string, { name: string, statement: object }>}
  */
 export function buildAaguidIndex(mdsPayload) {
-  if (!mdsPayload || !Array.isArray(mdsPayload.entries)) {
+  if (!mdsPayload || !isArray(mdsPayload.entries)) {
     throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: buildAaguidIndex requires a payload with .entries');
   }
   const out = {};
@@ -148,7 +149,7 @@ export function buildAaguidIndex(mdsPayload) {
       continue;
     }
     const aaguid = statement.aaguid || entry.aaguid;
-    if (typeof aaguid !== 'string' || aaguid.length === 0) {
+    if (!isString(aaguid) || aaguid.length === 0) {
       continue;
     }
     const name = statement.description ?? aaguid;

@@ -26,6 +26,7 @@ import { importCoseKey, DEFAULT_SUPPORTED_ALGORITHMS } from '../cose/key.js';
 import { consumePasskeyChallenge } from '../internal/challenge.js';
 import { getVerifier } from '../attestation/index.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isArray, isObject } from '@exortek/shared/predicates';
 
 /**
  * Resolve the per-format options blob a caller supplied via
@@ -49,7 +50,7 @@ export function resolveAttestationOptions(fmt, attestationOptions) {
 }
 
 function decodeB64uField(value, field) {
-  if (typeof value !== 'string' || value.length === 0) {
+  if (!isString(value) || value.length === 0) {
     throw new PasskeyError(
       ErrorCode.INVALID_ARGUMENT,
       `registration.finish: response.${field} must be a base64url string`,
@@ -130,7 +131,7 @@ function decodeB64uField(value, field) {
  * }>}
  */
 export async function finish(params) {
-  if (!params || typeof params !== 'object') {
+  if (!isObject(params)) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.finish: options object required');
   }
   const {
@@ -152,7 +153,7 @@ export async function finish(params) {
     challengePrefix,
   } = params;
 
-  if (!response || typeof response !== 'object' || !response.response) {
+  if (!isObject(response) || !response.response) {
     throw new PasskeyError(
       ErrorCode.INVALID_ARGUMENT,
       'registration.finish: response must be a WebAuthn PublicKeyCredential-shaped object',
@@ -167,13 +168,13 @@ export async function finish(params) {
   // WebAuthn transports `id` as the base64url of `rawId`; a client
   // that sends mismatched values is malformed (SimpleWebAuthn rejects
   // the same way). Only enforced when both are present.
-  if (typeof response.id === 'string' && typeof response.rawId === 'string' && response.id !== response.rawId) {
+  if (isString(response.id) && isString(response.rawId) && response.id !== response.rawId) {
     throw new PasskeyError(
       ErrorCode.INVALID_ARGUMENT,
       'registration.finish: response.id must equal response.rawId (base64url mismatch)',
     );
   }
-  if (typeof challengeToken !== 'string' || challengeToken.length === 0) {
+  if (!isString(challengeToken) || challengeToken.length === 0) {
     throw new PasskeyError(ErrorCode.INVALID_ARGUMENT, 'registration.finish: challengeToken is required');
   }
   if (!expectedRpId) {
@@ -237,7 +238,7 @@ export async function finish(params) {
   const fmt = attestationObject.get('fmt');
   const authDataBytes = attestationObject.get('authData');
   const attStmt = attestationObject.get('attStmt');
-  if (typeof fmt !== 'string' || fmt.length === 0) {
+  if (!isString(fmt) || fmt.length === 0) {
     throw new PasskeyError(
       ErrorCode.AUTH_DATA_INVALID,
       'registration.finish: attestationObject.fmt missing or not a string',
@@ -334,7 +335,7 @@ export async function finish(params) {
       publicKeyCose: authData.attestedCredentialData.credentialPublicKey,
       algorithm: credAlg,
       counter: authData.signCount,
-      transports: Array.isArray(response.response.transports) ? response.response.transports : undefined,
+      transports: isArray(response.response.transports) ? response.response.transports : undefined,
     },
     aaguid: authData.attestedCredentialData.aaguidString,
     deviceType: deviceTypeFromFlags(authData.flags),

@@ -41,6 +41,7 @@ import { base64url } from '@exortek/crypto/encode';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { concat } from '../internal/bytes.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { isString, isArray } from '@exortek/shared/predicates';
 
 const LEAF_CN = 'attest.android.com';
 const DEFAULT_TIMESTAMP_WINDOW_MS = 5 * 60_000; // 5 minutes either side
@@ -112,7 +113,7 @@ export function verifyAndroidSafetynet(params) {
   }
   const ver = attStmt.get('ver');
   const response = attStmt.get('response');
-  if (typeof ver !== 'string' || ver.length === 0) {
+  if (!isString(ver) || ver.length === 0) {
     throw new PasskeyError(ErrorCode.ATTESTATION_INVALID, 'android-safetynet: attStmt.ver missing or not a string');
   }
   if (!(response instanceof Uint8Array) || response.byteLength === 0) {
@@ -141,7 +142,7 @@ export function verifyAndroidSafetynet(params) {
       `android-safetynet: header.alg must be "RS256" (got "${header.alg}")`,
     );
   }
-  if (!Array.isArray(header.x5c) || header.x5c.length === 0) {
+  if (!isArray(header.x5c) || header.x5c.length === 0) {
     throw new PasskeyError(
       ErrorCode.ATTESTATION_INVALID,
       'android-safetynet: header.x5c must be a non-empty cert array',
