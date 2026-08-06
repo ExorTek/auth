@@ -7,8 +7,9 @@
  * can share a single detection path instead of copy-pasting the same
  * three-way dispatch.
  *
- * Internal to `@exortek/shared` — consumed by `incr-store.js` and
- * `record-store.js`, not re-exported to consuming packages.
+ * Consumed by `incr-store.js` and `record-store.js` here, and imported
+ * directly by the `oauth2`, `opaque` and `session` stores — so treat this
+ * module's surface as shared, not private to `@exortek/shared`.
  */
 
 import { isFunction, isString } from './predicates.js';
