@@ -33,6 +33,7 @@
     "./incr-store": "./src/incr-store.js",
     "./redis-helpers": "./src/redis-helpers.js",
     "./record-store": "./src/record-store.js",
+    "./custom-store": "./src/custom-store.js",
     "./fastify-plugin": "./src/fastify-plugin.js",
     "./test-helpers/redis-drivers": "./test-helpers/redis-drivers.js"
   },
