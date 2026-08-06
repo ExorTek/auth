@@ -56,8 +56,10 @@ membership out of band.
 const store = createStore('custom', { impl: myStore });
 ```
 
-`impl` must implement `add` / `has` / `get` / `delete` / `deleteAll`.
-`markUsed` (atomic compare-and-swap) is optional — without it, rotation
+`impl` must implement `add` / `has` / `get` / `delete` / `deleteAll` —
+this is validated at construction, so a missing method raises
+`INVALID_ARGUMENT` immediately rather than failing later inside a token
+operation. `markUsed` (atomic compare-and-swap) is optional — without it, rotation
 falls back to an in-process per-key mutex, safe in a single process but
 not across processes. `size` and `_stop` are lifecycle helpers the
 built-in stores expose for introspection and timer cleanup; `tokenPair`
