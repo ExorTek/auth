@@ -11,12 +11,6 @@ import { forEachRedisDriver } from '@exortek/shared/test-helpers/redis-drivers';
 
 import { createRedisAuthCodeStore, createRedisRefreshStore, createRedisDeviceStore } from '../../src/server/index.js';
 
-// The shared `setWithTTL` helper tries the ioredis positional form first and
-// falls back on throw — but node-redis does not throw, it accepts the call and
-// silently stores the key with no expiry. Short-lived grant material therefore
-// persists indefinitely. Fixed in the follow-up commit.
-const TTL_DROPPED = { todo: { 'node-redis': 'setWithTTL dialect branch — fixed in a follow-up' } };
-
 forEachRedisDriver('oauth2 server stores', ({ test, client, ns, raw }) => {
   test('auth-code single-use consume', async () => {
     const store = createRedisAuthCodeStore(client(), { keyPrefix: ns('a') });
@@ -26,7 +20,7 @@ forEachRedisDriver('oauth2 server stores', ({ test, client, ns, raw }) => {
     assert.equal(await store.consume('c1'), undefined, 'a code must not be redeemable twice');
   });
 
-  test('an authorization code carries its expiry into Redis', TTL_DROPPED, async () => {
+  test('an authorization code carries its expiry into Redis', async () => {
     const keyPrefix = ns('b');
     const store = createRedisAuthCodeStore(client(), { keyPrefix });
     await store.save('c-ttl', { clientId: 'app' }, 60_000);

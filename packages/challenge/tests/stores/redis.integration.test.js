@@ -18,13 +18,8 @@ import { forEachRedisDriver } from '@exortek/shared/test-helpers/redis-drivers';
 
 import { redisStore } from '../../src/stores/redis.js';
 
-// The shared counter store issues its Lua call in the ioredis positional form
-// for every client, so the whole suite fails on node-redis. Fixed in the
-// follow-up commit.
-const WRONG_EVAL_FORM = { todo: { 'node-redis': 'incr-store dialect branch — fixed in a follow-up' } };
-
 forEachRedisDriver('challenge redis store', ({ test, client, ns }) => {
-  test('incr counts up from one and reports a future expiry', WRONG_EVAL_FORM, async () => {
+  test('incr counts up from one and reports a future expiry', async () => {
     const store = redisStore(client(), { keyPrefix: ns('a') });
 
     const first = await store.incr('user-1', 60_000);
@@ -35,7 +30,7 @@ forEachRedisDriver('challenge redis store', ({ test, client, ns }) => {
     assert.equal(second.count, 2, 'the counter must be shared across calls');
   });
 
-  test('separate keys keep independent counters', WRONG_EVAL_FORM, async () => {
+  test('separate keys keep independent counters', async () => {
     const store = redisStore(client(), { keyPrefix: ns('b') });
 
     await store.incr('user-a', 60_000);
@@ -45,7 +40,7 @@ forEachRedisDriver('challenge redis store', ({ test, client, ns }) => {
     assert.equal(other.count, 1, 'a different key must start its own counter');
   });
 
-  test('the TTL is bound on the first increment', WRONG_EVAL_FORM, async () => {
+  test('the TTL is bound on the first increment', async () => {
     const store = redisStore(client(), { keyPrefix: ns('c') });
 
     const { expiresAt } = await store.incr('user-ttl', 5_000);

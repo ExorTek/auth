@@ -70,6 +70,8 @@ test('incr: falls back to ttlMs when pttl is missing / non-positive', async () =
 test('keyPrefix: prepended before every call', async () => {
   let seenKey;
   const client = {
+    // ioredis-shaped: positional EVAL args.
+    status: 'ready',
     async eval(_s, _n, key) {
       seenKey = key;
       return [1, 1000];

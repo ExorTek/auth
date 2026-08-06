@@ -15,6 +15,9 @@ function fakeClient() {
   const kv = new Map();
   return {
     kv,
+    // `status` is part of ioredis's surface and is how the store recognises
+    // the positional argument convention this fake implements.
+    status: 'ready',
     async get(k) {
       const entry = kv.get(k);
       if (!entry) return null;
@@ -35,9 +38,10 @@ function fakeClient() {
 }
 
 /**
- * Mimics node-redis v4's object-options `set` signature — throws on
- * the ioredis-style `set(k, v, 'PX', ms)` call so `setWithTTL`'s
- * try/catch actually falls through to the object-options form.
+ * Mimics node-redis's object-options `set` signature. It exposes none of
+ * ioredis's surface, so the store detects it as node-redis and passes the
+ * options form. It throws on a positional call to make a regression loud —
+ * the real client would accept it and silently drop the TTL.
  */
 function fakeNodeRedisV4Client() {
   const kv = new Map();

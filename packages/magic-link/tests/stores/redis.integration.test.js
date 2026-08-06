@@ -44,7 +44,7 @@ function newRecord(id, email, extras = {}) {
   };
 }
 
-forEachRedisDriver('magic-link redis store', ({ test, client, ns }) => {
+forEachRedisDriver('magic-link redis store', ({ test, client, ns, raw }) => {
   test('put + getById + consume atomicity', WRONG_EVAL_FORM, async () => {
     const store = redisStore(client(), { keyPrefix: ns('a') });
     await store.put(newRecord('id1', 'a@x.com'));
@@ -70,7 +70,7 @@ forEachRedisDriver('magic-link redis store', ({ test, client, ns }) => {
     );
   });
 
-  test('incrRate increments and PEXPIRE binds a TTL', WRONG_EVAL_FORM, async () => {
+  test('incrRate increments and PEXPIRE binds a TTL', async () => {
     const keyPrefix = ns('c');
     const store = redisStore(client(), { keyPrefix });
 
@@ -80,7 +80,7 @@ forEachRedisDriver('magic-link redis store', ({ test, client, ns }) => {
     assert.equal(b.count, 2);
 
     // Real Redis PTTL reports the remaining ms — must be > 0 and ≤ 60_000.
-    const pttl = await client().pttl(`${keyPrefix}rate:u@x.com`);
+    const pttl = await raw.pttl(`${keyPrefix}rate:u@x.com`);
     assert.ok(pttl > 0 && pttl <= 60_000, `expected a bounded TTL, got ${pttl}`);
   });
 

@@ -14,6 +14,57 @@
 import { isFunction, isString } from './predicates.js';
 
 /**
+ * Which calling convention a client expects for the commands whose
+ * signatures differ between drivers — Lua (`eval`) and `SET` with a TTL.
+ *
+ * Most helpers here can dispatch on a method name (`mget` vs `mGet`), but
+ * these two share a name and differ only in how arguments are passed, so
+ * they need an explicit answer.
+ *
+ * A real `ioredis` instance reports `constructor.name === 'EventEmitter'`
+ * — it extends EventEmitter and no class name survives to the instance —
+ * so a constructor-name probe alone never matches it. Detect on the API
+ * surface instead (`scanStream` / the `status` string), neither of which
+ * node-redis has, and keep the name check as a fallback for wrapped
+ * clients. Anything unrecognised is treated as node-redis, whose
+ * options-object form is also what `@upstash/redis` accepts.
+ *
+ * @param {any} client
+ * @returns {'ioredis' | 'node-redis'}
+ */
+export function detectDialect(client) {
+  if (client && (isFunction(client.scanStream) || isString(client.status))) {
+    return 'ioredis';
+  }
+  const name = (client && client.constructor && client.constructor.name) || '';
+  if (name === 'Redis' || name === 'Cluster') {
+    return 'ioredis';
+  }
+  return 'node-redis';
+}
+
+/**
+ * Run a Lua script, passing its keys and arguments the way `client`
+ * expects.
+ *
+ * Getting this wrong is silent on node-redis: handed the ioredis
+ * positional form it does not throw, it sends `EVAL <script> 0` and the
+ * script runs against an empty `KEYS`/`ARGV`.
+ *
+ * @param {any} client
+ * @param {string} script
+ * @param {string[]} keys
+ * @param {string[]} args
+ * @param {'ioredis' | 'node-redis'} [dialect]
+ * @returns {Promise<any>}
+ */
+export function evalScript(client, script, keys, args, dialect = detectDialect(client)) {
+  return dialect === 'ioredis'
+    ? client.eval(script, keys.length, ...keys, ...args)
+    : client.eval(script, { keys, arguments: args });
+}
+
+/**
  * @param {object} client  A Redis-compatible client instance.
  * @returns {{
  *   mget: (keys: string[]) => Promise<(string|null)[]>,
@@ -26,7 +77,11 @@ import { isFunction, isString } from './predicates.js';
  * }}
  */
 export function createRedisHelpers(client) {
+  const dialect = detectDialect(client);
+
   return {
+    dialect,
+
     async mget(keys) {
       if (keys.length === 0) {
         return [];
@@ -72,9 +127,13 @@ export function createRedisHelpers(client) {
 
     async setWithTTL(key, value, ttlMs) {
       const px = Math.max(1, Math.ceil(ttlMs));
-      try {
+      // Must dispatch on the dialect, not on a try/catch: node-redis accepts
+      // the ioredis positional form without complaint and simply stores the
+      // key with no expiry, so a catch-based fallback never fires and the TTL
+      // is silently dropped.
+      if (dialect === 'ioredis') {
         await client.set(key, value, 'PX', px);
-      } catch {
+      } else {
         await client.set(key, value, { PX: px });
       }
     },

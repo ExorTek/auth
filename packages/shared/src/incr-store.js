@@ -11,6 +11,7 @@
 
 import { isFunction, isInteger, isUndefined } from './predicates.js';
 import { assertRedisClient } from './redis-guard.js';
+import { evalScript } from './redis-helpers.js';
 
 // Memory
 
@@ -157,7 +158,20 @@ export function createRedisIncrStore(client, options = {}, wrap) {
 
   return {
     async incr(key, ttlMs) {
-      const raw = await client.eval(INCR_SCRIPT, 1, k(key), String(Math.max(1, Math.ceil(ttlMs))));
+      let raw;
+      try {
+        raw = await evalScript(client, INCR_SCRIPT, [k(key)], [String(Math.max(1, Math.ceil(ttlMs)))]);
+      } catch (err) {
+        // Surface driver failures as the binding package's own error rather
+        // than letting a raw `ErrorReply` escape — callers branch on
+        // `err instanceof <Pkg>Error` and on `err.code`, and a driver error
+        // satisfies neither.
+        const message = `incr-store.incr: EVAL failed — ${err instanceof Error ? err.message : String(err)}`;
+        if (wrap) {
+          wrap(message, { cause: err });
+        }
+        throw err;
+      }
       const arr = Array.isArray(raw) ? raw : [raw, ttlMs];
       const count = Number(arr[0]);
       const pttl = Number(arr[1]);
