@@ -175,8 +175,10 @@ packages/<name>/
 
 - **Dual output.** `dist/<name>.mjs` (ESM) + `dist/<name>.cjs` (CJS) per
   subpath.
-- **JSDoc → `.d.ts`.** `tsc --emitDeclarationOnly` emits declaration files at
-  build time.
+- **JSDoc → `.d.ts`.** `tsc --emitDeclarationOnly` emits declarations, then a
+  `rollup-plugin-dts` pass flattens each entry into one self-contained file —
+  inlining the private `@exortek/shared` types (see below) so the shipped
+  declarations never reference the unpublished workspace package.
 - **Tests live in `tests/`**, run through Node's native `node --test` runner.
   No Jest / Mocha / Vitest.
 
@@ -184,6 +186,47 @@ Packages that ship subpath exports use one rollup input/output pair per
 subpath. Existing examples: `@exortek/jwk` (`./generate`, `./import`,
 `./export`, `./thumbprint`, `./validate`), `@exortek/jws` (`./sign`,
 `./verify`, `./decode`, `./json`).
+
+## Internal `@exortek/shared` layer
+
+`@exortek/shared` is a `private`, never-published workspace package. Every
+`@exortek/*` package imports from it (`@exortek/shared/predicates`,
+`@exortek/shared/asserts`, …) but declares it nowhere: rollup **inlines** its
+source into each package's `dist` at build time (Design principle 2), so a
+standalone install pulls no `shared` peer. Rules to respect:
+
+- Never "fix" the missing `dependencies` entry — it would break the
+  standalone-install guarantee.
+- Never publish `shared`.
+- It emits no `.d.ts` of its own. So consumers don't inherit a dangling
+  `import … from '@exortek/shared/*'` in their types, the declaration-bundling
+  pass (see "Per-package layout") inlines `shared`'s JSDoc-derived types into
+  each package's own `.d.ts`.
+
+### Store primitives (family factories)
+
+Stateful packages (jwt, paseto, apikey, magic-link, opaque, session, challenge,
+security, oauth2) each need a memory + Redis + custom backing store. Instead of
+re-implementing that per package, `shared` ships one factory per **store
+family**; a package binds it once and layers its domain methods on top:
+
+- **`record-store`** — indexed record CRUD + secondary owner-index (apikey,
+  magic-link, oauth2 refresh family).
+- **`registry-store`** — blacklist / refresh-token registry with atomic
+  `markUsed` (jwt, paseto).
+- **`incr-store`** — atomic TTL counter for replay guards / rate limits
+  (challenge, magic-link, security).
+- **`custom-store`** — `createCustomStoreValidator` / `assertStoreShape`:
+  validate a caller-supplied store and promote its sync methods to the async
+  interface.
+- **`redis-helpers`** — the single ioredis / node-redis / Upstash dialect layer
+  (`detectDialect`, `evalScript`, `setWithTTL`); every Redis store dispatches
+  through it, so a driver quirk is fixed in one place.
+
+Adding a store means composing these, not re-writing memory/Redis/dialect
+plumbing. Genuinely different shapes (session's anonymous-first eviction,
+security's bucket compare-and-set) stay in their package — shared owns the
+mechanics, the package owns its domain.
 
 ## Modern JOSE conventions
 
