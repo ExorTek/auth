@@ -50,6 +50,7 @@
     "fastify": "^5.11.2",
     "ioredis": "^6.0.0",
     "prettier": "^3.9.6",
+    "redis": "^6.2.0",
     "rollup": "^4.62.4",
     "typescript": "6.0.3"
   },

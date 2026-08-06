@@ -17,6 +17,15 @@ jobs:
   verify:
     name: typecheck · lint · format · test
     runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:8.4.0-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+
     steps:
       - uses: actions/checkout@v7
 
@@ -51,8 +60,15 @@ jobs:
       # (jwks → jwk, passkey → challenge / crypto, …), which is gitignored and
       # absent on a fresh checkout, so tests would otherwise fail with
       # ERR_MODULE_NOT_FOUND.
+      # `REDIS_URL` switches on the `*.integration.test.js` suites, which are
+      # skipped without it. They exercise the client boundary the fake-client
+      # unit tests cannot reach — real Lua, real SET-with-TTL, real SCAN — and
+      # each one runs against both `ioredis` and `node-redis`, because the two
+      # drivers take those arguments differently.
       - name: Verify (build + typecheck + lint + format + test)
         if: steps.changes.outputs.code == 'true'
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
         run: |
           yarn build
           yarn verify

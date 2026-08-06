@@ -1,60 +1,67 @@
-// Live-Redis pass for the AS stores (audit §4.2). Skipped unless REDIS_URL
-// is set:  REDIS_URL=redis://localhost:6379 yarn workspace @exortek/oauth2 test
-import { test, after } from 'node:test';
+/**
+ * Live-Redis pass for the authorization-server stores, run against both
+ * supported clients. Skipped unless REDIS_URL is set:
+ *
+ *   REDIS_URL=redis://localhost:6379 yarn workspace @exortek/oauth2 test
+ */
+
 import assert from 'node:assert/strict';
+
+import { forEachRedisDriver } from '@exortek/shared/test-helpers/redis-drivers';
 
 import { createRedisAuthCodeStore, createRedisRefreshStore, createRedisDeviceStore } from '../../src/server/index.js';
 
-const REDIS_URL = process.env.REDIS_URL;
-let ioredis;
-try {
-  ioredis = (await import('ioredis')).default;
-} catch {
-  ioredis = null;
-}
+// The shared `setWithTTL` helper tries the ioredis positional form first and
+// falls back on throw — but node-redis does not throw, it accepts the call and
+// silently stores the key with no expiry. Short-lived grant material therefore
+// persists indefinitely. Fixed in the follow-up commit.
+const TTL_DROPPED = { todo: { 'node-redis': 'setWithTTL dialect branch — fixed in a follow-up' } };
 
-const skip = !REDIS_URL
-  ? 'REDIS_URL not set — skipping integration tests'
-  : !ioredis
-    ? 'ioredis not installed — skipping integration tests'
-    : false;
+forEachRedisDriver('oauth2 server stores', ({ test, client, ns, raw }) => {
+  test('auth-code single-use consume', async () => {
+    const store = createRedisAuthCodeStore(client(), { keyPrefix: ns('a') });
+    await store.save('c1', { clientId: 'app', scope: ['read'] }, 5_000);
 
-let sharedClient = null;
-function client() {
-  if (!sharedClient) sharedClient = new ioredis(REDIS_URL, { lazyConnect: true });
-  return sharedClient;
-}
-const prefix = () => `oauth2:test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}:`;
+    assert.equal((await store.consume('c1')).clientId, 'app');
+    assert.equal(await store.consume('c1'), undefined, 'a code must not be redeemable twice');
+  });
 
-after(() => sharedClient?.quit());
+  test('an authorization code carries its expiry into Redis', TTL_DROPPED, async () => {
+    const keyPrefix = ns('b');
+    const store = createRedisAuthCodeStore(client(), { keyPrefix });
+    await store.save('c-ttl', { clientId: 'app' }, 60_000);
 
-test('live redis: auth-code single-use consume', { skip }, async () => {
-  const store = createRedisAuthCodeStore(client(), { keyPrefix: prefix() });
-  await store.save('c1', { clientId: 'app', scope: ['read'] }, 5_000);
-  assert.equal((await store.consume('c1')).clientId, 'app');
-  assert.equal(await store.consume('c1'), undefined);
-});
+    const pttl = await raw.pttl(`${keyPrefix}code:c-ttl`);
+    assert.ok(
+      pttl > 0 && pttl <= 60_000,
+      `an authorization code must expire on its own; got PTTL ${pttl} (-1 means it never expires)`,
+    );
+  });
 
-test('live redis: refresh rotate + revokeFamily', { skip }, async () => {
-  const store = createRedisRefreshStore(client(), { keyPrefix: prefix() });
-  const base = { familyId: 'f1', clientId: 'app', scope: [], expiresAt: Date.now() + 5_000 };
-  await store.save({ ...base, token: 't1' });
-  await store.rotate('t1', { ...base, token: 't2' });
-  assert.equal((await store.get('t1')).used, true);
-  await store.revokeFamily('f1');
-  assert.equal((await store.get('t2')).revoked, true);
-});
+  test('refresh rotate + revokeFamily', async () => {
+    const store = createRedisRefreshStore(client(), { keyPrefix: ns('c') });
+    const base = { familyId: 'f1', clientId: 'app', scope: [], expiresAt: Date.now() + 5_000 };
 
-test('live redis: an expired refresh record reads as absent', { skip }, async () => {
-  const store = createRedisRefreshStore(client(), { keyPrefix: prefix() });
-  await store.save({ token: 't1', familyId: 'f1', clientId: 'app', scope: [], expiresAt: Date.now() - 1 });
-  assert.equal(await store.get('t1'), null);
-});
+    await store.save({ ...base, token: 't1' });
+    await store.rotate('t1', { ...base, token: 't2' });
+    assert.equal((await store.get('t1')).used, true);
 
-test('live redis: device lookup + reverse-index cleanup', { skip }, async () => {
-  const store = createRedisDeviceStore(client(), { keyPrefix: prefix() });
-  await store.save({ deviceCode: 'd1', userCode: 'WXYZ-2345', clientId: 'app', scope: [], status: 'pending' }, 5_000);
-  assert.equal((await store.getByUserCode('WXYZ-2345')).deviceCode, 'd1');
-  await store.update('d1', { status: 'redeemed' });
-  assert.equal(await store.getByUserCode('WXYZ-2345'), undefined);
+    await store.revokeFamily('f1');
+    assert.equal((await store.get('t2')).revoked, true);
+  });
+
+  test('an expired refresh record reads as absent', async () => {
+    const store = createRedisRefreshStore(client(), { keyPrefix: ns('d') });
+    await store.save({ token: 't1', familyId: 'f1', clientId: 'app', scope: [], expiresAt: Date.now() - 1 });
+    assert.equal(await store.get('t1'), null);
+  });
+
+  test('device lookup + reverse-index cleanup', async () => {
+    const store = createRedisDeviceStore(client(), { keyPrefix: ns('e') });
+    await store.save({ deviceCode: 'd1', userCode: 'WXYZ-2345', clientId: 'app', scope: [], status: 'pending' }, 5_000);
+
+    assert.equal((await store.getByUserCode('WXYZ-2345')).deviceCode, 'd1');
+    await store.update('d1', { status: 'redeemed' });
+    assert.equal(await store.getByUserCode('WXYZ-2345'), undefined);
+  });
 });
