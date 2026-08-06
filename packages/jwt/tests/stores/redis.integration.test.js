@@ -19,24 +19,8 @@ import { createStore } from '../../src/stores.js';
 
 const nowSec = () => Math.floor(Date.now() / 1000);
 
-// Two known defects, scheduled for the follow-up commit. Each case is marked
-// only for the driver it actually breaks, so the rest keep asserting:
-//
-//   ioredis    — the store misdetects the client as node-redis, so every
-//                SET-with-TTL path (`add`) sends the wrong argument form.
-//   node-redis — `markUsed` never consults the detected dialect, so its Lua
-//                call always uses the ioredis positional form.
-const WRONG_SET_FORM = { todo: { ioredis: 'redis dialect detection — fixed in a follow-up' } };
-const WRONG_EVAL_FORM = { todo: { 'node-redis': 'markUsed dialect branch — fixed in a follow-up' } };
-const BOTH = {
-  todo: {
-    ioredis: 'redis dialect detection — fixed in a follow-up',
-    'node-redis': 'markUsed dialect branch — fixed in a follow-up',
-  },
-};
-
 forEachRedisDriver('jwt redis store', ({ test, client, ns }) => {
-  test('add + has + get round trip', WRONG_SET_FORM, async () => {
+  test('add + has + get round trip', async () => {
     const store = createStore('redis', { client: client(), keyPrefix: ns('a') });
     await store.add('jti-1', nowSec() + 60, { userId: 'u1' });
 
@@ -47,7 +31,7 @@ forEachRedisDriver('jwt redis store', ({ test, client, ns }) => {
     assert.equal(record.metadata.userId, 'u1');
   });
 
-  test('markUsed flips the record once and reports reuse on the second call', BOTH, async () => {
+  test('markUsed flips the record once and reports reuse on the second call', async () => {
     const store = createStore('redis', { client: client(), keyPrefix: ns('b') });
     await store.add('jti-2', nowSec() + 60, {});
 
@@ -58,15 +42,26 @@ forEachRedisDriver('jwt redis store', ({ test, client, ns }) => {
     assert.equal(second.swapped, false, 'second markUsed must report the token as already used');
   });
 
-  test('markUsed on an absent key resolves to null', WRONG_EVAL_FORM, async () => {
+  test('markUsed on an absent key resolves to null', async () => {
     const store = createStore('redis', { client: client(), keyPrefix: ns('c') });
     assert.equal(await store.markUsed('never-added', nowSec()), null);
   });
 
-  test('delete removes the entry', WRONG_SET_FORM, async () => {
+  test('delete removes the entry', async () => {
     const store = createStore('redis', { client: client(), keyPrefix: ns('d') });
     await store.add('jti-3', nowSec() + 60, {});
     await store.delete('jti-3');
     assert.equal(await store.has('jti-3'), false);
+  });
+
+  test('deleteAll sweeps entries matching a metadata filter', async () => {
+    const store = createStore('redis', { client: client(), keyPrefix: ns('e') });
+    await store.add('keep', nowSec() + 60, { familyId: 'f2' });
+    await store.add('drop-1', nowSec() + 60, { familyId: 'f1' });
+    await store.add('drop-2', nowSec() + 60, { familyId: 'f1' });
+
+    assert.equal(await store.deleteAll({ familyId: 'f1' }), 2);
+    assert.equal(await store.has('drop-1'), false);
+    assert.equal(await store.has('keep'), true, 'a non-matching entry must survive');
   });
 });

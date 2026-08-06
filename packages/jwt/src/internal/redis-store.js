@@ -14,6 +14,8 @@
  * family membership out of band and delete keys explicitly.
  */
 
+import { isFunction, isString } from '@exortek/shared/predicates';
+
 import { JwtError, ErrorCode } from './errors.js';
 
 // Atomically stamp metadata.usedAt if it is currently null/absent.
@@ -148,7 +150,10 @@ export function createRedisStore(options) {
         );
       }
       const pattern = `${keyPrefix}*`;
-      let cursor = dialect === 'ioredis' ? '0' : 0;
+      // Redis cursors are protocol strings. node-redis typed them as numbers
+      // through v5 but requires a string from v6 on, and the declared peer
+      // range admits v6 — so seed a string for both dialects.
+      let cursor = '0';
       let count = 0;
       try {
         do {
@@ -185,7 +190,7 @@ export function createRedisStore(options) {
               count++;
             }
           }
-        } while (dialect === 'ioredis' ? cursor !== '0' : Number(cursor) !== 0);
+        } while (String(cursor) !== '0');
       } catch (err) {
         if (err instanceof JwtError) {
           throw err;
@@ -200,7 +205,14 @@ export function createRedisStore(options) {
     },
     async markUsed(key, nowSec) {
       try {
-        const result = await client.eval(MARK_USED_LUA, 1, build(key), String(nowSec));
+        // ioredis takes positional EVAL args; node-redis takes an options
+        // object. Passing the positional form to node-redis does not throw —
+        // it sends `EVAL <script> 0`, so the script runs with an empty KEYS
+        // and errors inside Redis instead.
+        const result =
+          dialect === 'ioredis'
+            ? await client.eval(MARK_USED_LUA, 1, build(key), String(nowSec))
+            : await client.eval(MARK_USED_LUA, { keys: [build(key)], arguments: [String(nowSec)] });
         if (result == null) {
           return null;
         }
@@ -237,19 +249,28 @@ export function createRedisStore(options) {
 }
 
 /**
- * Detect whether the client is `ioredis`-style or `redis@4`-style.
- * `ioredis`'s `set` takes positional args (`'EX', ttl`); `redis@4`'s
- * takes an options object. We probe the constructor name; users with
- * a wrapped client can force via `options.dialect` if we add that
- * later.
+ * Detect whether the client is `ioredis`-style or `node-redis`-style.
+ * `ioredis`'s `set` takes positional args (`'EX', ttl`) and its `eval`
+ * takes `(script, numKeys, ...keys, ...args)`; node-redis takes an
+ * options object for both.
+ *
+ * A real `ioredis` instance reports `constructor.name === 'EventEmitter'`
+ * — it extends EventEmitter and does not set a class name that survives
+ * to the instance — so a constructor-name probe alone never matches it.
+ * Detect on the API surface instead (`scanStream` / the `status` string),
+ * both of which node-redis lacks, and keep the name check as a fallback
+ * for wrapped clients. Callers with an exotic client can still force the
+ * answer with `options.dialect`.
  *
  * @param {any} client
  * @returns {'ioredis' | 'node-redis'}
  */
 function _detectDialect(client) {
+  if (client && (isFunction(client.scanStream) || isString(client.status))) {
+    return 'ioredis';
+  }
   const name = (client && client.constructor && client.constructor.name) || '';
   if (name === 'Redis' || name === 'Cluster') {
-    // ioredis — top-level classes are `Redis` and `Cluster`.
     return 'ioredis';
   }
   return 'node-redis';
