@@ -18,12 +18,6 @@ import { create, rotate } from '../src/token-pair.js';
 import { createStore } from '../src/stores.js';
 import { decrypt, generateKey, PasetoError, ErrorCode } from '../src/index.js';
 
-// Family revocation walks the keyspace with SCAN, seeding the cursor as a
-// number on the node-redis branch. node-redis v4/v5 accepted that; v6 requires
-// a string cursor, and the declared peer range (`>=4.0.0`) admits v6. Fixed in
-// a follow-up commit.
-const NUMERIC_SCAN_CURSOR = { todo: { 'node-redis': 'SCAN cursor type — fixed in a follow-up' } };
-
 forEachRedisDriver('paseto token-pair over redis', ({ test, client, ns }) => {
   const mkOpts = suffix => ({
     secret: { access: generateKey() },
@@ -44,7 +38,7 @@ forEachRedisDriver('paseto token-pair over redis', ({ test, client, ns }) => {
     assert.equal(decrypt(second.accessToken, opts.secret.access).userId, 1);
   });
 
-  test('replaying a rotated refresh revokes the family via Lua CAS', NUMERIC_SCAN_CURSOR, async () => {
+  test('replaying a rotated refresh revokes the family via Lua CAS', async () => {
     const opts = mkOpts('b');
     const first = await create({ userId: 2 }, opts);
     await rotate(first.refreshToken, opts);

@@ -144,7 +144,10 @@ export function createRedisStore(options) {
         );
       }
       const pattern = `${keyPrefix}*`;
-      let cursor = dialect === 'ioredis' ? '0' : 0;
+      // Redis cursors are protocol strings. node-redis typed them as numbers
+      // through v5 but requires a string from v6 on, and the declared peer
+      // range admits v6 — so seed a string for both dialects.
+      let cursor = '0';
       let count = 0;
       try {
         do {
@@ -181,7 +184,7 @@ export function createRedisStore(options) {
               count++;
             }
           }
-        } while (dialect === 'ioredis' ? cursor !== '0' : Number(cursor) !== 0);
+        } while (String(cursor) !== '0');
       } catch (err) {
         if (err instanceof PasetoError) {
           throw err;
