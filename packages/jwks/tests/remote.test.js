@@ -181,6 +181,44 @@ describe('resolver — error handling', () => {
     assert.match(err.message, /maxResponseSize/i);
   });
 
+  test('stops reading a response with no content-length once the cap is crossed', async () => {
+    // A chunked reply advertises no length, so the header gate cannot see it.
+    // The body must be capped while it streams, not after it is buffered.
+    const CHUNK = new Uint8Array(32 * 1024);
+    let chunksDelivered = 0;
+    let cancelled = false;
+
+    mockFetch(async () => ({
+      ok: true,
+      status: 200,
+      headers: new Map(),
+      body: {
+        getReader: () => ({
+          read: async () => {
+            chunksDelivered++;
+            return { done: false, value: CHUNK };
+          },
+          cancel: async () => {
+            cancelled = true;
+          },
+        }),
+      },
+      text: async () => {
+        throw new Error('text() must not be used — it would buffer the whole body');
+      },
+    }));
+
+    const resolver = createRemoteJWKS('https://example.com/jwks', { maxResponseSize: 64 * 1024 });
+    const err = await resolver({ kid: 'k1' }).catch(e => e);
+
+    assert.ok(err instanceof JwksError);
+    assert.equal(err.code, ErrorCode.FETCH_FAILED);
+    assert.match(err.message, /maxResponseSize/i);
+    // 64 KiB cap over 32 KiB chunks: two fit, the third crosses it and stops.
+    assert.equal(chunksDelivered, 3, 'must stop at the first chunk past the cap');
+    assert.ok(cancelled, 'the remainder of the stream must be cancelled');
+  });
+
   test('throws FETCH_FAILED on invalid response body', async () => {
     mockFetch(async () => okResponse({ notKeys: [] }));
     const resolver = createRemoteJWKS('https://example.com/jwks');
