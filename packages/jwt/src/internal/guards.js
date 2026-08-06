@@ -6,10 +6,25 @@
  * error class for the whole package.
  */
 
-import { defineGuards } from '@exortek/shared/asserts';
+import {
+  makeInvalidArgument,
+  makeAssertNonEmptyString,
+  makeAssertObject,
+  makeAssertPositiveInt,
+  makeAssertString,
+} from '@exortek/shared/asserts';
 import { JwtError, ErrorCode } from './errors.js';
 
-export const { invalidArgument, assertNonEmptyString, assertObject, assertPositiveInt, assertString } = defineGuards(
-  JwtError,
-  ErrorCode.INVALID_ARGUMENT,
-);
+/**
+ * Bind every guard this package calls to JwtError, so an argument-shape
+ * failure anywhere carries one class and one code to branch on.
+ *
+ * @type {import('@exortek/shared/asserts').WrapFn}
+ */
+const wrap = (message, extra) => new JwtError(ErrorCode.INVALID_ARGUMENT, message, extra);
+
+export const invalidArgument = makeInvalidArgument(wrap);
+export const assertNonEmptyString = makeAssertNonEmptyString(wrap);
+export const assertObject = makeAssertObject(wrap);
+export const assertPositiveInt = makeAssertPositiveInt(wrap);
+export const assertString = makeAssertString(wrap);

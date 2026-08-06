@@ -6,16 +6,31 @@
  * error class for the whole package.
  */
 
-import { defineGuards } from '@exortek/shared/asserts';
+import {
+  makeInvalidArgument,
+  makeParse,
+  makeAssertPositiveInt,
+  makeAssertString,
+  makeAssertNonEmptyString,
+  makeAssertBytesOrString,
+  makeAssertFunction,
+  makeAssertObject,
+} from '@exortek/shared/asserts';
 import { PasswordError, ErrorCode } from '../errors.js';
 
-export const {
-  invalidArgument,
-  parse,
-  assertPositiveInt,
-  assertString,
-  assertNonEmptyString,
-  assertBytesOrString,
-  assertFunction,
-  assertObject,
-} = defineGuards(PasswordError, ErrorCode.INVALID_ARGUMENT);
+/**
+ * Bind every guard this package calls to PasswordError, so an argument-shape
+ * failure anywhere carries one class and one code to branch on.
+ *
+ * @type {import('@exortek/shared/asserts').WrapFn}
+ */
+const wrap = (message, extra) => new PasswordError(ErrorCode.INVALID_ARGUMENT, message, extra);
+
+export const invalidArgument = makeInvalidArgument(wrap);
+export const parse = makeParse(wrap);
+export const assertPositiveInt = makeAssertPositiveInt(wrap);
+export const assertString = makeAssertString(wrap);
+export const assertNonEmptyString = makeAssertNonEmptyString(wrap);
+export const assertBytesOrString = makeAssertBytesOrString(wrap);
+export const assertFunction = makeAssertFunction(wrap);
+export const assertObject = makeAssertObject(wrap);

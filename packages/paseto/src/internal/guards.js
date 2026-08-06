@@ -6,10 +6,17 @@
  * error class for the whole package.
  */
 
-import { defineGuards } from '@exortek/shared/asserts';
+import { makeInvalidArgument, makeAssertObject, makeAssertNonEmptyString } from '@exortek/shared/asserts';
 import { PasetoError, ErrorCode } from './errors.js';
 
-export const { invalidArgument, assertObject, assertNonEmptyString } = defineGuards(
-  PasetoError,
-  ErrorCode.INVALID_ARGUMENT,
-);
+/**
+ * Bind every guard this package calls to PasetoError, so an argument-shape
+ * failure anywhere carries one class and one code to branch on.
+ *
+ * @type {import('@exortek/shared/asserts').WrapFn}
+ */
+const wrap = (message, extra) => new PasetoError(ErrorCode.INVALID_ARGUMENT, message, extra);
+
+export const invalidArgument = makeInvalidArgument(wrap);
+export const assertObject = makeAssertObject(wrap);
+export const assertNonEmptyString = makeAssertNonEmptyString(wrap);
