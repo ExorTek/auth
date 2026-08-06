@@ -14,6 +14,30 @@
 import { isObject, isFunction } from './predicates.js';
 
 /**
+ * Assert `impl` is an object exposing every method in `required` as a function.
+ * Throws the caller's typed error (via `wrap`) on the first failure. Used on
+ * its own by stores that keep a caller's implementation verbatim (jwt / paseto
+ * token registries), and internally by {@link createCustomStoreValidator}.
+ *
+ * @param {unknown} impl
+ * @param {readonly string[]} required
+ * @param {(message: string) => Error} wrap
+ *   The package's error factory; its returned error is thrown. A `wrap` that
+ *   throws directly also works (the outer `throw` is then unreachable).
+ * @returns {void}
+ */
+export function assertStoreShape(impl, required, wrap) {
+  if (!isObject(impl)) {
+    throw wrap(`customStore(impl) requires an object with { ${required.join(', ')} } methods`);
+  }
+  for (const name of required) {
+    if (!isFunction(/** @type {any} */ (impl)[name])) {
+      throw wrap(`customStore: impl.${name} is required and must be a function`);
+    }
+  }
+}
+
+/**
  * @param {object} spec
  * @param {readonly string[]} spec.required
  *   Methods that must exist on `impl`; missing ones fail at construction time.
@@ -32,14 +56,7 @@ import { isObject, isFunction } from './predicates.js';
  */
 export function createCustomStoreValidator({ required, optional = [], wrap, coerce = {} }) {
   return function customStore(impl) {
-    if (!isObject(impl)) {
-      throw wrap(`customStore(impl) requires an object with { ${required.join(', ')} } methods`);
-    }
-    for (const name of required) {
-      if (!isFunction(impl[name])) {
-        throw wrap(`customStore: impl.${name} is required and must be a function`);
-      }
-    }
+    assertStoreShape(impl, required, wrap);
 
     /** @type {Record<string, (...args: any[]) => Promise<any>>} */
     const store = {};
