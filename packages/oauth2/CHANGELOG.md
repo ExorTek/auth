@@ -1,5 +1,64 @@
 # @exortek/oauth2
 
+## 1.1.0
+
+### Minor Changes
+
+- b4dab8a: Let a deployment constrain which hosts the authorization server will fetch a client's `jwks_uri` from.
+
+  A client's `jwks_uri` is client-supplied, and the server fetches it when verifying `private_key_jwt` client assertions
+  and JAR request objects. Under dynamic client registration the value is chosen by whoever registered, so the
+  destination is worth constraining.
+
+  `createServer` accepts `security.allowJwksHost`, a predicate receiving the hostname and parsed URL; returning `false`
+  refuses the URI. `createRemoteJWKS` gains the same hook as `allowHost`. Both are optional and unset by default —
+  existing behaviour is unchanged.
+
+  Recommended wherever `registration` is enabled.
+
+### Patch Changes
+
+- 4162651: Document server storage, and correct the modules table.
+
+  The README never mentioned storage, so a reader following it deployed an authorization server on in-memory stores and
+  discovered the problem on the second instance. It now covers the Redis-backed stores, which clients they work with,
+  and why memory is not a default to run behind a load balancer.
+
+  The modules table also named `mountOAuthLogin` as the fastify export — that function is Express-only; the fastify
+  subpath exports `oauthLogin` and `oauthLoginPlugin`. The `./server` row listed three of its exports and omitted the
+  rest.
+
+- b9e0647: Publish only the package-root README, CHANGELOG and LICENSE.
+
+  The `files` list matched those names at any depth rather than just the root, so a nested document was published
+  alongside them — `@exortek/oauth2` shipped its `examples/README.md`. The entries are now anchored to the package root.
+
+- 828f4ae: Fix Redis TTL and Lua handling so both supported clients behave the same.
+
+  The internal helper that writes a key with an expiry tried the `ioredis` argument form and fell back only if it threw.
+  node-redis does not throw on that form — it accepts the call and stores the key with **no expiry at all**, so the
+  fallback never ran and the TTL was silently dropped. Anything given a lifetime through this path never expired on
+  node-redis: OAuth 2 authorization codes, PAR request URIs and device codes among them.
+
+  The shared counter behind `challenge` and `magic-link` rate limiting had the same problem in its Lua call, where it
+  surfaced as a failure rather than silence, and let the driver's own error escape instead of the package's.
+
+  Both now dispatch on the detected client, and counter failures are reported as the calling package's error type with a
+  `code` you can branch on.
+
+- Updated dependencies [8097e69]
+- Updated dependencies [925efa8]
+- Updated dependencies [b4dab8a]
+- Updated dependencies [b72abf8]
+- Updated dependencies [b9e0647]
+- Updated dependencies [0a94f13]
+  - @exortek/jwks@1.1.0
+  - @exortek/jwt@1.2.3
+  - @exortek/paseto@1.0.1
+  - @exortek/jwe@1.0.1
+  - @exortek/jwk@1.0.3
+  - @exortek/jws@1.0.3
+
 ## 1.0.0
 
 ### Major Changes

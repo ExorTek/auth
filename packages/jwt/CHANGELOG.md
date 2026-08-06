@@ -1,5 +1,36 @@
 # @exortek/jwt
 
+## 1.2.3
+
+### Patch Changes
+
+- 925efa8: Fix the Redis store's client detection so the blacklist and refresh registry work with both supported
+  clients.
+
+  `createStore('redis', …)` identified an `ioredis` client by its constructor name, which never matches a real instance
+  — so every ioredis client took the node-redis code path and `add()` sent the wrong `SET` argument form. Separately,
+  `markUsed()` ignored the detected dialect entirely and always used the ioredis `eval` form, which node-redis accepts
+  but executes with no keys. Detection now probes the client's API surface, `markUsed()` branches like the rest of the
+  store, and `deleteAll()` seeds its `SCAN` cursor as a string (node-redis requires this from v6, which the declared
+  peer range admits).
+
+  If you previously worked around this by passing `dialect` explicitly, that option still works and still takes
+  precedence.
+
+- b9e0647: Publish only the package-root README, CHANGELOG and LICENSE.
+
+  The `files` list matched those names at any depth rather than just the root, so a nested document was published
+  alongside them — `@exortek/oauth2` shipped its `examples/README.md`. The entries are now anchored to the package root.
+
+- 0a94f13: Smaller bundles — the internal argument-guard helpers are now tree-shakeable.
+
+  Each package bundles the guard helpers it uses. They were previously built as one object holding all fourteen, which a
+  bundler cannot take apart, so every package shipped all of them regardless of how many it called. They are now
+  individually importable, and each package pulls in only what it uses.
+
+  No API change: the errors, codes and messages raised by argument validation are identical. Published bundles shrink by
+  roughly 7-18% depending on the package.
+
 ## 1.2.2
 
 ### Patch Changes

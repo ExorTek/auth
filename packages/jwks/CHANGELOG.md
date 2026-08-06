@@ -1,5 +1,48 @@
 # @exortek/jwks
 
+## 1.1.0
+
+### Minor Changes
+
+- b4dab8a: Let a deployment constrain which hosts the authorization server will fetch a client's `jwks_uri` from.
+
+  A client's `jwks_uri` is client-supplied, and the server fetches it when verifying `private_key_jwt` client assertions
+  and JAR request objects. Under dynamic client registration the value is chosen by whoever registered, so the
+  destination is worth constraining.
+
+  `createServer` accepts `security.allowJwksHost`, a predicate receiving the hostname and parsed URL; returning `false`
+  refuses the URI. `createRemoteJWKS` gains the same hook as `allowHost`. Both are optional and unset by default —
+  existing behaviour is unchanged.
+
+  Recommended wherever `registration` is enabled.
+
+### Patch Changes
+
+- 8097e69: Enforce `maxResponseSize` while the JWKS response is read, rather than after.
+
+  The limit was checked against the `Content-Length` header and then again once the body had been read in full. A
+  response that omits the header — any chunked reply — skipped the first check, so the entire body was already buffered
+  by the time the second one ran and the limit had no effect on what was allocated. The body is now read incrementally
+  and abandoned as soon as it crosses the limit.
+
+- b9e0647: Publish only the package-root README, CHANGELOG and LICENSE.
+
+  The `files` list matched those names at any depth rather than just the root, so a nested document was published
+  alongside them — `@exortek/oauth2` shipped its `examples/README.md`. The entries are now anchored to the package root.
+
+- 0a94f13: Smaller bundles — the internal argument-guard helpers are now tree-shakeable.
+
+  Each package bundles the guard helpers it uses. They were previously built as one object holding all fourteen, which a
+  bundler cannot take apart, so every package shipped all of them regardless of how many it called. They are now
+  individually importable, and each package pulls in only what it uses.
+
+  No API change: the errors, codes and messages raised by argument validation are identical. Published bundles shrink by
+  roughly 7-18% depending on the package.
+
+- Updated dependencies [b9e0647]
+- Updated dependencies [0a94f13]
+  - @exortek/jwk@1.0.3
+
 ## 1.0.4
 
 ### Patch Changes
