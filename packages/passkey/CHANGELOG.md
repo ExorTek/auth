@@ -1,5 +1,21 @@
 # @exortek/passkey
 
+## 1.0.3
+
+### Patch Changes
+
+- b9e0647: Publish only the package-root README, CHANGELOG and LICENSE.
+
+  The `files` list matched those names at any depth rather than just the root, so a nested document was published
+  alongside them — `@exortek/oauth2` shipped its `examples/README.md`. The entries are now anchored to the package root.
+
+- Updated dependencies [b827c5c]
+- Updated dependencies [b9e0647]
+- Updated dependencies [0a94f13]
+- Updated dependencies [828f4ae]
+  - @exortek/crypto@1.1.0
+  - @exortek/challenge@1.1.2
+
 ## 1.0.2
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @exortek/ua
 
+## 1.0.2
+
+### Patch Changes
+
+- b9e0647: Publish only the package-root README, CHANGELOG and LICENSE.
+
+  The `files` list matched those names at any depth rather than just the root, so a nested document was published
+  alongside them — `@exortek/oauth2` shipped its `examples/README.md`. The entries are now anchored to the package root.
+
 ## 1.0.1
 
 ### Patch Changes
