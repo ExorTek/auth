@@ -158,7 +158,6 @@ export function verifyAndroidSafetynet(params) {
         ErrorCode.ATTESTATION_INVALID,
         `android-safetynet: header.x5c[${i}] not a valid certificate (${err.message})`,
       );
-      return null;
     }
   });
   const leaf = chain[0];
