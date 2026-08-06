@@ -13,12 +13,6 @@ import { forEachRedisDriver } from '@exortek/shared/test-helpers/redis-drivers';
 
 import { redisStore } from '../../src/stores/redis.js';
 
-// The shared `setWithTTL` helper tries the ioredis positional form first and
-// falls back on throw — but node-redis does not throw, it accepts the call and
-// silently stores the key with no expiry. So the fallback never runs and the
-// TTL is dropped. Fixed in the follow-up commit.
-const TTL_DROPPED = { todo: { 'node-redis': 'setWithTTL dialect branch — fixed in a follow-up' } };
-
 forEachRedisDriver('opaque redis store', ({ test, client, ns }) => {
   test('set + get round-trip', async () => {
     const store = redisStore(client(), { keyPrefix: ns('a') });
@@ -26,7 +20,7 @@ forEachRedisDriver('opaque redis store', ({ test, client, ns }) => {
     assert.deepEqual(await store.get('hash1'), { userId: 'usr_1' });
   });
 
-  test('entries expire via native Redis TTL', TTL_DROPPED, async () => {
+  test('entries expire via native Redis TTL', async () => {
     const store = redisStore(client(), { keyPrefix: ns('b') });
     await store.set('hash1', { a: 1 }, { expiresIn: 50 });
     assert.deepEqual(await store.get('hash1'), { a: 1 });

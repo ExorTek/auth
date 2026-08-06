@@ -84,8 +84,9 @@ describe('createRedisIncrStore', () => {
     assert.throws(() => createRedisIncrStore({ get: () => {} }), /eval/);
   });
 
-  test('incr calls eval with the Lua script and returns parsed result', async () => {
+  test('incr passes node-redis its options form and returns the parsed result', async () => {
     let capturedArgs;
+    // No ioredis surface, so the store treats it as node-redis.
     const fakeClient = {
       eval: async (...args) => {
         capturedArgs = args;
@@ -97,10 +98,39 @@ describe('createRedisIncrStore', () => {
 
     assert.equal(res.count, 1);
     assert.ok(res.expiresAt > Date.now() - 100);
-    // verify the key was prefixed
+    assert.deepEqual(capturedArgs[1], { keys: ['test:mykey'], arguments: ['10000'] });
+  });
+
+  test('incr passes ioredis its positional form', async () => {
+    let capturedArgs;
+    const fakeClient = {
+      // `status` is part of ioredis's surface and selects the positional form.
+      status: 'ready',
+      eval: async (...args) => {
+        capturedArgs = args;
+        return [1, 5000];
+      },
+    };
+    const store = createRedisIncrStore(fakeClient, { keyPrefix: 'test:' });
+    await store.incr('mykey', 10_000);
+
+    assert.equal(capturedArgs[1], 1, 'numKeys');
     assert.equal(capturedArgs[2], 'test:mykey');
-    // verify ttlMs was passed as string
     assert.equal(capturedArgs[3], '10000');
+  });
+
+  test("a driver failure surfaces through the caller's wrap, not as a raw reply", async () => {
+    class FakeReply extends Error {}
+    const fakeClient = {
+      eval: async () => {
+        throw new FakeReply('ERR something went wrong');
+      },
+    };
+    const store = createRedisIncrStore(fakeClient, {}, msg => {
+      throw new RangeError(`WRAPPED: ${msg}`);
+    });
+
+    await assert.rejects(() => store.incr('k', 1000), /WRAPPED: incr-store.incr: EVAL failed/);
   });
 
   test('handles Upstash string responses', async () => {
@@ -122,16 +152,16 @@ describe('createRedisIncrStore', () => {
   });
 
   test('default keyPrefix is empty string', async () => {
-    let capturedKey;
+    let capturedKeys;
     const fakeClient = {
-      eval: async (...args) => {
-        capturedKey = args[2];
+      eval: async (_script, options) => {
+        capturedKeys = options.keys;
         return [1, 5000];
       },
     };
     const store = createRedisIncrStore(fakeClient);
     await store.incr('raw', 1000);
-    assert.equal(capturedKey, 'raw');
+    assert.deepEqual(capturedKeys, ['raw']);
   });
 
   test('custom wrap callback for client validation', () => {
