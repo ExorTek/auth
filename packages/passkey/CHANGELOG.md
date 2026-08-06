@@ -1,5 +1,52 @@
 # @exortek/passkey
 
+## 1.1.0
+
+### Minor Changes
+
+- ee78259: Every passkey failure now throws a typed `PasskeyError` with a branchable `code`. The binary parsers (CBOR,
+  ASN.1 DER, COSE, X.509, and the WebAuthn authenticator/client-data readers) previously threw generic `Error`s, so a
+  malformed attestation or assertion surfaced from the public API with no `code` — breaking the package's "branch on
+  `err.code`" contract. They now carry proper codes, including a new `ErrorCode.DECODE_ERROR` for low-level CBOR/DER
+  decode failures. Existing `try/catch` keeps working (`PasskeyError extends Error`); the new capability is that
+  `err.code` is now populated for parser failures too.
+
+  Internally, the 24 per-code `throwXxx` factory exports were removed in favour of constructing `PasskeyError` directly
+  (matching jwt / apikey / session), and the argument checks now use `@exortek/shared/predicates`. No public-API surface
+  was removed — `index` only ever re-exported `PasskeyError` and `ErrorCode`.
+
+### Patch Changes
+
+- 89aea87: Ship self-contained TypeScript declarations. Every package's emitted `.d.ts` referenced `@exortek/shared`
+  (e.g. `import { BaseError } from '@exortek/shared/errors'`), but `@exortek/shared` is a private, never-published
+  workspace package that is inlined into each bundle at build time. A TypeScript consumer therefore hit
+  `Cannot find module '@exortek/shared/…'` (with `skipLibCheck` off) or silently degraded error-class types like
+  `ApiKeyError` — losing its constructor signature and `.code` / `.message` — with `skipLibCheck` on.
+
+  The build now runs a declaration-bundling pass (`rollup-plugin-dts`) after `tsc`, flattening each entry's `.d.ts` and
+  inlining the `@exortek/shared` types so the shipped declarations are fully self-contained. Runtime deps and `node:*`
+  stay external. No runtime or API change — types only.
+
+- e9fc662: Publish sanctioned cross-package edges with a `workspace:^` range instead of `workspace:*`. The exact pin
+  forced an exact `@exortek/crypto` (and, for passkey, `@exortek/challenge`) version into consumer trees, which could
+  duplicate a copy of the dependency; the caret range dedupes to a single shared install. Aligns both manifests with the
+  range policy in `AGENTS.md`.
+- 3f6ce12: Correct and expand the built-in AAGUID → authenticator-name baseline (`@exortek/passkey/aaguid`), verified
+  against the Passkey.dev community list.
+
+  Two entries were wrong:
+
+  - `d548826e-79b4-db40-a3d8-11116f7e8349` is **Bitwarden**, not "Google Password Manager (Android)" — a real Bitwarden
+    passkey was reported under the wrong name (and no such Google AAGUID exists).
+  - `d197a58d-4c07-4cff-8180-4e6c8fdd9c05` was labelled "Bitwarden" but is not Bitwarden's AAGUID; removed.
+
+  Also renamed `fbfc3007-…` from "iCloud Keychain" to its current name **Apple Passwords**, and added six common
+  providers: Bitwarden, Dashlane, Keeper, NordPass, Samsung Pass, Chrome on Mac, Edge on Mac.
+
+- Updated dependencies [89aea87]
+  - @exortek/challenge@1.1.3
+  - @exortek/crypto@1.1.1
+
 ## 1.0.3
 
 ### Patch Changes

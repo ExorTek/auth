@@ -1,6 +1,6 @@
 {
   "name": "@exortek/paseto",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "PASETO (Platform-Agnostic Security Tokens) for Node.js 22+. v4.local (XChaCha20 + keyed BLAKE2b) + v4.public (Ed25519). Purpose is bound into the token — no algorithm-confusion attacks. Server-only, zero-dependency, built on node:crypto.",
   "type": "module",
   "sideEffects": false,
