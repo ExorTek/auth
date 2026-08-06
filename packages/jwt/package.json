@@ -31,7 +31,7 @@
     "/LICENSE"
   ],
   "scripts": {
-    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json",
+    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json && rollup -c ../../rollup.dts.config.mjs",
     "build:watch": "rollup -c rollup.config.js --watch",
     "build:types": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

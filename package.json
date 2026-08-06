@@ -17,7 +17,7 @@
     "web"
   ],
   "scripts": {
-    "build": "yarn workspaces foreach --all --topological --exclude web run build",
+    "build": "yarn workspace @exortek/shared run build:types && yarn workspaces foreach --all --topological --exclude web run build",
     "build:watch": "yarn workspaces foreach --all --parallel --exclude web run build:watch",
     "test": "node --test 'packages/*/tests/**/*.test.js'",
     "test:coverage": "node --test --experimental-test-coverage 'packages/*/tests/**/*.test.js'",
@@ -52,6 +52,7 @@
     "prettier": "^3.9.6",
     "redis": "^6.2.0",
     "rollup": "^4.62.4",
+    "rollup-plugin-dts": "^6.5.1",
     "typescript": "6.0.3"
   },
   "engines": {
