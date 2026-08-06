@@ -1,4 +1,5 @@
 import { describe, it } from 'node:test';
+import { randomBytes } from 'node:crypto';
 import assert from 'node:assert/strict';
 
 import { encode } from '../../src/encode/base64url.js';
@@ -78,6 +79,33 @@ describe('encode.base64url.decode', () => {
         () => decode(bad),
         err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
+    }
+  });
+});
+
+describe('encode.base64url canonicalisation', () => {
+  it('decodes the canonical spelling, with or without padding', () => {
+    assert.equal(decode('aGVsbG8').toString('utf8'), 'hello');
+    assert.equal(decode('aGVsbG8=').toString('utf8'), 'hello');
+  });
+
+  it('rejects a non-canonical final character', () => {
+    // All four of these decode to the same bytes under a permissive decoder,
+    // because the unused low bits of the last character are ignored. Only
+    // 'aGVsbG8' spells those bytes canonically.
+    for (const variant of ['aGVsbG9', 'aGVsbG-', 'aGVsbG_']) {
+      assert.throws(
+        () => decode(variant),
+        err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ENCODING,
+        `${variant} should not decode`,
+      );
+    }
+  });
+
+  it('round-trips every encode output back through decode', () => {
+    for (let len = 0; len <= 24; len++) {
+      const bytes = randomBytes(len);
+      assert.deepEqual(decode(encode(bytes)), bytes, `length ${len}`);
     }
   });
 });
