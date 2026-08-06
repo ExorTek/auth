@@ -63,8 +63,8 @@
     "url": "https://github.com/ExorTek/auth/issues"
   },
   "dependencies": {
-    "@exortek/challenge": "workspace:*",
-    "@exortek/crypto": "workspace:*"
+    "@exortek/challenge": "workspace:^",
+    "@exortek/crypto": "workspace:^"
   },
   "engines": {
     "node": ">=22.0.0"
