@@ -161,6 +161,41 @@ challenge), PKCE, PAR (RFC 9126), resource indicators (RFC 8707), RAR
 profile. Resource servers get `verifyDpopForResource` for the `ath` /
 `cnf.jkt` check.
 
+### Storage (read this before you run two instances)
+
+`createServer` defaults every store to memory: authorization codes, PAR
+request URIs, refresh families, device codes, and the DPoP replay cache. That
+is fine for one process and wrong for two — a code issued on instance A cannot
+be redeemed on instance B, and a DPoP proof replayed against a different
+instance is not seen as a replay.
+
+Pass Redis-backed stores for any deployment with more than one process:
+
+```js
+import {
+  createServer,
+  createRedisAuthCodeStore,
+  createRedisRefreshStore,
+  createRedisParStore,
+  createRedisDeviceStore,
+} from '@exortek/oauth2/server';
+
+const server = createServer({
+  /* … */
+  stores: {
+    authCode: createRedisAuthCodeStore(redis),
+    refresh: createRedisRefreshStore(redis),
+    par: createRedisParStore(redis),
+    device: createRedisDeviceStore(redis),
+  },
+});
+```
+
+`redis` is your own client — `ioredis` or `node-redis`, both supported and
+both covered by the integration suite. They are peer dependencies, so install
+whichever you already use. Any object matching the store interface works too,
+if you would rather not use Redis.
+
 ### OpenID Connect (opt-in)
 
 Pass an `oidc` config and the server becomes an OpenID Provider: it issues a
@@ -202,10 +237,10 @@ const server = createServer({
 | Subpath                          | Status | Purpose                                                                      |
 | -------------------------------- | ------ | ---------------------------------------------------------------------------- |
 | `@exortek/oauth2`                | ✅     | `createOAuth` RP flow, PKCE (RFC 7636), `state` / `nonce`, `OAuth2Error`      |
-| `@exortek/oauth2/express`        | ✅     | `mountOAuthLogin` — Express login + callback middleware (web + api modes)     |
-| `@exortek/oauth2/fastify`        | ✅     | `mountOAuthLogin` — Fastify login + callback plugin                           |
+| `@exortek/oauth2/express`        | ✅     | `oauthLogin` / `mountOAuthLogin` — Express login + callback (web + api modes) |
+| `@exortek/oauth2/fastify`        | ✅     | `oauthLogin` / `oauthLoginPlugin` — Fastify login + callback plugin           |
 | `@exortek/oauth2/providers/*`    | ✅     | Pre-wired presets (google, github, microsoft, apple, okta, …)                 |
-| `@exortek/oauth2/server`         | ✅     | `createServer` + `jwtIssuer` / `pasetoIssuer` + `verifyDpopForResource`       |
+| `@exortek/oauth2/server`         | ✅     | `createServer`, `oauth2Handlers`, `jwtIssuer` / `pasetoIssuer`, `defineClient` / `createClientRegistry`, `createIdTokenSigner`, `verifyDpopForResource`, the Redis stores, `ServerError` |
 | `@exortek/oauth2/server/express` | ✅     | `mountOAuth2Server` — mount the AS on Express                                 |
 | `@exortek/oauth2/server/fastify` | ✅     | `oauth2ServerPlugin` — mount the AS on Fastify                                |
 
