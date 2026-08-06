@@ -4,7 +4,8 @@
  * A thin binding over `@exortek/shared/registry-store` — the ioredis /
  * redis@4 dialect handling, native `EX` TTL, `SCAN`-based `deleteAll`, and
  * the atomic `markUsed` Lua all live there. This file supplies paseto's
- * error class and default key prefix.
+ * error class and default key prefix, and declares the public store types
+ * locally so the emitted `.d.ts` stays self-contained.
  */
 
 import { createRedisRegistryStore } from '@exortek/shared/registry-store';
@@ -12,7 +13,7 @@ import { createRedisRegistryStore } from '@exortek/shared/registry-store';
 import { PasetoError, ErrorCode } from './errors.js';
 
 /**
- * @typedef {import('@exortek/shared/registry-store').Store} Store
+ * @typedef {import('./memory-store.js').Store} Store
  *
  * @typedef {Object} RedisConfig
  * @property {any} client        ioredis or redis@4 client
