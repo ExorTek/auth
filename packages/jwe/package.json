@@ -1,6 +1,6 @@
 {
   "name": "@exortek/jwe",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "JSON Web Encryption (JWE) — RFC 7516 / RFC 7518 for Node.js 22+. Compact serialization, RSA-OAEP / ECDH-ES / AES-KW / dir key management, AES-GCM + AES-CBC-HMAC content encryption. Alg + enc allowlist mandatory on decrypt. `RSA1_5` never accepted. Zero-dependency, built on node:crypto.",
   "type": "module",
   "sideEffects": false,

@@ -1,5 +1,30 @@
 # @exortek/paseto
 
+## 1.1.0
+
+### Minor Changes
+
+- 89aea87: Validate custom store implementations at construction time. `createStore('custom', { impl })` previously
+  accepted any object and returned it verbatim, so a store missing a required method surfaced only later as a
+  `TypeError` deep inside a token operation. It now asserts the impl exposes the core registry contract — `add`, `has`,
+  `get`, `delete`, `deleteAll` — and throws `INVALID_ARGUMENT` immediately when one is missing (`markUsed` stays
+  optional, since only refresh-token rotation calls it).
+
+  Behaviour change: an incomplete custom store that happened to work — because the missing method was never exercised —
+  is now rejected up front. Complete implementations are unaffected and are still returned verbatim (no wrapping).
+
+### Patch Changes
+
+- 89aea87: Ship self-contained TypeScript declarations. Every package's emitted `.d.ts` referenced `@exortek/shared`
+  (e.g. `import { BaseError } from '@exortek/shared/errors'`), but `@exortek/shared` is a private, never-published
+  workspace package that is inlined into each bundle at build time. A TypeScript consumer therefore hit
+  `Cannot find module '@exortek/shared/…'` (with `skipLibCheck` off) or silently degraded error-class types like
+  `ApiKeyError` — losing its constructor signature and `.code` / `.message` — with `skipLibCheck` on.
+
+  The build now runs a declaration-bundling pass (`rollup-plugin-dts`) after `tsc`, flattening each entry's `.d.ts` and
+  inlining the `@exortek/shared` types so the shipped declarations are fully self-contained. Runtime deps and `node:*`
+  stay external. No runtime or API change — types only.
+
 ## 1.0.1
 
 ### Patch Changes
