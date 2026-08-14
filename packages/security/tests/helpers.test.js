@@ -493,7 +493,7 @@ test('slowDown: allows all requests, adds delay after threshold', async () => {
   assert.equal(r2.delayMs, 0);
   assert.equal(r3.allowed, true);
   assert.ok(r3.delayMs >= 10);
-  assert.ok(elapsed >= 10);
+  assert.ok(elapsed >= 50);
   store._stop();
 });
 
