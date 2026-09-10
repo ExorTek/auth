@@ -1,0 +1,51 @@
+---
+title: '@exortek/oidc — Session Management'
+sidebarTitle: 'Session Management'
+---
+
+import { Callout } from 'nextra/components';
+
+# Session Management
+
+OpenID Connect **Session Management 1.0** lets a relying party detect that
+the user's OP session changed — without a network round-trip. The OP derives
+a `session_state` from its browser-scoped login state (the "OP browser
+state") and returns it to the RP; the RP renders a hidden iframe pointing at
+the OP's `check_session_iframe` and polls it with `postMessage`.
+
+## `session_state`
+
+```js
+const ss = provider.sessionState({
+  clientId,
+  origin: 'https://myapp.com',   // the RP's origin
+  opBrowserState,                // the OP's browser-state value (a cookie you set)
+});
+// attach `ss` as session_state on the authorization response
+```
+
+Per §4.2, `session_state = base64url(sha256(client_id + " " + origin + " " +
+op_browser_state + " " + salt)) + "." + salt`. It changes whenever the OP
+browser state changes (i.e. on login / logout), which is what the RP
+detects.
+
+## `check_session_iframe`
+
+```js
+const provider = createProvider({
+  // ...
+  session: { cookieName: 'op_browser_state' }, // names the OP browser-state cookie
+});
+```
+
+`checkSessionHandler()` serves the OP iframe document. Its browser-side
+script re-runs the §4.2 calculation on each `postMessage` (reading the OP
+browser state from `cookieName`) and replies `unchanged` / `changed` /
+`error`. Configuring `session` auto-advertises `check_session_iframe` in
+discovery.
+
+<Callout type="info">
+  `computeSessionState` and the iframe are server/browser primitives — the OP
+  browser-state cookie itself (setting it on login, rotating it on logout) is
+  yours to manage, since only you know when the session materially changes.
+</Callout>

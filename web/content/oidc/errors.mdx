@@ -1,0 +1,39 @@
+---
+title: '@exortek/oidc — errors'
+sidebarTitle: 'errors — OidcError'
+---
+
+# `errors` — `OidcError`
+
+`@exortek/oidc` raises `OidcError` for its own configuration and discovery
+failures. Branch on the stable `code`, never on the message.
+
+```js
+import { OidcError, ErrorCode } from '@exortek/oidc';
+
+try {
+  await client.endSessionUrl({ idTokenHint });
+} catch (err) {
+  if (err instanceof OidcError && err.code === ErrorCode.DISCOVERY_FAILED) {
+    // the OP metadata could not be fetched
+  }
+}
+```
+
+## Codes
+
+| `ErrorCode` | Status | Raised when |
+|-------------|:------:|-------------|
+| `INVALID_ARGUMENT` | 400 | A `createClient` / `createProvider` / handler config guard fails. |
+| `DISCOVERY_FAILED` | 502 | The client's own OP-metadata fetch (used to resolve `end_session_endpoint`) fails or the issuer mismatches. |
+
+`OidcError` extends the shared `BaseError`, so it carries `code`, `status`,
+and the standard `cause` chain.
+
+## Where oauth2 errors surface
+
+The relying-party flow delegates to `@exortek/oauth2`, so callback-validation
+failures — a `state` mismatch, a bad `nonce`, an `id_token` that fails
+`iss` / `aud` / signature — surface as **`OAuth2Error`** (from
+`@exortek/oauth2`), not `OidcError`. The UserInfo endpoint returns a
+`401` with `WWW-Authenticate` rather than throwing.

@@ -1,0 +1,58 @@
+---
+title: '@exortek/oidc — RP-Initiated Logout'
+sidebarTitle: 'RP-Initiated Logout'
+---
+
+import { Callout } from 'nextra/components';
+
+# RP-Initiated Logout
+
+OpenID Connect **RP-Initiated Logout 1.0** — the relying party sends the end
+user to the OP's `end_session_endpoint` with an `id_token_hint`; the OP ends
+its session and, after validating the `post_logout_redirect_uri`, redirects
+back.
+
+## Relying party — `client.endSessionUrl`
+
+```js
+const logoutUrl = await client.endSessionUrl({
+  idTokenHint: idToken,                         // required
+  postLogoutRedirectUri: 'https://myapp.com/',
+  state: 'xyz',
+});
+// redirect the user to logoutUrl
+```
+
+The `end_session_endpoint` is taken from `endSessionEndpoint` in the client
+config when set, otherwise resolved from the OP metadata (cached).
+
+## OpenID Provider — `endSessionHandler`
+
+```js
+const provider = createProvider({
+  // ...
+  logout: {
+    postLogoutRedirectUris: ['https://myapp.com/'],   // exact-match allow-list
+    onLogout: async ({ sub }) => sessionStore.destroyForUser(sub),
+  },
+});
+```
+
+<Callout type="warning">
+  `post_logout_redirect_uri` is **exact-matched** against the registered list
+  before any redirect — an unregistered URI gets a `400`, never a redirect
+  (the open-redirect lever). Configuring `logout` auto-advertises
+  `end_session_endpoint` in discovery.
+</Callout>
+
+The handler:
+
+- calls `onLogout({ sub, idTokenHint })` (best-effort — never blocks the
+  redirect) to clear the OP session,
+- redirects to a **registered** `post_logout_redirect_uri`, echoing `state`,
+- returns a `{ logged_out: true }` confirmation when no redirect is
+  requested.
+
+`sub` is read from the (unverified) `id_token_hint` after checking its `iss`
+matches the OP — a logout hint is frequently expired, so the issuer/audience
+check stands in for a full signature+`exp` verification.

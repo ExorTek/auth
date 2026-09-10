@@ -1,0 +1,73 @@
+---
+title: '@exortek/oidc — Framework adapters'
+sidebarTitle: 'Framework adapters'
+---
+
+import { Callout } from 'nextra/components';
+
+# Framework adapters
+
+Both halves ship Express and Fastify adapters. `express` / `fastify` are
+**optional peers** — installed only if you use them; the Fastify plugins are
+`fastify-plugin`-wrapped so their routes register at the app's top level.
+
+## Relying party — login routes
+
+A browser-redirect login in two routes: `start` stashes the flow session in
+a short-lived cookie and redirects to the OP; `callback` reads it back, runs
+`handleCallback`, and hands the result to `onSuccess`.
+
+```js
+// Express
+import { mountOidcLogin } from '@exortek/oidc/client/express';
+
+mountOidcLogin(app, {
+  client,
+  loginPath: '/login',
+  callbackPath: '/callback',
+  onSuccess: ({ res, claims }) => {
+    req.session.user = claims.sub;
+    res.redirect('/');
+  },
+});
+```
+
+```js
+// Fastify
+import { oidcLoginPlugin } from '@exortek/oidc/client/fastify';
+
+await app.register(oidcLoginPlugin, {
+  client,
+  onSuccess: ({ reply, claims }) => reply.redirect('/'),
+});
+```
+
+<Callout type="info">
+  API / SPA / mobile clients don't need an adapter — call `client.authorize`
+  and `client.handleCallback` directly and carry the `session` yourself.
+</Callout>
+
+## OpenID Provider — endpoint mounts
+
+`mountOidcProvider` mounts exactly the endpoints discovery advertises, at the
+paths it names:
+
+```js
+// Express
+import { mountOidcProvider } from '@exortek/oidc/provider/express';
+
+mountOidcProvider(app, provider);
+// → /.well-known/openid-configuration · /.well-known/jwks.json ·
+//   /userinfo · /end_session · /check_session
+```
+
+```js
+// Fastify
+import { oidcProviderPlugin } from '@exortek/oidc/provider/fastify';
+
+await app.register(oidcProviderPlugin, { provider });
+```
+
+Prefer your own routes? `oidcProviderHandlers(provider)` (Express) returns
+`{ [name]: { path, handler } }` so you can mount each endpoint with your own
+middleware and paths.
