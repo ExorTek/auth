@@ -423,7 +423,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@exortek/oauth2@workspace:packages/oauth2":
+"@exortek/oauth2@workspace:^, @exortek/oauth2@workspace:packages/oauth2":
   version: 0.0.0-use.local
   resolution: "@exortek/oauth2@workspace:packages/oauth2"
   dependencies:
@@ -446,6 +446,25 @@ __metadata:
     ioredis:
       optional: true
     redis:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
+"@exortek/oidc@workspace:packages/oidc":
+  version: 0.0.0-use.local
+  resolution: "@exortek/oidc@workspace:packages/oidc"
+  dependencies:
+    "@exortek/jwk": "workspace:^"
+    "@exortek/jwks": "workspace:^"
+    "@exortek/jwt": "workspace:^"
+    "@exortek/oauth2": "workspace:^"
+  peerDependencies:
+    express: ">=4.0.0"
+    fastify: ">=4.0.0"
+  peerDependenciesMeta:
+    express:
+      optional: true
+    fastify:
       optional: true
   languageName: unknown
   linkType: soft

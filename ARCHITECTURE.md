@@ -124,7 +124,7 @@ Status legend: ✅ shipped to npm · 🛠 on disk, pre-release · ⏳ planned.
 | 16 | `@exortek/opaque`      |   ✅   | Opaque reference tokens, RFC 7662 introspection + RFC 7009 revocation                |
 | 17 | `@exortek/paseto`      |   ✅   | PASETO v4 — `v4.local` (XChaCha20 + keyed BLAKE2b) + `v4.public` (Ed25519), no `alg` header |
 | 18 | `@exortek/oauth2`      |   ✅   | OAuth 2.1 — RP flow + provider presets + full authorization server (DPoP · PAR · JAR/JARM · device · token-exchange · dynamic registration · opt-in OIDC id_token · FAPI) |
-| 19 | `@exortek/oidc`        |   ⏳   | OpenID Connect on top of `@exortek/oauth2`                                          |
+| 19 | `@exortek/oidc`        |   ✅   | OpenID Connect Core 1.0 on `@exortek/oauth2` — discovery-first RP + OP add-ons (discovery · UserInfo · JWKS · RP-Initiated Logout · Session Management) |
 | 20 | `@exortek/auth`        |   ⏳   | Umbrella — re-exports every package above                                          |
 
 Not versioned in this table: `@exortek/shared` — internal consolidation
@@ -303,7 +303,7 @@ Where each protocol is anchored:
 | `session`       | OWASP ASVS 4.0.3 V3, RFC 6265 (Cookies)                                       |
 | `security`      | OWASP ASVS 4.0.3 V13 / V14, RFC 6749 §10 (OAuth2 threats), RFC 7231 §5 (HTTP) |
 | `oauth2`        | OAuth 2.1 / RFC 9700 (BCP), RFC 6749, RFC 7636 (PKCE), RFC 9207 (iss), RFC 8414 (metadata), RFC 9449 (DPoP), RFC 9126 (PAR), RFC 8707 (resource), RFC 9396 (RAR), RFC 9101 (JAR/JARM), RFC 7523 / 8705 (client auth), RFC 8693 (exchange), RFC 8628 (device), RFC 7591 (dynamic registration), RFC 9068 (JWT profile), OpenID Connect Core (id_token, opt-in OP mode), FAPI 2.0 |
-| `oidc`          | _(planned)_ OpenID Connect Core 1.0, OpenID Connect Discovery |
+| `oidc`          | OpenID Connect Core 1.0, Discovery 1.0, RP-Initiated Logout 1.0, Session Management 1.0 (on `@exortek/oauth2`) |
 | `passkey`       | W3C WebAuthn Level 3, FIDO2 CTAP2                                             |
 
 For deeper per-package interface tables (JSDoc typedefs, worked API

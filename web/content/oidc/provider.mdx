@@ -1,0 +1,84 @@
+---
+title: '@exortek/oidc — OpenID Provider'
+sidebarTitle: 'OpenID Provider — createProvider'
+---
+
+import { Callout } from 'nextra/components';
+
+# OpenID Provider — `createProvider`
+
+Your `@exortek/oauth2/server` `createServer` already issues an `id_token`
+off the `openid` scope. `createProvider` supplies the OIDC identity surface
+it has no first-class answer for, to mount **beside** it.
+
+<Callout type="info">
+  `createProvider` is an **add-on**, not a replacement authorization server —
+  it does not re-wrap `createServer`. Mount its handlers next to your oauth2
+  server's on the same app.
+</Callout>
+
+```js
+import { createProvider } from '@exortek/oidc/provider';
+
+const provider = createProvider({
+  issuer: 'https://auth.myapp.com',
+  signing: { key: signingPrivateJwk, alg: 'ES256', kid: 'key-1' },
+  jwks: [publicJwk],                          // published at jwks_uri
+  endpoints: { authorization: '/authorize', token: '/token' },
+  claims: {
+    supported: ['sub', 'email', 'email_verified', 'name', 'picture'],
+    userinfo: ['email', 'name', 'picture'],   // release policy
+  },
+  userinfo: { resolve: accessToken => introspect(accessToken) },
+  logout: { postLogoutRedirectUris: ['https://myapp.com/'] },
+  session: { cookieName: 'op_browser_state' },
+});
+```
+
+## Config
+
+| Option | Type | Notes |
+|--------|------|-------|
+| `issuer` | `string` | OP issuer identifier (https). |
+| `signing` | `{ key, alg, kid?, expiresIn? }` | Private signing key for the `id_token`. Reuses oauth2's `createIdTokenSigner`. |
+| `jwks` | `JWK[] \| { keys }` | Public key set published at `jwks_uri`. |
+| `endpoints` | object | Advertised endpoint URLs/paths; `authorization` + `token` required. |
+| `claims` | `{ supported?, id_token?, userinfo? }` | Claim policy. |
+| `scopes` | `string[]?` | Advertised scopes (default `openid`/`profile`/`email`). |
+| `userinfo` | `{ resolve }` | `accessToken → { sub, scope, claims }`. Enables the UserInfo endpoint. |
+| `logout` | `{ postLogoutRedirectUris?, onLogout? }` | See [RP-Initiated Logout](/oidc/logout). |
+| `session` | `{ cookieName? }` | See [Session Management](/oidc/session). |
+
+## Handlers
+
+Each returns a framework-agnostic handler (`{ method, url, headers, query }
+→ { status, headers, body }`). Mount them by hand, or use the
+[adapters](/oidc/middleware).
+
+| Handler | Serves |
+|---------|--------|
+| `discoveryHandler()` | `/.well-known/openid-configuration` — the OIDC metadata (superset of RFC 8414), advertising only the endpoints the OP actually serves. |
+| `userinfoHandler()` | UserInfo (OIDC Core §5.3) — resolves the Bearer token, releases claims per granted scope (§5.4) and the `claims.userinfo` policy; 401 + `WWW-Authenticate` on a bad token. |
+| `jwksHandler()` | The published JWK Set at `jwks_uri`. |
+| `endSessionHandler()` | RP-Initiated Logout (see its page). |
+| `checkSessionHandler()` | Session Management iframe (see its page). |
+
+## `idTokenSigner`
+
+The `createIdTokenSigner`-backed signer, exposed so your `createServer` and
+this provider sign `id_token`s with **one** key:
+
+```js
+const idToken = await provider.idTokenSigner.sign({
+  subject: userId,
+  clientId,
+  issuer: provider.issuer,
+  nonce,
+  accessToken, // → at_hash
+});
+```
+
+## `metadata()`
+
+Returns the assembled discovery document (also what `discoveryHandler`
+serves) — useful for tests or serving it yourself.

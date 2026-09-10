@@ -1,0 +1,87 @@
+---
+title: '@exortek/oidc — Relying party'
+sidebarTitle: 'Relying party — createClient'
+---
+
+import { Callout } from 'nextra/components';
+
+# Relying party — `createClient`
+
+`createClient` is a **discovery-first** OpenID Connect relying party. You
+point it at an `issuer` (not a provider preset) and it discovers the
+endpoints, runs the OAuth 2.1 authorization-code flow with mandatory PKCE /
+`state` / `nonce`, and — because every request carries the `openid` scope —
+verifies the returned `id_token` end to end.
+
+<Callout type="info">
+  The flow itself is `@exortek/oauth2`'s, reused verbatim: discovery,
+  `id_token` signature + `iss` / `aud` / `nonce` / `exp` / `azp` / `at_hash`
+  validation, and the UserInfo `sub`-match are done there, not reimplemented.
+</Callout>
+
+```js
+import { createClient } from '@exortek/oidc/client';
+
+const client = createClient({
+  issuer: 'https://accounts.google.com',
+  clientId: '...',
+  clientSecret: '...',            // omit for public clients
+  redirectUri: 'https://myapp.com/callback',
+  scope: ['openid', 'email', 'profile'], // openid is enforced either way
+});
+```
+
+## Config
+
+| Option | Type | Notes |
+|--------|------|-------|
+| `issuer` | `string` | OP issuer identifier; endpoints are discovered from it. |
+| `clientId` | `string` | Required. |
+| `clientSecret` | `string?` | Confidential clients. |
+| `redirectUri` | `string` | Registered callback URI. |
+| `scope` | `string[]?` | `openid` is always included. |
+| `idTokenAlgs` | `string[]?` | Signature-alg allowlist for the `id_token`. |
+| `clockTolerance` | `string \| number?` | Leeway for `exp`/`nbf`/`iat`. |
+| `store` | object? | Flow-session store keyed by `state` (else the session is carried by the caller). |
+| `endSessionEndpoint` | `string?` | Pin the logout endpoint instead of discovering it. |
+
+## `authorize(options?)`
+
+Returns `{ url, session }` — redirect the user to `url` and keep `session`
+(cookie or store) for the callback. OIDC auth-request parameters are threaded
+through:
+
+```js
+const { url, session } = await client.authorize({
+  prompt: 'login',        // → prompt
+  loginHint: 'a@b.com',   // → login_hint
+  maxAge: 3600,           // → max_age
+  acrValues: 'urn:...',   // → acr_values
+  scope: ['openid', 'email'],
+});
+```
+
+## `handleCallback(query, { session })`
+
+Completes the flow and returns the verified identity:
+
+```js
+const { idToken, claims, userinfo, tokens } = await client.handleCallback(req.query, { session });
+```
+
+| Field | What |
+|-------|------|
+| `idToken` | The raw `id_token` (already verified). |
+| `claims` | The verified `id_token` payload. |
+| `userinfo` | The merged profile (`id_token` claims + UserInfo, `sub`-matched). |
+| `tokens` | The raw token response (`access_token`, `refresh_token`, …). |
+
+## `refresh` / `revoke`
+
+```js
+const fresh = await client.refresh(refreshToken); // RFC 6749 §6
+await client.revoke(accessToken, 'access_token'); // RFC 7009
+```
+
+For logout, see [RP-Initiated Logout](/oidc/logout); for the Express /
+Fastify route wrappers, see [Framework adapters](/oidc/middleware).

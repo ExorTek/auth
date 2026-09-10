@@ -186,6 +186,17 @@ never transmit plaintext passwords over the network.
 | RFC 7009 / 7662  | Revocation + introspection, no cross-client oracle                 |   ✅    | Revoke is idempotent; introspection denies cross-client by default (`allowCrossClient` opt-in)   |
 | FAPI 2.0         | PAR + PKCE + DPoP/mTLS + `iss` in one profile                      |   ✅    | `security: { fapi: true }` tightens the defaults together                                         |
 
+## OpenID Connect (`@exortek/oidc`)
+
+| §                | Requirement                                                        | Status | How                                                                                              |
+|------------------|--------------------------------------------------------------------|:------:|--------------------------------------------------------------------------------------------------|
+| OIDC Core §3.1.3.7 | RP `id_token` validation (`iss`/`aud`/`nonce`/`exp`, `azp`, `at_hash`) |   ✅    | `createClient` reuses oauth2's verified flow; `openid` scope is non-optional                     |
+| OIDC Core §2     | OP `id_token` issuance — signed JWS with `nonce` / `auth_time` / `at_hash` |   ✅    | `provider.idTokenSigner` (oauth2 `createIdTokenSigner`), asymmetric alg only, never `none`/HS*   |
+| OIDC Core §5.3 / §5.4 | UserInfo endpoint — `sub` always, claims released per granted scope |   ✅    | `userinfoHandler` — Bearer resolve, scope→claims map + `claims.userinfo` policy, 401 on bad token |
+| OIDC Discovery 1.0 | `/.well-known/openid-configuration` metadata                     |   ✅    | `discoveryHandler` — superset of RFC 8414, advertises only endpoints the OP actually serves       |
+| RP-Initiated Logout 1.0 | `end_session_endpoint`, validated `post_logout_redirect_uri`   |   ✅    | `endSessionHandler` exact-matches registered URIs before redirect (open-redirect lever); `endSessionUrl` on the RP |
+| Session Management 1.0 | `session_state` + `check_session_iframe`                       |   ✅    | `sessionState()` (§4.2 hash) + `checkSessionHandler` serving the OP iframe                        |
+
 ## Summary — what we ship today
 
 - ✅ **NIST SP 800-63B AAL2** — memorized secret + OOB OTP paths
@@ -200,6 +211,10 @@ never transmit plaintext passwords over the network.
   `@exortek/oauth2` (mandatory PKCE, `iss`, DPoP incl. nonce, PAR,
   RAR, JAR/JARM, resource indicators, token exchange, device grant,
   FAPI 2.0; RP flow + authorization server; see table above)
+- ✅ **OpenID Connect Core 1.0 + Discovery / RP-Initiated Logout /
+  Session Management** — `@exortek/oidc` (discovery-first RP with full
+  `id_token` validation; OpenID Provider add-ons: discovery, UserInfo,
+  JWKS, logout, session; see table above)
 - ✅ **ASVS V2.9 cryptographic authenticators** — `@exortek/passkey`
   (WebAuthn L3 / FIDO2 CTAP2 server verification, all seven
   attestation formats)

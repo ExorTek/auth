@@ -1,0 +1,115 @@
+{
+  "name": "@exortek/oidc",
+  "version": "0.0.0",
+  "description": "OpenID Connect Core 1.0 for Node.js 22+ — the identity layer on top of @exortek/oauth2. A relying-party client (id_token + UserInfo, discovery, nonce/state) and an OpenID Provider (discovery metadata, UserInfo endpoint, id_token issuance). Server-only, built on node:crypto.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.mjs",
+      "require": "./dist/client/index.cjs"
+    },
+    "./client/express": {
+      "types": "./dist/client/express.d.ts",
+      "import": "./dist/client/express.mjs",
+      "require": "./dist/client/express.cjs"
+    },
+    "./client/fastify": {
+      "types": "./dist/client/fastify.d.ts",
+      "import": "./dist/client/fastify.mjs",
+      "require": "./dist/client/fastify.cjs"
+    },
+    "./provider": {
+      "types": "./dist/provider/index.d.ts",
+      "import": "./dist/provider/index.mjs",
+      "require": "./dist/provider/index.cjs"
+    },
+    "./provider/express": {
+      "types": "./dist/provider/express.d.ts",
+      "import": "./dist/provider/express.mjs",
+      "require": "./dist/provider/express.cjs"
+    },
+    "./provider/fastify": {
+      "types": "./dist/provider/fastify.d.ts",
+      "import": "./dist/provider/fastify.mjs",
+      "require": "./dist/provider/fastify.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json && rollup -c ../../rollup.dts.config.mjs",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "prepack": "cp ../../LICENSE ./LICENSE"
+  },
+  "keywords": [
+    "backend",
+    "security",
+    "oidc",
+    "openid",
+    "openid-connect",
+    "id-token",
+    "userinfo",
+    "discovery",
+    "oauth2",
+    "sso",
+    "single-sign-on",
+    "authentication",
+    "identity",
+    "node-crypto"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/oidc#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git",
+    "directory": "packages/oidc"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "dependencies": {
+    "@exortek/jwks": "workspace:^",
+    "@exortek/jwt": "workspace:^",
+    "@exortek/oauth2": "workspace:^"
+  },
+  "devDependencies": {
+    "@exortek/jwk": "workspace:^"
+  },
+  "peerDependencies": {
+    "express": ">=4.0.0",
+    "fastify": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

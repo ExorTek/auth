@@ -1,0 +1,99 @@
+---
+title: '@exortek/oidc — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/oidc`
+
+OpenID Connect Core 1.0 for Node.js 22+ — the identity layer on top of
+[`@exortek/oauth2`](/oauth2). Where oauth2 speaks OAuth 2.1 and can issue an
+`id_token`, `@exortek/oidc` makes **OpenID Connect** the first-class shape on
+both sides: a discovery-first **relying-party** client that enforces the
+`openid` scope and validates the `id_token` end to end, and an **OpenID
+Provider** add-on that serves discovery, UserInfo, logout and session
+management beside your `@exortek/oauth2/server` authorization server.
+
+<Callout type="info">
+  OIDC's guarantees live in the parts people skip — a `nonce` that is sent but
+  never checked, an unvalidated `aud`, trusting UserInfo `sub` over the
+  `id_token` `sub`, an open `post_logout_redirect_uri`. This package reuses
+  oauth2's verified flow rather than reimplementing it, and refuses to let the
+  caller skip the checks that matter.
+</Callout>
+
+## Install
+
+```bash
+npm install @exortek/oidc
+```
+
+## Relying party (SSO)
+
+```js
+import { createClient } from '@exortek/oidc/client';
+
+const client = createClient({
+  issuer: 'https://accounts.google.com',
+  clientId: '...',
+  clientSecret: '...',
+  redirectUri: 'https://myapp.com/callback',
+  scope: ['openid', 'email', 'profile'],
+});
+
+const { url, session } = await client.authorize({ prompt: 'login' });
+// → redirect to `url`, keep `session`
+
+const { idToken, claims, userinfo } = await client.handleCallback(req.query, { session });
+
+const logoutUrl = await client.endSessionUrl({
+  idTokenHint: idToken,
+  postLogoutRedirectUri: 'https://myapp.com/',
+});
+```
+
+`@exortek/oidc/client/express` and `/client/fastify` wrap this as a
+two-route browser login (`mountOidcLogin` / `oidcLoginPlugin`).
+
+## OpenID Provider
+
+`createProvider` supplies the OIDC endpoints to mount **beside** your
+`@exortek/oauth2/server` `createServer`:
+
+```js
+import { createProvider } from '@exortek/oidc/provider';
+import { mountOidcProvider } from '@exortek/oidc/provider/express';
+
+const provider = createProvider({
+  issuer: 'https://auth.myapp.com',
+  signing: { key: signingPrivateJwk, alg: 'ES256', kid: 'key-1' },
+  jwks: [publicJwk],
+  endpoints: { authorization: '/authorize', token: '/token' },
+  claims: { supported: ['sub', 'email', 'name'], userinfo: ['email', 'name'] },
+  userinfo: { resolve: accessToken => introspect(accessToken) },
+  logout: { postLogoutRedirectUris: ['https://myapp.com/'] },
+  session: { cookieName: 'op_browser_state' },
+});
+
+mountOidcProvider(app, provider);
+// → /.well-known/openid-configuration · /.well-known/jwks.json ·
+//   /userinfo · /end_session · /check_session
+```
+
+`provider.idTokenSigner` is the same signer your `createServer` uses, so both
+sign with one key.
+
+## Continue
+
+- [Relying party — `createClient`](/oidc/client) — login, `id_token`, UserInfo
+- [OpenID Provider — `createProvider`](/oidc/provider) — discovery, UserInfo, JWKS
+- [RP-Initiated Logout](/oidc/logout)
+- [Session Management](/oidc/session)
+- [Framework adapters](/oidc/middleware) — Express & Fastify
+- [errors — `OidcError`](/oidc/errors)
+
+## Specifications
+
+OpenID Connect Core 1.0 · Discovery 1.0 · RP-Initiated Logout 1.0 · Session
+Management 1.0, on OAuth 2.1 ([`@exortek/oauth2`](/oauth2)).
