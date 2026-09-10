@@ -22,7 +22,8 @@ import { invalidArgument } from '../internal/errors.js';
 import { buildDiscoveryDocument } from '../internal/discovery-doc.js';
 import { buildUserInfo } from '../internal/userinfo.js';
 import { isRegisteredPostLogoutUri, readIdTokenHint } from '../internal/logout.js';
-import { jsonResponse, normalizeRequest, redirectResponse } from '../internal/http-io.js';
+import { checkSessionIframeHtml, computeSessionState } from '../internal/session.js';
+import { htmlResponse, jsonResponse, normalizeRequest, redirectResponse } from '../internal/http-io.js';
 
 const DEFAULT_SCOPES = ['openid', 'profile', 'email'];
 const DEFAULT_CLAIMS_SUPPORTED = ['sub', 'iss', 'aud', 'exp', 'iat', 'auth_time', 'nonce'];
@@ -38,6 +39,7 @@ const DEFAULT_CLAIMS_SUPPORTED = ['sub', 'iss', 'aud', 'exp', 'iat', 'auth_time'
  * @property {string[]} [authMethods]              token_endpoint_auth_methods_supported.
  * @property {{ resolve: (accessToken: string) => (Promise<{ sub: string, scope?: string|string[], claims?: Record<string, unknown> } | null> | { sub: string, scope?: string|string[], claims?: Record<string, unknown> } | null) }} [userinfo]  access-token resolver for the UserInfo endpoint.
  * @property {{ postLogoutRedirectUris?: string[], onLogout?: (ctx: { sub?: string, idTokenHint?: string }) => unknown }} [logout]  RP-Initiated Logout policy.
+ * @property {{ cookieName?: string }} [session]  enable Session Management; `cookieName` names the OP browser-state cookie.
  */
 
 /**
@@ -84,6 +86,10 @@ export function createProvider(config) {
   // conventional path when the caller did not pin one.
   if (isObject(config.logout) && !resolved.endSession) {
     resolved.endSession = toAbsolute('/end_session', issuer);
+  }
+  // Likewise for Session Management's check-session iframe.
+  if (isObject(config.session) && !resolved.checkSession) {
+    resolved.checkSession = toAbsolute('/check_session', issuer);
   }
 
   const discoveryDoc = buildDiscoveryDocument({
@@ -203,6 +209,38 @@ export function createProvider(config) {
 
         return jsonResponse(200, { logged_out: true }, { 'cache-control': 'no-store' });
       };
+    },
+
+    /**
+     * Compute a `session_state` (OIDC Session Management §4.2) for an auth
+     * response, from the client id, the RP's origin and the OP browser-state
+     * value the OP set in the user's browser.
+     *
+     * @param {{ clientId: string, origin: string, opBrowserState: string, salt?: string }} input
+     * @returns {string}
+     */
+    sessionState(input) {
+      if (
+        !isObject(input) ||
+        !isNonEmptyString(input.clientId) ||
+        !isNonEmptyString(input.origin) ||
+        !isNonEmptyString(input.opBrowserState)
+      ) {
+        invalidArgument('sessionState(input): { clientId, origin, opBrowserState } are required.');
+      }
+      return computeSessionState(input);
+    },
+
+    /**
+     * Serves the OP `check_session_iframe` document (OIDC Session Management
+     * §4.2). Cacheable; reads the OP browser-state cookie named
+     * `config.session.cookieName` (default `op_browser_state`).
+     * @returns {(req?: object) => import('../internal/http-io.js').OidcResponse}
+     */
+    checkSessionHandler() {
+      const cookieName = isObject(config.session) ? config.session.cookieName : undefined;
+      const html = checkSessionIframeHtml({ cookieName });
+      return () => htmlResponse(200, html, { 'cache-control': 'public, max-age=3600' });
     },
   };
 }

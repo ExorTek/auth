@@ -87,6 +87,22 @@ export function jsonResponse(status, payload, headers = {}) {
 }
 
 /**
+ * An HTML response (the check-session iframe document).
+ *
+ * @param {number} status
+ * @param {string} html
+ * @param {Record<string, string>} [headers]
+ * @returns {OidcResponse}
+ */
+export function htmlResponse(status, html, headers = {}) {
+  return {
+    status,
+    headers: { 'content-type': 'text/html; charset=utf-8', ...lower(headers) },
+    body: html,
+  };
+}
+
+/**
  * A 302 redirect to `location`.
  *
  * @param {string} location
