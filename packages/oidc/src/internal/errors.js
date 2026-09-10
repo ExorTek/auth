@@ -4,19 +4,15 @@
  *
  * These are the library's own error codes — distinct from the OpenID
  * Connect protocol `error` values an OpenID Provider returns on the wire.
- * The protocol catalogue lands with the provider/client flow handlers.
+ * The client flow delegates to `@exortek/oauth2`, so callback-validation
+ * failures surface as `OAuth2Error` and are left to propagate.
  */
 import { BaseError } from '@exortek/shared/errors';
 
 export const ErrorCode = Object.freeze({
-  // Configuration / argument guards raised by `createClient` / `createProvider`.
+  // Configuration / argument guards raised by `createClient` / `createProvider`
+  // and the provider handlers.
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
-
-  // Reserved while the flow handlers are scaffolded. Every method exposed on
-  // the returned client/provider throws this until its real implementation
-  // lands, so a consumer wiring the package up early gets an actionable code
-  // instead of an undefined-is-not-a-function crash.
-  NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
 });
 
 /**
@@ -29,7 +25,6 @@ export const ErrorCode = Object.freeze({
 export class OidcError extends BaseError {
   static statuses = {
     INVALID_ARGUMENT: 400,
-    NOT_IMPLEMENTED: 501,
   };
 
   static defaultStatus = 500;
@@ -43,17 +38,4 @@ export class OidcError extends BaseError {
  */
 export function invalidArgument(message) {
   throw new OidcError(ErrorCode.INVALID_ARGUMENT, message);
-}
-
-/**
- * Placeholder thrown by every scaffolded flow method until it is implemented.
- *
- * @param {string} what  The operation that is not yet available.
- * @returns {never}
- */
-export function notImplemented(what) {
-  throw new OidcError(
-    ErrorCode.NOT_IMPLEMENTED,
-    `${what} is not implemented yet — @exortek/oidc is pre-release (0.0.0).`,
-  );
 }

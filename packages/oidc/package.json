@@ -67,10 +67,12 @@
     "url": "https://github.com/ExorTek/auth/issues"
   },
   "dependencies": {
-    "@exortek/jwk": "workspace:^",
     "@exortek/jwks": "workspace:^",
     "@exortek/jwt": "workspace:^",
     "@exortek/oauth2": "workspace:^"
+  },
+  "devDependencies": {
+    "@exortek/jwk": "workspace:^"
   },
   "engines": {
     "node": ">=22.0.0"

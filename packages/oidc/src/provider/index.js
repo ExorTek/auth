@@ -1,79 +1,214 @@
 /**
- * `@exortek/oidc/provider` — the **OpenID Provider** (OP).
+ * `@exortek/oidc/provider` — the **OpenID Provider** (OP) add-ons.
  *
- * Turns an `@exortek/oauth2` authorization server into an OpenID Provider:
- * `id_token` issuance (signed with the configured JWKS), the discovery
- * document (`/.well-known/openid-configuration`, OIDC Discovery 1.0), and
- * the UserInfo endpoint (OIDC Core §5.3).
+ * `@exortek/oauth2`'s authorization server (`@exortek/oauth2/server`) already
+ * issues an `id_token` off the `openid` scope; what it has no first-class
+ * answer for is the OIDC identity surface. `createProvider` supplies exactly
+ * that, to mount **beside** your `createServer`:
  *
- * The handlers are scaffolded — configuration validation is real; the
- * `discoveryHandler` / `userinfoHandler` bodies throw `NOT_IMPLEMENTED`
- * until the endpoint pipeline lands.
+ *   - the OpenID discovery document (`/.well-known/openid-configuration`),
+ *   - the UserInfo endpoint (OIDC Core §5.3),
+ *   - the published JWKS,
+ *   - and an `id_token` signer (`createIdTokenSigner`) so the server and this
+ *     provider sign with the same key.
+ *
+ * RP-Initiated Logout and Session Management add their handlers in follow-up
+ * work.
  */
-import { isNonEmptyString, isObject } from '@exortek/shared/predicates';
-import { invalidArgument, notImplemented } from '../internal/errors.js';
+import { createIdTokenSigner } from '@exortek/oauth2/server';
+import { isArray, isNonEmptyString, isObject } from '@exortek/shared/predicates';
 
-/**
- * @typedef {object} OidcProviderClaims
- * @property {string[]} [supported] Every claim this OP can assert.
- * @property {string[]} [id_token]  Claims embedded in the `id_token`.
- * @property {string[]} [userinfo]  Claims returned from the UserInfo endpoint.
- */
+import { invalidArgument } from '../internal/errors.js';
+import { buildDiscoveryDocument } from '../internal/discovery-doc.js';
+import { buildUserInfo } from '../internal/userinfo.js';
+import { jsonResponse, normalizeRequest } from '../internal/http-io.js';
+
+const DEFAULT_SCOPES = ['openid', 'profile', 'email'];
+const DEFAULT_CLAIMS_SUPPORTED = ['sub', 'iss', 'aud', 'exp', 'iat', 'auth_time', 'nonce'];
 
 /**
  * @typedef {object} OidcProviderConfig
- * @property {string}  issuer  This OP's issuer identifier (an https URL).
- * @property {object}  jwks    The signing key set (from `@exortek/jwk`).
- * @property {object}  store   Backing store for codes / grants / subjects.
- * @property {OidcProviderClaims} [claims] Claim policy for id_token / UserInfo.
+ * @property {string} issuer                       the OP issuer identifier (https URL).
+ * @property {{ key: unknown, alg: string, kid?: string, expiresIn?: string|number }} signing  id_token signer.
+ * @property {object[] | { keys: object[] }} [jwks]  public JWK Set to publish at `jwks_uri`.
+ * @property {Record<string, string>} endpoints    endpoint URLs/paths to advertise (authorization + token required).
+ * @property {{ supported?: string[], id_token?: string[], userinfo?: string[] }} [claims]  claim policy.
+ * @property {string[]} [scopes]                    advertised scopes (default openid/profile/email).
+ * @property {string[]} [authMethods]              token_endpoint_auth_methods_supported.
+ * @property {{ resolve: (accessToken: string) => (Promise<{ sub: string, scope?: string|string[], claims?: Record<string, unknown> } | null> | { sub: string, scope?: string|string[], claims?: Record<string, unknown> } | null) }} [userinfo]  access-token resolver for the UserInfo endpoint.
  */
 
 /**
- * Create an OpenID Provider.
+ * Create an OpenID Provider add-on.
  *
  * @param {OidcProviderConfig} config
- * @returns {{
- *   issuer: string,
- *   discoveryHandler: () => never,
- *   userinfoHandler: () => never,
- * }}
  */
 export function createProvider(config) {
   if (!isObject(config)) {
     invalidArgument('createProvider(config): config must be an object.');
   }
-  const { issuer, jwks, store } = config;
+  const { issuer, signing, endpoints } = config;
 
   if (!isNonEmptyString(issuer)) {
     invalidArgument('createProvider(config): `issuer` must be a non-empty string.');
   }
-  if (!isObject(jwks)) {
-    invalidArgument('createProvider(config): `jwks` must be a key set object.');
+  if (!isObject(signing) || signing.key === undefined || signing.key === null || !isNonEmptyString(signing.alg)) {
+    invalidArgument('createProvider(config): `signing` must be { key, alg }.');
   }
-  if (!isObject(store)) {
-    invalidArgument('createProvider(config): `store` must be an object.');
+  if (!isObject(endpoints) || !isNonEmptyString(endpoints.authorization) || !isNonEmptyString(endpoints.token)) {
+    invalidArgument('createProvider(config): `endpoints` must include `authorization` and `token`.');
   }
   if (config.claims !== undefined && !isObject(config.claims)) {
     invalidArgument('createProvider(config): `claims` must be an object when provided.');
   }
 
+  const claimsPolicy = config.claims ?? {};
+  const scopes = isArray(config.scopes) ? config.scopes : DEFAULT_SCOPES;
+
+  // Resolve every advertised endpoint to an absolute URL; default the two the
+  // provider itself serves (userinfo + jwks) to conventional paths.
+  const resolved = {
+    authorization: toAbsolute(endpoints.authorization, issuer),
+    token: toAbsolute(endpoints.token, issuer),
+    userinfo: toAbsolute(endpoints.userinfo ?? '/userinfo', issuer),
+    jwks: toAbsolute(endpoints.jwks ?? '/.well-known/jwks.json', issuer),
+  };
+  for (const optional of ['endSession', 'checkSession', 'revocation', 'introspection', 'registration']) {
+    if (isNonEmptyString(endpoints[optional])) {
+      resolved[optional] = toAbsolute(endpoints[optional], issuer);
+    }
+  }
+
+  const discoveryDoc = buildDiscoveryDocument({
+    issuer,
+    endpoints: resolved,
+    scopes,
+    claimsSupported: isArray(claimsPolicy.supported) ? claimsPolicy.supported : DEFAULT_CLAIMS_SUPPORTED,
+    idTokenAlgs: [signing.alg],
+    authMethods: config.authMethods,
+  });
+
+  const publicJwks = normalizeJwks(config.jwks);
+
+  const idTokenSigner = createIdTokenSigner({
+    signingKey: signing.key,
+    alg: signing.alg,
+    kid: signing.kid,
+    expiresIn: signing.expiresIn,
+  });
+
   return {
     issuer,
+    idTokenSigner,
+
+    /** The assembled discovery document (also served by `discoveryHandler`). */
+    metadata() {
+      return discoveryDoc;
+    },
 
     /**
-     * Framework-agnostic handler serving `/.well-known/openid-configuration`.
-     * @returns {never}
+     * Serves `/.well-known/openid-configuration`. Cacheable.
+     * @returns {(req?: object) => import('../internal/http-io.js').OidcResponse}
      */
     discoveryHandler() {
-      return notImplemented('createProvider().discoveryHandler');
+      return () => jsonResponse(200, discoveryDoc, { 'cache-control': 'public, max-age=3600' });
     },
 
     /**
-     * Framework-agnostic handler serving the UserInfo endpoint.
-     * @returns {never}
+     * Serves the published JWKS at `jwks_uri`. Cacheable.
+     * @returns {(req?: object) => import('../internal/http-io.js').OidcResponse}
+     */
+    jwksHandler() {
+      return () => jsonResponse(200, { keys: publicJwks }, { 'cache-control': 'public, max-age=3600' });
+    },
+
+    /**
+     * Serves the UserInfo endpoint (OIDC Core §5.3). Requires `config.userinfo.
+     * resolve` to turn a Bearer access token into `{ sub, scope, claims }`.
+     * @returns {(req: object) => Promise<import('../internal/http-io.js').OidcResponse>}
      */
     userinfoHandler() {
-      return notImplemented('createProvider().userinfoHandler');
+      if (!isObject(config.userinfo) || typeof config.userinfo.resolve !== 'function') {
+        invalidArgument('userinfoHandler(): config.userinfo.resolve must be a function.');
+      }
+      const resolve = config.userinfo.resolve;
+      return async raw => {
+        const req = normalizeRequest(raw);
+        const token = bearerToken(req);
+        if (!token) {
+          return unauthorized('invalid_request', 'a Bearer access token is required');
+        }
+        let resolved;
+        try {
+          resolved = await resolve(token);
+        } catch {
+          resolved = null;
+        }
+        if (!isObject(resolved) || !isNonEmptyString(resolved.sub)) {
+          return unauthorized('invalid_token', 'the access token is invalid or expired');
+        }
+        const grantedScopes = toScopeArray(resolved.scope);
+        const body = buildUserInfo(resolved.sub, resolved.claims ?? {}, grantedScopes, claimsPolicy.userinfo);
+        return jsonResponse(200, body, { 'cache-control': 'no-store', pragma: 'no-cache' });
+      };
     },
   };
+}
+
+/**
+ * @param {string} value  absolute URL or a path resolved against `issuer`
+ * @param {string} issuer
+ * @returns {string}
+ */
+function toAbsolute(value, issuer) {
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+  return new URL(value, issuer.endsWith('/') ? issuer : `${issuer}/`).toString();
+}
+
+/** @param {object[] | { keys: object[] } | undefined} jwks */
+function normalizeJwks(jwks) {
+  if (isArray(jwks)) {
+    return jwks;
+  }
+  if (isObject(jwks) && isArray(jwks.keys)) {
+    return jwks.keys;
+  }
+  return [];
+}
+
+/** @param {import('../internal/http-io.js').OidcRequest} req */
+function bearerToken(req) {
+  const auth = req.header('authorization');
+  if (isNonEmptyString(auth) && auth.slice(0, 7).toLowerCase() === 'bearer ') {
+    return auth.slice(7).trim();
+  }
+  // OIDC Core §5.3.1 also permits the token as an `access_token` form/query param.
+  const param = req.param('access_token');
+  return isNonEmptyString(param) ? param : undefined;
+}
+
+/** @param {string|string[]|undefined} scope */
+function toScopeArray(scope) {
+  if (isArray(scope)) {
+    return scope;
+  }
+  if (isNonEmptyString(scope)) {
+    return scope.split(/\s+/).filter(Boolean);
+  }
+  return [];
+}
+
+/**
+ * @param {string} error
+ * @param {string} description
+ * @returns {import('../internal/http-io.js').OidcResponse}
+ */
+function unauthorized(error, description) {
+  return jsonResponse(
+    401,
+    { error, error_description: description },
+    { 'www-authenticate': `Bearer error="${error}", error_description="${description}"`, 'cache-control': 'no-store' },
+  );
 }

@@ -17,20 +17,4 @@ describe('@exortek/oidc surface', () => {
     assert.equal(createClientSub, createClient);
     assert.equal(createProviderSub, createProvider);
   });
-
-  // NOTE: createProvider is still scaffolded here — its real handlers land in
-  // the provider commit; these assertions track that transition.
-  describe('createProvider (scaffold)', () => {
-    const base = {
-      issuer: 'https://auth.example.com',
-      jwks: { keys: [] },
-      store: {},
-    };
-
-    it('rejects a missing jwks with INVALID_ARGUMENT', () => {
-      assert.throws(() => createProvider({ ...base, jwks: undefined }), {
-        code: ErrorCode.INVALID_ARGUMENT,
-      });
-    });
-  });
 });
