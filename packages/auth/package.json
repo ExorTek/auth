@@ -1,0 +1,660 @@
+{
+  "name": "@exortek/auth",
+  "version": "0.0.0",
+  "description": "The full @exortek authentication toolkit in one install — JWT/JWE/JWS/JWK/JWKS, PASETO, password hashing, OTP/TOTP, passkeys, magic links, opaque tokens, sessions, API keys, OAuth 2.1, OpenID Connect, security middleware, and UA/bot detection. Framework-agnostic, server-only, pure JavaScript with types included. Re-exports every package as a namespace and forwards every subpath.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./crypto": {
+      "types": "./dist/crypto.d.ts",
+      "import": "./dist/crypto.mjs",
+      "require": "./dist/crypto.cjs"
+    },
+    "./crypto/hash": {
+      "types": "./dist/crypto/hash.d.ts",
+      "import": "./dist/crypto/hash.mjs",
+      "require": "./dist/crypto/hash.cjs"
+    },
+    "./crypto/cipher": {
+      "types": "./dist/crypto/cipher.d.ts",
+      "import": "./dist/crypto/cipher.mjs",
+      "require": "./dist/crypto/cipher.cjs"
+    },
+    "./crypto/sign": {
+      "types": "./dist/crypto/sign.d.ts",
+      "import": "./dist/crypto/sign.mjs",
+      "require": "./dist/crypto/sign.cjs"
+    },
+    "./crypto/binary": {
+      "types": "./dist/crypto/binary.d.ts",
+      "import": "./dist/crypto/binary.mjs",
+      "require": "./dist/crypto/binary.cjs"
+    },
+    "./crypto/encode": {
+      "types": "./dist/crypto/encode.d.ts",
+      "import": "./dist/crypto/encode.mjs",
+      "require": "./dist/crypto/encode.cjs"
+    },
+    "./crypto/random": {
+      "types": "./dist/crypto/random.d.ts",
+      "import": "./dist/crypto/random.mjs",
+      "require": "./dist/crypto/random.cjs"
+    },
+    "./jwk": {
+      "types": "./dist/jwk.d.ts",
+      "import": "./dist/jwk.mjs",
+      "require": "./dist/jwk.cjs"
+    },
+    "./jwk/generate": {
+      "types": "./dist/jwk/generate.d.ts",
+      "import": "./dist/jwk/generate.mjs",
+      "require": "./dist/jwk/generate.cjs"
+    },
+    "./jwk/import": {
+      "types": "./dist/jwk/import.d.ts",
+      "import": "./dist/jwk/import.mjs",
+      "require": "./dist/jwk/import.cjs"
+    },
+    "./jwk/export": {
+      "types": "./dist/jwk/export.d.ts",
+      "import": "./dist/jwk/export.mjs",
+      "require": "./dist/jwk/export.cjs"
+    },
+    "./jwk/thumbprint": {
+      "types": "./dist/jwk/thumbprint.d.ts",
+      "import": "./dist/jwk/thumbprint.mjs",
+      "require": "./dist/jwk/thumbprint.cjs"
+    },
+    "./jwk/validate": {
+      "types": "./dist/jwk/validate.d.ts",
+      "import": "./dist/jwk/validate.mjs",
+      "require": "./dist/jwk/validate.cjs"
+    },
+    "./jws": {
+      "types": "./dist/jws.d.ts",
+      "import": "./dist/jws.mjs",
+      "require": "./dist/jws.cjs"
+    },
+    "./jws/sign": {
+      "types": "./dist/jws/sign.d.ts",
+      "import": "./dist/jws/sign.mjs",
+      "require": "./dist/jws/sign.cjs"
+    },
+    "./jws/verify": {
+      "types": "./dist/jws/verify.d.ts",
+      "import": "./dist/jws/verify.mjs",
+      "require": "./dist/jws/verify.cjs"
+    },
+    "./jws/decode": {
+      "types": "./dist/jws/decode.d.ts",
+      "import": "./dist/jws/decode.mjs",
+      "require": "./dist/jws/decode.cjs"
+    },
+    "./jws/json": {
+      "types": "./dist/jws/json.d.ts",
+      "import": "./dist/jws/json.mjs",
+      "require": "./dist/jws/json.cjs"
+    },
+    "./jwt": {
+      "types": "./dist/jwt.d.ts",
+      "import": "./dist/jwt.mjs",
+      "require": "./dist/jwt.cjs"
+    },
+    "./jwt/token-pair": {
+      "types": "./dist/jwt/token-pair.d.ts",
+      "import": "./dist/jwt/token-pair.mjs",
+      "require": "./dist/jwt/token-pair.cjs"
+    },
+    "./jwt/stores": {
+      "types": "./dist/jwt/stores.d.ts",
+      "import": "./dist/jwt/stores.mjs",
+      "require": "./dist/jwt/stores.cjs"
+    },
+    "./jwe": {
+      "types": "./dist/jwe.d.ts",
+      "import": "./dist/jwe.mjs",
+      "require": "./dist/jwe.cjs"
+    },
+    "./jwe/encrypt": {
+      "types": "./dist/jwe/encrypt.d.ts",
+      "import": "./dist/jwe/encrypt.mjs",
+      "require": "./dist/jwe/encrypt.cjs"
+    },
+    "./jwe/decrypt": {
+      "types": "./dist/jwe/decrypt.d.ts",
+      "import": "./dist/jwe/decrypt.mjs",
+      "require": "./dist/jwe/decrypt.cjs"
+    },
+    "./jwe/decode": {
+      "types": "./dist/jwe/decode.d.ts",
+      "import": "./dist/jwe/decode.mjs",
+      "require": "./dist/jwe/decode.cjs"
+    },
+    "./jwe/json": {
+      "types": "./dist/jwe/json.d.ts",
+      "import": "./dist/jwe/json.mjs",
+      "require": "./dist/jwe/json.cjs"
+    },
+    "./jwks": {
+      "types": "./dist/jwks.d.ts",
+      "import": "./dist/jwks.mjs",
+      "require": "./dist/jwks.cjs"
+    },
+    "./jwks/local": {
+      "types": "./dist/jwks/local.d.ts",
+      "import": "./dist/jwks/local.mjs",
+      "require": "./dist/jwks/local.cjs"
+    },
+    "./jwks/remote": {
+      "types": "./dist/jwks/remote.d.ts",
+      "import": "./dist/jwks/remote.mjs",
+      "require": "./dist/jwks/remote.cjs"
+    },
+    "./opaque": {
+      "types": "./dist/opaque.d.ts",
+      "import": "./dist/opaque.mjs",
+      "require": "./dist/opaque.cjs"
+    },
+    "./opaque/stores": {
+      "types": "./dist/opaque/stores.d.ts",
+      "import": "./dist/opaque/stores.mjs",
+      "require": "./dist/opaque/stores.cjs"
+    },
+    "./paseto": {
+      "types": "./dist/paseto.d.ts",
+      "import": "./dist/paseto.mjs",
+      "require": "./dist/paseto.cjs"
+    },
+    "./paseto/token-pair": {
+      "types": "./dist/paseto/token-pair.d.ts",
+      "import": "./dist/paseto/token-pair.mjs",
+      "require": "./dist/paseto/token-pair.cjs"
+    },
+    "./paseto/stores": {
+      "types": "./dist/paseto/stores.d.ts",
+      "import": "./dist/paseto/stores.mjs",
+      "require": "./dist/paseto/stores.cjs"
+    },
+    "./password": {
+      "types": "./dist/password.d.ts",
+      "import": "./dist/password.mjs",
+      "require": "./dist/password.cjs"
+    },
+    "./password/scrypt": {
+      "types": "./dist/password/scrypt.d.ts",
+      "import": "./dist/password/scrypt.mjs",
+      "require": "./dist/password/scrypt.cjs"
+    },
+    "./password/pbkdf2": {
+      "types": "./dist/password/pbkdf2.d.ts",
+      "import": "./dist/password/pbkdf2.mjs",
+      "require": "./dist/password/pbkdf2.cjs"
+    },
+    "./password/argon2": {
+      "types": "./dist/password/argon2.d.ts",
+      "import": "./dist/password/argon2.mjs",
+      "require": "./dist/password/argon2.cjs"
+    },
+    "./password/bcrypt": {
+      "types": "./dist/password/bcrypt.d.ts",
+      "import": "./dist/password/bcrypt.mjs",
+      "require": "./dist/password/bcrypt.cjs"
+    },
+    "./password/strength": {
+      "types": "./dist/password/strength.d.ts",
+      "import": "./dist/password/strength.mjs",
+      "require": "./dist/password/strength.cjs"
+    },
+    "./password/generate": {
+      "types": "./dist/password/generate.d.ts",
+      "import": "./dist/password/generate.mjs",
+      "require": "./dist/password/generate.cjs"
+    },
+    "./password/policy": {
+      "types": "./dist/password/policy.d.ts",
+      "import": "./dist/password/policy.mjs",
+      "require": "./dist/password/policy.cjs"
+    },
+    "./password/hibp": {
+      "types": "./dist/password/hibp.d.ts",
+      "import": "./dist/password/hibp.mjs",
+      "require": "./dist/password/hibp.cjs"
+    },
+    "./otp": {
+      "types": "./dist/otp.d.ts",
+      "import": "./dist/otp.mjs",
+      "require": "./dist/otp.cjs"
+    },
+    "./otp/totp": {
+      "types": "./dist/otp/totp.d.ts",
+      "import": "./dist/otp/totp.mjs",
+      "require": "./dist/otp/totp.cjs"
+    },
+    "./otp/hotp": {
+      "types": "./dist/otp/hotp.d.ts",
+      "import": "./dist/otp/hotp.mjs",
+      "require": "./dist/otp/hotp.cjs"
+    },
+    "./otp/backup": {
+      "types": "./dist/otp/backup.d.ts",
+      "import": "./dist/otp/backup.mjs",
+      "require": "./dist/otp/backup.cjs"
+    },
+    "./otp/uri": {
+      "types": "./dist/otp/uri.d.ts",
+      "import": "./dist/otp/uri.mjs",
+      "require": "./dist/otp/uri.cjs"
+    },
+    "./otp/enroll": {
+      "types": "./dist/otp/enroll.d.ts",
+      "import": "./dist/otp/enroll.mjs",
+      "require": "./dist/otp/enroll.cjs"
+    },
+    "./challenge": {
+      "types": "./dist/challenge.d.ts",
+      "import": "./dist/challenge.mjs",
+      "require": "./dist/challenge.cjs"
+    },
+    "./challenge/stores": {
+      "types": "./dist/challenge/stores.d.ts",
+      "import": "./dist/challenge/stores.mjs",
+      "require": "./dist/challenge/stores.cjs"
+    },
+    "./magic-link": {
+      "types": "./dist/magic-link.d.ts",
+      "import": "./dist/magic-link.mjs",
+      "require": "./dist/magic-link.cjs"
+    },
+    "./magic-link/stores": {
+      "types": "./dist/magic-link/stores.d.ts",
+      "import": "./dist/magic-link/stores.mjs",
+      "require": "./dist/magic-link/stores.cjs"
+    },
+    "./passkey": {
+      "types": "./dist/passkey.d.ts",
+      "import": "./dist/passkey.mjs",
+      "require": "./dist/passkey.cjs"
+    },
+    "./passkey/mds": {
+      "types": "./dist/passkey/mds.d.ts",
+      "import": "./dist/passkey/mds.mjs",
+      "require": "./dist/passkey/mds.cjs"
+    },
+    "./passkey/aaguid": {
+      "types": "./dist/passkey/aaguid.d.ts",
+      "import": "./dist/passkey/aaguid.mjs",
+      "require": "./dist/passkey/aaguid.cjs"
+    },
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "import": "./dist/session.mjs",
+      "require": "./dist/session.cjs"
+    },
+    "./session/stores/redis": {
+      "types": "./dist/session/stores/redis.d.ts",
+      "import": "./dist/session/stores/redis.mjs",
+      "require": "./dist/session/stores/redis.cjs"
+    },
+    "./session/trusted-device": {
+      "types": "./dist/session/trusted-device.d.ts",
+      "import": "./dist/session/trusted-device.mjs",
+      "require": "./dist/session/trusted-device.cjs"
+    },
+    "./session/fastify": {
+      "types": "./dist/session/fastify.d.ts",
+      "import": "./dist/session/fastify.mjs",
+      "require": "./dist/session/fastify.cjs"
+    },
+    "./session/express": {
+      "types": "./dist/session/express.d.ts",
+      "import": "./dist/session/express.mjs",
+      "require": "./dist/session/express.cjs"
+    },
+    "./security": {
+      "types": "./dist/security.d.ts",
+      "import": "./dist/security.mjs",
+      "require": "./dist/security.cjs"
+    },
+    "./security/csrf": {
+      "types": "./dist/security/csrf.d.ts",
+      "import": "./dist/security/csrf.mjs",
+      "require": "./dist/security/csrf.cjs"
+    },
+    "./security/rate-limit": {
+      "types": "./dist/security/rate-limit.d.ts",
+      "import": "./dist/security/rate-limit.mjs",
+      "require": "./dist/security/rate-limit.cjs"
+    },
+    "./security/headers": {
+      "types": "./dist/security/headers.d.ts",
+      "import": "./dist/security/headers.mjs",
+      "require": "./dist/security/headers.cjs"
+    },
+    "./security/cors": {
+      "types": "./dist/security/cors.d.ts",
+      "import": "./dist/security/cors.mjs",
+      "require": "./dist/security/cors.cjs"
+    },
+    "./security/redirect": {
+      "types": "./dist/security/redirect.d.ts",
+      "import": "./dist/security/redirect.mjs",
+      "require": "./dist/security/redirect.cjs"
+    },
+    "./security/fastify": {
+      "types": "./dist/security/fastify.d.ts",
+      "import": "./dist/security/fastify.mjs",
+      "require": "./dist/security/fastify.cjs"
+    },
+    "./security/express": {
+      "types": "./dist/security/express.d.ts",
+      "import": "./dist/security/express.mjs",
+      "require": "./dist/security/express.cjs"
+    },
+    "./ua": {
+      "types": "./dist/ua.d.ts",
+      "import": "./dist/ua.mjs",
+      "require": "./dist/ua.cjs"
+    },
+    "./ua/bots": {
+      "types": "./dist/ua/bots.d.ts",
+      "import": "./dist/ua/bots.mjs",
+      "require": "./dist/ua/bots.cjs"
+    },
+    "./ua/fingerprint": {
+      "types": "./dist/ua/fingerprint.d.ts",
+      "import": "./dist/ua/fingerprint.mjs",
+      "require": "./dist/ua/fingerprint.cjs"
+    },
+    "./ua/middleware/express": {
+      "types": "./dist/ua/middleware/express.d.ts",
+      "import": "./dist/ua/middleware/express.mjs",
+      "require": "./dist/ua/middleware/express.cjs"
+    },
+    "./ua/middleware/fastify": {
+      "types": "./dist/ua/middleware/fastify.d.ts",
+      "import": "./dist/ua/middleware/fastify.mjs",
+      "require": "./dist/ua/middleware/fastify.cjs"
+    },
+    "./ua/middleware/bot-guard": {
+      "types": "./dist/ua/middleware/bot-guard.d.ts",
+      "import": "./dist/ua/middleware/bot-guard.mjs",
+      "require": "./dist/ua/middleware/bot-guard.cjs"
+    },
+    "./ua/middleware/bot-guard/fastify": {
+      "types": "./dist/ua/middleware/bot-guard/fastify.d.ts",
+      "import": "./dist/ua/middleware/bot-guard/fastify.mjs",
+      "require": "./dist/ua/middleware/bot-guard/fastify.cjs"
+    },
+    "./apikey": {
+      "types": "./dist/apikey.d.ts",
+      "import": "./dist/apikey.mjs",
+      "require": "./dist/apikey.cjs"
+    },
+    "./apikey/stores": {
+      "types": "./dist/apikey/stores.d.ts",
+      "import": "./dist/apikey/stores.mjs",
+      "require": "./dist/apikey/stores.cjs"
+    },
+    "./apikey/middleware/express": {
+      "types": "./dist/apikey/middleware/express.d.ts",
+      "import": "./dist/apikey/middleware/express.mjs",
+      "require": "./dist/apikey/middleware/express.cjs"
+    },
+    "./apikey/middleware/fastify": {
+      "types": "./dist/apikey/middleware/fastify.d.ts",
+      "import": "./dist/apikey/middleware/fastify.mjs",
+      "require": "./dist/apikey/middleware/fastify.cjs"
+    },
+    "./oauth2": {
+      "types": "./dist/oauth2.d.ts",
+      "import": "./dist/oauth2.mjs",
+      "require": "./dist/oauth2.cjs"
+    },
+    "./oauth2/express": {
+      "types": "./dist/oauth2/express.d.ts",
+      "import": "./dist/oauth2/express.mjs",
+      "require": "./dist/oauth2/express.cjs"
+    },
+    "./oauth2/fastify": {
+      "types": "./dist/oauth2/fastify.d.ts",
+      "import": "./dist/oauth2/fastify.mjs",
+      "require": "./dist/oauth2/fastify.cjs"
+    },
+    "./oauth2/server": {
+      "types": "./dist/oauth2/server.d.ts",
+      "import": "./dist/oauth2/server.mjs",
+      "require": "./dist/oauth2/server.cjs"
+    },
+    "./oauth2/server/express": {
+      "types": "./dist/oauth2/server/express.d.ts",
+      "import": "./dist/oauth2/server/express.mjs",
+      "require": "./dist/oauth2/server/express.cjs"
+    },
+    "./oauth2/server/fastify": {
+      "types": "./dist/oauth2/server/fastify.d.ts",
+      "import": "./dist/oauth2/server/fastify.mjs",
+      "require": "./dist/oauth2/server/fastify.cjs"
+    },
+    "./oauth2/providers/google": {
+      "types": "./dist/oauth2/providers/google.d.ts",
+      "import": "./dist/oauth2/providers/google.mjs",
+      "require": "./dist/oauth2/providers/google.cjs"
+    },
+    "./oauth2/providers/github": {
+      "types": "./dist/oauth2/providers/github.d.ts",
+      "import": "./dist/oauth2/providers/github.mjs",
+      "require": "./dist/oauth2/providers/github.cjs"
+    },
+    "./oauth2/providers/microsoft": {
+      "types": "./dist/oauth2/providers/microsoft.d.ts",
+      "import": "./dist/oauth2/providers/microsoft.mjs",
+      "require": "./dist/oauth2/providers/microsoft.cjs"
+    },
+    "./oauth2/providers/discord": {
+      "types": "./dist/oauth2/providers/discord.d.ts",
+      "import": "./dist/oauth2/providers/discord.mjs",
+      "require": "./dist/oauth2/providers/discord.cjs"
+    },
+    "./oauth2/providers/facebook": {
+      "types": "./dist/oauth2/providers/facebook.d.ts",
+      "import": "./dist/oauth2/providers/facebook.mjs",
+      "require": "./dist/oauth2/providers/facebook.cjs"
+    },
+    "./oauth2/providers/linkedin": {
+      "types": "./dist/oauth2/providers/linkedin.d.ts",
+      "import": "./dist/oauth2/providers/linkedin.mjs",
+      "require": "./dist/oauth2/providers/linkedin.cjs"
+    },
+    "./oauth2/providers/spotify": {
+      "types": "./dist/oauth2/providers/spotify.d.ts",
+      "import": "./dist/oauth2/providers/spotify.mjs",
+      "require": "./dist/oauth2/providers/spotify.cjs"
+    },
+    "./oauth2/providers/twitch": {
+      "types": "./dist/oauth2/providers/twitch.d.ts",
+      "import": "./dist/oauth2/providers/twitch.mjs",
+      "require": "./dist/oauth2/providers/twitch.cjs"
+    },
+    "./oauth2/providers/apple": {
+      "types": "./dist/oauth2/providers/apple.d.ts",
+      "import": "./dist/oauth2/providers/apple.mjs",
+      "require": "./dist/oauth2/providers/apple.cjs"
+    },
+    "./oauth2/providers/twitter": {
+      "types": "./dist/oauth2/providers/twitter.d.ts",
+      "import": "./dist/oauth2/providers/twitter.mjs",
+      "require": "./dist/oauth2/providers/twitter.cjs"
+    },
+    "./oauth2/providers/okta": {
+      "types": "./dist/oauth2/providers/okta.d.ts",
+      "import": "./dist/oauth2/providers/okta.mjs",
+      "require": "./dist/oauth2/providers/okta.cjs"
+    },
+    "./oauth2/providers/azure": {
+      "types": "./dist/oauth2/providers/azure.d.ts",
+      "import": "./dist/oauth2/providers/azure.mjs",
+      "require": "./dist/oauth2/providers/azure.cjs"
+    },
+    "./oauth2/providers/gitlab": {
+      "types": "./dist/oauth2/providers/gitlab.d.ts",
+      "import": "./dist/oauth2/providers/gitlab.mjs",
+      "require": "./dist/oauth2/providers/gitlab.cjs"
+    },
+    "./oauth2/providers/bitbucket": {
+      "types": "./dist/oauth2/providers/bitbucket.d.ts",
+      "import": "./dist/oauth2/providers/bitbucket.mjs",
+      "require": "./dist/oauth2/providers/bitbucket.cjs"
+    },
+    "./oauth2/providers/slack": {
+      "types": "./dist/oauth2/providers/slack.d.ts",
+      "import": "./dist/oauth2/providers/slack.mjs",
+      "require": "./dist/oauth2/providers/slack.cjs"
+    },
+    "./oauth2/providers/reddit": {
+      "types": "./dist/oauth2/providers/reddit.d.ts",
+      "import": "./dist/oauth2/providers/reddit.mjs",
+      "require": "./dist/oauth2/providers/reddit.cjs"
+    },
+    "./oauth2/providers/amazon": {
+      "types": "./dist/oauth2/providers/amazon.d.ts",
+      "import": "./dist/oauth2/providers/amazon.mjs",
+      "require": "./dist/oauth2/providers/amazon.cjs"
+    },
+    "./oauth2/providers/salesforce": {
+      "types": "./dist/oauth2/providers/salesforce.d.ts",
+      "import": "./dist/oauth2/providers/salesforce.mjs",
+      "require": "./dist/oauth2/providers/salesforce.cjs"
+    },
+    "./oidc": {
+      "types": "./dist/oidc.d.ts",
+      "import": "./dist/oidc.mjs",
+      "require": "./dist/oidc.cjs"
+    },
+    "./oidc/client": {
+      "types": "./dist/oidc/client.d.ts",
+      "import": "./dist/oidc/client.mjs",
+      "require": "./dist/oidc/client.cjs"
+    },
+    "./oidc/client/express": {
+      "types": "./dist/oidc/client/express.d.ts",
+      "import": "./dist/oidc/client/express.mjs",
+      "require": "./dist/oidc/client/express.cjs"
+    },
+    "./oidc/client/fastify": {
+      "types": "./dist/oidc/client/fastify.d.ts",
+      "import": "./dist/oidc/client/fastify.mjs",
+      "require": "./dist/oidc/client/fastify.cjs"
+    },
+    "./oidc/provider": {
+      "types": "./dist/oidc/provider.d.ts",
+      "import": "./dist/oidc/provider.mjs",
+      "require": "./dist/oidc/provider.cjs"
+    },
+    "./oidc/provider/express": {
+      "types": "./dist/oidc/provider/express.d.ts",
+      "import": "./dist/oidc/provider/express.mjs",
+      "require": "./dist/oidc/provider/express.cjs"
+    },
+    "./oidc/provider/fastify": {
+      "types": "./dist/oidc/provider/fastify.d.ts",
+      "import": "./dist/oidc/provider/fastify.mjs",
+      "require": "./dist/oidc/provider/fastify.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist tsconfig.tsbuildinfo && rollup -c rollup.config.js && tsc -p tsconfig.json && rollup -c ../../rollup.dts.config.mjs",
+    "build:watch": "rollup -c rollup.config.js --watch",
+    "build:types": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test 'tests/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage 'tests/**/*.test.js'",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "prepack": "cp ../../LICENSE ./LICENSE"
+  },
+  "keywords": [
+    "backend",
+    "auth",
+    "authentication",
+    "jwt",
+    "paseto",
+    "oauth2",
+    "oidc",
+    "passkey",
+    "webauthn",
+    "otp",
+    "totp",
+    "mfa",
+    "2fa",
+    "password",
+    "session",
+    "magic-link",
+    "api-key",
+    "security",
+    "framework-agnostic",
+    "zero-dependency",
+    "node-crypto"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ExorTek/auth/tree/master/packages/auth#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExorTek/auth.git",
+    "directory": "packages/auth"
+  },
+  "bugs": {
+    "url": "https://github.com/ExorTek/auth/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@exortek/apikey": "workspace:^",
+    "@exortek/challenge": "workspace:^",
+    "@exortek/crypto": "workspace:^",
+    "@exortek/jwe": "workspace:^",
+    "@exortek/jwk": "workspace:^",
+    "@exortek/jwks": "workspace:^",
+    "@exortek/jws": "workspace:^",
+    "@exortek/jwt": "workspace:^",
+    "@exortek/magic-link": "workspace:^",
+    "@exortek/oauth2": "workspace:^",
+    "@exortek/oidc": "workspace:^",
+    "@exortek/opaque": "workspace:^",
+    "@exortek/otp": "workspace:^",
+    "@exortek/paseto": "workspace:^",
+    "@exortek/passkey": "workspace:^",
+    "@exortek/password": "workspace:^",
+    "@exortek/security": "workspace:^",
+    "@exortek/session": "workspace:^",
+    "@exortek/ua": "workspace:^"
+  },
+  "peerDependencies": {
+    "express": ">=4.0.0",
+    "fastify": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

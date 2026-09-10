@@ -10,7 +10,7 @@ packages under one scope. Every package is built on `node:crypto`, ships secure-
 [![license](https://img.shields.io/github/license/ExorTek/auth?style=flat-square&color=blue)](./LICENSE)
 [![docs](https://img.shields.io/badge/docs-auth.memet.dev-cb3837?style=flat-square&logo=readthedocs&logoColor=white)](https://auth.memet.dev)
 
-**19 of 20 packages published** · [Documentation](https://auth.memet.dev) · [Guides](https://auth.memet.dev/guides) · [Comparison](https://auth.memet.dev/comparison)
+**All 20 packages published** · [Documentation](https://auth.memet.dev) · [Guides](https://auth.memet.dev/guides) · [Comparison](https://auth.memet.dev/comparison)
 
 ## Why
 
@@ -82,7 +82,7 @@ time. Linked names are **published on npm**; the rest are planned.
 | 17 | [`@exortek/paseto`](https://auth.memet.dev/paseto) | [![v](https://img.shields.io/npm/v/@exortek/paseto?style=flat-square&color=07d600&label=)](https://www.npmjs.com/package/@exortek/paseto) | PASETO v4 — `v4.local` (XChaCha20 + BLAKE2b) · `v4.public` (Ed25519), `tokenPair` reuse detection |
 | 18 | [`@exortek/oauth2`](https://auth.memet.dev/oauth2) | [![v](https://img.shields.io/npm/v/@exortek/oauth2?style=flat-square&color=07d600&label=)](https://www.npmjs.com/package/@exortek/oauth2) | OAuth 2.1 — `createOAuth` RP flow + 18 provider presets, login middleware, full authorization server (DPoP · PAR · PKCE · JAR/JARM · device · token-exchange · FAPI) |
 | 19 | [`@exortek/oidc`](https://auth.memet.dev/oidc) | [![v](https://img.shields.io/npm/v/@exortek/oidc?style=flat-square&color=07d600&label=)](https://www.npmjs.com/package/@exortek/oidc) | OpenID Connect Core 1.0 on top of `oauth2` — discovery-first RP + OpenID Provider add-ons (discovery · UserInfo · JWKS · RP-Initiated Logout · Session Management) |
-| 20 | `@exortek/auth` | _planned_ | umbrella — re-exports every package above |
+| 20 | [`@exortek/auth`](https://auth.memet.dev) | [![v](https://img.shields.io/npm/v/@exortek/auth?style=flat-square&color=07d600&label=)](https://www.npmjs.com/package/@exortek/auth) | umbrella — re-exports every package above as a namespace (`import { jwt } from '@exortek/auth'`) and forwards every subpath; one install, one version |
 
 ## Documentation
 

@@ -30,6 +30,7 @@ doesn't apply — a "🟢 N/A" is fine, empty checkbox lists are noise.
 - [ ] `@exortek/paseto`
 - [ ] `@exortek/oauth2`
 - [ ] `@exortek/oidc`
+- [ ] `@exortek/auth`
 - [ ] Repo tooling (build, CI, docs site, lint/format)
 - [ ] Docs only (no source code changed)
 

@@ -37,6 +37,7 @@ body:
         - '@exortek/paseto'
         - '@exortek/oauth2'
         - '@exortek/oidc'
+        - '@exortek/auth'
         - 'A new package (please describe below)'
         - 'Repo tooling / docs site'
     validations:

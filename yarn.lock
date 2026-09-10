@@ -351,12 +351,46 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@exortek/apikey@workspace:packages/apikey":
+"@exortek/apikey@workspace:^, @exortek/apikey@workspace:packages/apikey":
   version: 0.0.0-use.local
   resolution: "@exortek/apikey@workspace:packages/apikey"
   peerDependencies:
     express: ">=4"
     fastify: ">=4"
+  peerDependenciesMeta:
+    express:
+      optional: true
+    fastify:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
+"@exortek/auth@workspace:packages/auth":
+  version: 0.0.0-use.local
+  resolution: "@exortek/auth@workspace:packages/auth"
+  dependencies:
+    "@exortek/apikey": "workspace:^"
+    "@exortek/challenge": "workspace:^"
+    "@exortek/crypto": "workspace:^"
+    "@exortek/jwe": "workspace:^"
+    "@exortek/jwk": "workspace:^"
+    "@exortek/jwks": "workspace:^"
+    "@exortek/jws": "workspace:^"
+    "@exortek/jwt": "workspace:^"
+    "@exortek/magic-link": "workspace:^"
+    "@exortek/oauth2": "workspace:^"
+    "@exortek/oidc": "workspace:^"
+    "@exortek/opaque": "workspace:^"
+    "@exortek/otp": "workspace:^"
+    "@exortek/paseto": "workspace:^"
+    "@exortek/passkey": "workspace:^"
+    "@exortek/password": "workspace:^"
+    "@exortek/security": "workspace:^"
+    "@exortek/session": "workspace:^"
+    "@exortek/ua": "workspace:^"
+  peerDependencies:
+    express: ">=4.0.0"
+    fastify: ">=4.0.0"
   peerDependenciesMeta:
     express:
       optional: true
@@ -417,7 +451,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@exortek/magic-link@workspace:packages/magic-link":
+"@exortek/magic-link@workspace:^, @exortek/magic-link@workspace:packages/magic-link":
   version: 0.0.0-use.local
   resolution: "@exortek/magic-link@workspace:packages/magic-link"
   languageName: unknown
@@ -450,7 +484,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@exortek/oidc@workspace:packages/oidc":
+"@exortek/oidc@workspace:^, @exortek/oidc@workspace:packages/oidc":
   version: 0.0.0-use.local
   resolution: "@exortek/oidc@workspace:packages/oidc"
   dependencies:
@@ -469,7 +503,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@exortek/opaque@workspace:packages/opaque":
+"@exortek/opaque@workspace:^, @exortek/opaque@workspace:packages/opaque":
   version: 0.0.0-use.local
   resolution: "@exortek/opaque@workspace:packages/opaque"
   dependencies:
@@ -477,7 +511,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@exortek/otp@workspace:packages/otp":
+"@exortek/otp@workspace:^, @exortek/otp@workspace:packages/otp":
   version: 0.0.0-use.local
   resolution: "@exortek/otp@workspace:packages/otp"
   languageName: unknown
@@ -489,7 +523,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@exortek/passkey@workspace:packages/passkey":
+"@exortek/passkey@workspace:^, @exortek/passkey@workspace:packages/passkey":
   version: 0.0.0-use.local
   resolution: "@exortek/passkey@workspace:packages/passkey"
   dependencies:
@@ -498,7 +532,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@exortek/password@workspace:packages/password":
+"@exortek/password@workspace:^, @exortek/password@workspace:packages/password":
   version: 0.0.0-use.local
   resolution: "@exortek/password@workspace:packages/password"
   peerDependencies:
@@ -512,7 +546,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@exortek/security@workspace:packages/security":
+"@exortek/security@workspace:^, @exortek/security@workspace:packages/security":
   version: 0.0.0-use.local
   resolution: "@exortek/security@workspace:packages/security"
   peerDependencies:
@@ -526,7 +560,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@exortek/session@workspace:packages/session":
+"@exortek/session@workspace:^, @exortek/session@workspace:packages/session":
   version: 0.0.0-use.local
   resolution: "@exortek/session@workspace:packages/session"
   dependencies:
@@ -554,7 +588,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@exortek/ua@workspace:packages/ua":
+"@exortek/ua@workspace:^, @exortek/ua@workspace:packages/ua":
   version: 0.0.0-use.local
   resolution: "@exortek/ua@workspace:packages/ua"
   peerDependencies:

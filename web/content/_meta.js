@@ -20,6 +20,7 @@ export default {
   paseto: '@exortek/paseto',
   oauth2: '@exortek/oauth2',
   oidc: '@exortek/oidc',
+  auth: '@exortek/auth',
   comparison: 'Comparison',
   compliance: 'Compliance',
 };
