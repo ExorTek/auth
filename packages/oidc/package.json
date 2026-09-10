@@ -1,6 +1,6 @@
 {
   "name": "@exortek/oidc",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "OpenID Connect Core 1.0 for Node.js 22+ — the identity layer on top of @exortek/oauth2. A relying-party client (id_token + UserInfo, discovery, nonce/state) and an OpenID Provider (discovery metadata, UserInfo endpoint, id_token issuance). Server-only, built on node:crypto.",
   "type": "module",
   "sideEffects": false,
