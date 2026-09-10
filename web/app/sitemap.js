@@ -1,63 +1,40 @@
+import { getPageMap } from 'nextra/page-map';
+
 const SITE_URL = 'https://auth.memet.dev';
 
-// Top-level routes plus the multi-page package sections. Kept explicit so the
-// sitemap stays correct regardless of how Nextra resolves the page map.
-const ROUTES = [
-  '',
-  'guides',
-  'guides/password-login',
-  'guides/jwt-access-refresh',
-  'guides/jwks-verify',
-  'guides/two-factor',
-  'guides/passkey',
-  'guides/multi-step',
-  'guides/magic-link',
-  'guides/api-keys',
-  'guides/opaque-tokens',
-  'guides/nested-jwt',
-  'guides/security-hardening',
-  'comparison',
-  'compliance',
-  'crypto',
-  'password',
-  'otp',
-  'challenge',
-  'jwk',
-  'jws',
-  'jws/sign',
-  'jws/verify',
-  'jws/decode',
-  'jws/json',
-  'jws/errors',
-  'jwt',
-  'jwt/sign',
-  'jwt/verify',
-  'jwt/token-pair',
-  'jwt/stores',
-  'jwt/errors',
-  'jwe',
-  'jwe/encrypt',
-  'jwe/decrypt',
-  'jwe/decode',
-  'jwe/json',
-  'jwe/algorithms',
-  'jwe/errors',
-  'jwks',
-  'session',
-  'security',
-  'ua',
-  'apikey',
-  'magic-link',
-  'passkey',
-  'opaque',
-];
+// Walk the Nextra page map and collect every routable page. Deriving the
+// sitemap from the page map (rather than a hand-kept list) keeps it correct as
+// packages and pages are added — the previous static ROUTES array had already
+// drifted several sections behind the content tree.
+const collectRoutes = (nodes, out = new Set()) => {
+  for (const node of nodes ?? []) {
+    if (typeof node.route === 'string' && !node.route.includes('[')) {
+      out.add(node.route);
+    }
+    if (Array.isArray(node.children)) {
+      collectRoutes(node.children, out);
+    }
+  }
+  return out;
+};
 
-export default function sitemap() {
+// Deeper pages get a lower priority; the home page ranks highest, package roots
+// above their sub-pages.
+const priorityFor = route => {
+  if (route === '/') return 1;
+  const depth = route.split('/').filter(Boolean).length;
+  return depth <= 1 ? 0.8 : 0.6;
+};
+
+export default async function sitemap() {
+  const pageMap = await getPageMap();
+  const routes = [...collectRoutes(pageMap)].sort();
   const lastModified = new Date();
-  return ROUTES.map(route => ({
-    url: route ? `${SITE_URL}/${route}` : SITE_URL,
+
+  return routes.map(route => ({
+    url: route === '/' ? SITE_URL : `${SITE_URL}${route}`,
     lastModified,
     changeFrequency: 'weekly',
-    priority: route === '' ? 1 : 0.7,
+    priority: priorityFor(route),
   }));
 }
