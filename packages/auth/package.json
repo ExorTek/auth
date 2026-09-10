@@ -1,6 +1,6 @@
 {
   "name": "@exortek/auth",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "The full @exortek authentication toolkit in one install — JWT/JWE/JWS/JWK/JWKS, PASETO, password hashing, OTP/TOTP, passkeys, magic links, opaque tokens, sessions, API keys, OAuth 2.1, OpenID Connect, security middleware, and UA/bot detection. Framework-agnostic, server-only, pure JavaScript with types included. Re-exports every package as a namespace and forwards every subpath.",
   "type": "module",
   "sideEffects": false,
