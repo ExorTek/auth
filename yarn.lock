@@ -458,6 +458,14 @@ __metadata:
     "@exortek/jwks": "workspace:^"
     "@exortek/jwt": "workspace:^"
     "@exortek/oauth2": "workspace:^"
+  peerDependencies:
+    express: ">=4.0.0"
+    fastify: ">=4.0.0"
+  peerDependenciesMeta:
+    express:
+      optional: true
+    fastify:
+      optional: true
   languageName: unknown
   linkType: soft
 

@@ -14,6 +14,7 @@ async function makeProvider(overrides = {}) {
     jwks: [signer.publicJwk],
     endpoints: { authorization: '/authorize', token: '/token' },
     claims: { supported: ['sub', 'email', 'email_verified', 'name'] },
+    userinfo: { resolve: () => null },
     ...overrides,
   });
   return { provider, signer };
@@ -136,7 +137,7 @@ describe('userinfoHandler', () => {
   });
 
   it('throws INVALID_ARGUMENT if userinfo.resolve is missing', async () => {
-    const { provider } = await makeProvider();
+    const { provider } = await makeProvider({ userinfo: undefined });
     assert.throws(() => provider.userinfoHandler(), { code: ErrorCode.INVALID_ARGUMENT });
   });
 });

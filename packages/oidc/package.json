@@ -18,10 +18,30 @@
       "import": "./dist/client/index.mjs",
       "require": "./dist/client/index.cjs"
     },
+    "./client/express": {
+      "types": "./dist/client/express.d.ts",
+      "import": "./dist/client/express.mjs",
+      "require": "./dist/client/express.cjs"
+    },
+    "./client/fastify": {
+      "types": "./dist/client/fastify.d.ts",
+      "import": "./dist/client/fastify.mjs",
+      "require": "./dist/client/fastify.cjs"
+    },
     "./provider": {
       "types": "./dist/provider/index.d.ts",
       "import": "./dist/provider/index.mjs",
       "require": "./dist/provider/index.cjs"
+    },
+    "./provider/express": {
+      "types": "./dist/provider/express.d.ts",
+      "import": "./dist/provider/express.mjs",
+      "require": "./dist/provider/express.cjs"
+    },
+    "./provider/fastify": {
+      "types": "./dist/provider/fastify.d.ts",
+      "import": "./dist/provider/fastify.mjs",
+      "require": "./dist/provider/fastify.cjs"
     }
   },
   "files": [
@@ -73,6 +93,18 @@
   },
   "devDependencies": {
     "@exortek/jwk": "workspace:^"
+  },
+  "peerDependencies": {
+    "express": ">=4.0.0",
+    "fastify": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=22.0.0"

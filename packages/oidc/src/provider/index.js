@@ -74,9 +74,13 @@ export function createProvider(config) {
   const resolved = {
     authorization: toAbsolute(endpoints.authorization, issuer),
     token: toAbsolute(endpoints.token, issuer),
-    userinfo: toAbsolute(endpoints.userinfo ?? '/userinfo', issuer),
     jwks: toAbsolute(endpoints.jwks ?? '/.well-known/jwks.json', issuer),
   };
+  // UserInfo is advertised only when a resolver is configured — a provider
+  // that can't back the endpoint must not announce it in discovery.
+  if (isObject(config.userinfo) || isNonEmptyString(endpoints.userinfo)) {
+    resolved.userinfo = toAbsolute(endpoints.userinfo ?? '/userinfo', issuer);
+  }
   for (const optional of ['endSession', 'checkSession', 'revocation', 'introspection', 'registration']) {
     if (isNonEmptyString(endpoints[optional])) {
       resolved[optional] = toAbsolute(endpoints[optional], issuer);
