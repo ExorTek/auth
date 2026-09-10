@@ -19,6 +19,8 @@ import { decode } from '@exortek/jwt';
 import { isArray, isNonEmptyString, isObject } from '@exortek/shared/predicates';
 
 import { invalidArgument } from '../internal/errors.js';
+import { buildEndSessionUrl } from '../internal/logout.js';
+import { resolveIssuerMetadata } from '../internal/issuer-discovery.js';
 
 /**
  * Standard OIDC claim projection. A relying party consumes the registered
@@ -57,6 +59,8 @@ const AUTH_PARAM_NAMES = {
  * @property {string[]} [idTokenAlgs]  Signature alg allowlist for the id_token.
  * @property {string|number} [clockTolerance]  Leeway for `exp`/`nbf`/`iat`.
  * @property {import('@exortek/jwks').RemoteJWKSOptions} [jwksOptions]  Forwarded to the id_token JWKS resolver.
+ * @property {string} [endSessionEndpoint]  RP-Initiated Logout endpoint; auto-discovered from OP metadata when omitted.
+ * @property {typeof fetch} [fetch]          Override used only for the logout-endpoint metadata fetch (tests / proxies).
  * @property {{ set: Function, get: Function, delete: Function }} [store]  Flow-session store keyed by `state`.
  */
 
@@ -159,6 +163,36 @@ export function createClient(config) {
         tokens,
         warnings,
       };
+    },
+
+    /**
+     * Build the RP-Initiated Logout URL (OIDC RP-Initiated Logout 1.0). The
+     * issuer's `end_session_endpoint` is taken from `config.endSessionEndpoint`
+     * when set, else resolved from the OP metadata.
+     *
+     * @param {{ idTokenHint: string, postLogoutRedirectUri?: string, state?: string, logoutHint?: string, uiLocales?: string }} params
+     * @returns {Promise<string>}
+     */
+    async endSessionUrl(params = /** @type {any} */ ({})) {
+      if (!isObject(params) || !isNonEmptyString(params.idTokenHint)) {
+        invalidArgument('endSessionUrl(params): `idTokenHint` must be a non-empty string.');
+      }
+      let endpoint = config.endSessionEndpoint;
+      if (!isNonEmptyString(endpoint)) {
+        const meta = await resolveIssuerMetadata(issuer, { fetchImpl: config.fetch });
+        endpoint = /** @type {string} */ (meta.end_session_endpoint);
+        if (!isNonEmptyString(endpoint)) {
+          invalidArgument(`endSessionUrl: issuer ${issuer} advertises no end_session_endpoint.`);
+        }
+      }
+      return buildEndSessionUrl(endpoint, {
+        idTokenHint: params.idTokenHint,
+        postLogoutRedirectUri: params.postLogoutRedirectUri,
+        state: params.state,
+        clientId,
+        logoutHint: params.logoutHint,
+        uiLocales: params.uiLocales,
+      });
     },
 
     /**

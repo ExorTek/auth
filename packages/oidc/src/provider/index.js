@@ -21,7 +21,8 @@ import { isArray, isNonEmptyString, isObject } from '@exortek/shared/predicates'
 import { invalidArgument } from '../internal/errors.js';
 import { buildDiscoveryDocument } from '../internal/discovery-doc.js';
 import { buildUserInfo } from '../internal/userinfo.js';
-import { jsonResponse, normalizeRequest } from '../internal/http-io.js';
+import { isRegisteredPostLogoutUri, readIdTokenHint } from '../internal/logout.js';
+import { jsonResponse, normalizeRequest, redirectResponse } from '../internal/http-io.js';
 
 const DEFAULT_SCOPES = ['openid', 'profile', 'email'];
 const DEFAULT_CLAIMS_SUPPORTED = ['sub', 'iss', 'aud', 'exp', 'iat', 'auth_time', 'nonce'];
@@ -36,6 +37,7 @@ const DEFAULT_CLAIMS_SUPPORTED = ['sub', 'iss', 'aud', 'exp', 'iat', 'auth_time'
  * @property {string[]} [scopes]                    advertised scopes (default openid/profile/email).
  * @property {string[]} [authMethods]              token_endpoint_auth_methods_supported.
  * @property {{ resolve: (accessToken: string) => (Promise<{ sub: string, scope?: string|string[], claims?: Record<string, unknown> } | null> | { sub: string, scope?: string|string[], claims?: Record<string, unknown> } | null) }} [userinfo]  access-token resolver for the UserInfo endpoint.
+ * @property {{ postLogoutRedirectUris?: string[], onLogout?: (ctx: { sub?: string, idTokenHint?: string }) => unknown }} [logout]  RP-Initiated Logout policy.
  */
 
 /**
@@ -77,6 +79,11 @@ export function createProvider(config) {
     if (isNonEmptyString(endpoints[optional])) {
       resolved[optional] = toAbsolute(endpoints[optional], issuer);
     }
+  }
+  // Configuring logout auto-advertises the end-session endpoint at its
+  // conventional path when the caller did not pin one.
+  if (isObject(config.logout) && !resolved.endSession) {
+    resolved.endSession = toAbsolute('/end_session', issuer);
   }
 
   const discoveryDoc = buildDiscoveryDocument({
@@ -150,6 +157,51 @@ export function createProvider(config) {
         const grantedScopes = toScopeArray(resolved.scope);
         const body = buildUserInfo(resolved.sub, resolved.claims ?? {}, grantedScopes, claimsPolicy.userinfo);
         return jsonResponse(200, body, { 'cache-control': 'no-store', pragma: 'no-cache' });
+      };
+    },
+
+    /**
+     * Serves the RP-Initiated Logout endpoint (OIDC RP-Initiated Logout 1.0).
+     * Validates `post_logout_redirect_uri` against the client's registered
+     * URIs before redirecting; calls `config.logout.onLogout` (when given) to
+     * clear the OP session.
+     * @returns {(req: object) => Promise<import('../internal/http-io.js').OidcResponse>}
+     */
+    endSessionHandler() {
+      const logout = isObject(config.logout) ? config.logout : {};
+      const registered = isArray(logout.postLogoutRedirectUris) ? logout.postLogoutRedirectUris : [];
+      const onLogout = typeof logout.onLogout === 'function' ? logout.onLogout : undefined;
+      return async raw => {
+        const req = normalizeRequest(raw);
+        const idTokenHint = req.param('id_token_hint');
+        const postLogout = req.param('post_logout_redirect_uri');
+        const state = req.param('state');
+        const hint = readIdTokenHint(idTokenHint, issuer);
+
+        if (onLogout) {
+          try {
+            await onLogout({ sub: hint ? hint.sub : undefined, idTokenHint });
+          } catch {
+            // Session teardown is best-effort — never block the logout redirect.
+          }
+        }
+
+        if (isNonEmptyString(postLogout)) {
+          if (!isRegisteredPostLogoutUri(postLogout, registered)) {
+            return jsonResponse(
+              400,
+              { error: 'invalid_request', error_description: 'post_logout_redirect_uri is not registered' },
+              { 'cache-control': 'no-store' },
+            );
+          }
+          const target = new URL(postLogout);
+          if (isNonEmptyString(state)) {
+            target.searchParams.set('state', state);
+          }
+          return redirectResponse(target.toString(), { 'cache-control': 'no-store' });
+        }
+
+        return jsonResponse(200, { logged_out: true }, { 'cache-control': 'no-store' });
       };
     },
   };

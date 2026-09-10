@@ -13,6 +13,11 @@ export const ErrorCode = Object.freeze({
   // Configuration / argument guards raised by `createClient` / `createProvider`
   // and the provider handlers.
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
+
+  // The client's own OP-metadata fetch failed (used to resolve the
+  // `end_session_endpoint` for RP-Initiated Logout — the main login flow's
+  // discovery is delegated to @exortek/oauth2 and surfaces as OAuth2Error).
+  DISCOVERY_FAILED: 'DISCOVERY_FAILED',
 });
 
 /**
@@ -25,6 +30,7 @@ export const ErrorCode = Object.freeze({
 export class OidcError extends BaseError {
   static statuses = {
     INVALID_ARGUMENT: 400,
+    DISCOVERY_FAILED: 502,
   };
 
   static defaultStatus = 500;
