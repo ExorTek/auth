@@ -10,7 +10,7 @@ packages under one scope. Every package is built on `node:crypto`, ships secure-
 [![license](https://img.shields.io/github/license/ExorTek/auth?style=flat-square&color=blue)](./LICENSE)
 [![docs](https://img.shields.io/badge/docs-auth.memet.dev-cb3837?style=flat-square&logo=readthedocs&logoColor=white)](https://auth.memet.dev)
 
-**18 of 20 packages published** · [Documentation](https://auth.memet.dev) · [Guides](https://auth.memet.dev/guides) · [Comparison](https://auth.memet.dev/comparison)
+**19 of 20 packages published** · [Documentation](https://auth.memet.dev) · [Guides](https://auth.memet.dev/guides) · [Comparison](https://auth.memet.dev/comparison)
 
 ## Why
 
@@ -53,7 +53,7 @@ Some packages pull in **optional peers** only when you use a feature that needs 
 | Peer | Needed for | Packages |
 |------|------------|----------|
 | `ioredis` **or** `redis` | multi-process stores | apikey · magic-link · opaque · passkey · paseto · session · jwt · oauth2 · security |
-| `express` **or** `fastify` | middleware adapters | apikey · opaque · passkey · ua · security · session · oauth2 |
+| `express` **or** `fastify` | middleware adapters | apikey · opaque · passkey · ua · security · session · oauth2 · oidc |
 | `argon2` / `bcrypt` | those hash algorithms | password |
 
 ## Packages
@@ -81,7 +81,7 @@ time. Linked names are **published on npm**; the rest are planned.
 | 16 | [`@exortek/opaque`](https://auth.memet.dev/opaque) | [![v](https://img.shields.io/npm/v/@exortek/opaque?style=flat-square&color=07d600&label=)](https://www.npmjs.com/package/@exortek/opaque) | opaque reference tokens, RFC 7662 introspection + RFC 7009 revocation handlers |
 | 17 | [`@exortek/paseto`](https://auth.memet.dev/paseto) | [![v](https://img.shields.io/npm/v/@exortek/paseto?style=flat-square&color=07d600&label=)](https://www.npmjs.com/package/@exortek/paseto) | PASETO v4 — `v4.local` (XChaCha20 + BLAKE2b) · `v4.public` (Ed25519), `tokenPair` reuse detection |
 | 18 | [`@exortek/oauth2`](https://auth.memet.dev/oauth2) | [![v](https://img.shields.io/npm/v/@exortek/oauth2?style=flat-square&color=07d600&label=)](https://www.npmjs.com/package/@exortek/oauth2) | OAuth 2.1 — `createOAuth` RP flow + 18 provider presets, login middleware, full authorization server (DPoP · PAR · PKCE · JAR/JARM · device · token-exchange · FAPI) |
-| 19 | `@exortek/oidc` | _planned_ | OpenID Connect on top of `oauth2` |
+| 19 | [`@exortek/oidc`](https://auth.memet.dev/oidc) | [![v](https://img.shields.io/npm/v/@exortek/oidc?style=flat-square&color=07d600&label=)](https://www.npmjs.com/package/@exortek/oidc) | OpenID Connect Core 1.0 on top of `oauth2` — discovery-first RP + OpenID Provider add-ons (discovery · UserInfo · JWKS · RP-Initiated Logout · Session Management) |
 | 20 | `@exortek/auth` | _planned_ | umbrella — re-exports every package above |
 
 ## Documentation
