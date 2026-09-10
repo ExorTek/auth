@@ -125,7 +125,7 @@ Status legend: ✅ shipped to npm · 🛠 on disk, pre-release · ⏳ planned.
 | 17 | `@exortek/paseto`      |   ✅   | PASETO v4 — `v4.local` (XChaCha20 + keyed BLAKE2b) + `v4.public` (Ed25519), no `alg` header |
 | 18 | `@exortek/oauth2`      |   ✅   | OAuth 2.1 — RP flow + provider presets + full authorization server (DPoP · PAR · JAR/JARM · device · token-exchange · dynamic registration · opt-in OIDC id_token · FAPI) |
 | 19 | `@exortek/oidc`        |   ✅   | OpenID Connect Core 1.0 on `@exortek/oauth2` — discovery-first RP + OP add-ons (discovery · UserInfo · JWKS · RP-Initiated Logout · Session Management) |
-| 20 | `@exortek/auth`        |   ⏳   | Umbrella — re-exports every package above                                          |
+| 20 | `@exortek/auth`        |   ✅   | Umbrella — re-exports every package above                                          |
 
 Not versioned in this table: `@exortek/shared` — internal consolidation
 workspace (see `PLAN.md`), not published on its own.

@@ -1,0 +1,93 @@
+---
+title: '@exortek/auth — Overview'
+sidebarTitle: Overview
+---
+
+import { Callout } from 'nextra/components';
+
+# `@exortek/auth`
+
+The complete `@exortek` authentication toolkit in a single install. One
+package re-exports every primitive in the stack — JWT, JWE, JWS, JWK, JWKS,
+PASETO, password hashing, OTP, passkeys, magic links, opaque tokens, sessions,
+API keys, OAuth 2.1, OpenID Connect, the defensive HTTP layer, and UA/bot
+detection.
+
+<Callout type="info">
+  The umbrella is pure re-export glue. Every export is a thin
+  `export * from '@exortek/<pkg>'` shim — the same module objects the leaf
+  packages expose, byte-for-byte. There is **no** aggregating `createAuth()`
+  API, no renamed bindings, and nothing inlined. Your bundler still tree-shakes
+  each subpath independently.
+</Callout>
+
+## When to use it
+
+- **Building an app?** Install `@exortek/auth` — one dependency, one version,
+  every primitive on tap.
+- **Shipping a library that needs one primitive?** Install that package
+  directly (`@exortek/jwt`) and keep your dependency graph tight.
+
+## Install
+
+```bash
+npm install @exortek/auth
+```
+
+Requires **Node.js 22 or newer**. `express` and `fastify` are optional peers —
+only needed if you import a framework adapter subpath.
+
+## Namespace imports
+
+Every leaf package is re-exported as a namespace object:
+
+```js
+import { password, jwt, otp, session, oauth2, oidc, security, ua } from '@exortek/auth';
+
+const hash = await password.hash(plaintext);
+const { accessToken, refreshToken } = await jwt.tokenPair.create(payload, options);
+const code = otp.totp.generate(secret);
+const bot = ua.isBot(req.headers['user-agent']);
+```
+
+`auth.jwt` **is** `@exortek/jwt` — same bindings, same values.
+
+## Subpath imports
+
+Reach a single subpath when you want to keep the resolved graph minimal. It
+resolves to the exact same code as the namespace form:
+
+```js
+import { tokenPair } from '@exortek/auth/jwt/token-pair';
+import { google } from '@exortek/auth/oauth2/providers/google';
+import { fastify } from '@exortek/auth/security/fastify';
+import { hash } from '@exortek/auth/crypto/hash';
+```
+
+Every subpath a leaf package publishes is forwarded under a matching path —
+`@exortek/auth/<pkg>/<subpath>`. See each package's own page for its complete
+API and subpath list.
+
+## The stack
+
+| Namespace   | Package                    | Covers                                                          |
+| ----------- | -------------------------- | -------------------------------------------------------------- |
+| `crypto`    | [`@exortek/crypto`](/crypto)       | Hash, HMAC, KDFs, AEAD cipher, signatures, CSPRNG, encoders    |
+| `jwk`       | [`@exortek/jwk`](/jwk)             | JSON Web Key — generate / import / export / thumbprint          |
+| `jws`       | [`@exortek/jws`](/jws)             | JSON Web Signature — sign / verify / decode / JSON              |
+| `jwt`       | [`@exortek/jwt`](/jwt)             | JSON Web Token — sign / verify + refresh pairs                  |
+| `jwe`       | [`@exortek/jwe`](/jwe)             | JSON Web Encryption — encrypt / decrypt / decode / JSON         |
+| `jwks`      | [`@exortek/jwks`](/jwks)           | JSON Web Key Set — local rotation + remote fetch                |
+| `opaque`    | [`@exortek/opaque`](/opaque)       | Opaque reference tokens — store-backed                          |
+| `paseto`    | [`@exortek/paseto`](/paseto)       | PASETO v4 — local / public + refresh pairs                      |
+| `password`  | [`@exortek/password`](/password)   | Argon2 / scrypt / bcrypt / pbkdf2, strength, policy, HIBP       |
+| `otp`       | [`@exortek/otp`](/otp)             | TOTP / HOTP, backup codes, enrollment                           |
+| `challenge` | [`@exortek/challenge`](/challenge) | Signed single-use challenge tokens                              |
+| `magicLink` | [`@exortek/magic-link`](/magic-link) | Passwordless email-link auth                                  |
+| `passkey`   | [`@exortek/passkey`](/passkey)     | WebAuthn / FIDO2 server verification                            |
+| `session`   | [`@exortek/session`](/session)     | Sealed-cookie sessions — rotation, revocation, sudo             |
+| `security`  | [`@exortek/security`](/security)   | CSRF, rate limiting, headers, CORS, redirect safety             |
+| `ua`        | [`@exortek/ua`](/ua)               | User-Agent parsing, bot detection, fingerprinting               |
+| `apiKey`    | [`@exortek/apikey`](/apikey)       | Stripe-style prefixed API keys                                  |
+| `oauth2`    | [`@exortek/oauth2`](/oauth2)       | OAuth 2.1 RP + authorization server, 24 provider presets        |
+| `oidc`      | [`@exortek/oidc`](/oidc)           | OpenID Connect Core 1.0 — client + provider                     |
