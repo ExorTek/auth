@@ -1,3 +1,4 @@
+import Script from 'next/script';
 import { Footer, Layout, Navbar } from 'nextra-theme-docs';
 import { Head } from 'nextra/components';
 import { getPageMap } from 'nextra/page-map';
@@ -80,6 +81,9 @@ const footer = (
         <a href="https://github.com/ExorTek/auth/blob/master/CONTRIBUTING.md">Contributing</a>
       </div>
       <div style={{ opacity: 0.7 }}>MIT © {new Date().getFullYear()} · @exortek/auth — built on node:crypto</div>
+      <div style={{ opacity: 0.55, fontSize: '0.8125rem' }}>
+        Privacy-friendly, cookieless analytics (Cloudflare) — no personal data, no tracking cookies.
+      </div>
     </div>
   </Footer>
 );
@@ -98,6 +102,12 @@ export default async function RootLayout({ children }) {
         >
           {children}
         </Layout>
+        {/* Cloudflare Web Analytics — cookieless, privacy-first page metrics. */}
+        <Script
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          strategy="afterInteractive"
+          data-cf-beacon='{"token": "ecd22aa7135345d78a264582b6faba5a"}'
+        />
       </body>
     </html>
   );
