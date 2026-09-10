@@ -1,46 +1,75 @@
 /**
  * `@exortek/oidc/client` — the OpenID Connect **relying party** (SSO).
  *
- * A thin identity layer over `@exortek/oauth2`'s authorization-code flow:
- * it drives the same PKCE / `state` / `nonce` machinery, then adds the
- * OIDC Core guarantees on top — mandatory `openid` scope, `id_token`
- * validation (`iss` / `aud` / `exp` / `nonce`, per OIDC Core §3.1.3.7),
- * and a UserInfo fetch.
+ * A thin identity facade over `@exortek/oauth2`. Rather than a provider
+ * preset, you point the client at an `issuer` and it discovers the
+ * endpoints (`/.well-known/openid-configuration`), runs the OAuth 2.1
+ * authorization-code flow with mandatory PKCE / `state` / `nonce`, and —
+ * because the request always carries the `openid` scope — verifies the
+ * returned `id_token` end to end (`iss` / `aud` / `nonce` / `exp`, `azp`,
+ * `at_hash`, per OIDC Core §3.1.3.7) and layers UserInfo on top.
  *
- * The flow methods are scaffolded — configuration validation is real; the
- * `createAuthUrl` / `handleCallback` bodies throw `NOT_IMPLEMENTED` until
- * the callback pipeline lands.
+ * All of that machinery already lives in `@exortek/oauth2`
+ * (`defineProvider({ discover: true })` + `createOAuth`); this module is
+ * the OIDC-shaped surface over it and does not reimplement discovery or
+ * token verification.
  */
-import { randomNonce, randomState } from '@exortek/oauth2';
+import { createOAuth, defineProvider } from '@exortek/oauth2';
+import { decode } from '@exortek/jwt';
 import { isArray, isNonEmptyString, isObject } from '@exortek/shared/predicates';
-import { invalidArgument, notImplemented } from '../internal/errors.js';
+
+import { invalidArgument } from '../internal/errors.js';
+
+/**
+ * Standard OIDC claim projection. A relying party consumes the registered
+ * claims verbatim; the normalization simply surfaces the common ones with
+ * camelCase names while `handleCallback` also returns the raw claim set.
+ *
+ * @param {Record<string, unknown>} raw
+ * @returns {{ sub: string, email?: string, emailVerified?: boolean, name?: string, picture?: string }}
+ */
+function mapStandardClaims(raw) {
+  return {
+    sub: /** @type {string} */ (raw.sub),
+    email: /** @type {string | undefined} */ (raw.email),
+    emailVerified: /** @type {boolean | undefined} */ (raw.email_verified),
+    name: /** @type {string | undefined} */ (raw.name),
+    picture: /** @type {string | undefined} */ (raw.picture),
+  };
+}
+
+/** Map the camelCase OIDC auth-request options onto their wire names. */
+const AUTH_PARAM_NAMES = {
+  prompt: 'prompt',
+  loginHint: 'login_hint',
+  maxAge: 'max_age',
+  acrValues: 'acr_values',
+  uiLocales: 'ui_locales',
+};
 
 /**
  * @typedef {object} OidcClientConfig
- * @property {string}   issuer        The OpenID Provider's issuer identifier.
- * @property {string}   clientId      This relying party's client id.
+ * @property {string}   issuer         The OpenID Provider's issuer identifier.
+ * @property {string}   clientId       This relying party's client id.
  * @property {string}   [clientSecret] Client secret for confidential clients.
- * @property {string}   redirectUri   Registered redirect URI for the callback.
- * @property {string[]} [scope]       Requested scopes; `openid` is enforced.
+ * @property {string}   redirectUri    Registered redirect URI for the callback.
+ * @property {string[]} [scope]        Requested scopes; `openid` is enforced.
+ * @property {string[]} [idTokenAlgs]  Signature alg allowlist for the id_token.
+ * @property {string|number} [clockTolerance]  Leeway for `exp`/`nbf`/`iat`.
+ * @property {import('@exortek/jwks').RemoteJWKSOptions} [jwksOptions]  Forwarded to the id_token JWKS resolver.
+ * @property {{ set: Function, get: Function, delete: Function }} [store]  Flow-session store keyed by `state`.
  */
 
 /**
  * Create an OpenID Connect relying-party client.
  *
  * @param {OidcClientConfig} config
- * @returns {{
- *   issuer: string,
- *   clientId: string,
- *   scope: string[],
- *   createAuthUrl: (options?: object) => never,
- *   handleCallback: (params: object, options?: object) => Promise<never>,
- * }}
  */
 export function createClient(config) {
   if (!isObject(config)) {
     invalidArgument('createClient(config): config must be an object.');
   }
-  const { issuer, clientId, redirectUri } = config;
+  const { issuer, clientId, clientSecret, redirectUri } = config;
 
   if (!isNonEmptyString(issuer)) {
     invalidArgument('createClient(config): `issuer` must be a non-empty string.');
@@ -51,39 +80,104 @@ export function createClient(config) {
   if (!isNonEmptyString(redirectUri)) {
     invalidArgument('createClient(config): `redirectUri` must be a non-empty string.');
   }
-
-  // OIDC Core §3.1.2.1 — `openid` is what turns an OAuth request into an
-  // OpenID Connect one. Default to it, and never let a caller drop it.
-  const requested = config.scope === undefined ? ['openid'] : config.scope;
-  if (!isArray(requested) || !requested.every(isNonEmptyString)) {
+  if (config.scope !== undefined && (!isArray(config.scope) || !config.scope.every(isNonEmptyString))) {
     invalidArgument('createClient(config): `scope` must be an array of non-empty strings.');
   }
-  const scope = requested.includes('openid') ? [...requested] : ['openid', ...requested];
+  if (
+    config.idTokenAlgs !== undefined &&
+    (!isArray(config.idTokenAlgs) || !config.idTokenAlgs.every(isNonEmptyString))
+  ) {
+    invalidArgument('createClient(config): `idTokenAlgs` must be an array of non-empty strings.');
+  }
+
+  // `autoOpenidScope` (default true in defineProvider) prepends `openid`, so a
+  // caller can never accidentally drop the scope that makes this OIDC.
+  const providerFactory = defineProvider({
+    id: 'oidc',
+    kind: 'oidc',
+    discover: true,
+    issuer,
+    idTokenAlgs: config.idTokenAlgs,
+    jwksOptions: config.jwksOptions,
+    mapUser: mapStandardClaims,
+  });
+  const provider = providerFactory({
+    clientId,
+    clientSecret,
+    scope: config.scope,
+    redirectUri,
+  });
+
+  const oauth = createOAuth({
+    providers: [provider],
+    store: config.store,
+    security: config.clockTolerance === undefined ? {} : { clockTolerance: config.clockTolerance },
+  });
 
   return {
     issuer,
     clientId,
-    scope,
 
     /**
-     * Build the authorization-request URL (with PKCE / `state` / `nonce`).
-     * @returns {never}
+     * Build the authorization-request URL (PKCE / `state` / `nonce` handled
+     * by the oauth2 hub) with the OIDC auth-request parameters threaded in.
+     *
+     * @param {{ scope?: string[], prompt?: string, loginHint?: string, maxAge?: string|number, acrValues?: string, uiLocales?: string, params?: Record<string,string> }} [options]
+     * @returns {Promise<{ url: string, session: string }>}
      */
-    createAuthUrl() {
-      // `randomState` / `randomNonce` are wired now so the CSRF-nonce source
-      // is settled; the URL assembly lands with the discovery pipeline.
-      void randomState;
-      void randomNonce;
-      return notImplemented('createClient().createAuthUrl');
+    async authorize(options = {}) {
+      /** @type {Record<string, string>} */
+      const params = { ...options.params };
+      for (const [key, wire] of Object.entries(AUTH_PARAM_NAMES)) {
+        const value = /** @type {Record<string, unknown>} */ (options)[key];
+        if (value !== undefined) {
+          params[wire] = String(value);
+        }
+      }
+      const { url, session } = await oauth.authorize('oidc', { scope: options.scope, params });
+      return { url, session };
     },
 
     /**
-     * Validate the callback, exchange the code, verify the `id_token`, and
-     * fetch UserInfo.
-     * @returns {Promise<never>}
+     * Complete the flow: validate the callback, exchange the code, verify the
+     * `id_token`, and fetch UserInfo. Signature / `nonce` / `iss` / `aud`
+     * are already checked inside the oauth2 hub; `decode` here only reads the
+     * now-trusted payload (no second network hop).
+     *
+     * @param {Record<string, unknown>} query   the callback query params
+     * @param {{ session?: string }} [options]
+     * @returns {Promise<{ idToken: string, claims: Record<string, unknown>, userinfo: Record<string, unknown>, user: object, tokens: Record<string, unknown>, warnings: object[] }>}
      */
-    async handleCallback() {
-      return notImplemented('createClient().handleCallback');
+    async handleCallback(query, options = {}) {
+      const { tokens, user, warnings } = await oauth.callback('oidc', query, { session: options.session });
+      const idToken = /** @type {string} */ (tokens.id_token);
+      return {
+        idToken,
+        claims: decode(idToken).payload,
+        userinfo: /** @type {Record<string, unknown>} */ (user).raw,
+        user,
+        tokens,
+        warnings,
+      };
+    },
+
+    /**
+     * Exchange a refresh token for fresh tokens (RFC 6749 §6).
+     * @param {string} refreshToken
+     * @returns {Promise<Record<string, unknown>>}
+     */
+    refresh(refreshToken) {
+      return oauth.refresh('oidc', refreshToken);
+    },
+
+    /**
+     * Revoke an access or refresh token (RFC 7009).
+     * @param {string} token
+     * @param {string} [tokenTypeHint]
+     * @returns {Promise<Record<string, unknown>>}
+     */
+    revoke(token, tokenTypeHint) {
+      return oauth.revoke('oidc', token, tokenTypeHint);
     },
   };
 }
