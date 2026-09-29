@@ -36,7 +36,7 @@
     "verify": "yarn typecheck && yarn lint && yarn format:check && yarn test"
   },
   "devDependencies": {
-    "@changesets/cli": "^3.0.2",
+    "@changesets/cli": "^3.0.3",
     "@fastify/cookie": "^11.1.2",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^1.0.0",
@@ -44,14 +44,14 @@
     "argon2": "^0.45.1",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
-    "dotenv": "^17.4.2",
-    "eslint": "^10.10.0",
+    "dotenv": "^18.0.4",
+    "eslint": "^10.11.0",
     "express": "^5.2.1",
-    "fastify": "^5.12.4",
+    "fastify": "^5.12.5",
     "ioredis": "^6.0.0",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.9",
     "redis": "^6.2.1",
-    "rollup": "^4.63.2",
+    "rollup": "^4.63.5",
     "rollup-plugin-dts": "^6.5.1",
     "typescript": "6.0.3"
   },
