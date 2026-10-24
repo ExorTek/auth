@@ -6,6 +6,9 @@ import { isArray, isBuffer, isInteger, isString } from '@exortek/shared/predicat
 import { invalidArgument } from '../internal/guards.js';
 import { statelessPattern } from '../internal/patterns.js';
 
+const DEFAULT_SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+/** @type {WeakMap<string[], Set<string>>} */
+const safeMethodSets = new WeakMap();
 
 /**
  * Extract the real client IP from a request-like object, honouring a
@@ -139,6 +142,22 @@ function normalizeIp(addr) {
 }
 
 /**
+ * @param {string[] | undefined} methods
+ * @returns {Set<string>}
+ */
+function safeMethodSet(methods) {
+  if (methods === undefined) {
+    return DEFAULT_SAFE_METHODS;
+  }
+  let set = safeMethodSets.get(methods);
+  if (!set) {
+    set = new Set(methods.map(m => m.toUpperCase()));
+    safeMethodSets.set(methods, set);
+  }
+  return set;
+}
+
+/**
  * A webhook HMAC key must actually be a key: a non-empty string or Buffer.
  * `Buffer.alloc(0)` is truthy, so a bare `!secret` check let an empty key
  * through — and an HMAC under an empty key is forgeable by anyone.
@@ -193,7 +212,7 @@ export function bearer(headerValue) {
  * @returns {boolean} true if the request may proceed
  */
 export function checkOrigin(req, options) {
-  const safe = new Set((options.safeMethods ?? ['GET', 'HEAD', 'OPTIONS']).map(m => m.toUpperCase()));
+  const safe = safeMethodSet(options.safeMethods);
   if (safe.has(String(req.method || '').toUpperCase())) {
     return true;
   }
