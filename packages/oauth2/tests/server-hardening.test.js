@@ -515,3 +515,49 @@ test('client jwks_uri: private hosts are refused when registration is enabled', 
   assert.equal(res.status, 401);
   assert.equal(body(res).error, 'invalid_client');
 });
+
+// MULTI-NODE REPLAY + NONCES
+
+test('stores.replay shares client-assertion replay checks across servers', async () => {
+  const { createMemoryIncrStore } = await import('@exortek/shared/incr-store');
+  const { assertionClient } = await import('./helpers/server.js');
+  const pk = await assertionClient('pk');
+  const replay = createMemoryIncrStore();
+  const node = () =>
+    buildServer({
+      clients: [
+        {
+          clientId: 'pk',
+          tokenEndpointAuthMethod: 'private_key_jwt',
+          jwks: { keys: [pk.jwk] },
+          redirectUris: ['https://x.example.com/cb'],
+          grantTypes: ['client_credentials'],
+          scope: ['read'],
+        },
+      ],
+      grants: ['client_credentials'],
+      stores: { replay },
+    }).server;
+  const assertion = await pk.assertion('only-once');
+  const req = () =>
+    post({
+      grant_type: 'client_credentials',
+      client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      client_assertion: assertion,
+    });
+  assert.equal((await node().token(req())).status, 200);
+  const replayed = await node().token(req());
+  assert.equal(replayed.status, 401);
+  assert.match(body(replayed).error_description, /replay/);
+});
+
+test('DPoP nonces issued by one node are accepted by another with the same secret', async () => {
+  const nonceSecret = 'n'.repeat(32);
+  const a = buildServer({ security: { dpop: { nonce: true, nonceSecret } } }).server;
+  const b = buildServer({ security: { dpop: { nonce: true, nonceSecret } } }).server;
+  const nonce = a._config.dpopNonces.issue();
+  assert.equal(b._config.dpopNonces.isValid(nonce), true);
+  assert.equal(buildServer({ security: { dpop: { nonce: true } } }).server._config.dpopNonces.isValid(nonce), false);
+  assert.equal(b._config.dpopNonces.isValid(`${nonce.slice(0, -2)}AA`), false);
+  assert.throws(() => buildServer({ security: { dpop: { nonce: true, nonceSecret: 'short' } } }), /32 bytes/);
+});

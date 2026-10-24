@@ -25,12 +25,10 @@ import { isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates
 import { ProtocolError, ServerError } from '../errors.js';
 import { readClientCredentials } from '../request.js';
 import { parseDn, sameDn, subjectAttributes } from './dn.js';
-import { createReplayCache } from './replay-cache.js';
 
 const JWT_BEARER_ASSERTION = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
-// RFC 7523 §3 requires `exp`; bound its reach so the (process-local,
-// opportunistically-evicted) jti replay cache actually covers the token's
-// whole life.
+// RFC 7523 §3 requires `exp`; bound its reach so the jti replay guard
+// actually covers the token's whole life.
 const MAX_ASSERTION_LIFETIME_MS = 300_000; // 5 minutes
 const ASSERTION_ALGS = new Set([
   'ES256',
@@ -44,10 +42,6 @@ const ASSERTION_ALGS = new Set([
   'PS512',
   'EdDSA',
 ]);
-
-// Assertion replay cache — a `jti` is single-use within its lifetime. The
-// 5-minute retention matches the accepted assertion lifetime bound above.
-const seenAssertionJti = createReplayCache(MAX_ASSERTION_LIFETIME_MS);
 
 /**
  * Resolve and authenticate the client behind a request.
@@ -217,16 +211,21 @@ async function authenticateAssertion(req, config, assertionType) {
     throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion lifetime exceeds the accepted maximum');
   }
 
-  assertSingleUse(payload.jti);
+  await assertSingleUse(payload.jti, config.replay);
   return client;
 }
 
-/** @param {unknown} jti */
-function assertSingleUse(jti) {
+/**
+ * A `jti` is single-use within the accepted assertion lifetime.
+ *
+ * @param {unknown} jti
+ * @param {import('./replay.js').ReplayGuard} replay
+ */
+async function assertSingleUse(jti, replay) {
   if (!isNonEmptyString(jti)) {
     throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion is missing jti');
   }
-  if (seenAssertionJti.seen(jti)) {
+  if (await replay.seen('assertion', jti, MAX_ASSERTION_LIFETIME_MS)) {
     throw new ServerError(ProtocolError.INVALID_CLIENT, 'client_assertion jti has already been used (replay)');
   }
 }

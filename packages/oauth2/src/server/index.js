@@ -29,6 +29,8 @@ import { createRegisterHandler } from './handlers/register.js';
 import { applyFapiProfile } from './security/fapi.js';
 import { createIdTokenSigner } from './issuers/id-token.js';
 import { createClientKeyResolver } from './security/client-keys.js';
+import { createDpopNonces } from './security/dpop.js';
+import { createReplayGuard, isReplayStore } from './security/replay.js';
 
 export { defineClient, createClientRegistry, AUTH_METHODS } from './clients.js';
 export { jwtIssuer } from './issuers/jwt.js';
@@ -55,7 +57,7 @@ const DEFAULT_REFRESH_TTL = '30d';
  * @typedef {Object} ServerSecurity
  * @property {string|number} [authorizationCodeTtl='1m']
  * @property {string|number} [refreshTokenTtl='30d']    lifetime of an issued refresh token
- * @property {{ required?: boolean, algs?: string[], nonce?: boolean }} [dpop]   RFC 9449
+ * @property {{ required?: boolean, algs?: string[], nonce?: boolean, nonceSecret?: string | Uint8Array }} [dpop]   RFC 9449; give every node the same ≥32-byte `nonceSecret` when nonces are on behind a load balancer
  * @property {{ required?: boolean, ttl?: string|number }} [par]                 RFC 9126
  * @property {boolean} [fapi]                      FAPI 2.0 profile (bundles PAR + PKCE + DPoP/mTLS + iss)
  * @property {(hostname: string, url: URL) => boolean} [allowJwksHost]  gate the hosts the server will fetch a client's `jwks_uri` from; return false to refuse. With dynamic registration enabled and no gate set, loopback / private / link-local hosts are refused by default, since the URI is then chosen by the registrant.
@@ -106,6 +108,7 @@ const DEFAULT_REFRESH_TTL = '30d';
  * @property {ReturnType<typeof createRefreshStore>} refresh
  * @property {ReturnType<typeof createParStore>} par
  * @property {ReturnType<typeof createDeviceStore>} device
+ * @property {import('./security/replay.js').ReplayStore} [replay]  IncrStore-shaped (`incr(key, ttlMs)`) — shares DPoP / client-assertion / request-object jti replay checks across nodes
  *
  * @typedef {Object} ResolvedServerConfig
  * @property {string} issuer
@@ -160,6 +163,11 @@ export function createServer(config) {
     ]),
   };
 
+  const replayStore = config.stores?.replay;
+  if (replayStore !== undefined && !isReplayStore(replayStore)) {
+    throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, 'stores.replay must implement incr(key, ttlMs)');
+  }
+
   // FAPI 2.0 tightens several defaults at once (PLAN Tier C).
   const { fapi, requirePkce, requirePar, dpopRequired } = applyFapiProfile(security);
 
@@ -192,6 +200,9 @@ export function createServer(config) {
     requirePkce,
     dpopRequired,
     dpopNonceRequired: security.dpop?.nonce === true,
+    dpopNonces: createDpopNonces(security.dpop?.nonceSecret),
+    // Per-server single-use jti guard (DPoP, client assertions, JAR).
+    replay: createReplayGuard(replayStore),
     fapi,
     authenticateUser: config.authenticateUser,
     authorizationCodeTtlMs: parseDuration(security.authorizationCodeTtl ?? DEFAULT_AUTH_CODE_TTL),
