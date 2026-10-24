@@ -78,6 +78,8 @@ const DEFAULT_REFRESH_TTL = '30d';
  * @property {boolean} [open]                      allow unauthenticated registration (NOT recommended)
  * @property {(req: import('./request.js').ServerRequest) => boolean | Promise<boolean>} [authorize]  custom gate
  * @property {Partial<import('./clients.js').ClientConfig>} [defaults]  defaults layered under each registration
+ * @property {string[]} [allowedGrants]           grant types a registrant may request (default `['authorization_code','refresh_token']`)
+ * @property {string[]} [allowedAuthMethods]      token-endpoint auth methods a registrant may request (default: every non-mTLS method)
  *
  * @typedef {Object} OidcConfig
  * @property {import('./issuers/id-token.js').IdTokenSignerConfig} idToken   id_token JWS signer (signingKey + alg)

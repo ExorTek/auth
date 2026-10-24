@@ -22,6 +22,21 @@ import { json, jsonError } from '../response.js';
 
 const SECRET_BASED = new Set(['client_secret_basic', 'client_secret_post', 'client_secret_jwt']);
 
+// What a registrant may ask for unless the deployment widens it. The
+// client_credentials / device / token-exchange grants act without a user
+// in the loop, so a self-registered client gets them only when the
+// deployment lists them in `registration.allowedGrants`.
+const DEFAULT_ALLOWED_GRANTS = ['authorization_code', 'refresh_token'];
+// mTLS methods need key material (subject DN / thumbprint) that RFC 7591
+// metadata here does not carry, so they are registered out of band.
+const DEFAULT_ALLOWED_AUTH_METHODS = [
+  'none',
+  'client_secret_basic',
+  'client_secret_post',
+  'client_secret_jwt',
+  'private_key_jwt',
+];
+
 /**
  * @param {Record<string, any>} config
  * @returns {(raw: import('../request.js').RawRequest) => Promise<import('../response.js').ServerResponse>}
@@ -50,7 +65,7 @@ export function createRegisterHandler(config) {
         throw new ServerError(ProtocolError.INVALID_CLIENT_METADATA, 'client metadata is required');
       }
 
-      const clientConfig = buildClientConfig(meta, reg);
+      const clientConfig = buildClientConfig(meta, reg, config);
       let client;
       try {
         client = config.registry.register(clientConfig);
@@ -106,18 +121,46 @@ async function authorizeRegistration(req, reg) {
  * the deployment's `registration.defaults` under the request. The server owns
  * the generated `client_id` / `client_secret`.
  *
+ * Registrant-supplied `grant_types`, `scope` and `token_endpoint_auth_method`
+ * are checked against what the deployment allows; the deployment's own
+ * `defaults` are trusted as configured.
+ *
  * @param {Record<string, any>} meta
  * @param {Record<string, any>} reg
+ * @param {Record<string, any>} config
  * @returns {import('../clients.js').ClientConfig}
  */
-function buildClientConfig(meta, reg) {
+function buildClientConfig(meta, reg, config) {
   const defaults = isObject(reg.defaults) ? reg.defaults : {};
   const redirectUris = meta.redirect_uris ?? defaults.redirectUris;
-  const authMethod = meta.token_endpoint_auth_method ?? defaults.tokenEndpointAuthMethod ?? 'client_secret_basic';
 
+  const requestedAuthMethod = meta.token_endpoint_auth_method;
+  if (requestedAuthMethod !== undefined) {
+    const allowed = isArray(reg.allowedAuthMethods) ? reg.allowedAuthMethods : DEFAULT_ALLOWED_AUTH_METHODS;
+    if (!allowed.includes(requestedAuthMethod)) {
+      throw new ServerError(
+        ProtocolError.INVALID_CLIENT_METADATA,
+        `token_endpoint_auth_method ${JSON.stringify(requestedAuthMethod)} is not permitted for registration`,
+      );
+    }
+  }
+  const authMethod = requestedAuthMethod ?? defaults.tokenEndpointAuthMethod ?? 'client_secret_basic';
+
+  const requestedGrants = toArray(meta.grant_types);
+  if (requestedGrants) {
+    const allowed = isArray(reg.allowedGrants) ? reg.allowedGrants : DEFAULT_ALLOWED_GRANTS;
+    for (const grant of requestedGrants) {
+      if (!allowed.includes(grant)) {
+        throw new ServerError(
+          ProtocolError.INVALID_CLIENT_METADATA,
+          `grant_type ${JSON.stringify(grant)} is not permitted for registration`,
+        );
+      }
+    }
+  }
   // RFC 7591 §2 / §3.2.2: a client using a redirect-based grant must supply
   // at least one redirect URI.
-  const grantTypes = toArray(meta.grant_types) ?? defaults.grantTypes ?? ['authorization_code'];
+  const grantTypes = requestedGrants ?? defaults.grantTypes ?? ['authorization_code'];
   const usesRedirect = grantTypes.includes('authorization_code');
   if (usesRedirect && (!isArray(redirectUris) || redirectUris.length === 0)) {
     throw new ServerError(ProtocolError.INVALID_REDIRECT_URI, 'redirect_uris is required for this grant');
@@ -137,7 +180,18 @@ function buildClientConfig(meta, reg) {
   if (responseTypes) {
     cfg.responseTypes = responseTypes;
   }
-  const scope = isNonEmptyString(meta.scope) ? meta.scope.split(/\s+/).filter(Boolean) : defaults.scope;
+  const requestedScope = isNonEmptyString(meta.scope) ? meta.scope.split(/\s+/).filter(Boolean) : undefined;
+  if (requestedScope && isArray(config.scopes)) {
+    for (const s of requestedScope) {
+      if (!config.scopes.includes(s)) {
+        throw new ServerError(
+          ProtocolError.INVALID_CLIENT_METADATA,
+          `scope ${JSON.stringify(s)} is not supported by this server`,
+        );
+      }
+    }
+  }
+  const scope = requestedScope ?? defaults.scope;
   if (isArray(scope)) {
     cfg.scope = scope;
   }

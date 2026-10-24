@@ -108,3 +108,53 @@ test('open registration is allowed only when explicitly opened', async () => {
   const reg = body(await server.register(jsonPost({ redirect_uris: ['https://o/cb'] })));
   assert.ok(reg.client_id);
 });
+
+test('a registrant cannot pick client_credentials or an unadvertised scope', async () => {
+  const { server } = buildRegistrationServer({ initialAccessToken: IAT });
+  const auth = { authorization: `Bearer ${IAT}` };
+
+  const grant = await server.register(
+    jsonPost({ grant_types: ['client_credentials'], token_endpoint_auth_method: 'client_secret_post' }, auth),
+  );
+  assert.equal(grant.status, 400);
+  assert.equal(body(grant).error, 'invalid_client_metadata');
+
+  const scope = await server.register(
+    jsonPost({ redirect_uris: ['https://c.example.com/cb'], scope: 'admin superuser' }, auth),
+  );
+  assert.equal(scope.status, 400);
+  assert.equal(body(scope).error, 'invalid_client_metadata');
+
+  const method = await server.register(
+    jsonPost({ redirect_uris: ['https://c.example.com/cb'], token_endpoint_auth_method: 'tls_client_auth' }, auth),
+  );
+  assert.equal(method.status, 400);
+  assert.equal(body(method).error, 'invalid_client_metadata');
+});
+
+test('registration.allowedGrants opts a deployment into more grants', async () => {
+  const { server } = buildRegistrationServer({
+    initialAccessToken: IAT,
+    allowedGrants: ['client_credentials'],
+  });
+  const reg = body(
+    await server.register(
+      jsonPost(
+        {
+          redirect_uris: ['https://c.example.com/cb'],
+          grant_types: ['client_credentials'],
+          token_endpoint_auth_method: 'client_secret_post',
+          scope: 'read',
+        },
+        { authorization: `Bearer ${IAT}` },
+      ),
+    ),
+  );
+  assert.ok(reg.client_id);
+  const tok = body(
+    await server.token(
+      post({ grant_type: 'client_credentials', client_id: reg.client_id, client_secret: reg.client_secret }),
+    ),
+  );
+  assert.equal(tok.scope, 'read');
+});
