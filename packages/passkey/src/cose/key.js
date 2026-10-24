@@ -172,6 +172,17 @@ export function importCoseKey(coseKey) {
     throw new PasskeyError(ErrorCode.UNSUPPORTED_ALGORITHM, `cose: unsupported algorithm ${alg}`);
   }
 
+  // The key type must be the one the algorithm is defined over — an RSA
+  // key declared as ES256 would otherwise verify RSA signatures under an
+  // ECDSA label (Node picks the scheme from the key, not the alg).
+  const expectedKty = params.name.startsWith('ES') ? KTY.EC2 : params.name === 'EdDSA' ? KTY.OKP : KTY.RSA;
+  if ((kty === KTY.EC2 || kty === KTY.OKP || kty === KTY.RSA) && kty !== expectedKty) {
+    throw new PasskeyError(
+      ErrorCode.PUBLIC_KEY_UNSUPPORTED,
+      `cose: kty ${String(kty)} does not match algorithm ${params.name}`,
+    );
+  }
+
   let jwk;
   if (kty === KTY.EC2) {
     jwk = ec2ToJwk(coseKey, params);
