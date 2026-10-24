@@ -1,34 +1,44 @@
 import { createHmac } from 'node:crypto';
 
 import { timingSafeEqual } from '@exortek/shared/timing-safe';
-import { isArray, isBuffer, isNumber, isString } from '@exortek/shared/predicates';
+import { isArray, isBuffer, isInteger, isString } from '@exortek/shared/predicates';
 
 import { invalidArgument } from '../internal/guards.js';
 
 /**
  * Extract the real client IP from a request-like object, honouring a
- * trust-proxy allowlist. Node behind a load balancer sees the LB's IP
- * in `req.socket.remoteAddress`; the real client sits inside
- * `X-Forwarded-For` — but only reachable safely by walking the header
+ * trust-proxy policy. Node behind a load balancer sees the LB's IP in
+ * `req.socket.remoteAddress`; the real client sits inside
+ * `X-Forwarded-For` — but only reachable safely by walking the chain
  * **right-to-left** past the trusted proxy hops, because a client can
  * forge left-most entries and every conforming proxy *appends* the
- * real address.
+ * address it saw.
+ *
+ * The walk runs over `[socket.remoteAddress, ...X-Forwarded-For reversed]`
+ * — the same address list Express's `trust proxy` uses — with every
+ * repeated header value included and IPv4-mapped IPv6 (`::ffff:1.2.3.4`)
+ * folded to plain IPv4 before comparison.
  *
  * ### `trustProxy` semantics
  *
  * | Value              | Meaning                                                                                     |
  * | ------------------ | ------------------------------------------------------------------------------------------- |
- * | `false` (default)  | Ignore XFF entirely; return `socket.remoteAddress`. Only correct when Node is edge-facing.  |
- * | `true`             | Trust every hop. Returns the left-most XFF entry — **spoofable unless the first proxy strips inbound XFF**. |
- * | `string[]`         | Right-to-left walk skipping entries whose value is in the set; returns the first untrusted hop. |
+ * | `false` (default)  | Ignore forwarding headers; return `socket.remoteAddress`. Only correct when Node is edge-facing. |
+ * | `true`             | Trust every hop. Returns the left-most entry — **spoofable unless the first proxy strips inbound XFF**. |
+ * | `string[]`         | Skip addresses in the set (starting with the socket peer); return the first untrusted one.  |
  *
  * ### `proxyCount`
  *
- * Alternative to `trustProxy: string[]` when the proxy chain depth is
- * known but the addresses aren't stable (e.g. Cloudflare + a k8s
- * ingress). Skips **N** rightmost XFF entries and returns the
- * `(N + 1)`-th from the right — i.e. the last hop before the trusted
- * chain begins. Wins over `trustProxy` when both are set.
+ * Same meaning as Express `trust proxy: N`: the N hops closest to Node —
+ * counting the socket peer as the first — are trusted, and the client is
+ * the next address out. `0` trusts nothing (the socket peer). When the
+ * chain is shorter than N the furthest address is returned. Use it when
+ * the chain depth is known but the addresses aren't stable (e.g. Cloudflare
+ * + a k8s ingress). Wins over `trustProxy` when both are set.
+ *
+ * Only `X-Forwarded-For` is read by default; `X-Real-IP` and similar
+ * single-value headers are spoofable unless your proxy overwrites them, so
+ * they are used only when named in `headers`.
  *
  * @param {{
  *   headers?: Record<string, string | string[] | undefined>,
@@ -45,51 +55,85 @@ import { invalidArgument } from '../internal/guards.js';
 export function getClientIp(req, options = {}) {
   const trustProxy = options.trustProxy ?? false;
   const proxyCount = options.proxyCount;
-  const headerNames = options.headers ?? ['x-forwarded-for', 'x-real-ip'];
+  if (proxyCount !== undefined && (!isInteger(proxyCount) || proxyCount < 0)) {
+    throw invalidArgument('getClientIp.options.proxyCount must be a non-negative integer');
+  }
+  const headerNames = options.headers ?? ['x-forwarded-for'];
 
-  const remote = req.socket?.remoteAddress || req.ip;
-
+  const remote = normalizeIp(req.socket?.remoteAddress || req.ip);
   if (trustProxy === false && proxyCount === undefined) {
-    return remote || undefined;
-  }
-  const trustedSet = isArray(trustProxy) ? new Set(trustProxy) : null;
-  if (trustedSet && remote && !trustedSet.has(remote) && proxyCount === undefined) {
-    return remote || undefined;
+    return remote;
   }
 
-  for (const name of headerNames) {
-    const raw = req.headers?.[name];
-    const value = isArray(raw) ? raw[0] : raw;
-    if (!isString(value) || value.length === 0) {
-      continue;
-    }
-    const parts = value
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean);
-    if (parts.length === 0) {
-      continue;
-    }
+  // Closest first: the socket peer, then each forwarded hop right-to-left.
+  const forwarded = readForwarded(req.headers, headerNames);
+  const addrs = remote === undefined ? forwarded.reverse() : [remote, ...forwarded.reverse()];
+  if (addrs.length === 0) {
+    return undefined;
+  }
 
-    if (isNumber(proxyCount) && proxyCount >= 0) {
-      const idx = parts.length - proxyCount - 1;
-      return idx >= 0 ? parts[idx] : parts[0];
+  if (proxyCount !== undefined) {
+    // Without a socket peer the first forwarded entry stands in for hop 0.
+    const index = remote === undefined ? proxyCount - 1 : proxyCount;
+    if (index < 0) {
+      return undefined;
     }
+    return addrs[Math.min(index, addrs.length - 1)];
+  }
+  if (isArray(trustProxy)) {
+    const trusted = new Set(trustProxy.map(normalizeIp));
+    for (const addr of addrs) {
+      if (!trusted.has(addr)) {
+        return addr;
+      }
+    }
+    return addrs[addrs.length - 1]; // every hop trusted — the furthest one
+  }
+  // trustProxy === true → every hop is trusted; the client sits furthest out.
+  // This is spoofable unless the first proxy strips inbound XFF.
+  return addrs[addrs.length - 1];
+}
 
-    if (trustedSet) {
-      for (let i = parts.length - 1; i >= 0; i--) {
-        if (!trustedSet.has(parts[i])) {
-          return parts[i];
+/**
+ * Every address in the named forwarding headers, left-to-right, across
+ * repeated header lines.
+ *
+ * @param {Record<string, string | string[] | undefined> | undefined} headers
+ * @param {string[]} names
+ * @returns {string[]}
+ */
+function readForwarded(headers, names) {
+  for (const name of names) {
+    const raw = headers?.[name];
+    const lines = isArray(raw) ? raw : [raw];
+    const parts = [];
+    for (const line of lines) {
+      if (!isString(line)) {
+        continue;
+      }
+      for (const part of line.split(',')) {
+        const addr = normalizeIp(part.trim());
+        if (addr) {
+          parts.push(addr);
         }
       }
-      return parts[0]; // every hop trusted — fall back to the original client
     }
-
-    // trustProxy === true → every hop is trusted; the client sits at the
-    // left. This is spoofable unless the first proxy strips inbound XFF.
-    return parts[0];
+    if (parts.length > 0) {
+      return parts;
+    }
   }
-  return remote || undefined;
+  return [];
+}
+
+/**
+ * @param {string | undefined} addr
+ * @returns {string | undefined}
+ */
+function normalizeIp(addr) {
+  if (!isString(addr) || addr.length === 0) {
+    return undefined;
+  }
+  return /^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(addr) ? addr.slice(7) : addr;
 }
 
 /**

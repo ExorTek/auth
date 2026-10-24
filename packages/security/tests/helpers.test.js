@@ -73,18 +73,45 @@ test('getClientIp: trustProxy=list — every hop trusted falls back to left-most
   assert.equal(getClientIp(req, { trustProxy: ['10.0.0.1', '10.0.0.2', '10.0.0.3'] }), '10.0.0.2');
 });
 
-test('getClientIp: proxyCount=N skips N rightmost hops', () => {
+test('getClientIp: proxyCount=N matches Express trust proxy: N (socket peer is hop 1)', () => {
   const req = {
     socket: { remoteAddress: '10.0.0.1' },
     headers: { 'x-forwarded-for': '1.2.3.4, 203.0.113.42, 172.16.0.5, 10.0.0.2' },
   };
-  // 2 trusted proxy hops from the right → return the 3rd-from-right
-  assert.equal(getClientIp(req, { proxyCount: 2 }), '203.0.113.42');
+  // Trusted: 10.0.0.1 (peer), 10.0.0.2, 172.16.0.5 → the client is the next one out.
+  assert.equal(getClientIp(req, { proxyCount: 3 }), '203.0.113.42');
+  assert.equal(getClientIp(req, { proxyCount: 1 }), '10.0.0.2');
 });
 
-test('getClientIp: proxyCount=0 returns the right-most hop', () => {
-  const req = { headers: { 'x-forwarded-for': '1.2.3.4, 203.0.113.42, 10.0.0.2' } };
-  assert.equal(getClientIp(req, { proxyCount: 0 }), '10.0.0.2');
+test('getClientIp: proxyCount=0 trusts nothing — the socket peer', () => {
+  const req = { socket: { remoteAddress: '10.0.0.1' }, headers: { 'x-forwarded-for': '1.2.3.4, 10.0.0.2' } };
+  assert.equal(getClientIp(req, { proxyCount: 0 }), '10.0.0.1');
+});
+
+test('getClientIp: X-Real-IP is not trusted unless named', () => {
+  const req = { socket: { remoteAddress: '10.0.0.1' }, headers: { 'x-real-ip': '6.6.6.6' } };
+  assert.equal(getClientIp(req, { proxyCount: 1 }), '10.0.0.1');
+  assert.equal(getClientIp(req, { proxyCount: 1, headers: ['x-real-ip'] }), '6.6.6.6');
+});
+
+test('getClientIp: repeated XFF header lines are all part of the chain', () => {
+  const req = {
+    socket: { remoteAddress: '10.0.0.1' },
+    headers: { 'x-forwarded-for': ['6.6.6.6', '203.0.113.42'] },
+  };
+  // Reading only the first line would hand back the attacker-supplied value.
+  assert.equal(getClientIp(req, { proxyCount: 1 }), '203.0.113.42');
+});
+
+test('getClientIp: IPv4-mapped IPv6 peers match an IPv4 trust list', () => {
+  const req = { socket: { remoteAddress: '::ffff:10.0.0.1' }, headers: { 'x-forwarded-for': '203.0.113.42' } };
+  assert.equal(getClientIp(req, { trustProxy: ['10.0.0.1'] }), '203.0.113.42');
+  assert.equal(getClientIp({ socket: { remoteAddress: '::ffff:10.0.0.9' } }), '10.0.0.9');
+});
+
+test('getClientIp: a non-integer proxyCount is rejected', () => {
+  assert.throws(() => getClientIp({}, { proxyCount: '1' }), /proxyCount/);
+  assert.throws(() => getClientIp({}, { proxyCount: -1 }), /proxyCount/);
 });
 
 test('getClientIp: proxyCount larger than chain returns left-most', () => {
