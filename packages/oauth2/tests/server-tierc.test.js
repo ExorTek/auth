@@ -224,6 +224,7 @@ test('token exchange delegates a subject token to a new audience (RFC 8693)', as
     ],
     grants: [CC, EXCHANGE],
     scopes: ['api'],
+    tokenExchange: { audiences: ['https://downstream.example.com'] },
   });
 
   const subjectTok = body(

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildServer, getAuthorizationCode, get, post, body } from './helpers/server.js';
+import { buildServer, getAuthorizationCode, dpopClient, get, post, body, ISSUER } from './helpers/server.js';
 
 // SCOPE CEILING
 
@@ -263,4 +263,90 @@ test('refresh: a narrowed request does not narrow the successor refresh token', 
   assert.equal(narrowed.scope, 'read');
   const next = body(await refresh(server, narrowed.refresh_token, { scope: 'write' }));
   assert.equal(next.scope, 'write');
+});
+
+// TOKEN EXCHANGE
+
+const EXCHANGE = 'urn:ietf:params:oauth:grant-type:token-exchange';
+const ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token';
+
+function exchangeServer(extra = {}) {
+  const svc = id => ({
+    clientId: id,
+    clientSecret: `${id}-secret-value-strong`,
+    tokenEndpointAuthMethod: 'client_secret_post',
+    redirectUris: ['https://x.example.com/cb'],
+    grantTypes: ['client_credentials', EXCHANGE],
+    scope: ['api'],
+  });
+  return buildServer({
+    clients: [svc('alice'), svc('mallory')],
+    grants: ['client_credentials', EXCHANGE],
+    scopes: ['api'],
+    tokenExchange: { audiences: ['https://downstream.example.com'] },
+    ...extra,
+  });
+}
+
+const creds = id => ({ client_id: id, client_secret: `${id}-secret-value-strong` });
+
+async function ccToken(server, id, headers = {}) {
+  return body(await server.token(post({ grant_type: 'client_credentials', scope: 'api', ...creds(id) }, headers)));
+}
+
+function exchange(server, id, subjectToken, extra = {}, headers = {}) {
+  return server.token(
+    post(
+      {
+        grant_type: EXCHANGE,
+        subject_token: subjectToken,
+        subject_token_type: ACCESS_TOKEN_TYPE,
+        ...creds(id),
+        ...extra,
+      },
+      headers,
+    ),
+  );
+}
+
+test('token exchange: a token issued to another client cannot be exchanged', async () => {
+  const { server } = exchangeServer();
+  const alice = await ccToken(server, 'alice');
+  const res = await exchange(server, 'mallory', alice.access_token);
+  assert.equal(res.status, 400);
+  assert.equal(body(res).error, 'invalid_grant');
+
+  assert.equal((await exchange(server, 'alice', alice.access_token)).status, 200);
+});
+
+test('token exchange: a DPoP-bound subject token needs the same key', async () => {
+  const { server } = exchangeServer();
+  const dpop = await dpopClient();
+  const htu = `${ISSUER}/token`;
+  const bound = await ccToken(server, 'alice', { dpop: await dpop.proof('POST', htu) });
+  assert.equal(bound.token_type, 'DPoP');
+
+  const stripped = await exchange(server, 'alice', bound.access_token);
+  assert.equal(body(stripped).error, 'invalid_grant');
+
+  const proven = await exchange(server, 'alice', bound.access_token, {}, { dpop: await dpop.proof('POST', htu) });
+  assert.equal(proven.status, 200);
+});
+
+test('token exchange: the target audience must be allowlisted', async () => {
+  const { server } = exchangeServer();
+  const alice = await ccToken(server, 'alice');
+  const res = await exchange(server, 'alice', alice.access_token, { audience: 'https://evil.example.com' });
+  assert.equal(body(res).error, 'invalid_target');
+  const ok = await exchange(server, 'alice', alice.access_token, { resource: 'https://downstream.example.com' });
+  assert.equal(ok.status, 200);
+});
+
+test('token exchange: a prior actor chain nests under the new act', async () => {
+  const { server } = exchangeServer();
+  const alice = await ccToken(server, 'alice');
+  const once = body(await exchange(server, 'alice', alice.access_token));
+  const twice = body(await exchange(server, 'alice', once.access_token));
+  const claims = JSON.parse(Buffer.from(twice.access_token.split('.')[1], 'base64url').toString());
+  assert.deepEqual(claims.act, { sub: 'alice', act: { sub: 'alice' } });
 });

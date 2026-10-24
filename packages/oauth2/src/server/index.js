@@ -72,6 +72,7 @@ const DEFAULT_REFRESH_TTL = '30d';
  * @property {ServerSecurity} [security]
  * @property {OidcConfig} [oidc]                   make this an OpenID Provider (issue id_token on the `openid` scope)
  * @property {RegistrationConfig} [registration]   enable RFC 7591 dynamic client registration (opt-in)
+ * @property {{ audiences?: string[] }} [tokenExchange]  RFC 8693: the `resource` / `audience` values a token may be exchanged for (default: none)
  *
  * @typedef {Object} RegistrationConfig
  * @property {string} [initialAccessToken]         bearer required to register (secure default; omit only with `open`)
@@ -197,6 +198,7 @@ export function createServer(config) {
     refreshTokenTtlMs: parseDuration(security.refreshTokenTtl ?? DEFAULT_REFRESH_TTL),
     authorizationDetailsTypes: config.authorizationDetailsTypes,
     introspection: isObject(config.introspection) ? config.introspection : {},
+    tokenExchange: isObject(config.tokenExchange) ? config.tokenExchange : {},
     // JARM is enabled only when fully configured: without a signing key
     // `signJarmResponse` can't sign, so advertising / accepting jwt mode would
     // fail at runtime. An under-configured `jarm` is treated as absent.
