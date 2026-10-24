@@ -137,6 +137,18 @@ function normalizeIp(addr) {
 }
 
 /**
+ * A webhook HMAC key must actually be a key: a non-empty string or Buffer.
+ * `Buffer.alloc(0)` is truthy, so a bare `!secret` check let an empty key
+ * through — and an HMAC under an empty key is forgeable by anyone.
+ *
+ * @param {unknown} secret
+ * @returns {boolean}
+ */
+function isNonEmptySecret(secret) {
+  return (isString(secret) || isBuffer(secret)) && secret.length > 0;
+}
+
+/**
  * Parse an `Authorization: Bearer <token>` header. Case-insensitive on the
  * scheme (RFC 7235 §2.1). Returns the token, or `null` when the header is
  * missing / malformed / uses a different scheme.
@@ -229,7 +241,7 @@ export function webhookVerify(payload, signatureHeader, secret, options = {}) {
   if (!isString(signatureHeader) || signatureHeader.length === 0) {
     return false;
   }
-  if (!secret || (!isString(secret) && !isBuffer(secret))) {
+  if (!isNonEmptySecret(secret)) {
     throw invalidArgument('webhookVerify.secret must be a non-empty string or Buffer');
   }
   const algorithm = options.algorithm ?? 'sha256';
@@ -310,7 +322,7 @@ export function webhookVerifyStripe(payload, signatureHeader, secret, options = 
     throw invalidArgument('webhookVerifyStripe.secret must be a non-empty string / Buffer, or a non-empty array');
   }
   for (const s of secrets) {
-    if (!s || (!isString(s) && !isBuffer(s))) {
+    if (!isNonEmptySecret(s)) {
       throw invalidArgument('webhookVerifyStripe.secret entries must be non-empty strings or Buffers');
     }
   }

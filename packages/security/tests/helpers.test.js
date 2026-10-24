@@ -572,3 +572,9 @@ test('sanitizeFilename: strips trailing spaces/dots without ReDoS (linear)', () 
   const flooded = 'file' + ' '.repeat(500000);
   assert.equal(sanitizeFilename(flooded), 'file');
 });
+
+test('webhookVerify / webhookVerifyStripe: an empty Buffer secret is rejected', () => {
+  assert.throws(() => webhookVerify('{}', 'sha256=00', Buffer.alloc(0)), /secret/);
+  assert.throws(() => webhookVerifyStripe('{}', 't=1,v1=00', Buffer.alloc(0)), /secret/);
+  assert.throws(() => webhookVerifyStripe('{}', 't=1,v1=00', ['ok-secret', Buffer.alloc(0)]), /secret/);
+});
