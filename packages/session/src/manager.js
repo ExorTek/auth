@@ -28,6 +28,7 @@ const SessionManagerConfigSchema = object({
   bindStrictness: optional(oneOf(['strict', 'soft'])),
   impersonation: optional(boolean()),
   impersonationTtl: optional(duration()),
+  impersonationAuthorize: optional(any()),
   deviceLabels: optional(boolean()),
   events: optional(any()),
   suspiciousActivity: optional(any()),
@@ -76,7 +77,10 @@ const SessionManagerConfigSchema = object({
  *                                                        let the request through. Useful for
  *                                                        mobile users who move between wifi
  *                                                        and 5G.
- * @property {boolean} [impersonation=false]               Enable impersonate() API.
+ * @property {boolean} [impersonation=false]               Enable impersonate() API (requires `impersonationAuthorize`).
+ * @property {(ctx: { admin: Session, targetUserId: string, reason?: string, req: any }) => boolean | Promise<boolean>} [impersonationAuthorize]
+ *                                                          Decides whether this admin may impersonate this user. Required
+ *                                                          with `impersonation: true` — a valid session alone is not authority.
  * @property {string | number} [impersonationTtl='30m']     Absolute lifetime of an
  *                                                          impersonation session. Defaults to
  *                                                          30 minutes — impersonation is a
@@ -168,6 +172,12 @@ export function createSessionManager(config) {
   const bindTo = isArray(config.bindTo) ? Object.freeze([...config.bindTo]) : null;
   const bindStrictness = config.bindStrictness ?? 'strict';
   const impersonationEnabled = config.impersonation === true;
+  const impersonationAuthorize = config.impersonationAuthorize;
+  if (impersonationEnabled && !isFunction(impersonationAuthorize)) {
+    throw invalidArgument(
+      'createSessionManager.config.impersonationAuthorize is required with impersonation: true — decide which sessions may impersonate whom',
+    );
+  }
   const impersonationTtlMs = impersonationEnabled
     ? parseDuration(config.impersonationTtl ?? '30m', 'impersonationTtl')
     : 0;
@@ -653,12 +663,28 @@ export function createSessionManager(config) {
         'impersonate: the current session is itself an impersonation — chaining is not allowed; act from the real admin session',
       );
     }
+    // Any valid session reached this point; whether it may borrow this
+    // user's identity is the application's call.
+    const allowed = await impersonationAuthorize({
+      admin: adminSession,
+      targetUserId,
+      reason: options.reason,
+      req: adminReq,
+    });
+    if (allowed !== true) {
+      throw new SessionError(ErrorCode.FORBIDDEN, 'impersonate: not authorized to impersonate this user');
+    }
     const now = options.now ?? Date.now();
     // Impersonation runs against its own (shorter) TTL — the regular
     // ttlMs would keep an admin's borrowed identity alive for the full
-    // session window (7 days by default). Callers can override at the
-    // config layer OR per-call via `options.ttl`.
-    const durationMs = options.ttl ? parseDuration(options.ttl, 'impersonate.ttl') : impersonationTtlMs;
+    // session window (7 days by default). A per-call `options.ttl` may
+    // shorten it, never extend it.
+    const durationMs = options.ttl !== undefined ? parseDuration(options.ttl, 'impersonate.ttl') : impersonationTtlMs;
+    if (!(durationMs > 0) || durationMs > impersonationTtlMs) {
+      throw invalidArgument(
+        `impersonate.ttl must be positive and at most impersonationTtl (${impersonationTtlMs} ms); got ${durationMs}`,
+      );
+    }
     const expiresAt = now + durationMs;
     /** @type {SessionRecord} */
     const record = {

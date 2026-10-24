@@ -149,6 +149,7 @@ test('bindTo: impersonate sets fp from adminReq', async () => {
     idleTtl: '30m',
     bindTo: ['ip'],
     impersonation: true,
+    impersonationAuthorize: () => true,
   });
   const adminReq = mkReq({ ip: '10.0.0.1', ua: 'Admin/1.0' });
   const { token: adminToken } = await sessions.issue({ userId: 'admin1', req: adminReq });

@@ -10,6 +10,9 @@ export const ErrorCode = Object.freeze({
   INVALID_TOKEN: 'INVALID_TOKEN',
   EXPIRED: 'EXPIRED',
   SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+  // The caller is authenticated but not allowed to do this (e.g. an
+  // impersonation the authorize hook refused).
+  FORBIDDEN: 'FORBIDDEN',
 });
 
 /**
@@ -34,6 +37,7 @@ export class SessionError extends BaseError {
     [ErrorCode.INVALID_TOKEN]: 401,
     [ErrorCode.EXPIRED]: 401,
     [ErrorCode.SESSION_NOT_FOUND]: 401,
+    [ErrorCode.FORBIDDEN]: 403,
   };
   static defaultStatus = 500;
 }
