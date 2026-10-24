@@ -74,6 +74,17 @@ function assertCsrfSecret(secret) {
  */
 export function normalizeCsrf(options) {
   assertCsrfSecret(options.secret);
+  const cookieName = options.cookieName ?? '__Host-csrf';
+  if (!cookieName.startsWith('__Host-')) {
+    // The signed double-submit token is not bound to a session; what stops
+    // an attacker planting their own valid cookie+token pair is the
+    // __Host- prefix (no Domain, Secure, Path=/ — unwritable from a
+    // sibling subdomain or over plain http).
+    process.emitWarning(
+      `csrf.cookieName ${JSON.stringify(cookieName)} lacks the __Host- prefix; a sibling subdomain can then plant a valid token. Keep __Host- or bind tokens to the session with csrf.generateForSession().`,
+      { code: 'EXORTEK_SECURITY_CSRF_COOKIE_PREFIX' },
+    );
+  }
   return {
     secret: options.secret,
     cookieName: options.cookieName ?? '__Host-csrf',
