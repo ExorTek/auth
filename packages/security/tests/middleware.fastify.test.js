@@ -204,3 +204,20 @@ test('fastify: securityPlugin composes all four when enabled', async () => {
   await app.close();
   store._stop();
 });
+
+test('fastify: csrfPlugin accepts the token from the parsed body', async () => {
+  const app = await build(async a => {
+    await a.register(fastifyCookie);
+    await a.register(csrfPlugin, { secret: SECRET, formField: '_csrf' });
+  });
+  const get = await app.inject({ method: 'GET', url: '/ping' });
+  const token = get.headers['set-cookie'].match(/__Host-csrf=([^;]+)/)?.[1];
+  const res = await app.inject({
+    method: 'POST',
+    url: '/echo',
+    headers: { cookie: `__Host-csrf=${token}`, 'content-type': 'application/json' },
+    payload: JSON.stringify({ _csrf: token }),
+  });
+  assert.equal(res.statusCode, 200);
+  await app.close();
+});
