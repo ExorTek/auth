@@ -41,6 +41,26 @@ const DURATION_RE = /^(\d+)(ms|s|m|h|d|w)$/;
  * @property {number} expiresAt    Millisecond Unix timestamp.
  */
 
+const MIN_SECRET_BYTES = 32;
+
+/**
+ * A seal secret is the HKDF input key: an empty string or a short
+ * password-like value gives no real protection (`seal(x, '')` used to
+ * work). Require at least 32 bytes — `crypto.randomBytes(32)` or 32+
+ * characters of a high-entropy string.
+ *
+ * @param {unknown} secret
+ */
+function assertSealSecret(secret) {
+  assertBytesOrString(secret, 'secret');
+  const length = isString(secret) ? Buffer.byteLength(secret, 'utf8') : /** @type {Uint8Array} */ (secret).length;
+  if (length < MIN_SECRET_BYTES) {
+    throw invalidArgument(
+      `secret must be at least ${MIN_SECRET_BYTES} bytes; got ${length}. Generate one with crypto.randomBytes(32).`,
+    );
+  }
+}
+
 /**
  * Encrypt and time-stamp an arbitrary JSON-serialisable payload into a short
  * opaque token, suitable for password-reset links, email-verification codes,
@@ -81,7 +101,7 @@ const DURATION_RE = /^(\d+)(ms|s|m|h|d|w)$/;
  * const token = seal({ email }, VERIFY_SECRET, { ttl: '24h' })
  */
 export function seal(payload, secret, options) {
-  assertBytesOrString(secret, 'secret');
+  assertSealSecret(secret);
   assertOptionalObject(options, 'options');
   if (isUndefined(options) || isUndefined(options.ttl)) {
     throw invalidArgument(
@@ -164,7 +184,7 @@ export function unseal(token, secret, options) {
     throw invalidArgument('secret list is empty — pass at least one key (or an array of keys for rotation)');
   }
   for (const s of secrets) {
-    assertBytesOrString(s, 'secret');
+    assertSealSecret(s);
   }
   assertOptionalObject(options, 'options');
   const bytes = decodeStrict(token, ErrorCode.TOKEN_MALFORMED);
