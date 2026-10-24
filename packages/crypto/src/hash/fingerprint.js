@@ -90,11 +90,27 @@ function _canonicalize(value, seen, path) {
   if (isSymbol(value) || isFunction(value) || isUndefined(value)) {
     throw invalidArgument(`${path} is a ${typeof value}; not hashable`);
   }
-  // From here: object-like.
+  // From here: object-like. `seen` holds the objects on the current path
+  // (ancestors) only — the same object reached twice through siblings is a
+  // shared reference, not a cycle, and hashes like any other value.
   if (seen.has(value)) {
     throw invalidArgument(`${path} contains a cyclic reference`);
   }
   seen.add(value);
+  try {
+    return _canonicalizeObject(value, seen, path);
+  } finally {
+    seen.delete(value);
+  }
+}
+
+/**
+ * @param {object} value
+ * @param {WeakSet<object>} seen
+ * @param {string} path
+ * @returns {string}
+ */
+function _canonicalizeObject(value, seen, path) {
   // Reject bytes before .toJSON — Buffer's .toJSON returns `{ type, data: [...] }`
   // which would silently produce a stable but surprising fingerprint.
   if (isBytes(value)) {
