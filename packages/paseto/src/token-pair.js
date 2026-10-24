@@ -103,7 +103,13 @@ export async function create(payload, options) {
   const accessExpiresAtSec = now + Math.floor(parseDurationSeconds(access.expiresIn));
   const refreshExpiresAtSec = now + Math.floor(parseDurationSeconds(refresh.expiresIn));
 
-  const accessToken = mintAccess(payload, secret.access, access);
+  // Token-pair durations are seconds (a bare number means seconds), while
+  // encrypt/sign read a bare number as milliseconds — hand them an explicit
+  // unit so the token's `exp` matches accessExpiresAt.
+  const accessToken = mintAccess(payload, secret.access, {
+    ...access,
+    expiresIn: `${accessExpiresAtSec - now}s`,
+  });
   const { plaintext: refreshPlaintext, storeKey: refreshStoreKey } = await _generateRefresh(
     refresh,
     payload,
@@ -285,7 +291,7 @@ async function _generateRefresh(refresh, payload, secret, expiresAtSec) {
     const expiresIn = expiresAtSec - Math.floor(Date.now() / 1000);
     plaintext = mintAccess({ ...payload, kind: 'refresh' }, secret, {
       purpose: refresh.purpose ?? 'local',
-      expiresIn,
+      expiresIn: `${expiresIn}s`,
     });
   } else {
     const size = refresh.tokenSize ?? 32;

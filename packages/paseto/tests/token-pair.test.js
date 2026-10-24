@@ -141,3 +141,21 @@ test('missing required options throw INVALID_ARGUMENT', async () => {
   );
   store._stop();
 });
+
+test('a numeric expiresIn is seconds for both the token exp and the reported expiry', async () => {
+  const store = createStore('memory');
+  const secret = { access: generateKey(), refresh: generateKey() };
+  const res = await create(
+    { userId: 1 },
+    { secret, access: { expiresIn: 900 }, refresh: { expiresIn: '30d', opaque: false, store } },
+  );
+  const now = Date.now();
+  const access = decrypt(res.accessToken, secret.access);
+  const accessExp = Date.parse(access.exp);
+  assert.ok(Math.abs(accessExp - res.accessExpiresAt.getTime()) < 2000, `access exp ${access.exp}`);
+  assert.ok(accessExp - now > 890_000);
+
+  const refresh = decrypt(res.refreshToken, secret.refresh);
+  assert.ok(Math.abs(Date.parse(refresh.exp) - res.refreshExpiresAt.getTime()) < 2000, `refresh exp ${refresh.exp}`);
+  store._stop();
+});
