@@ -258,3 +258,20 @@ test('an OIDC provider without an issuer is a definition error', () => {
     { code: ErrorCode.INVALID_ARGUMENT },
   );
 });
+
+test('an email the provider does not report as verified is flagged', async () => {
+  const provider = testProvider({ mapUser: raw => ({ sub: raw.sub, email: raw.email }) });
+  const oauth = createOAuth({
+    baseUrl: 'https://app.com',
+    callback: '/auth/{provider}/callback',
+    providers: [provider({ clientId: CLIENT_ID, clientSecret: 'secret' })],
+  });
+  const { session } = await oauth.authorize('test');
+  const parsed = JSON.parse(Buffer.from(session, 'base64url').toString());
+  idTokenToServe = await signer.mint(
+    { iss: as.issuer, sub: 'user-1', aud: CLIENT_ID, nonce: parsed.nonce },
+    { expiresIn: '5m' },
+  );
+  const { warnings } = await oauth.callback('test', { code: 'c', state: parsed.state }, { session });
+  assert.ok(warnings.some(w => w.code === 'EMAIL_UNVERIFIED'));
+});

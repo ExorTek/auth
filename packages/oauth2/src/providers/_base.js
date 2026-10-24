@@ -420,9 +420,18 @@ export async function handleCallback(provider, opts) {
     throw new OAuth2Error(ErrorCode.SUB_MISMATCH, `${provider.id} did not yield a stable subject id`);
   }
 
-  // surface an unverified email rather than trusting it.
-  if (isNonEmptyString(mapped.email) && mapped.emailVerified === false) {
-    warnings.push(warn(WarningCode.EMAIL_UNVERIFIED, `${provider.id} reports the email as unverified`));
+  // Surface an email that is not positively verified rather than trusting
+  // it. A provider that simply omits the flag (Entra's mutable `email`, the
+  // nOAuth account-takeover vector) counts as unverified too.
+  if (isNonEmptyString(mapped.email) && mapped.emailVerified !== true) {
+    warnings.push(
+      warn(
+        WarningCode.EMAIL_UNVERIFIED,
+        mapped.emailVerified === false
+          ? `${provider.id} reports the email as unverified`
+          : `${provider.id} does not report the email as verified`,
+      ),
+    );
   }
 
   /** @type {NormalizedUser} */
