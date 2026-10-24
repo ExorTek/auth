@@ -280,6 +280,7 @@ describe('authentication.finish — credential shape branches', () => {
     // publicKeyCose is already on the fixture credential; strip the
     // KeyObject to force the COSE-import path.
     const coseOnly = {
+      id: credential.id,
       publicKeyCose: credential.publicKeyCose,
       counter: credential.counter,
       idBytes: credential.idBytes,
@@ -330,6 +331,59 @@ describe('authentication.finish — credential shape branches', () => {
           credential: bare,
         }),
       err => err instanceof PasskeyError && err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+  });
+});
+
+describe('authentication.finish — credential / user binding', () => {
+  async function ceremony({ userId } = {}) {
+    const store = memoryIncrStore();
+    const { credential, privateKey } = await register(store);
+    const beginRes = await authBegin({ rpId: RP_ID, challengeSecret: SECRET, challengeStore: store, userId });
+    const assertion = makeAssertionResponse({
+      rpId: RP_ID,
+      challengeBase64Url: beginRes.options.challenge,
+      origin: ORIGIN,
+      privateKey,
+      counter: 5,
+      credentialId: credential.idBytes,
+    });
+    const base = {
+      response: assertion,
+      challengeToken: beginRes.challengeToken,
+      expectedRpId: RP_ID,
+      expectedOrigin: ORIGIN,
+      challengeSecret: SECRET,
+      challengeStore: store,
+    };
+    return { credential, base };
+  }
+  const mismatch = err => err instanceof PasskeyError && err.code === ErrorCode.CREDENTIAL_MISMATCH;
+
+  test('requires the stored credential id and refuses a different credential', async () => {
+    const { credential, base } = await ceremony();
+    await assert.rejects(
+      authFinish({ ...base, credential: { ...credential, id: undefined } }),
+      err => err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+    await assert.rejects(authFinish({ ...base, credential: { ...credential, id: 'AAAA' } }), mismatch);
+  });
+
+  test("an attacker's own passkey cannot complete the victim's ceremony", async () => {
+    const { credential, base } = await ceremony({ userId: 'victim' });
+    // The app looked up the credential by response.id (the attacker's) and
+    // the user from the challenge (the victim).
+    await assert.rejects(
+      authFinish({ ...base, expectedUserId: 'victim', credential: { ...credential, userId: 'attacker' } }),
+      mismatch,
+    );
+  });
+
+  test('expectedUserId needs credential.userId', async () => {
+    const { credential, base } = await ceremony({ userId: 'u1' });
+    await assert.rejects(
+      authFinish({ ...base, expectedUserId: 'u1', credential }),
+      err => err.code === ErrorCode.INVALID_ARGUMENT,
     );
   });
 });
