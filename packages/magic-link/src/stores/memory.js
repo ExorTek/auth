@@ -14,11 +14,18 @@
 
 import { createMemoryRecordStore } from '@exortek/shared/record-store';
 import { createMemoryIncrStore } from '@exortek/shared/incr-store';
+import { isFunction } from '@exortek/shared/predicates';
 
 /**
+ * Records are swept once they expire, and the store holds at most
+ * `maxRecords` (oldest dropped first) — a link that is never clicked must
+ * not stay in memory forever.
+ *
+ * @param {{ maxRecords?: number, sweepMs?: number }} [options]
  * @returns {import('../index.js').MagicLinkStore & { _size: () => number, _stop: () => void }}
  */
-export function memoryStore() {
+export function memoryStore(options = {}) {
+  const { maxRecords = 100_000, sweepMs = 60_000 } = options;
   const store = createMemoryRecordStore({
     idField: 'id',
     indexField: 'email',
@@ -26,8 +33,36 @@ export function memoryStore() {
   });
   const incrStore = createMemoryIncrStore();
 
+  function drop(id) {
+    const record = store.byId.get(id);
+    store.byId.delete(id);
+    const set = record ? store.byIndex.get(record.email) : undefined;
+    set?.delete(id);
+    if (set?.size === 0) {
+      store.byIndex.delete(record.email);
+    }
+  }
+
+  const timer = setInterval(() => {
+    const now = Date.now();
+    for (const [id, record] of store.byId) {
+      if (record.expiresAt <= now) {
+        drop(id);
+      }
+    }
+  }, sweepMs);
+  if (isFunction(timer.unref)) {
+    timer.unref();
+  }
+
   return {
-    put: record => store.put(record),
+    async put(record) {
+      if (!store.byId.has(record.id) && store.byId.size >= maxRecords) {
+        // Map iteration order is insertion order: the first key is the oldest.
+        drop(store.byId.keys().next().value);
+      }
+      await store.put(record);
+    },
     getById: id => store.getById(id),
     listByEmail: email => store.listByIndex(email),
 
@@ -62,6 +97,9 @@ export function memoryStore() {
     },
 
     _size: () => store._size(),
-    _stop: () => incrStore._stop(),
+    _stop: () => {
+      clearInterval(timer);
+      incrStore._stop();
+    },
   };
 }

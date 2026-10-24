@@ -120,3 +120,17 @@ test('incrRate: expired counter resets to 1', async () => {
     store._stop();
   }
 });
+
+test('memoryStore drops expired links and caps its size', async () => {
+  const store = memoryStore({ maxRecords: 2, sweepMs: 1000 });
+  try {
+    const rec = (id, expiresAt) => ({ id, email: 'a@b.co', expiresAt, consumedAt: null });
+    await store.put(rec('1', Date.now() + 60_000));
+    await store.put(rec('2', Date.now() + 60_000));
+    await store.put(rec('3', Date.now() + 60_000));
+    assert.equal(store._size(), 2);
+    assert.equal(await store.getById('1'), null);
+  } finally {
+    store._stop();
+  }
+});
