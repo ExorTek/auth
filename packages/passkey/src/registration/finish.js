@@ -298,15 +298,13 @@ export async function finish(params) {
     ...resolveAttestationOptions(fmt, attestationOptions),
   });
 
-  // Trust-anchor policy. A format that carries a certificate chain
-  // (`packed` full, `tpm`, `apple`, `android-key`, `android-safetynet`,
-  // `fido-u2f`) reports `trustPath: 'no-anchor'` when the caller did
-  // not supply anchors for it — the chain was NOT verified to any root,
-  // so the attestation proves nothing about the authenticator's make.
-  // `none` (and `packed` self, which reports `'self'`) are exempt: they
-  // never had a chain to anchor. Opt in with `requireTrustAnchor` to
-  // turn that silent gap into a hard failure.
-  if (requireTrustAnchor && fmt !== 'none' && attestationReport.trustPath === 'no-anchor') {
+  // Trust-anchor policy. Only a certificate chain verified to a caller-
+  // supplied root proves anything about the authenticator's make; every
+  // other outcome — an unanchored chain (`'no-anchor'`), `packed` self
+  // attestation (`'self'`, signed by the credential key itself) and
+  // `none` — proves nothing. `requireTrustAnchor` therefore accepts only
+  // `'trust-anchor'`; without it, unanchored attestation is accepted.
+  if (requireTrustAnchor && attestationReport.trustPath !== 'trust-anchor') {
     throw new PasskeyError(
       ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING,
       `registration.finish: attestation format "${fmt}" was not verified against any trust anchor ` +
