@@ -42,7 +42,7 @@ The second argument is polymorphic. All five shapes are first-class.
 | ------------------------------ | ------------------------------------------------------------------------------------ |
 | `KeyObject` (public / secret)  | Used directly.                                                                        |
 | `Buffer` / `Uint8Array`        | HMAC secret. Non-HS* algorithms raise `INVALID_KEY`.                                 |
-| JWK object                     | Normalised into a `KeyObject`. `kty` must match the algorithm family.                 |
+| JWK object                     | Normalised into a `KeyObject` (once per object). `kty` must match the algorithm family; a declared `alg`, `use` (`sig`) or `key_ops` (`verify`) must match too. |
 | JWK array (JWKS-like)          | Picked by matching `kid` against the token's header. Single-key array bypasses match. |
 | `async (header) => key`        | Awaited, then normalised. Return a `KeyObject`, JWK, or `Buffer`.                     |
 

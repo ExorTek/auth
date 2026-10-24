@@ -31,8 +31,16 @@ const { payload: out } = await decryptJson(jwe, rsaPrivateKey, {
 
 ```ts
 encryptJson(payload, recipients, options) → Promise<GeneralJwe>
-decryptJson(jwe, key, options) → Promise<{ protectedHeader, payload }>
+decryptJson(jwe, key, options) → Promise<{ protectedHeader, unprotectedHeader, header, payload }>
 ```
+
+`protectedHeader` holds only what the authentication tag covers;
+`unprotectedHeader` is the shared + per-recipient unprotected members and
+`header` the joint header the recipient was processed with. The three
+header sources must be disjoint (RFC 7516 §7.2.1) and `crit` must be
+protected — an unprotected copy of a protected parameter is
+`INVALID_HEADER`, never a silent override. `maxTokenSize` (default 64 KiB)
+and `maxRecipients` (default 8) bound the work before any unwrap.
 
 `decryptJson` accepts both the General shape (a `recipients` array) and the
 Flattened shape (a single recipient inlined at the top level).
@@ -41,7 +49,8 @@ Flattened shape (a single recipient inlined at the top level).
 
 - **`recipients`** — `[{ key, alg, kid?, header?, apu?, apv? }]`, non-empty.
 - **`options.enc`** — required content-encryption algorithm.
-- **`options.header`** — extra protected params (`enc` lives here).
+- **`options.header`** — extra protected params (`enc` lives here). A
+  parameter may not be set both here and on a recipient.
 - **`options.aad`** — optional JWE AAD (`string` / `Buffer`), bound into the
   tag and emitted as the `aad` member.
 - **`options.expiresIn`** — stamps `exp` on object payloads.
