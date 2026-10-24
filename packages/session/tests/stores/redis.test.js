@@ -249,3 +249,24 @@ test('redisStore: works with an MGET-capable client', async () => {
   assert.equal(list.length, 2);
   assert.ok(mgetCalls > 0, 'listByUser should batch reads through MGET');
 });
+
+test('redisStore: update with the current record skips the re-read', async () => {
+  const client = fakeIoredis();
+  const store = redisStore(client);
+  await store.put(makeRecord({ sid: 'a' }));
+  const current = await store.get('a');
+  let reads = 0;
+  for (const name of ['get', 'mget']) {
+    const original = client[name];
+    if (original) {
+      client[name] = (...args) => {
+        reads++;
+        return original.apply(client, args);
+      };
+    }
+  }
+  const next = await store.update('a', { lastSeenAt: 42 }, current);
+  assert.equal(next.lastSeenAt, 42);
+  assert.equal(reads, 0);
+  assert.equal((await store.get('a')).lastSeenAt, 42);
+});

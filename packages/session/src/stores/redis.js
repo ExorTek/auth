@@ -193,14 +193,19 @@ export function redisStore(client, options = {}) {
         throw invalidArgument('redisStore.put.record.sid must be a string');
       }
       const ttlMs = Math.max(1, record.expiresAt - Date.now());
-      await writeRecord(record, ttlMs);
-      if (record.uid != null) {
-        await indexAdd(record.uid, record.sid, ttlMs);
-      }
+      // The record and its user-index entry are independent writes — send
+      // them together instead of one round trip after the other.
+      await Promise.all([
+        writeRecord(record, ttlMs),
+        record.uid != null ? indexAdd(record.uid, record.sid, ttlMs) : undefined,
+      ]);
     },
 
-    async update(sid, patch) {
-      const existing = await readRecord(sid);
+    // `current` (the record the caller just read) saves the re-read on the
+    // hot rolling-touch path. A revocation is a separate tombstone key, so
+    // writing over a stale copy can never un-revoke a session.
+    async update(sid, patch, current) {
+      const existing = current !== undefined && current?.sid === sid ? current : await readRecord(sid);
       if (!existing) {
         return null;
       }

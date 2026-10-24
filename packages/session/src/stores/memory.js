@@ -26,8 +26,10 @@ import { ErrorCode, SessionError } from '../errors.js';
  * @property {(sid: string) => Promise<SessionRecord | null>} get
  * @property {(record: SessionRecord) => Promise<void>} put
  *   Insert-or-replace. Also updates the reverse `user → set(sid)` index.
- * @property {(sid: string, patch: Partial<SessionRecord>) => Promise<SessionRecord | null>} update
- *   Merge-patch a session. Returns the updated record, or `null` if the
+ * @property {(sid: string, patch: Partial<SessionRecord>, current?: SessionRecord) => Promise<SessionRecord | null>} update
+ *   Merge-patch a session. `current` is the record the caller just read
+ *   with `get` — a store may use it to skip re-reading (the manager's
+ *   rolling touch passes it). Returns the updated record, or `null` if the
  *   sid isn't present.
  * @property {(sid: string, reason?: string) => Promise<boolean>} revoke
  *   Mark a single session as revoked. Returns `true` if it was already

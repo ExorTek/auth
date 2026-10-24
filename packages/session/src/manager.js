@@ -459,7 +459,7 @@ export function createSessionManager(config) {
     }
     // Rolling touch — sampled at touchEvery to bound store write traffic.
     if (now - record.lastSeenAt > touchEveryMs) {
-      await store.update(payload.sid, { lastSeenAt: now });
+      await store.update(payload.sid, { lastSeenAt: now }, record);
       record.lastSeenAt = now;
     }
     const session = projectSession(record);
