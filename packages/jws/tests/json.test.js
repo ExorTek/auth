@@ -168,3 +168,20 @@ test('verifyJson: neither `signatures` nor `signature` present → INVALID_TOKEN
     err => err instanceof JwsError && err.code === ErrorCode.INVALID_TOKEN,
   );
 });
+
+test('verifyJson: size and signature-count limits apply before any verification', async () => {
+  const key = randomBytes(32);
+  const flat = await signJson({ a: 1 }, [{ key, options: { alg: 'HS256' } }]);
+  const many = {
+    payload: flat.payload,
+    signatures: Array.from({ length: 9 }, () => ({ protected: flat.protected, signature: flat.signature })),
+  };
+  await assert.rejects(
+    verifyJson(many, key, { alg: ['HS256'] }),
+    err => err.code === 'INVALID_TOKEN' && /maxSignatures/.test(err.message),
+  );
+  assert.ok(await verifyJson({ ...many, signatures: many.signatures.slice(0, 8) }, key, { alg: ['HS256'] }));
+
+  const big = { ...flat, payload: 'A'.repeat(70_000) };
+  await assert.rejects(verifyJson(big, key, { alg: ['HS256'] }), err => err.code === 'TOKEN_TOO_LARGE');
+});
