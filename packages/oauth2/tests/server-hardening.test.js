@@ -583,3 +583,12 @@ test('a replayed authorization code revokes the refresh family it produced', asy
   assert.equal(body(await redeem()).error, 'invalid_grant');
   assert.equal(body(await refresh(server, first.refresh_token)).error, 'invalid_grant');
 });
+
+test('introspection refuses a public client unless allowed', async () => {
+  const pub = { clientId: 'spa', tokenEndpointAuthMethod: 'none', redirectUris: ['https://spa.example.com/cb'] };
+  const refused = buildServer({ clients: [pub] }).server;
+  const res = await refused.introspect(post({ token: 'x', client_id: 'spa' }));
+  assert.equal(res.status, 401);
+  const allowed = buildServer({ clients: [pub], introspection: { allowPublicClients: true } }).server;
+  assert.equal((await allowed.introspect(post({ token: 'x', client_id: 'spa' }))).status, 200);
+});

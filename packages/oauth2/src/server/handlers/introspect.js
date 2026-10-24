@@ -13,6 +13,10 @@
  * user identities). Deployments where trusted resource servers must
  * introspect any client's token opt in with
  * `introspection: { allowCrossClient: true }`.
+ *
+ * A public client authenticates by `client_id` alone, so it is refused
+ * unless `introspection.allowPublicClients` is set — otherwise anyone who
+ * knows a public client's id could query its tokens.
  */
 import { isArray, isNonEmptyString, isObject } from '@exortek/shared/predicates';
 
@@ -36,6 +40,9 @@ export function createIntrospectHandler(config) {
       }
 
       const client = await authenticateClient(req, config);
+      if (client.isPublic && config.introspection?.allowPublicClients !== true) {
+        throw new ServerError(ProtocolError.INVALID_CLIENT, 'introspection requires a confidential client');
+      }
 
       const token = req.form.token;
       if (!isNonEmptyString(token)) {
