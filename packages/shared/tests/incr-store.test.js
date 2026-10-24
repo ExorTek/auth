@@ -29,29 +29,22 @@ describe('createMemoryIncrStore', () => {
     assert.equal(res.count, 1);
   });
 
-  test('maxKeys evicts oldest entry', async () => {
+  test('a full store never evicts a live counter — it fails closed', async () => {
     store = createMemoryIncrStore({ maxKeys: 2 });
     await store.incr('a', 60_000);
     await store.incr('b', 60_000);
-    await store.incr('c', 60_000);
-    assert.equal(store._size(), 2);
-    // 'a' was evicted — fresh incr gives count 1
-    const res = await store.incr('a', 60_000);
-    assert.equal(res.count, 1);
+    // Evicting 'a' would reset its count (a rate limit, a replay marker).
+    await assert.rejects(store.incr('c', 60_000), /live/);
+    assert.equal((await store.incr('a', 60_000)).count, 2);
   });
 
-  test('LRU: accessing an entry refreshes its position', async () => {
+  test('expired counters are reclaimed to make room', async () => {
     store = createMemoryIncrStore({ maxKeys: 2 });
-    await store.incr('a', 60_000);
+    await store.incr('a', 1);
     await store.incr('b', 60_000);
-    // touch 'a' again so 'b' becomes oldest
-    await store.incr('a', 60_000);
-    await store.incr('c', 60_000);
-    // 'b' was evicted, 'a' survives
-    const resA = await store.incr('a', 60_000);
-    assert.equal(resA.count, 3);
-    const resB = await store.incr('b', 60_000);
-    assert.equal(resB.count, 1);
+    await new Promise(r => setTimeout(r, 5));
+    assert.equal((await store.incr('c', 60_000)).count, 1);
+    assert.equal((await store.incr('b', 60_000)).count, 2);
   });
 
   test('validation rejects bad maxKeys', () => {
