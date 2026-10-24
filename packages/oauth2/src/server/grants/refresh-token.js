@@ -91,6 +91,7 @@ export async function refreshTokenGrant(req, ctx) {
     scope,
     audience,
     dpopJkt: record.dpopJkt,
+    confirmation: ctx.confirmation,
   });
   body.refresh_token = nextToken;
 

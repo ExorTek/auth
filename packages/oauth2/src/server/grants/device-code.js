@@ -73,6 +73,7 @@ export async function deviceCodeGrant(req, ctx) {
     clientId: client.clientId,
     scope: record.scope,
     dpopJkt: ctx.dpopJkt,
+    confirmation: ctx.confirmation,
   });
 
   if (refreshAllowed(config, client)) {

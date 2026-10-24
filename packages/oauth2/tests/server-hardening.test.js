@@ -350,3 +350,41 @@ test('token exchange: a prior actor chain nests under the new act', async () => 
   const claims = JSON.parse(Buffer.from(twice.access_token.split('.')[1], 'base64url').toString());
   assert.deepEqual(claims.act, { sub: 'alice', act: { sub: 'alice' } });
 });
+
+// CERTIFICATE BINDING
+
+test('refresh and device grants keep mTLS certificate binding', async () => {
+  const der = Buffer.from('device-cert-der');
+  const { createHash } = await import('node:crypto');
+  const thumb = createHash('sha256').update(der).digest('base64url');
+  const DEVICE = 'urn:ietf:params:oauth:grant-type:device_code';
+  const { server } = buildServer({
+    clients: [
+      {
+        clientId: 'mtls',
+        tokenEndpointAuthMethod: 'self_signed_tls_client_auth',
+        certificateThumbprint: thumb,
+        redirectUris: ['https://x.example.com/cb'],
+        grantTypes: [DEVICE, 'refresh_token'],
+        scope: ['read'],
+      },
+    ],
+    grants: [DEVICE, 'refresh_token'],
+  });
+  const call = (handler, params) =>
+    handler({
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: 'mtls', ...params }).toString(),
+      clientCertificate: { raw: der },
+    });
+  const cnfOf = tok => JSON.parse(Buffer.from(tok.split('.')[1], 'base64url').toString()).cnf;
+
+  const da = body(await call(server.deviceAuthorization, { scope: 'read' }));
+  await server.device.approve(da.user_code, { subject: 'user-1' });
+  const tok = body(await call(server.token, { grant_type: DEVICE, device_code: da.device_code }));
+  assert.equal(cnfOf(tok.access_token)['x5t#S256'], thumb);
+
+  const refreshed = body(await call(server.token, { grant_type: 'refresh_token', refresh_token: tok.refresh_token }));
+  assert.equal(cnfOf(refreshed.access_token)['x5t#S256'], thumb);
+});
