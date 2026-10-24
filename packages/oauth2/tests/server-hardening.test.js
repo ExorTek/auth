@@ -255,3 +255,12 @@ test('refresh: the memory store evicts expired tokens in the background', async 
   await store.revokeFamily('f1');
   assert.equal(await store.get('r1'), null);
 });
+
+test('refresh: a narrowed request does not narrow the successor refresh token', async () => {
+  const { server } = buildServer();
+  const first = await issueRefresh(server);
+  const narrowed = body(await refresh(server, first.refresh_token, { scope: 'read' }));
+  assert.equal(narrowed.scope, 'read');
+  const next = body(await refresh(server, narrowed.refresh_token, { scope: 'write' }));
+  assert.equal(next.scope, 'write');
+});

@@ -69,7 +69,9 @@ export async function refreshTokenGrant(req, ctx) {
     token: nextToken,
     familyId: record.familyId,
     clientId: client.clientId,
-    scope,
+    // RFC 6749 §6: the new refresh token's scope MUST be identical to the
+    // presented one's — a narrowed request narrows this access token only.
+    scope: record.scope,
     subject: record.subject,
     resource: record.resource,
     dpopJkt: record.dpopJkt,
