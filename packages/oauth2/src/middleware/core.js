@@ -54,6 +54,8 @@ const DEFAULT_MAX_AGE_SEC = 600; // 10 minutes — matches the default maxAuthAg
  * @property {string} [attach='oauth']
  */
 
+const MIN_SECRET_BYTES = 32;
+
 /**
  * @param {LoginConfig} config
  */
@@ -71,6 +73,18 @@ export function normalizeLoginConfig(config) {
   const seal = config.seal === 'jwe' ? 'jwe' : 'sign';
   if (seal === 'jwe' && !isNonEmptyString(secret)) {
     throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, "seal: 'jwe' requires a secret");
+  }
+  // api mode hands the flow session (PKCE verifier, nonce, state,
+  // createdAt) to the client to bring back — unsigned, the client could
+  // rewrite any of it, including the createdAt the freshness check trusts.
+  if (mode === 'api' && !isNonEmptyString(secret)) {
+    throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, "mode: 'api' requires a secret to sign the flow session");
+  }
+  if (isNonEmptyString(secret) && Buffer.byteLength(secret, 'utf8') < MIN_SECRET_BYTES) {
+    throw new OAuth2Error(
+      ErrorCode.INVALID_ARGUMENT,
+      `the flow-session secret must be at least ${MIN_SECRET_BYTES} bytes`,
+    );
   }
 
   return Object.freeze({
