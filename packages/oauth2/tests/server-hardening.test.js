@@ -232,3 +232,26 @@ test('refresh: a rotated token keeps the family expiry', async () => {
   await new Promise(r => setTimeout(r, 100));
   assert.equal(body(await refresh(server, rotated.refresh_token)).error, 'invalid_grant');
 });
+
+test('refresh: two simultaneous redemptions cannot fork the family', async () => {
+  const { server } = buildServer();
+  const first = await issueRefresh(server);
+  const results = (await Promise.all([refresh(server, first.refresh_token), refresh(server, first.refresh_token)])).map(
+    body,
+  );
+  const winners = results.filter(r => r.refresh_token);
+  assert.equal(winners.length, 1);
+  assert.equal(results.find(r => !r.refresh_token).error, 'invalid_grant');
+  // The race is treated as reuse: the winner's successor is burned too.
+  assert.equal(body(await refresh(server, winners[0].refresh_token)).error, 'invalid_grant');
+});
+
+test('refresh: the memory store evicts expired tokens in the background', async () => {
+  const { createRefreshStore } = await import('../src/server/stores.js');
+  const store = createRefreshStore({ sweepIntervalMs: 10 });
+  await store.save({ token: 'r1', familyId: 'f1', clientId: 'app', scope: [], expiresAt: Date.now() + 5 });
+  await new Promise(r => setTimeout(r, 40));
+  assert.equal(await store.get('r1'), null);
+  await store.revokeFamily('f1');
+  assert.equal(await store.get('r1'), null);
+});

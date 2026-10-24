@@ -27,6 +27,8 @@ import { createRedisRecordStore } from '@exortek/shared/record-store';
 import { isFunction } from '@exortek/shared/predicates';
 
 const DEFAULT_PREFIX = 'oauth2:';
+// Claim-key lifetime for a family that carries no expiry (legacy records).
+const CLAIM_FALLBACK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * GET-then-DEL a key, atomically when the client supports `GETDEL`
@@ -117,6 +119,7 @@ export function createRedisRefreshStore(client, options = {}) {
   /** @param {{ expiresAt?: number }} record */
   const ttlOf = record =>
     typeof record.expiresAt === 'number' ? Math.max(1, record.expiresAt - Date.now()) : undefined;
+  const claimKey = token => `${options.keyPrefix ?? DEFAULT_PREFIX}refresh:claim:${token}`;
 
   return {
     async save(record) {
@@ -129,9 +132,18 @@ export function createRedisRefreshStore(client, options = {}) {
       }
       return record;
     },
+    // Compare-and-set across nodes: the first redemption creates the claim
+    // key (SET NX) and wins; a concurrent one finds it and resolves false,
+    // which the grant treats as reuse. The claim lives as long as the
+    // family, so a late replay is still caught after the record is gone.
     async rotate(oldToken, next) {
+      const won = await store.helpers.setIfAbsent(claimKey(oldToken), '1', ttlOf(next) ?? CLAIM_FALLBACK_TTL_MS);
+      if (!won) {
+        return false;
+      }
       await store.update(oldToken, { used: true });
       await store.put(next, ttlOf(next));
+      return true;
     },
     async revokeFamily(familyId) {
       const members = await store.listByIndex(familyId);

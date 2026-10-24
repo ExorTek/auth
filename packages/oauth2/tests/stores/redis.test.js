@@ -27,15 +27,21 @@ function fakeClient() {
     async get(k) {
       return live(k) ? kv.get(k) : null;
     },
-    // Mirrors real SET semantics for both driver call forms: PX sets an
-    // expiry, KEEPTTL keeps it, anything else clears it.
+    // Mirrors real SET semantics for both driver call forms: NX refuses an
+    // existing key, PX sets an expiry, KEEPTTL keeps it, anything else
+    // clears it.
     async set(k, v, ...rest) {
+      const nx = rest.includes('NX') || rest[0]?.NX === true;
+      if (nx && live(k)) {
+        return null;
+      }
       kv.set(k, v);
       const opts = typeof rest[0] === 'object' && rest[0] !== null ? rest[0] : null;
       const ix = rest.indexOf('PX');
       if (ix !== -1) ttl.set(k, Date.now() + Number(rest[ix + 1]));
       else if (opts?.PX !== undefined) ttl.set(k, Date.now() + Number(opts.PX));
       else if (!rest.includes('KEEPTTL') && !opts?.KEEPTTL) ttl.delete(k);
+      return 'OK';
     },
     _ttl: ttl,
     async del(k) {

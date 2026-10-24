@@ -57,6 +57,18 @@ forEachRedisDriver('oauth2 server stores', ({ test, client, ns, raw }) => {
     }
   });
 
+  test('refresh rotate is a compare-and-set across clients', async () => {
+    const store = createRedisRefreshStore(client(), { keyPrefix: ns('c3') });
+    const base = { familyId: 'f1', clientId: 'app', scope: [], expiresAt: Date.now() + 60_000 };
+    await store.save({ ...base, token: 't1' });
+
+    const outcomes = await Promise.all([
+      store.rotate('t1', { ...base, token: 't2a' }),
+      store.rotate('t1', { ...base, token: 't2b' }),
+    ]);
+    assert.deepEqual(outcomes.sort(), [false, true]);
+  });
+
   test('an expired refresh record reads as absent', async () => {
     const store = createRedisRefreshStore(client(), { keyPrefix: ns('d') });
     await store.save({ token: 't1', familyId: 'f1', clientId: 'app', scope: [], expiresAt: Date.now() - 1 });

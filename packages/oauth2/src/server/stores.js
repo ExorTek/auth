@@ -143,34 +143,63 @@ export function createAuthCodeStore() {
  * @typedef {Object} RefreshStore
  * @property {(record: RefreshRecord) => Promise<void>} save
  * @property {(token: string) => Promise<RefreshRecord | null>} get
- * @property {(oldToken: string, next: RefreshRecord) => Promise<void>} rotate
+ * @property {(oldToken: string, next: RefreshRecord) => Promise<boolean | void>} rotate
+ *   Atomically claim `oldToken` and persist `next`. Resolve `false` when the
+ *   token was already rotated or revoked (a concurrent redemption won), so the
+ *   grant treats it as reuse. A store that resolves nothing is treated as a
+ *   successful rotation (pre-CAS custom stores).
  * @property {(familyId: string) => Promise<void>} revokeFamily
  */
 
-/** @returns {RefreshStore} */
-export function createRefreshStore() {
+/**
+ * @param {{ sweepIntervalMs?: number }} [options]
+ * @returns {RefreshStore}
+ */
+export function createRefreshStore({ sweepIntervalMs = 60_000 } = {}) {
   const store = createMemoryRecordStore({ idField: 'token', indexField: 'familyId' });
+
+  // The record store has no TTL of its own: evict expired tokens in the
+  // background so a family that is never presented again cannot leak.
+  const sweep = setInterval(() => {
+    const now = Date.now();
+    for (const [token, record] of store.byId) {
+      const { expiresAt, familyId } = /** @type {RefreshRecord} */ (record);
+      if (isNumber(expiresAt) && expiresAt <= now) {
+        store.byId.delete(token);
+        const members = store.byIndex.get(familyId);
+        members?.delete(token);
+        if (members?.size === 0) {
+          store.byIndex.delete(familyId);
+        }
+      }
+    }
+  }, sweepIntervalMs);
+  if (isFunction(sweep.unref)) {
+    sweep.unref();
+  }
+
   return {
     async save(record) {
       await store.put(record);
     },
     async get(token) {
       const record = /** @type {RefreshRecord | null} */ (await store.getById(token));
-      // An expired refresh token is treated as absent (the memory record
-      // store has no TTL of its own); a Redis-backed store would let the
-      // key expire instead.
+      // An expired refresh token is treated as absent.
       if (record && isNumber(record.expiresAt) && record.expiresAt <= Date.now()) {
         return null;
       }
       return record;
     },
-    // Mark the presented token used and persist its successor. If the
-    // presented token was ALREADY used, the caller detects reuse from
-    // `get` first and calls `revokeFamily` instead — this only runs on a
-    // legitimate rotation.
+    // Compare-and-set: the check and the `used` flip happen in one
+    // synchronous step, so of two concurrent redemptions exactly one wins.
     async rotate(oldToken, next) {
-      await store.update(oldToken, { used: true });
+      const existing = /** @type {RefreshRecord | undefined} */ (store.byId.get(oldToken));
+      if (!existing || existing.used === true || existing.revoked === true) {
+        return false;
+      }
+      existing.used = true;
       await store.put(next);
+      return true;
     },
     async revokeFamily(familyId) {
       const members = await store.listByIndex(familyId);
