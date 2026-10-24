@@ -132,7 +132,7 @@ const KNOWN_METHODS = new Set([
 /**
  * @typedef {'malformed' | 'bad_signature' | 'expired' | 'not_yet_valid'
  *   | 'user_mismatch' | 'method_mismatch' | 'step_mismatch'
- *   | 'next_step_mismatch' | 'ip_mismatch' | 'ip_missing' | 'replay'
+ *   | 'next_step_mismatch' | 'ip_mismatch' | 'ip_missing' | 'replay' | 'consume_required'
  *   | 'store_unavailable'} VerifyFailureReason
  */
 
@@ -301,6 +301,11 @@ export async function verifyChallenge(token, options) {
     if (options.ip !== payload.ip) {
       return { valid: false, reason: 'ip_mismatch' };
     }
+  }
+  // A single-use challenge verified without consuming it could be replayed
+  // indefinitely — its single-use guarantee lives entirely in the store.
+  if (payload.su === 1 && !consume) {
+    return { valid: false, reason: 'consume_required' };
   }
   if (consume && payload.su === 1) {
     const ttlMs = Math.max(1, payload.exp * 1000 - now);
