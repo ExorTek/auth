@@ -64,7 +64,11 @@ export function leakyBucket(config) {
         if (level + 1 > capacity) {
           const overflow = level + 1 - capacity;
           const retryAfter = Math.max(1, Math.ceil(overflow / leakRate));
-          nextState = encodeState(level, now);
+          // A denial leaves the stored state untouched. Rewriting it would
+          // re-quantize the fractional refill to milli-units and move
+          // updatedAt forward on every rejected call — a client polling
+          // every millisecond then gains (or loses) refill to rounding.
+          nextState = null;
           result = {
             allowed: false,
             remaining: 0,
@@ -83,6 +87,9 @@ export function leakyBucket(config) {
           };
         }
 
+        if (nextState === null) {
+          return result;
+        }
         if (hasCas) {
           const wrote = await store.compareAndSet(storeKey, rawState, nextState, ttlMs);
           if (!wrote) {
