@@ -1,4 +1,5 @@
 import { assertRedisClient } from '@exortek/shared/redis-guard';
+import { createRedisHelpers } from '@exortek/shared/redis-helpers';
 import { isArray, isFunction } from '@exortek/shared/predicates';
 
 import { invalidArgument } from '../../internal/guards.js';
@@ -113,6 +114,7 @@ export function redisStore(client, options = {}) {
 
   const prefix = options.prefix ?? 'rl:';
   const k = key => `${prefix}${key}`;
+  const helpers = createRedisHelpers(client);
 
   // ioredis exposes `defineCommand` — cache the scripts once so subsequent
   // calls go out as EVALSHA (saves bandwidth + parse cost per request).
@@ -216,9 +218,10 @@ export function redisStore(client, options = {}) {
     },
 
     async set(key, count, ttlMs) {
-      // node-redis v4 accepts positional 'PX', ttl on its `set` command;
-      // ioredis and Upstash do too.
-      await client.set(k(key), String(count), 'PX', ttlMs);
+      // Dispatched per driver: node-redis takes `{ PX }` and silently
+      // ignores the ioredis-style positional `'PX', ttl` — storing the key
+      // with no expiry, which made every `withBan` ban unenforceable.
+      await helpers.setWithTTL(k(key), String(count), ttlMs);
     },
 
     async decr(key) {
