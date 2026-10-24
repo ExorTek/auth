@@ -124,6 +124,11 @@ describe('resolve', () => {
     assert.equal(key.type, 'public');
   });
 
+  test('imports a key once and reuses it', async () => {
+    const ks = await createLocalKeySet([{ alg: 'ES256', kid: 'r1' }]);
+    assert.equal(await ks.resolve({ kid: 'r1' }), await ks.resolve({ kid: 'r1' }));
+  });
+
   test('throws KID_NOT_FOUND for unknown kid', async () => {
     const ks = await createLocalKeySet([{ alg: 'ES256', kid: 'r1' }]);
     const err = await ks.resolve({ kid: 'unknown' }).catch(e => e);

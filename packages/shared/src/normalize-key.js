@@ -37,7 +37,67 @@ import { KeyObject, createPrivateKey, createPublicKey, createSecretKey } from 'n
  * @param {{ INVALID_KEY: string }} opts.ErrorCode
  * @param {(alg: string) => AlgDescriptor} opts.lookupAlg
  */
+/**
+ * Memoise imported keys so a verifier handed the same JWK object or PEM
+ * string on every request doesn't re-parse it each time (~35 % of an
+ * ES256 verify). Only successful imports are cached, per alg + direction
+ * (the validation differs between them). JWK objects are keyed by
+ * identity in a WeakMap — treat key inputs as immutable; PEM strings live
+ * in a small bounded map.
+ */
+export function createImportCache({ maxStrings = 256 } = {}) {
+  /** @type {WeakMap<object, Map<string, KeyObject>>} */
+  const byObject = new WeakMap();
+  /** @type {Map<string, KeyObject>} */
+  const byString = new Map();
+  return {
+    /**
+     * @param {object} input
+     * @param {string} tag
+     * @param {() => KeyObject} build
+     * @returns {KeyObject}
+     */
+    object(input, tag, build) {
+      let perInput = byObject.get(input);
+      const hit = perInput?.get(tag);
+      if (hit) {
+        return hit;
+      }
+      const key = build();
+      if (!perInput) {
+        perInput = new Map();
+        byObject.set(input, perInput);
+      }
+      perInput.set(tag, key);
+      return key;
+    },
+    /**
+     * @param {string} input
+     * @param {string} tag
+     * @param {() => KeyObject} build
+     * @returns {KeyObject}
+     */
+    string(input, tag, build) {
+      const id = `${tag}\0${input}`;
+      const hit = byString.get(id);
+      if (hit) {
+        byString.delete(id);
+        byString.set(id, hit);
+        return hit;
+      }
+      const key = build();
+      if (byString.size >= maxStrings) {
+        byString.delete(byString.keys().next().value);
+      }
+      byString.set(id, key);
+      return key;
+    },
+  };
+}
+
 export function createKeyNormalizer({ ErrorClass, ErrorCode, lookupAlg }) {
+  const imports = createImportCache();
+
   /**
    * @param {AlgDescriptor} meta
    * @returns {string[] | null}
@@ -233,7 +293,9 @@ export function createKeyNormalizer({ ErrorClass, ErrorCode, lookupAlg }) {
       return fromBytes(/** @type {Buffer | Uint8Array} */ (key), meta, alg);
     }
     if (key && typeof key === 'object' && 'kty' in /** @type {any} */ (key)) {
-      return fromJwk(/** @type {Record<string, unknown>} */ (key), meta, direction, alg);
+      return imports.object(/** @type {object} */ (key), `${alg}:${direction}`, () =>
+        fromJwk(/** @type {Record<string, unknown>} */ (key), meta, direction, alg),
+      );
     }
     return null;
   }

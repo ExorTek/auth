@@ -20,7 +20,7 @@
 
 import { createPrivateKey, createPublicKey, createSecretKey, X509Certificate } from 'node:crypto';
 
-import { createKeyNormalizer } from '@exortek/shared/normalize-key';
+import { createImportCache, createKeyNormalizer } from '@exortek/shared/normalize-key';
 import { isString } from '@exortek/shared/predicates';
 
 import { JwtError, ErrorCode } from './errors.js';
@@ -29,6 +29,9 @@ import { lookup as lookupAlg } from './algorithms.js';
 /**
  * @typedef {import('node:crypto').KeyObject | Buffer | Uint8Array | string | Record<string, unknown>} KeyInput
  */
+
+// PEM / HMAC-secret strings handed in on every call are parsed once.
+const pemImports = createImportCache();
 
 const shared = createKeyNormalizer({
   ErrorClass: JwtError,
@@ -44,7 +47,7 @@ const shared = createKeyNormalizer({
  */
 export async function normalizeKey(key, alg, direction) {
   if (isString(key)) {
-    return _fromString(key, lookupAlg(alg), direction, alg);
+    return pemImports.string(key, `${alg}:${direction}`, () => _fromString(key, lookupAlg(alg), direction, alg));
   }
   const out = await shared.normalizeCore(key, alg, direction);
   if (out !== null) {
