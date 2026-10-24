@@ -158,3 +158,11 @@ test('unknown critical header is rejected unless declared known', async () => {
   const { payload } = await decrypt(token, key, { alg: ['dir'], enc: ['A256GCM'], knownCriticalHeaders: ['exp2'] });
   assert.equal(payload.a, 1);
 });
+
+test('a JWE with zip is rejected instead of returning deflated bytes', async () => {
+  const { randomBytes } = await import('node:crypto');
+  const { encrypt, decrypt } = await import('../src/index.js');
+  const key = randomBytes(32);
+  const token = await encrypt({ a: 1 }, key, { alg: 'dir', enc: 'A256GCM', header: { zip: 'DEF' } });
+  await assert.rejects(decrypt(token, key, { alg: ['dir'], enc: ['A256GCM'] }), err => err.code === 'INVALID_HEADER');
+});
