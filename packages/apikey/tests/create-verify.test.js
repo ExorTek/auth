@@ -272,3 +272,19 @@ test('store error inside verify → store_unavailable', async () => {
   assert.equal(res.valid, false);
   assert.equal(res.reason, 'store_unavailable');
 });
+
+test('verifyApiKey: a wrong secret learns nothing about lifecycle state', async () => {
+  const store = newStore();
+  const pepper = randomBytes(32);
+  const { key, id } = await createApiKey({
+    store,
+    prefix: 'sk_live',
+    userId: 'u',
+    scopes: ['read'],
+    peppers: [pepper],
+  });
+  await store.update(id, { revokedAt: Date.now() });
+  const forged = key.slice(0, key.lastIndexOf('_') + 1) + 'A'.repeat(key.length - key.lastIndexOf('_') - 1);
+  assert.equal((await verifyApiKey(forged, { store, peppers: [pepper] })).reason, 'bad_secret');
+  assert.equal((await verifyApiKey(key, { store, peppers: [pepper] })).reason, 'revoked');
+});

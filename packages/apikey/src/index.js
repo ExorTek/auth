@@ -241,19 +241,15 @@ export async function verifyApiKey(rawKey, options) {
   if (!record) {
     return { valid: false, reason: 'not_found' };
   }
-  const now = _now(options.now);
-  if (record.revokedAt) {
-    return { valid: false, reason: 'revoked' };
-  }
-  if (record.expiresAt && record.expiresAt <= now) {
-    return { valid: false, reason: 'expired' };
-  }
   if (parsed.prefix !== record.prefix) {
     // Someone submitted a key whose id belongs to a different prefix —
     // treat as bad, not merely 'prefix_mismatch', because the id half
     // was correct: the attacker guessed the id and swapped the prefix.
     return { valid: false, reason: 'prefix_mismatch' };
   }
+  // The secret is checked before lifecycle state: the id is not secret (it
+  // is in every masked key), so answering 'revoked' / 'expired' first
+  // would tell anyone holding an id the key's status without its secret.
   const { candidateHashes } = candidateHashesFor(parsed.secret, peppers);
   let matched = false;
   let matchedIndex = -1;
@@ -266,6 +262,13 @@ export async function verifyApiKey(rawKey, options) {
   }
   if (!matched) {
     return { valid: false, reason: 'bad_secret' };
+  }
+  const now = _now(options.now);
+  if (record.revokedAt) {
+    return { valid: false, reason: 'revoked' };
+  }
+  if (record.expiresAt && record.expiresAt <= now) {
+    return { valid: false, reason: 'expired' };
   }
   if (isArray(requiredScopes) && requiredScopes.length > 0 && !hasAll(record.scopes, requiredScopes)) {
     return { valid: false, reason: 'missing_scope' };
