@@ -165,9 +165,13 @@ export async function verifyTotp(code, secret, options = {}) {
   // separate get-then-set would leave open under concurrency.
   if (options.replay) {
     const key = replayKey(options.replay.key, secret, matched);
-    // TTL: (window + 1) periods forward from now — the code stays inside
-    // the acceptance window that long, then naturally rolls off.
-    const ttlMs = (window + 1) * period * 1000;
+    // TTL: until the matched counter leaves the acceptance window, i.e.
+    // until the window centre passes `matched + window`. Measured from the
+    // matched counter, not from now: a code matched ahead of the centre
+    // stays acceptable up to (2·window + 1) periods, longer than a fixed
+    // (window + 1) — the marker would expire first and the code replay.
+    const windowEndMs = ((matched + window + 1) * period + t0) * 1000;
+    const ttlMs = Math.max(1, windowEndMs - timestamp);
     const { count } = await options.replay.store.incr(key, ttlMs);
     if (count > 1) {
       return false;
