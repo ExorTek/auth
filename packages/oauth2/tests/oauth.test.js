@@ -233,3 +233,14 @@ test('authorize on an unknown provider rejects', async () => {
     return true;
   });
 });
+
+test('caller params cannot override the flow-managed authorize parameters', async () => {
+  const oauth = mkOAuth();
+  for (const key of ['state', 'nonce', 'redirect_uri', 'code_challenge', 'code_challenge_method', 'scope']) {
+    await assert.rejects(oauth.authorize('test', { params: { [key]: 'attacker' } }), {
+      code: ErrorCode.INVALID_ARGUMENT,
+    });
+  }
+  const { url } = await oauth.authorize('test', { params: { prompt: 'consent' } });
+  assert.equal(new URL(url).searchParams.get('prompt'), 'consent');
+});

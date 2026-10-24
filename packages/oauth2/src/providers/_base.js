@@ -165,6 +165,17 @@ export async function resolveEndpoints(provider) {
   return ep;
 }
 
+const RESERVED_AUTHORIZATION_PARAMS = new Set([
+  'response_type',
+  'client_id',
+  'redirect_uri',
+  'state',
+  'nonce',
+  'scope',
+  'code_challenge',
+  'code_challenge_method',
+]);
+
 /**
  * Build the authorization-request URL and the flow session.
  *
@@ -219,6 +230,15 @@ export async function buildAuthorization(provider, opts) {
     params.set(k, v);
   }
   for (const [k, v] of Object.entries(opts.params ?? {})) {
+    if (RESERVED_AUTHORIZATION_PARAMS.has(k)) {
+      // These carry the flow's security bindings — overriding `state`,
+      // `nonce`, `redirect_uri` or the PKCE challenge from caller input
+      // would silently detach the request from the session that checks it.
+      throw new OAuth2Error(
+        ErrorCode.INVALID_ARGUMENT,
+        `authorize params must not set ${JSON.stringify(k)}; it is managed by the flow`,
+      );
+    }
     params.set(k, v);
   }
 
