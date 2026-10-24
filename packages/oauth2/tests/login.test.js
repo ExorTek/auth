@@ -35,7 +35,11 @@ function fakeOauth() {
 test('signValue / unsignValue round-trips and rejects tampering', () => {
   const signed = signValue('payload-abc', SECRET);
   assert.equal(unsignValue(signed, SECRET), 'payload-abc');
-  assert.equal(unsignValue(signed.slice(0, -1) + 'X', SECRET), undefined);
+  // Change the first character to a different one. (A fixed 'X' at the
+  // end was a no-op whenever the value already ended in 'X', and a final
+  // base64url character can carry unused bits.)
+  const first = signed[0] === 'A' ? 'B' : 'A';
+  assert.equal(unsignValue(first + signed.slice(1), SECRET), undefined);
   assert.equal(unsignValue('no-signature', SECRET), undefined);
   assert.equal(unsignValue(signed, 'wrong-secret'), undefined);
 });
