@@ -32,8 +32,9 @@ config when set, otherwise resolved from the OP metadata (cached).
 const provider = createProvider({
   // ...
   logout: {
-    postLogoutRedirectUris: ['https://myapp.com/'],   // exact-match allow-list
+    postLogoutRedirectUris: ['https://myapp.com/'],   // exact-match allow-list (or { [clientId]: [...] })
     onLogout: async ({ sub }) => sessionStore.destroyForUser(sub),
+    // idTokenHintMaxAge: '30d',                     // how long past exp a hint is still accepted
   },
 });
 ```
@@ -47,12 +48,16 @@ const provider = createProvider({
 
 The handler:
 
-- calls `onLogout({ sub, idTokenHint })` (best-effort — never blocks the
-  redirect) to clear the OP session,
+- calls `onLogout({ sub, clientId, idTokenHint })` (best-effort — never
+  blocks the redirect) to clear the OP session,
 - redirects to a **registered** `post_logout_redirect_uri`, echoing `state`,
 - returns a `{ logged_out: true }` confirmation when no redirect is
   requested.
 
-`sub` is read from the (unverified) `id_token_hint` after checking its `iss`
-matches the OP — a logout hint is frequently expired, so the issuer/audience
-check stands in for a full signature+`exp` verification.
+`sub` comes only from an `id_token_hint` that **verifies** against the OP's
+published JWKS (or its signing key) with the configured alg and issuer — an
+unsigned or foreign hint names no subject, so nobody can force another user's
+logout. Logout hints are frequently expired, so `exp` is tolerated for
+`idTokenHintMaxAge` (default `'30d'`). A `client_id` parameter must match the
+hint's audience, and with `postLogoutRedirectUris` as a `{ [clientId]: uris }`
+map the redirect is checked against the verified hint's client.
