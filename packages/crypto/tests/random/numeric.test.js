@@ -31,18 +31,21 @@ describe('numeric', () => {
   });
 
   it('produces a uniform distribution (bias-free rejection sampling)', () => {
-    // Chi-squared-lite: draw 100_000 digits and ensure each appears within
-    // 3% of the expected uniform frequency (10_000). Rejection sampling should
-    // deliver a very tight bound; 3% is a comfortable margin for CI stability.
+    // Pearson chi-squared over 1_000_000 digits (9 degrees of freedom). A
+    // healthy generator stays under 42.6 with probability 1 - 1e-6, so this
+    // essentially never flakes; plain `byte % 10` modulo bias (26/256 vs
+    // 25/256 per digit) scores ≈ 365 and is caught every time. A per-digit
+    // percentage bound cannot do both: 3% at 100k samples is only ~3σ and
+    // failed on healthy runs.
+    const N = 1_000_000;
     const counts = new Array(10).fill(0);
-    const s = numeric(100_000);
+    const s = numeric(N);
     for (const ch of s) {
       counts[ch.charCodeAt(0) - 48]++;
     }
-    for (let d = 0; d < 10; d++) {
-      const deviation = Math.abs(counts[d] - 10_000) / 10_000;
-      assert.ok(deviation < 0.03, `digit ${d}: count=${counts[d]}, deviation=${deviation.toFixed(4)}`);
-    }
+    const expected = N / 10;
+    const chi2 = counts.reduce((sum, c) => sum + (c - expected) ** 2 / expected, 0);
+    assert.ok(chi2 < 42.6, `chi-squared ${chi2.toFixed(1)} over counts ${counts.join(',')}`);
   });
 
   it('produces unique values on successive calls', () => {
