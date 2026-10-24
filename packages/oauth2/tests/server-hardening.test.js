@@ -561,3 +561,25 @@ test('DPoP nonces issued by one node are accepted by another with the same secre
   assert.equal(b._config.dpopNonces.isValid(`${nonce.slice(0, -2)}AA`), false);
   assert.throws(() => buildServer({ security: { dpop: { nonce: true, nonceSecret: 'short' } } }), /32 bytes/);
 });
+
+// AUTHORIZATION CODE REUSE + INTROSPECTION
+
+test('a replayed authorization code revokes the refresh family it produced', async () => {
+  const { server } = buildServer();
+  const { code, pkce, redirectUri } = await getAuthorizationCode(server, { scope: 'read' });
+  const redeem = () =>
+    server.token(
+      post({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        client_id: 'app',
+        client_secret: 's3cret-value-strong',
+        code_verifier: pkce.codeVerifier,
+      }),
+    );
+  const first = body(await redeem());
+  assert.ok(first.refresh_token);
+  assert.equal(body(await redeem()).error, 'invalid_grant');
+  assert.equal(body(await refresh(server, first.refresh_token)).error, 'invalid_grant');
+});

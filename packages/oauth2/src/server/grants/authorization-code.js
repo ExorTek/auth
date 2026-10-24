@@ -7,6 +7,7 @@
  */
 import { isNonEmptyString } from '@exortek/shared/predicates';
 
+import { randomState } from '../../internal/state.js';
 import { ProtocolError, ServerError } from '../errors.js';
 import { verifyCodeVerifier } from '../security/pkce.js';
 import { resolveTokenAudience } from '../security/resource.js';
@@ -29,8 +30,19 @@ export async function authorizationCodeGrant(req, ctx) {
     throw new ServerError(ProtocolError.INVALID_REQUEST, 'missing code');
   }
 
-  // Single-use: consuming the code here means a replay finds nothing.
+  // Single-use: consuming the code here is what makes redemption atomic.
+  // A redeemed code leaves a short-lived marker under the same key, so a
+  // replay finds it and revokes the refresh family the code produced
+  // (RFC 6749 §4.1.2: tokens issued for a reused code SHOULD be revoked).
+  // Refresh tokens are revocable; self-contained access tokens simply run
+  // out their (short) lifetime.
   const record = await config.stores.authCode.consume(code);
+  if (record?.redeemed === true) {
+    if (isNonEmptyString(record.familyId)) {
+      await config.stores.refresh.revokeFamily(record.familyId);
+    }
+    throw new ServerError(ProtocolError.INVALID_GRANT, 'authorization code has already been used');
+  }
   if (!record) {
     throw new ServerError(ProtocolError.INVALID_GRANT, 'authorization code is invalid, expired, or already used');
   }
@@ -81,8 +93,12 @@ export async function authorizationCodeGrant(req, ctx) {
     authTime: record.authTime,
   });
 
+  /** @type {string | undefined} */
+  let familyId;
   if (refreshAllowed(config, client)) {
+    familyId = randomState();
     body.refresh_token = await mintRefreshToken(config, {
+      familyId,
       subject: record.subject,
       clientId: client.clientId,
       scope: record.scope,
@@ -90,6 +106,7 @@ export async function authorizationCodeGrant(req, ctx) {
       dpopJkt,
     });
   }
+  await config.stores.authCode.save(code, { redeemed: true, familyId }, config.authorizationCodeTtlMs);
 
   return body;
 }

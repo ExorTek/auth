@@ -106,6 +106,8 @@ function createTtlMap({ sweepIntervalMs = 60_000 } = {}) {
  * @property {string} [resource]
  * @property {unknown} [authorizationDetails]
  * @property {string} [dpopJkt]              DPoP `jkt` bound at the authorize step (RFC 9449 §10)
+ * @property {boolean} [redeemed]            marker left after redemption so a replay can revoke the family
+ * @property {string} [familyId]             the refresh family a redeemed code produced
  *
  * @typedef {Object} AuthCodeStore
  * @property {(code: string, record: AuthCodeRecord, ttlMs: number) => void | Promise<void>} save
