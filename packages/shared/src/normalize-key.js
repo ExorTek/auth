@@ -151,6 +151,18 @@ export function createKeyNormalizer({ ErrorClass, ErrorCode, lookupAlg }) {
    * @param {string} alg
    */
   function fromJwk(jwk, meta, direction, alg) {
+    // RFC 7517 §4.2-4.4: a JWK that declares what it is for may only be
+    // used for that — a key published for RS512, for encryption, or
+    // without the matching key_op is not a key for this operation.
+    if (typeof jwk.alg === 'string' && jwk.alg !== alg) {
+      throw new ErrorClass(ErrorCode.INVALID_KEY, `JWK is for alg ${jwk.alg}; cannot use it for ${alg}`);
+    }
+    if (jwk.use !== undefined && jwk.use !== 'sig') {
+      throw new ErrorClass(ErrorCode.INVALID_KEY, `JWK use=${JSON.stringify(jwk.use)} is not a signature key`);
+    }
+    if (Array.isArray(jwk.key_ops) && !jwk.key_ops.includes(direction)) {
+      throw new ErrorClass(ErrorCode.INVALID_KEY, `JWK key_ops does not include "${direction}"`);
+    }
     if (jwk.kty !== meta.kty) {
       throw new ErrorClass(
         ErrorCode.INVALID_KEY,
