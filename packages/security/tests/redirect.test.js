@@ -216,3 +216,9 @@ test('isSameOrigin: null / undefined / malformed → false', () => {
   assert.equal(isSameOrigin('https://x', undefined), false);
   assert.equal(isSameOrigin('not-a-url', 'https://x'), false);
 });
+
+test('isSameOrigin: opaque origins are never the same origin', () => {
+  assert.equal(isSameOrigin('javascript:alert(1)', 'myapp://cb'), false);
+  assert.equal(isSameOrigin('data:text/html,x', 'data:text/html,x'), false);
+  assert.equal(isSameOrigin('https://a.example/x', 'https://a.example/y'), true);
+});

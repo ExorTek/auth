@@ -259,6 +259,12 @@ export function isSameOrigin(a, b) {
   try {
     const oa = a instanceof URL ? a.origin : new URL(a).origin;
     const ob = b instanceof URL ? b.origin : new URL(b).origin;
+    // Opaque origins (`data:`, `javascript:`, `file:`, custom schemes)
+    // serialize as the string 'null' — equal as strings, never the same
+    // origin (WHATWG HTML §7.5).
+    if (oa === 'null' || ob === 'null') {
+      return false;
+    }
     return oa === ob;
   } catch {
     return false;
