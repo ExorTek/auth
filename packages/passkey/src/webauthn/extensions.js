@@ -334,7 +334,9 @@ export function readAuthenticatorExtensions(map) {
 
   // "hmac-secret-mc" (make credential result) and other draft
   // extensions come back untouched under `raw`.
-  const raw = {};
+  // Keys come from the authenticator; a null-prototype object keeps a
+  // `__proto__` key an ordinary property instead of a prototype swap.
+  const raw = Object.create(null);
   for (const [k, v] of map) {
     raw[isString(k) ? k : String(k)] = v;
   }
