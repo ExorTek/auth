@@ -149,7 +149,7 @@ export function createMemoryRecordStore(config) {
  * @returns {{
  *   put: (record: object, ttlMs?: number) => Promise<void>,
  *   getById: (id: string) => Promise<object|null>,
- *   update: (id: string, patch: object, ttlMs?: number) => Promise<object|null>,
+ *   update: (id: string, patch: object, ttlMs?: number) => Promise<object|null>,  without `ttlMs` a TTL store keeps the key's remaining expiry
  *   listByIndex: (indexValue: string) => Promise<object[]>,
  *   readRecord: (id: string) => Promise<object|null>,
  *   writeRecord: (record: object, ttlMs?: number) => Promise<void>,
@@ -212,6 +212,16 @@ export function createRedisRecordStore(client, config) {
     } else {
       await helpers.setPlain(rk(record[idField]), value);
     }
+  }
+
+  // An update with no explicit TTL keeps the key's remaining expiry
+  // instead of clearing it.
+  async function rewriteRecord(record, ttlMs) {
+    if (ttl && ttlMs === undefined) {
+      await helpers.setKeepTTL(rk(record[idField]), JSON.stringify(record));
+      return;
+    }
+    await writeRecord(record, ttlMs);
   }
 
   async function writeTombstone(id, data, ttlMs) {
@@ -279,7 +289,7 @@ export function createRedisRecordStore(client, config) {
       }
       const oldIndex = existing[indexField];
       const next = { ...existing, ...patch };
-      await writeRecord(next, ttlMs);
+      await rewriteRecord(next, ttlMs);
       if (!isUndefined(patch[indexField]) && patch[indexField] !== oldIndex) {
         if (isString(oldIndex)) {
           await indexRemove(oldIndex, id);

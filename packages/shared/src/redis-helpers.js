@@ -74,6 +74,7 @@ export function evalScript(client, script, keys, args, dialect = detectDialect(c
  *   smembers: (key: string) => Promise<string[]>,
  *   setWithTTL: (key: string, value: string, ttlMs: number) => Promise<void>,
  *   setPlain: (key: string, value: string) => Promise<void>,
+ *   setKeepTTL: (key: string, value: string) => Promise<void>,
  *   parseRecord: (raw: string|object|null) => object|null,
  * }}
  */
@@ -141,6 +142,17 @@ export function createRedisHelpers(client) {
 
     async setPlain(key, value) {
       await client.set(key, value);
+    },
+
+    // Overwrite a value but keep whatever expiry the key already has
+    // (Redis ≥ 6.0 `SET … KEEPTTL`). A plain SET clears the TTL, so an
+    // update to an expiring record would otherwise make it immortal.
+    async setKeepTTL(key, value) {
+      if (dialect === 'ioredis') {
+        await client.set(key, value, 'KEEPTTL');
+      } else {
+        await client.set(key, value, { KEEPTTL: true });
+      }
     },
 
     parseRecord(raw) {

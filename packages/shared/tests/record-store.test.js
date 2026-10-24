@@ -101,15 +101,17 @@ describe('createMemoryRecordStore', () => {
 
 // Redis
 
-function createFakeRedisClient() {
+function createFakeRedisClient(extra = {}) {
   const data = new Map();
   const sets = new Map();
+  const calls = [];
   return {
     async get(key) {
       return data.get(key) ?? null;
     },
-    async set(key, value) {
+    async set(key, value, ...opts) {
       data.set(key, value);
+      calls.push(opts);
     },
     async del(key) {
       data.delete(key);
@@ -130,6 +132,8 @@ function createFakeRedisClient() {
     },
     _data: data,
     _sets: sets,
+    _setOptions: calls,
+    ...extra,
   };
 }
 
@@ -245,5 +249,20 @@ describe('createRedisRecordStore', () => {
     assert.deepEqual(await client.smembers('ml:e:a@b.com'), ['k1']);
     await store.writeTombstone('k1', { at: 1 });
     assert.ok(client._data.has('ml:t:k1'));
+  });
+
+  test('update without ttlMs keeps the key expiry on a TTL store (both dialects)', async () => {
+    for (const [extra, expected] of [
+      [{ status: 'ready' }, ['KEEPTTL']],
+      [{}, [{ KEEPTTL: true }]],
+    ]) {
+      const client = createFakeRedisClient(extra);
+      const store = createRedisRecordStore(client, { idField: 'id', indexField: 'userId', ttl: true });
+      await store.put({ id: 'k1', userId: 'u1' }, 60_000);
+      await store.update('k1', { used: true });
+      assert.deepEqual(client._setOptions.at(-1), expected);
+      await store.update('k1', { used: true }, 5_000);
+      assert.notDeepEqual(client._setOptions.at(-1), expected);
+    }
   });
 });
