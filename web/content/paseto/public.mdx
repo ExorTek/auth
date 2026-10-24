@@ -23,18 +23,19 @@ const payload = verify(token, publicKey);
 
 ## Keys
 
-`generateKeyPair()` returns raw keys in PASETO's wire form:
+`generateKeyPair()` returns two typed `PasetoKey`s — `secretKey` (purpose
+`secret`) and `publicKey` (purpose `public`). `sign` only takes a `secret`
+key and `verify` only a `public` one; anything else, including a bare
+buffer, throws `INVALID_KEY_PURPOSE`. `.export()` gives PASETO's wire form
+(64-byte `seed ‖ public` / 32-byte public key) for storage.
 
-- `secretKey` — 64 bytes (`seed ‖ public`).
-- `publicKey` — 32 bytes.
-
-`sign` also accepts a bare 32-byte seed or a Node `KeyObject`; `verify`
-accepts a 32-byte public key or a `KeyObject`. Anything else throws
-`INVALID_KEY`.
+Wrap existing material explicitly:
 
 ```js
-const seedOnly = secretKey.subarray(0, 32); // 32-byte seed works too
-sign({ ok: true }, seedOnly);
+import { keys } from '@exortek/paseto';
+
+const secretKey = keys.secret(seedOrSeedAndPublicBytes); // 32 or 64 bytes, or an Ed25519 private KeyObject
+const publicKey = keys.public(publicKeyBytes); // 32 bytes, or an Ed25519 public KeyObject
 ```
 
 ## Options

@@ -39,7 +39,9 @@ PASETO fixes JWT's original sins, but the existing JS options leave gaps:
 production login reinvents:
 
 1. **No `alg` header, ever.** The version dictates the primitive —
-   confusion attacks cannot be expressed.
+   confusion attacks cannot be expressed. Keys are typed too
+   (`PasetoKey`: version + purpose), so a public key can never be
+   used as a `v4.local` secret.
 2. **`v4.local` = encrypted tokens.** Confidential payloads, not just
    authenticated — the JWE role without the JWE footgun matrix.
 3. **`tokenPair` with reuse detection.** Access + refresh, RFC 6749
@@ -78,7 +80,7 @@ For tokens your own services both mint and read.
 ```js
 import { generateKey, encrypt, decrypt } from '@exortek/paseto';
 
-const key = generateKey(); // 32-byte symmetric key
+const key = generateKey(); // typed v4 local key — keys.local(bytes) wraps your own
 
 const token = encrypt({ userId: 1, role: 'admin' }, key, {
   expiresIn: '1h',
@@ -172,7 +174,7 @@ await revokeAll(familyId, { store });
 
 | Subpath                                                                                                      | Purpose                                                                                          |
 | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [`@exortek/paseto`](https://github.com/ExorTek/auth/blob/master/packages/paseto/src/index.js)               | `encrypt`, `decrypt`, `sign`, `verify`, `decode`, `generateKey`, `generateKeyPair`               |
+| [`@exortek/paseto`](https://github.com/ExorTek/auth/blob/master/packages/paseto/src/index.js)               | `encrypt`, `decrypt`, `sign`, `verify`, `decode`, `generateKey`, `generateKeyPair`, `keys`, `PasetoKey` |
 | [`@exortek/paseto/token-pair`](https://github.com/ExorTek/auth/blob/master/packages/paseto/src/token-pair.js) | `create` / `rotate` / `revoke` / `revokeAll` with RFC 6749 §10.4 reuse detection                |
 | [`@exortek/paseto/stores`](https://github.com/ExorTek/auth/blob/master/packages/paseto/src/stores.js)       | `createStore('memory' \| 'redis' \| 'custom', ...)` with interval / lazy / lru GC strategies    |
 
