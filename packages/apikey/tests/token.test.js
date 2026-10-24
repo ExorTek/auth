@@ -44,7 +44,10 @@ test('hashesMatch: exact match → true, mismatch → false, length mismatch →
   const secret = randomBytes(32);
   const hash = hashSecret(secret, null);
   assert.equal(hashesMatch(hash, hash), true);
-  assert.equal(hashesMatch(hash, hash.replace(/./, 'X')), false);
+  // Swap the first character for a different one — replacing it with a
+  // fixed 'X' was a no-op whenever the hash already started with 'X'.
+  const tampered = (hash[0] === 'A' ? 'B' : 'A') + hash.slice(1);
+  assert.equal(hashesMatch(hash, tampered), false);
   assert.equal(hashesMatch(hash + 'x', hash), false);
 });
 
