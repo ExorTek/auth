@@ -24,9 +24,12 @@
  */
 import { createRedisHelpers } from '@exortek/shared/redis-helpers';
 import { createRedisRecordStore } from '@exortek/shared/record-store';
+import { createRedisIncrStore } from '@exortek/shared/incr-store';
 import { isFunction } from '@exortek/shared/predicates';
 
 const DEFAULT_PREFIX = 'oauth2:';
+// Claim-key lifetime for a family that carries no expiry (legacy records).
+const CLAIM_FALLBACK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * GET-then-DEL a key, atomically when the client supports `GETDEL`
@@ -117,6 +120,7 @@ export function createRedisRefreshStore(client, options = {}) {
   /** @param {{ expiresAt?: number }} record */
   const ttlOf = record =>
     typeof record.expiresAt === 'number' ? Math.max(1, record.expiresAt - Date.now()) : undefined;
+  const claimKey = token => `${options.keyPrefix ?? DEFAULT_PREFIX}refresh:claim:${token}`;
 
   return {
     async save(record) {
@@ -129,9 +133,18 @@ export function createRedisRefreshStore(client, options = {}) {
       }
       return record;
     },
+    // Compare-and-set across nodes: the first redemption creates the claim
+    // key (SET NX) and wins; a concurrent one finds it and resolves false,
+    // which the grant treats as reuse. The claim lives as long as the
+    // family, so a late replay is still caught after the record is gone.
     async rotate(oldToken, next) {
+      const won = await store.helpers.setIfAbsent(claimKey(oldToken), '1', ttlOf(next) ?? CLAIM_FALLBACK_TTL_MS);
+      if (!won) {
+        return false;
+      }
       await store.update(oldToken, { used: true });
       await store.put(next, ttlOf(next));
+      return true;
     },
     async revokeFamily(familyId) {
       const members = await store.listByIndex(familyId);
@@ -156,13 +169,11 @@ export function createRedisDeviceStore(client, options = {}) {
   const dk = deviceCode => `${prefix}d:${deviceCode}`;
   const uk = userCode => `${prefix}u:${userCode}`;
   const helpers = createRedisHelpers(client);
-  // Re-arm window for an update that carries no explicit TTL (mirrors the
-  // in-memory store): a device flow is minutes-long.
-  const REEARM_MS = 600_000;
 
   const self = {
     async save(record, ttlMs) {
-      await helpers.setWithTTL(dk(record.deviceCode), JSON.stringify(record), ttlMs);
+      const expiresAt = Date.now() + ttlMs;
+      await helpers.setWithTTL(dk(record.deviceCode), JSON.stringify({ ...record, expiresAt }), ttlMs);
       await helpers.setWithTTL(uk(record.userCode), record.deviceCode, ttlMs);
     },
     async getByDeviceCode(deviceCode) {
@@ -175,16 +186,45 @@ export function createRedisDeviceStore(client, options = {}) {
       }
       return self.getByDeviceCode(deviceCode);
     },
+    // KEEPTTL: an update (every poll writes lastPolledAt) never extends the
+    // code's life.
     async update(deviceCode, patch) {
       const existing = await self.getByDeviceCode(deviceCode);
       if (!existing) {
         return;
       }
-      await helpers.setWithTTL(dk(deviceCode), JSON.stringify({ ...existing, ...patch }), REEARM_MS);
+      await helpers.setKeepTTL(dk(deviceCode), JSON.stringify({ ...existing, ...patch }));
       if (patch.status === 'redeemed' || patch.status === 'denied') {
         await client.del(uk(existing.userCode));
       }
     },
+    // Single redemption across nodes: the first poll to create the redeem
+    // claim (SET NX) wins; any concurrent poll resolves false.
+    async redeem(deviceCode) {
+      const existing = await self.getByDeviceCode(deviceCode);
+      if (!existing || existing.status !== 'approved') {
+        return false;
+      }
+      const ttlMs = Math.max(1, (existing.expiresAt ?? Date.now() + 1000) - Date.now());
+      if (!(await helpers.setIfAbsent(`${dk(deviceCode)}:redeemed`, '1', ttlMs))) {
+        return false;
+      }
+      await self.update(deviceCode, { status: 'redeemed' });
+      return true;
+    },
   };
   return self;
+}
+
+/**
+ * Shared jti replay store (`stores.replay`) — DPoP proofs, client assertions
+ * and request objects replayed against a different node are caught. Each id
+ * is an INCR with a TTL; the first sighting counts 1.
+ *
+ * @param {any} client
+ * @param {{ keyPrefix?: string }} [options]
+ * @returns {import('../security/replay.js').ReplayStore}
+ */
+export function createRedisReplayStore(client, options = {}) {
+  return createRedisIncrStore(client, { keyPrefix: `${options.keyPrefix ?? DEFAULT_PREFIX}replay:` });
 }

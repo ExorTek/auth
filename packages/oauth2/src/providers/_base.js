@@ -81,6 +81,11 @@ export function defineProvider(def) {
   if (!isFunction(def.mapUser)) {
     throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, `provider ${def.id} must supply a mapUser function`);
   }
+  // An OIDC provider's id_token is verified against its issuer; with none
+  // configured the `iss` check would silently be skipped.
+  if (def.kind === 'oidc' && !isNonEmptyString(def.issuer) && !isFunction(def.issuer)) {
+    throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, `OIDC provider ${def.id} requires an issuer`);
+  }
 
   return function createProvider(appOptions = {}) {
     if (!isNonEmptyString(appOptions.clientId)) {
@@ -165,6 +170,17 @@ export async function resolveEndpoints(provider) {
   return ep;
 }
 
+const RESERVED_AUTHORIZATION_PARAMS = new Set([
+  'response_type',
+  'client_id',
+  'redirect_uri',
+  'state',
+  'nonce',
+  'scope',
+  'code_challenge',
+  'code_challenge_method',
+]);
+
 /**
  * Build the authorization-request URL and the flow session.
  *
@@ -219,6 +235,15 @@ export async function buildAuthorization(provider, opts) {
     params.set(k, v);
   }
   for (const [k, v] of Object.entries(opts.params ?? {})) {
+    if (RESERVED_AUTHORIZATION_PARAMS.has(k)) {
+      // These carry the flow's security bindings — overriding `state`,
+      // `nonce`, `redirect_uri` or the PKCE challenge from caller input
+      // would silently detach the request from the session that checks it.
+      throw new OAuth2Error(
+        ErrorCode.INVALID_ARGUMENT,
+        `authorize params must not set ${JSON.stringify(k)}; it is managed by the flow`,
+      );
+    }
     params.set(k, v);
   }
 
@@ -395,9 +420,18 @@ export async function handleCallback(provider, opts) {
     throw new OAuth2Error(ErrorCode.SUB_MISMATCH, `${provider.id} did not yield a stable subject id`);
   }
 
-  // surface an unverified email rather than trusting it.
-  if (isNonEmptyString(mapped.email) && mapped.emailVerified === false) {
-    warnings.push(warn(WarningCode.EMAIL_UNVERIFIED, `${provider.id} reports the email as unverified`));
+  // Surface an email that is not positively verified rather than trusting
+  // it. A provider that simply omits the flag (Entra's mutable `email`, the
+  // nOAuth account-takeover vector) counts as unverified too.
+  if (isNonEmptyString(mapped.email) && mapped.emailVerified !== true) {
+    warnings.push(
+      warn(
+        WarningCode.EMAIL_UNVERIFIED,
+        mapped.emailVerified === false
+          ? `${provider.id} reports the email as unverified`
+          : `${provider.id} does not report the email as verified`,
+      ),
+    );
   }
 
   /** @type {NormalizedUser} */

@@ -129,6 +129,12 @@ describe('userinfoHandler', () => {
     assert.match(res.headers['www-authenticate'], /Bearer/);
   });
 
+  it('ignores an access_token in the query string', async () => {
+    const { provider } = await makeProvider({ userinfo: { resolve } });
+    const res = await provider.userinfoHandler()({ headers: {}, query: { access_token: 'good-token' } });
+    assert.equal(res.status, 401);
+  });
+
   it('401s invalid_token when the token does not resolve', async () => {
     const { provider } = await makeProvider({ userinfo: { resolve } });
     const res = await provider.userinfoHandler()({ headers: { authorization: 'Bearer nope' } });

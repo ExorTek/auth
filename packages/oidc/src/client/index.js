@@ -16,9 +16,10 @@
  */
 import { createOAuth, defineProvider } from '@exortek/oauth2';
 import { decode } from '@exortek/jwt';
-import { isArray, isNonEmptyString, isObject } from '@exortek/shared/predicates';
+import { parseDuration } from '@exortek/shared/duration';
+import { isArray, isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates';
 
-import { invalidArgument } from '../internal/errors.js';
+import { authenticationRequirementsNotMet, invalidArgument } from '../internal/errors.js';
 import { buildEndSessionUrl } from '../internal/logout.js';
 import { resolveIssuerMetadata } from '../internal/issuer-discovery.js';
 
@@ -57,7 +58,9 @@ const AUTH_PARAM_NAMES = {
  * @property {string}   redirectUri    Registered redirect URI for the callback.
  * @property {string[]} [scope]        Requested scopes; `openid` is enforced.
  * @property {string[]} [idTokenAlgs]  Signature alg allowlist for the id_token.
- * @property {string|number} [clockTolerance]  Leeway for `exp`/`nbf`/`iat`.
+ * @property {string|number} [clockTolerance]  Leeway for `exp`/`nbf`/`iat` (and `auth_time` against `maxAge`).
+ * @property {number}   [maxAge]       Default `max_age` (seconds) for every authorization request; enforced on `auth_time` at the callback.
+ * @property {string}   [acrValues]    Default `acr_values` for every authorization request; the returned `acr` must be one of them.
  * @property {import('@exortek/jwks').RemoteJWKSOptions} [jwksOptions]  Forwarded to the id_token JWKS resolver.
  * @property {string} [endSessionEndpoint]  RP-Initiated Logout endpoint; auto-discovered from OP metadata when omitted.
  * @property {typeof fetch} [fetch]          Override used only for the logout-endpoint metadata fetch (tests / proxies).
@@ -132,8 +135,9 @@ export function createClient(config) {
     async authorize(options = {}) {
       /** @type {Record<string, string>} */
       const params = { ...options.params };
+      const withDefaults = { maxAge: config.maxAge, acrValues: config.acrValues, ...options };
       for (const [key, wire] of Object.entries(AUTH_PARAM_NAMES)) {
-        const value = /** @type {Record<string, unknown>} */ (options)[key];
+        const value = /** @type {Record<string, unknown>} */ (withDefaults)[key];
         if (value !== undefined) {
           params[wire] = String(value);
         }
@@ -148,16 +152,28 @@ export function createClient(config) {
      * are already checked inside the oauth2 hub; `decode` here only reads the
      * now-trusted payload (no second network hop).
      *
+     * When the request asked for `max_age` / `acr_values` (pass the same
+     * values here, or set them once on the client config), the id_token must
+     * show an `auth_time` within `max_age` and an `acr` from the list (OIDC
+     * Core §3.1.2.1, §3.1.3.7) — otherwise the OP silently ignoring them
+     * would let a stale or weaker login through.
+     *
      * @param {Record<string, unknown>} query   the callback query params
-     * @param {{ session?: string }} [options]
+     * @param {{ session?: string, maxAge?: number, acrValues?: string }} [options]
      * @returns {Promise<{ idToken: string, claims: Record<string, unknown>, userinfo: Record<string, unknown>, user: object, tokens: Record<string, unknown>, warnings: object[] }>}
      */
     async handleCallback(query, options = {}) {
       const { tokens, user, warnings } = await oauth.callback('oidc', query, { session: options.session });
       const idToken = /** @type {string} */ (tokens.id_token);
+      const claims = decode(idToken).payload;
+      assertAuthenticationRequirements(claims, {
+        maxAge: options.maxAge ?? config.maxAge,
+        acrValues: options.acrValues ?? config.acrValues,
+        clockToleranceMs: config.clockTolerance === undefined ? 0 : parseDuration(config.clockTolerance),
+      });
       return {
         idToken,
-        claims: decode(idToken).payload,
+        claims,
         userinfo: /** @type {Record<string, unknown>} */ (user).raw,
         user,
         tokens,
@@ -214,4 +230,27 @@ export function createClient(config) {
       return oauth.revoke('oidc', token, tokenTypeHint);
     },
   };
+}
+
+/**
+ * @param {Record<string, unknown>} claims
+ * @param {{ maxAge?: number, acrValues?: string, clockToleranceMs: number }} required
+ */
+function assertAuthenticationRequirements(claims, { maxAge, acrValues, clockToleranceMs }) {
+  if (maxAge !== undefined) {
+    const authTime = claims.auth_time;
+    if (!isNumber(authTime)) {
+      authenticationRequirementsNotMet('max_age was requested but the id_token has no auth_time');
+    }
+    const ageMs = Date.now() - authTime * 1000;
+    if (ageMs > Number(maxAge) * 1000 + clockToleranceMs) {
+      authenticationRequirementsNotMet(`the end user authenticated more than max_age (${maxAge}s) ago`);
+    }
+  }
+  if (isNonEmptyString(acrValues)) {
+    const allowed = acrValues.split(/\s+/).filter(Boolean);
+    if (!isNonEmptyString(claims.acr) || !allowed.includes(claims.acr)) {
+      authenticationRequirementsNotMet(`the id_token acr is not one of the requested acr_values (${acrValues})`);
+    }
+  }
 }

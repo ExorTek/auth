@@ -50,6 +50,18 @@ the proof's `nonce` claim. The server keeps rotating the nonce, so a
 captured one ages out. The whole handshake is automatic — you only flip
 the flag.
 
+Nonces are stateless HMAC tokens over a time window. Behind a load
+balancer give every instance the same secret so a nonce issued by one is
+accepted by the next:
+
+```js
+security: { dpop: { nonce: true, nonceSecret: process.env.DPOP_NONCE_SECRET } } // ≥ 32 bytes
+```
+
+Proof `jti`s are single-use per server; pass `stores: { replay }` (e.g.
+`createRedisReplayStore(redis)`) to share that check across instances, and
+`replayStore` to `verifyDpopForResource` on a multi-node resource server.
+
 ## Resource-server side
 
 The protected resource verifies the proof against the presented access

@@ -21,12 +21,13 @@ import { isArray, isNonEmptyString, isObject } from '@exortek/shared/predicates'
 import { invalidArgument } from '../internal/errors.js';
 import { buildDiscoveryDocument } from '../internal/discovery-doc.js';
 import { buildUserInfo } from '../internal/userinfo.js';
-import { isRegisteredPostLogoutUri, readIdTokenHint } from '../internal/logout.js';
+import { isRegisteredPostLogoutUri, verifyIdTokenHint } from '../internal/logout.js';
 import { checkSessionIframeHtml, computeSessionState } from '../internal/session.js';
 import { htmlResponse, jsonResponse, normalizeRequest, redirectResponse } from '../internal/http-io.js';
 
 const DEFAULT_SCOPES = ['openid', 'profile', 'email'];
 const DEFAULT_CLAIMS_SUPPORTED = ['sub', 'iss', 'aud', 'exp', 'iat', 'auth_time', 'nonce'];
+const DEFAULT_HINT_MAX_AGE = '30d';
 
 /**
  * @typedef {object} OidcProviderConfig
@@ -38,7 +39,11 @@ const DEFAULT_CLAIMS_SUPPORTED = ['sub', 'iss', 'aud', 'exp', 'iat', 'auth_time'
  * @property {string[]} [scopes]                    advertised scopes (default openid/profile/email).
  * @property {string[]} [authMethods]              token_endpoint_auth_methods_supported.
  * @property {{ resolve: (accessToken: string) => (Promise<{ sub: string, scope?: string|string[], claims?: Record<string, unknown> } | null> | { sub: string, scope?: string|string[], claims?: Record<string, unknown> } | null) }} [userinfo]  access-token resolver for the UserInfo endpoint.
- * @property {{ postLogoutRedirectUris?: string[], onLogout?: (ctx: { sub?: string, idTokenHint?: string }) => unknown }} [logout]  RP-Initiated Logout policy.
+ * @property {{ postLogoutRedirectUris?: string[] | Record<string, string[]>, idTokenHintMaxAge?: string | number, onLogout?: (ctx: { sub?: string, clientId?: string, idTokenHint?: string }) => unknown }} [logout]
+ *   RP-Initiated Logout policy. `postLogoutRedirectUris` is one list for every client, or a map
+ *   client_id → URIs (the client is identified by the verified hint's `aud`). `onLogout` receives a
+ *   `sub` only from a hint that verifies against the OP's keys; expired hints are accepted for
+ *   `idTokenHintMaxAge` (default `'30d'`) past `exp`.
  * @property {{ cookieName?: string }} [session]  enable Session Management; `cookieName` names the OP browser-state cookie.
  */
 
@@ -179,24 +184,53 @@ export function createProvider(config) {
      */
     endSessionHandler() {
       const logout = isObject(config.logout) ? config.logout : {};
-      const registered = isArray(logout.postLogoutRedirectUris) ? logout.postLogoutRedirectUris : [];
+      const uris = logout.postLogoutRedirectUris;
       const onLogout = typeof logout.onLogout === 'function' ? logout.onLogout : undefined;
+      const hintOptions = {
+        issuer,
+        // Published keys verify hints signed with a rotated-out key too.
+        keys: publicJwks.length > 0 ? publicJwks : signing.key,
+        alg: signing.alg,
+        maxAge: logout.idTokenHintMaxAge ?? DEFAULT_HINT_MAX_AGE,
+      };
       return async raw => {
         const req = normalizeRequest(raw);
         const idTokenHint = req.param('id_token_hint');
         const postLogout = req.param('post_logout_redirect_uri');
         const state = req.param('state');
-        const hint = readIdTokenHint(idTokenHint, issuer);
+        const requestedClient = req.param('client_id');
+        const hint = await verifyIdTokenHint(idTokenHint, hintOptions);
+
+        // The client is whoever the verified hint was issued to; a
+        // `client_id` parameter must agree with it (RP-Initiated Logout §2).
+        const audiences = hint ? (isArray(hint.aud) ? hint.aud : [hint.aud]).filter(isNonEmptyString) : [];
+        if (isNonEmptyString(requestedClient) && hint && !audiences.includes(requestedClient)) {
+          return jsonResponse(
+            400,
+            { error: 'invalid_request', error_description: 'client_id does not match the id_token_hint audience' },
+            { 'cache-control': 'no-store' },
+          );
+        }
+        const clientId = isNonEmptyString(requestedClient)
+          ? requestedClient
+          : audiences.length === 1
+            ? audiences[0]
+            : undefined;
 
         if (onLogout) {
           try {
-            await onLogout({ sub: hint ? hint.sub : undefined, idTokenHint });
+            await onLogout({ sub: hint ? hint.sub : undefined, clientId, idTokenHint });
           } catch {
             // Session teardown is best-effort — never block the logout redirect.
           }
         }
 
         if (isNonEmptyString(postLogout)) {
+          const registered = isArray(uris)
+            ? uris
+            : isObject(uris) && isNonEmptyString(clientId) && hint
+              ? (uris[clientId] ?? [])
+              : [];
           if (!isRegisteredPostLogoutUri(postLogout, registered)) {
             return jsonResponse(
               400,
@@ -278,9 +312,9 @@ function bearerToken(req) {
   if (isNonEmptyString(auth) && auth.slice(0, 7).toLowerCase() === 'bearer ') {
     return auth.slice(7).trim();
   }
-  // OIDC Core §5.3.1 also permits the token as an `access_token` form/query param.
-  const param = req.param('access_token');
-  return isNonEmptyString(param) ? param : undefined;
+  // Header only: a token in the query string (RFC 6750 §2.3) ends up in
+  // access logs, browser history and Referer headers.
+  return undefined;
 }
 
 /** @param {string|string[]|undefined} scope */

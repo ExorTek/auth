@@ -24,6 +24,7 @@ import { ProtocolError, ServerError } from './errors.js';
  * @property {Record<string, unknown>} [query]               pre-parsed query, else derived from `url`
  * @property {string | Record<string, unknown>} [body]       raw string or a framework-parsed object
  * @property {import('node:tls').PeerCertificate | Record<string, unknown>} [clientCertificate]  mTLS client cert (RFC 8705)
+ * @property {boolean} [clientCertificateAuthorized]         true only when the TLS layer verified the cert chain (`socket.authorized`)
  *
  * @typedef {Object} ServerRequest
  * @property {string} method
@@ -33,6 +34,7 @@ import { ProtocolError, ServerError } from './errors.js';
  * @property {(name: string) => string | undefined} header
  * @property {(name: string) => string | undefined} param    query ∪ form (form wins)
  * @property {object | undefined} clientCertificate
+ * @property {boolean} clientCertificateAuthorized          chain verified by the TLS layer (required for `tls_client_auth`)
  */
 
 /**
@@ -57,6 +59,7 @@ export function normalizeRequest(raw) {
     query,
     form,
     clientCertificate: isObject(raw.clientCertificate) ? raw.clientCertificate : undefined,
+    clientCertificateAuthorized: raw.clientCertificateAuthorized === true,
     header(name) {
       return headers[String(name).toLowerCase()];
     },

@@ -15,16 +15,13 @@ import { sign as jwtSign, verify as jwtVerify, decode as jwtDecode, JwtError } f
 import { isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
-import { resolveClientKeys } from './client-keys.js';
-import { createReplayCache } from './replay-cache.js';
 
 // A JAR request object is short-lived; bound its accepted lifetime so a
 // captured one cannot be replayed indefinitely, and remember its `jti`
-// (when present) for that window so a single-use request object cannot be
-// replayed at all. Module-level / single-process, like the DPoP and
-// client-assertion caches; a multi-node deployment fronts it with PAR.
+// (when present) for that window — through the server's replay guard,
+// shareable across nodes via `stores.replay` — so a single-use request
+// object cannot be replayed at all.
 const MAX_REQUEST_OBJECT_LIFETIME_MS = 300_000; // 5 minutes
-const seenRequestJti = createReplayCache(MAX_REQUEST_OBJECT_LIFETIME_MS);
 
 const REQUEST_OBJECT_ALGS = new Set([
   'ES256',
@@ -74,7 +71,7 @@ export async function verifyRequestObject(requestJwt, outerClientId, config) {
 
   let payload;
   try {
-    const keys = await resolveClientKeys(client, { allowJwksHost: config.security?.allowJwksHost });
+    const keys = await config.clientKeys(client);
     payload = (await jwtVerify(requestJwt, keys, { alg: [alg], audience: config.issuer })).payload;
   } catch (err) {
     if (err instanceof JwtError) {
@@ -92,7 +89,7 @@ export async function verifyRequestObject(requestJwt, outerClientId, config) {
   if (payload.exp * 1000 - Date.now() > MAX_REQUEST_OBJECT_LIFETIME_MS) {
     throw new ServerError(ProtocolError.INVALID_REQUEST, 'request object lifetime exceeds the accepted maximum');
   }
-  if (isNonEmptyString(payload.jti) && seenRequestJti.seen(payload.jti)) {
+  if (isNonEmptyString(payload.jti) && (await config.replay.seen('jar', payload.jti, MAX_REQUEST_OBJECT_LIFETIME_MS))) {
     throw new ServerError(ProtocolError.INVALID_REQUEST, 'request object jti has already been used (replay)');
   }
 

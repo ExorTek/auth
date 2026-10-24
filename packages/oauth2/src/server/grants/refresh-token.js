@@ -5,7 +5,7 @@
  * revokes the whole family. Scope may be narrowed but never widened, and
  * a DPoP-bound token stays bound to the same key.
  */
-import { isNonEmptyString } from '@exortek/shared/predicates';
+import { isNonEmptyString, isNumber } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 import { randomState } from '../../internal/state.js';
@@ -55,32 +55,43 @@ export async function refreshTokenGrant(req, ctx) {
   const scope = narrowScope(req.form.scope, record.scope);
   const audience = resolveTokenAudience(req.form.resource, record.resource, config);
 
+  // Rotate before issuing anything: mint the successor in the same family
+  // and claim the presented token. The store's rotate is a compare-and-set,
+  // so of two simultaneous redemptions of the SAME token exactly one wins;
+  // the loser is handled exactly like a replay and burns the family.
+  //
+  // The successor inherits the family's absolute expiry: rotation renews the
+  // token, not the grant, so a refresh family still dies `refreshTokenTtl`
+  // after the user authorized it. (A record written before expiries were
+  // carried gets a fresh one rather than none.)
+  const nextToken = randomState();
+  const rotated = await config.stores.refresh.rotate(presented, {
+    token: nextToken,
+    familyId: record.familyId,
+    clientId: client.clientId,
+    // RFC 6749 §6: the new refresh token's scope MUST be identical to the
+    // presented one's — a narrowed request narrows this access token only.
+    scope: record.scope,
+    subject: record.subject,
+    resource: record.resource,
+    dpopJkt: record.dpopJkt,
+    expiresAt: isNumber(record.expiresAt) ? record.expiresAt : Date.now() + config.refreshTokenTtlMs,
+  });
+  if (rotated === false) {
+    await config.stores.refresh.revokeFamily(record.familyId);
+    throw new ServerError(
+      ProtocolError.INVALID_GRANT,
+      'refresh token reuse detected; the token family has been revoked',
+    );
+  }
+
   const body = await buildAccessResponse(config, {
     subject: record.subject,
     clientId: client.clientId,
     scope,
     audience,
     dpopJkt: record.dpopJkt,
-  });
-
-  // Rotate: mint the successor in the same family and mark the presented
-  // token used so a later presentation trips the reuse check above.
-  //
-  // The get→check→rotate sequence assumes a single in-flight redemption per
-  // token (the normal client behaviour). It is not a compare-and-set: two
-  // truly-simultaneous redemptions of the SAME token could both pass the
-  // reuse check before either marks it used. The security guarantee that
-  // still holds unconditionally is the important one — any later replay of
-  // the now-rotated token trips reuse detection and burns the family.
-  const nextToken = randomState();
-  await config.stores.refresh.rotate(presented, {
-    token: nextToken,
-    familyId: record.familyId,
-    clientId: client.clientId,
-    scope,
-    subject: record.subject,
-    resource: record.resource,
-    dpopJkt: record.dpopJkt,
+    confirmation: ctx.confirmation,
   });
   body.refresh_token = nextToken;
 

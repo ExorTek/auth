@@ -36,7 +36,7 @@ export const AUTH_METHODS = Object.freeze([
  * @typedef {Object} ClientConfig
  * @property {string} clientId
  * @property {string} [clientSecret]                        confidential clients only
- * @property {string[]} redirectUris                        exact-match allowlist (RFC 6749 §3.1.2)
+ * @property {string[]} redirectUris                        exact-match allowlist (RFC 6749 §3.1.2); https, loopback http, or a reverse-domain private-use scheme
  * @property {string[]} [grantTypes]                        default `['authorization_code','refresh_token']`
  * @property {string[]} [responseTypes]                     default `['code']`
  * @property {string} [tokenEndpointAuthMethod]             one of {@link AUTH_METHODS}
@@ -76,9 +76,7 @@ export function defineClient(config) {
     );
   }
   for (const uri of config.redirectUris) {
-    if (!isNonEmptyString(uri)) {
-      throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, `client ${config.clientId} has an invalid redirectUri`);
-    }
+    assertRedirectUri(uri, config.clientId);
   }
 
   const authMethod =
@@ -130,6 +128,52 @@ export function defineClient(config) {
     tokenEndpointAuthMethod: authMethod,
     isPublic,
   });
+}
+
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * A redirect URI must be absolute with no fragment (RFC 6749 §3.1.2) and use
+ * a transport that cannot be intercepted (OAuth 2.1 §2.3.1 / RFC 8252):
+ * `https`, `http` on a loopback host, or a reverse-domain private-use scheme
+ * such as `com.example.app:/cb`. Anything else — `javascript:`, `data:`,
+ * plain `http`, a fragment — is refused at definition time, so neither a
+ * static client nor a dynamic registration can turn the authorize error
+ * redirect into an open redirect.
+ *
+ * @param {unknown} uri
+ * @param {string} clientId
+ */
+function assertRedirectUri(uri, clientId) {
+  const invalid = reason =>
+    new OAuth2Error(ErrorCode.INVALID_ARGUMENT, `client ${clientId} has an invalid redirectUri: ${reason}`);
+  if (!isNonEmptyString(uri)) {
+    throw invalid('must be a non-empty string');
+  }
+  let url;
+  try {
+    url = new URL(uri);
+  } catch {
+    throw invalid(`${JSON.stringify(uri)} is not an absolute URI`);
+  }
+  if (uri.includes('#')) {
+    throw invalid('must not contain a fragment');
+  }
+  const scheme = url.protocol.slice(0, -1);
+  if (scheme === 'https') {
+    return;
+  }
+  if (scheme === 'http') {
+    if (LOOPBACK_HOSTS.has(url.hostname)) {
+      return;
+    }
+    throw invalid('http is only allowed for a loopback host');
+  }
+  // RFC 8252 §7.1: a private-use scheme is a reverse domain name.
+  if (scheme.includes('.')) {
+    return;
+  }
+  throw invalid(`scheme ${JSON.stringify(scheme)} is not allowed`);
 }
 
 /**

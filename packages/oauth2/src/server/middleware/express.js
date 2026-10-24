@@ -148,6 +148,7 @@ function toRawRequest(req) {
     query: req.query,
     body: req.body,
     clientCertificate: readPeerCertificate(req),
+    clientCertificateAuthorized: peerCertificateAuthorized(req),
   };
 }
 
@@ -165,4 +166,18 @@ function readPeerCertificate(req) {
     return cert && Object.keys(cert).length > 0 ? cert : undefined;
   }
   return undefined;
+}
+
+/**
+ * Whether the TLS layer verified the client certificate against the
+ * server's trusted CAs. A listener run with `rejectUnauthorized: false`
+ * (needed for `self_signed_tls_client_auth`) still accepts unverified
+ * certificates, so `tls_client_auth` must not trust the subject DN alone.
+ *
+ * @param {any} req
+ * @returns {boolean}
+ */
+function peerCertificateAuthorized(req) {
+  const socket = req.socket ?? req.connection;
+  return socket?.authorized === true;
 }

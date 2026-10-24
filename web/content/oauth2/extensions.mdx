@@ -83,7 +83,23 @@ alphabet (no `0`/`O`/`1`/`I`), so every code is uniformly likely.
 Trade one token for another (delegation / impersonation) via
 `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`. The
 presented `subject_token` is validated through the same introspection
-path, so an `id_token` or JARM response can't be swapped in.
+path, so an `id_token` or JARM response can't be swapped in. On top of
+that:
+
+- the subject token must have been issued to the exchanging client, name
+  it in `aud`, or permit it through `may_act` — a token picked up elsewhere
+  cannot be laundered into a fresh one;
+- a DPoP- or certificate-bound subject token is only exchanged by a request
+  proving the same key / certificate;
+- scope only narrows, and stays within the exchanger's own ceiling;
+- `resource` / `audience` must be on the allowlist:
+
+```js
+createServer({ /* … */ tokenExchange: { audiences: ['https://api.example.com'] } });
+```
+
+The issued token's `act` names the exchanging client, with any prior actor
+chain nested beneath it (RFC 8693 §4.1).
 
 ## FAPI 2.0
 

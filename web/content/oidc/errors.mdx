@@ -26,6 +26,7 @@ try {
 |-------------|:------:|-------------|
 | `INVALID_ARGUMENT` | 400 | A `createClient` / `createProvider` / handler config guard fails. |
 | `DISCOVERY_FAILED` | 502 | The client's own OP-metadata fetch (used to resolve `end_session_endpoint`) fails or the issuer mismatches. |
+| `AUTHENTICATION_REQUIREMENTS_NOT_MET` | 401 | The id_token's `auth_time` is older than the requested `max_age`, or its `acr` is not one of the requested `acr_values`. |
 
 `OidcError` extends the shared `BaseError`, so it carries `code`, `status`,
 and the standard `cause` chain.

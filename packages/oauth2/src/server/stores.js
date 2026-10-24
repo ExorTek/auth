@@ -106,6 +106,8 @@ function createTtlMap({ sweepIntervalMs = 60_000 } = {}) {
  * @property {string} [resource]
  * @property {unknown} [authorizationDetails]
  * @property {string} [dpopJkt]              DPoP `jkt` bound at the authorize step (RFC 9449 §10)
+ * @property {boolean} [redeemed]            marker left after redemption so a replay can revoke the family
+ * @property {string} [familyId]             the refresh family a redeemed code produced
  *
  * @typedef {Object} AuthCodeStore
  * @property {(code: string, record: AuthCodeRecord, ttlMs: number) => void | Promise<void>} save
@@ -143,34 +145,63 @@ export function createAuthCodeStore() {
  * @typedef {Object} RefreshStore
  * @property {(record: RefreshRecord) => Promise<void>} save
  * @property {(token: string) => Promise<RefreshRecord | null>} get
- * @property {(oldToken: string, next: RefreshRecord) => Promise<void>} rotate
+ * @property {(oldToken: string, next: RefreshRecord) => Promise<boolean | void>} rotate
+ *   Atomically claim `oldToken` and persist `next`. Resolve `false` when the
+ *   token was already rotated or revoked (a concurrent redemption won), so the
+ *   grant treats it as reuse. A store that resolves nothing is treated as a
+ *   successful rotation (pre-CAS custom stores).
  * @property {(familyId: string) => Promise<void>} revokeFamily
  */
 
-/** @returns {RefreshStore} */
-export function createRefreshStore() {
+/**
+ * @param {{ sweepIntervalMs?: number }} [options]
+ * @returns {RefreshStore}
+ */
+export function createRefreshStore({ sweepIntervalMs = 60_000 } = {}) {
   const store = createMemoryRecordStore({ idField: 'token', indexField: 'familyId' });
+
+  // The record store has no TTL of its own: evict expired tokens in the
+  // background so a family that is never presented again cannot leak.
+  const sweep = setInterval(() => {
+    const now = Date.now();
+    for (const [token, record] of store.byId) {
+      const { expiresAt, familyId } = /** @type {RefreshRecord} */ (record);
+      if (isNumber(expiresAt) && expiresAt <= now) {
+        store.byId.delete(token);
+        const members = store.byIndex.get(familyId);
+        members?.delete(token);
+        if (members?.size === 0) {
+          store.byIndex.delete(familyId);
+        }
+      }
+    }
+  }, sweepIntervalMs);
+  if (isFunction(sweep.unref)) {
+    sweep.unref();
+  }
+
   return {
     async save(record) {
       await store.put(record);
     },
     async get(token) {
       const record = /** @type {RefreshRecord | null} */ (await store.getById(token));
-      // An expired refresh token is treated as absent (the memory record
-      // store has no TTL of its own); a Redis-backed store would let the
-      // key expire instead.
+      // An expired refresh token is treated as absent.
       if (record && isNumber(record.expiresAt) && record.expiresAt <= Date.now()) {
         return null;
       }
       return record;
     },
-    // Mark the presented token used and persist its successor. If the
-    // presented token was ALREADY used, the caller detects reuse from
-    // `get` first and calls `revokeFamily` instead — this only runs on a
-    // legitimate rotation.
+    // Compare-and-set: the check and the `used` flip happen in one
+    // synchronous step, so of two concurrent redemptions exactly one wins.
     async rotate(oldToken, next) {
-      await store.update(oldToken, { used: true });
+      const existing = /** @type {RefreshRecord | undefined} */ (store.byId.get(oldToken));
+      if (!existing || existing.used === true || existing.revoked === true) {
+        return false;
+      }
+      existing.used = true;
       await store.put(next);
+      return true;
     },
     async revokeFamily(familyId) {
       const members = await store.listByIndex(familyId);
@@ -213,51 +244,47 @@ export function createParStore() {
  * @property {'pending' | 'approved' | 'denied' | 'redeemed'} status
  * @property {string} [subject]           set on approval
  * @property {number} [lastPolledAt]      for slow_down enforcement
+ * @property {number} [expiresAt]         epoch ms; set by the store on save and never extended
  *
  * @typedef {Object} DeviceStore
  * @property {(record: DeviceRecord, ttlMs: number) => void | Promise<void>} save
  * @property {(deviceCode: string) => (DeviceRecord | undefined) | Promise<DeviceRecord | undefined>} getByDeviceCode
  * @property {(userCode: string) => (DeviceRecord | undefined) | Promise<DeviceRecord | undefined>} getByUserCode
  * @property {(deviceCode: string, patch: Partial<DeviceRecord>) => void | Promise<void>} update
+ *   Patch a record without extending its lifetime.
+ * @property {(deviceCode: string) => boolean | Promise<boolean>} [redeem]
+ *   Atomically flip an `approved` record to `redeemed`; resolve whether this
+ *   call did it. Optional for custom stores (the grant then falls back to a
+ *   non-atomic `update`), implemented by the built-in stores.
  */
 
 /** @returns {DeviceStore} */
 export function createDeviceStore() {
   const byDeviceCode = createTtlMap();
-  /** @type {Map<string, string>} user_code → device_code */
-  const userToDevice = new Map();
+  // user_code → device_code, on the same TTL as the record it points at.
+  const userToDevice = createTtlMap();
 
   return {
     save(record, ttlMs) {
-      byDeviceCode.set(record.deviceCode, record, ttlMs);
-      userToDevice.set(record.userCode, record.deviceCode);
+      const expiresAt = Date.now() + ttlMs;
+      byDeviceCode.set(record.deviceCode, { ...record, expiresAt }, ttlMs);
+      userToDevice.set(record.userCode, record.deviceCode, ttlMs);
     },
     getByDeviceCode(deviceCode) {
       return /** @type {DeviceRecord | undefined} */ (byDeviceCode.get(deviceCode));
     },
     getByUserCode(userCode) {
-      const deviceCode = userToDevice.get(userCode);
-      if (!deviceCode) {
-        return undefined;
-      }
-      const record = this.getByDeviceCode(deviceCode);
-      // The device record expired out from under the reverse index — drop
-      // the dangling `user_code` mapping so it cannot leak.
-      if (!record) {
-        userToDevice.delete(userCode);
-        return undefined;
-      }
-      return record;
+      const deviceCode = /** @type {string | undefined} */ (userToDevice.get(userCode));
+      return deviceCode ? this.getByDeviceCode(deviceCode) : undefined;
     },
     update(deviceCode, patch) {
       const existing = /** @type {DeviceRecord | undefined} */ (byDeviceCode.get(deviceCode));
       if (!existing) {
         return;
       }
-      // Preserve the remaining TTL by not resetting it — re-save with the
-      // original expiry window is unnecessary here since getByDeviceCode
-      // already evicts past expiry; a short re-arm is acceptable.
-      byDeviceCode.set(deviceCode, { ...existing, ...patch }, DEVICE_REEARM_MS);
+      // Keep the original expiry: polling must never extend a device code.
+      const remaining = /** @type {number} */ (existing.expiresAt) - Date.now();
+      byDeviceCode.set(deviceCode, { ...existing, ...patch }, remaining);
       // Once the code is spent (redeemed/denied), the one-time `user_code`
       // is done — free the reverse index eagerly rather than waiting for
       // TTL, so a verified device flow leaves nothing behind.
@@ -265,12 +292,17 @@ export function createDeviceStore() {
         userToDevice.delete(existing.userCode);
       }
     },
+    // Check-and-flip in one synchronous step: exactly one poll redeems.
+    redeem(deviceCode) {
+      const existing = /** @type {DeviceRecord | undefined} */ (byDeviceCode.get(deviceCode));
+      if (!existing || existing.status !== 'approved') {
+        return false;
+      }
+      this.update(deviceCode, { status: 'redeemed' });
+      return true;
+    },
   };
 }
-
-// A device flow is minutes-long; re-arming an update for 10 min keeps a
-// pending record alive across polls without a separate expiry field.
-const DEVICE_REEARM_MS = 600_000;
 
 /**
  * @param {unknown} store

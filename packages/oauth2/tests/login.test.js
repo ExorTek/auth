@@ -12,7 +12,7 @@ import {
 } from '../src/middleware/core.js';
 import { mountOAuthLogin } from '../src/middleware/express.js';
 
-const SECRET = 'flow-cookie-secret-value';
+const SECRET = 'flow-cookie-secret-value-32-bytes!';
 
 /** A hermetic stand-in for a `createOAuth` hub. */
 function fakeOauth() {
@@ -185,4 +185,12 @@ test('express web callback runs end-to-end over mock req/res', async () => {
   );
   assert.equal(onSuccessArg.user.sub, 'user-1');
   assert.equal(onSuccessArg.provider, 'google');
+});
+
+test('api mode requires a secret, and every secret needs 32 bytes', () => {
+  assert.throws(() => normalizeLoginConfig({ oauth: fakeOauth(), mode: 'api' }), /requires a secret/);
+  assert.throws(() => normalizeLoginConfig({ oauth: fakeOauth(), mode: 'api', secret: 'short' }), /32 bytes/);
+  assert.throws(() => normalizeLoginConfig({ oauth: fakeOauth(), cookie: { secret: 'short' } }), /32 bytes/);
+  // web mode without a secret still uses the server-side store.
+  assert.equal(normalizeLoginConfig({ oauth: fakeOauth() }).cookieMode, false);
 });

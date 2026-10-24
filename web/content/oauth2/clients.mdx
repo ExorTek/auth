@@ -34,11 +34,11 @@ createServer({
 | ----------------------------------- | ----------------------------------- | -------------------------------------------------------- |
 | `clientId`                          | —                                   | required                                                 |
 | `clientSecret`                      | —                                   | confidential clients only                                |
-| `redirectUris`                      | —                                   | exact-match allowlist (RFC 6749 §3.1.2 — no wildcards)   |
+| `redirectUris`                      | —                                   | exact-match allowlist (RFC 6749 §3.1.2 — no wildcards); `https`, loopback `http`, or a reverse-domain private-use scheme, no fragment |
 | `grantTypes`                        | `['authorization_code','refresh_token']` | the grants this client may use                      |
 | `responseTypes`                     | `['code']`                          | OAuth 2.1 is code-only                                   |
 | `tokenEndpointAuthMethod`           | secret ? `client_secret_basic` : `none` | see below                                            |
-| `scope`                             | server default                      | the ceiling of scopes this client may request            |
+| `scope`                             | server default                      | the ceiling of scopes this client may request (always within the server's `scopes`) |
 | `jwksUri` / `jwks`                  | —                                   | for `private_key_jwt` / signed request objects           |
 | `dpopBoundAccessTokens`             | `false`                             | require DPoP for this client (RFC 9449 §5.2)             |
 | `requirePushedAuthorizationRequests`| `false`                             | require PAR (RFC 9126)                                    |
@@ -67,6 +67,12 @@ createServer({
 Assertion-based methods (`*_jwt`) require an `exp`, bound the accepted
 lifetime, and reject a replayed `jti`. mTLS methods also sender-constrain
 the token via `cnf.x5t#S256`.
+
+`tls_client_auth` only trusts a certificate whose chain the TLS layer
+verified (`socket.authorized`) — the express / fastify adapters pass it
+through; on a bare `node:http` listener set `clientCertificateAuthorized`
+on the request descriptor. `tlsClientAuthSubjectDn` is an RFC 4514 DN
+(`CN=client,O=Example`), compared attribute by attribute.
 
 ## A registry instead of an array
 

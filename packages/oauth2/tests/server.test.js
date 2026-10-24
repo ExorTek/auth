@@ -271,10 +271,10 @@ test('PAR pushes params and the request_uri is single-use', async () => {
   );
   assert.ok(pushed.request_uri.startsWith('urn:ietf:params:oauth:request_uri:'));
 
-  const ok = await server.authorize(get('/authorize', { request_uri: pushed.request_uri }));
+  const ok = await server.authorize(get('/authorize', { client_id: 'app', request_uri: pushed.request_uri }));
   assert.ok(new URL(ok.headers.location).searchParams.get('code'));
 
-  const reuse = await server.authorize(get('/authorize', { request_uri: pushed.request_uri }));
+  const reuse = await server.authorize(get('/authorize', { client_id: 'app', request_uri: pushed.request_uri }));
   assert.equal(body(reuse).error, 'invalid_request');
 });
 

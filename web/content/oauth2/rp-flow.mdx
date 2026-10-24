@@ -43,6 +43,15 @@ const { user, tokens } = await oauth.callback('google', req.query, { session });
 it back to `callback`, which verifies the whole round-trip before
 exchanging the code.
 
+Extra authorization parameters go in `params` (`prompt`, `login_hint`, …).
+The flow-managed ones — `state`, `nonce`, `redirect_uri`, `scope`,
+`response_type`, `client_id` and the PKCE challenge — can't be overridden
+there; passing one throws `INVALID_ARGUMENT`.
+
+`warnings` from `callback` include `EMAIL_UNVERIFIED` whenever the provider
+did not report the email as verified — including providers that simply omit
+the flag, such as Entra ID. Don't key accounts on an unverified email.
+
 <Callout type="warning">
   The `session` is the CSRF/PKCE binding for the flow. Bind it to the
   initiating browser (cookie or `sessionBinding`) — a captured session

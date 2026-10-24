@@ -58,3 +58,19 @@ describe('provider session management', () => {
     assert.match(res.body, /"my_op_state"/);
   });
 });
+
+describe('checkSessionIframeHtml — cookie name', () => {
+  it('refuses a cookie name that is not an RFC 6265 token', async () => {
+    const { checkSessionIframeHtml } = await import('../src/internal/session.js');
+    assert.throws(() => checkSessionIframeHtml({ cookieName: 'x</script><script>alert(1)//' }), {
+      code: 'INVALID_ARGUMENT',
+    });
+    assert.throws(() => checkSessionIframeHtml({ cookieName: 'a b' }), { code: 'INVALID_ARGUMENT' });
+  });
+
+  it('regex-escapes token characters before they reach new RegExp', async () => {
+    const { checkSessionIframeHtml } = await import('../src/internal/session.js');
+    const html = checkSessionIframeHtml({ cookieName: 'op.state' });
+    assert.match(html, /COOKIE_NAME_PATTERN = "op\\\\.state";/);
+  });
+});

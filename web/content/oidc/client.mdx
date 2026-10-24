@@ -61,6 +61,9 @@ const { url, session } = await client.authorize({
 });
 ```
 
+`maxAge` / `acrValues` can also be set once on `createClient` — then every
+request sends them and every callback enforces them.
+
 ## `handleCallback(query, { session })`
 
 Completes the flow and returns the verified identity:
@@ -68,6 +71,12 @@ Completes the flow and returns the verified identity:
 ```js
 const { idToken, claims, userinfo, tokens } = await client.handleCallback(req.query, { session });
 ```
+
+When `max_age` / `acr_values` were requested (pass `{ maxAge, acrValues }`
+here too, or set them on the client), the id_token must carry an `auth_time`
+within `max_age` and an `acr` from the list — otherwise `handleCallback`
+throws `AUTHENTICATION_REQUIREMENTS_NOT_MET`. An OP that ignores the request
+can't pass a stale or weaker login off as the one you asked for.
 
 | Field | What |
 |-------|------|

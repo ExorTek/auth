@@ -58,7 +58,7 @@ Each returns a framework-agnostic handler (`{ method, url, headers, query }
 | Handler | Serves |
 |---------|--------|
 | `discoveryHandler()` | `/.well-known/openid-configuration` — the OIDC metadata (superset of RFC 8414), advertising only the endpoints the OP actually serves. |
-| `userinfoHandler()` | UserInfo (OIDC Core §5.3) — resolves the Bearer token, releases claims per granted scope (§5.4) and the `claims.userinfo` policy; 401 + `WWW-Authenticate` on a bad token. |
+| `userinfoHandler()` | UserInfo (OIDC Core §5.3) — resolves the Bearer token (`Authorization` header only, never the query string), releases claims per granted scope (§5.4) and the `claims.userinfo` policy; 401 + `WWW-Authenticate` on a bad token. |
 | `jwksHandler()` | The published JWK Set at `jwks_uri`. |
 | `endSessionHandler()` | RP-Initiated Logout (see its page). |
 | `checkSessionHandler()` | Session Management iframe (see its page). |

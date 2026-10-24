@@ -19,6 +19,7 @@ import { normalizeRequest } from '../request.js';
 import { json, jsonError } from '../response.js';
 import { authenticateClient } from '../security/client-auth.js';
 import { resolveDpopBinding } from '../security/dpop.js';
+import { verifyRequestObject } from '../security/jar-jarm.js';
 
 const REQUEST_URI_PREFIX = 'urn:ietf:params:oauth:request_uri:';
 
@@ -56,7 +57,13 @@ export function createParHandler(config) {
       // (RFC 9449 §10.1) via `dpop_jkt`.
       const { dpopJkt } = await resolveDpopBinding(req, config, client, { htu: config.endpoints.par });
 
-      const params = collectParams(req.form, client.clientId, dpopJkt);
+      // RFC 9126 §3: a pushed request may itself be a JAR request object.
+      // Verify it now, while the client is authenticated, and store the
+      // parameters it carries — never the unverified JWT.
+      const source = isNonEmptyString(req.form.request)
+        ? await verifyRequestObject(req.form.request, client.clientId, config)
+        : req.form;
+      const params = collectParams(source, client.clientId, dpopJkt);
       const requestUri = REQUEST_URI_PREFIX + randomState();
       await config.stores.par.save(requestUri, params, config.parTtlMs);
 
@@ -74,7 +81,7 @@ export function createParHandler(config) {
 }
 
 /**
- * @param {Record<string, string>} form
+ * @param {Record<string, unknown>} form
  * @param {string} clientId
  * @param {string | undefined} dpopJkt
  * @returns {Record<string, unknown>}
@@ -83,7 +90,7 @@ function collectParams(form, clientId, dpopJkt) {
   /** @type {Record<string, unknown>} */
   const params = {};
   for (const [key, value] of Object.entries(form)) {
-    if (!CLIENT_AUTH_PARAMS.has(key)) {
+    if (!CLIENT_AUTH_PARAMS.has(key) && key !== 'request') {
       params[key] = value;
     }
   }

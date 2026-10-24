@@ -7,7 +7,7 @@
  * redirects back. These are the pure builders/validators shared by the
  * client's `endSessionUrl` and the provider's `endSessionHandler`.
  */
-import { decode } from '@exortek/jwt';
+import { verify } from '@exortek/jwt';
 import { isArray, isNonEmptyString } from '@exortek/shared/predicates';
 
 /**
@@ -40,31 +40,34 @@ export function buildEndSessionUrl(endpoint, params) {
 }
 
 /**
- * Read the (unverified) `sub` / `aud` from an `id_token_hint`. A logout hint
- * is frequently expired, so the OP validates issuer/audience rather than the
- * full signature+exp; the return lets the handler match the session to clear.
+ * Verify an `id_token_hint` and read its `sub` / `aud`. The hint is the only
+ * thing that tells the OP whose session to end, so it must carry the OP's
+ * own signature — a decoded-but-unverified hint lets anyone name any `sub`
+ * and force that user's logout. A logout hint is frequently expired, so
+ * `exp` is tolerated up to `maxAge` past expiry; signature, `iss` and `alg`
+ * are always enforced.
  *
- * @param {string} idTokenHint
- * @param {string} issuer  the OP's own issuer — the hint's `iss` must match
- * @returns {{ sub?: string, aud?: string | string[] } | null}  null when the hint is unusable / not ours
+ * @param {string | undefined} idTokenHint
+ * @param {{ issuer: string, keys: unknown, alg: string, maxAge: string | number }} options
+ * @returns {Promise<{ sub?: string, aud?: string | string[] } | null>}  null when the hint is absent or not genuinely ours
  */
-export function readIdTokenHint(idTokenHint, issuer) {
+export async function verifyIdTokenHint(idTokenHint, { issuer, keys, alg, maxAge }) {
   if (!isNonEmptyString(idTokenHint)) {
     return null;
   }
-  let payload;
   try {
-    payload = decode(idTokenHint).payload;
+    const { payload } = await verify(idTokenHint, /** @type {any} */ (keys), {
+      alg: [alg],
+      issuer,
+      clockTolerance: maxAge,
+    });
+    return {
+      sub: /** @type {string|undefined} */ (payload.sub),
+      aud: /** @type {string|string[]|undefined} */ (payload.aud),
+    };
   } catch {
     return null;
   }
-  if (payload.iss !== issuer) {
-    return null;
-  }
-  return {
-    sub: /** @type {string|undefined} */ (payload.sub),
-    aud: /** @type {string|string[]|undefined} */ (payload.aud),
-  };
 }
 
 /**
