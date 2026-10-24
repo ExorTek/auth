@@ -117,6 +117,16 @@ describe('resolver — kid-miss refetch', () => {
     assert.equal(fn.mock.callCount(), 2);
   });
 
+  test('a key found by a kid-miss refetch still gets the alg check', async () => {
+    let keys = [SAMPLE_EC_JWK];
+    mockFetch(async () => okResponse({ keys }));
+    const resolver = createRemoteJWKS('https://example.com/jwks', { cooldownMs: 0 });
+    await resolver({ kid: 'k1' });
+
+    keys = [SAMPLE_EC_JWK, { ...SAMPLE_EC_JWK, kid: 'k3', alg: 'ES256' }];
+    await assert.rejects(resolver({ kid: 'k3', alg: 'RS256' }), /alg mismatch/);
+  });
+
   test('cooldown prevents rapid refetches', async () => {
     const fn = mockFetch(async () => okResponse(fakeJwksResponse()));
 

@@ -247,6 +247,27 @@ export function createRemoteJWKS(uri, options = {}) {
    * @param {{ kid: string, alg?: string }} header
    * @returns {Promise<import('node:crypto').KeyObject>}
    */
+  /**
+   * A key published with an `alg` never verifies a token declaring a
+   * different one.
+   *
+   * @param {string} kid
+   * @param {{ alg?: string }} header
+   */
+  function assertAlgMatches(kid, header) {
+    const pinned = jwksCache?.get(kid)?.alg;
+    if (isString(header.alg) && pinned && header.alg !== pinned) {
+      const err = new JwksError(
+        ErrorCode.KID_NOT_FOUND,
+        `kid=${JSON.stringify(kid)} found but alg mismatch: key has ${pinned}, token has ${header.alg}`,
+      );
+      if (onInvalidKey) {
+        onInvalidKey(header, err);
+      }
+      throw err;
+    }
+  }
+
   async function resolver(header) {
     const kid = header?.kid;
     if (!isString(kid) || kid === '') {
@@ -269,16 +290,7 @@ export function createRemoteJWKS(uri, options = {}) {
 
     let key = await getKeyObject(kid);
     if (key) {
-      if (isString(header.alg) && jwksCache?.get(kid)?.alg && jwksCache.get(kid).alg !== header.alg) {
-        const err = new JwksError(
-          ErrorCode.KID_NOT_FOUND,
-          `kid=${JSON.stringify(kid)} found but alg mismatch: key has ${jwksCache.get(kid).alg}, token has ${header.alg}`,
-        );
-        if (onInvalidKey) {
-          onInvalidKey(header, err);
-        }
-        throw err;
-      }
+      assertAlgMatches(kid, header);
       return key;
     }
 
@@ -293,6 +305,8 @@ export function createRemoteJWKS(uri, options = {}) {
       }
       key = await getKeyObject(kid);
       if (key) {
+        // A freshly-fetched key gets the same alg check as a cached one.
+        assertAlgMatches(kid, header);
         return key;
       }
     }
