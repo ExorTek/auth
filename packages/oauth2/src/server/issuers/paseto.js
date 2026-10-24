@@ -10,7 +10,7 @@
  * claims (`client_id`, `scope`, `cnf`) live in the payload, DPoP binding
  * included.
  */
-import { sign, verify, PasetoError } from '@exortek/paseto';
+import { sign, verify, PasetoError, PasetoKey } from '@exortek/paseto';
 import { parseDuration } from '@exortek/shared/duration';
 import { isArray, isNonEmptyString, isNullish, isObject } from '@exortek/shared/predicates';
 
@@ -21,8 +21,8 @@ const DEFAULT_EXPIRES_IN = '10m';
 
 /**
  * @typedef {Object} PasetoIssuerConfig
- * @property {import('node:crypto').KeyObject | Uint8Array} secretKey   Ed25519 secret (signing)
- * @property {import('node:crypto').KeyObject | Uint8Array} publicKey   Ed25519 public (introspection)
+ * @property {import('@exortek/paseto').PasetoKey} secretKey   v4 `secret` key (signing) — `generateKeyPair()` or `keys.secret(…)`
+ * @property {import('@exortek/paseto').PasetoKey} publicKey   v4 `public` key (introspection) — `generateKeyPair()` or `keys.public(…)`
  * @property {string | number} [expiresIn]                             access-token lifetime (default `'10m'`)
  */
 
@@ -35,6 +35,14 @@ export function pasetoIssuer(config) {
   }
   if (isNullish(config.secretKey) || isNullish(config.publicKey)) {
     throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, 'pasetoIssuer requires secretKey and publicKey');
+  }
+  // Typed keys (algorithm lucidity): refuse raw buffers and swapped
+  // purposes at configuration time rather than on the first token.
+  if (!isPasetoKey(config.secretKey, 'secret') || !isPasetoKey(config.publicKey, 'public')) {
+    throw new OAuth2Error(
+      ErrorCode.INVALID_ARGUMENT,
+      'pasetoIssuer requires a v4 secret and a v4 public PasetoKey (generateKeyPair() or keys.secret / keys.public)',
+    );
   }
   const { secretKey, publicKey } = config;
   const expiresInSec = Math.floor(parseDuration(config.expiresIn ?? DEFAULT_EXPIRES_IN) / 1000);
@@ -121,4 +129,13 @@ function audienceString(grant) {
     return grant.audience;
   }
   return grant.clientId;
+}
+
+/**
+ * @param {unknown} key
+ * @param {'secret' | 'public'} purpose
+ * @returns {boolean}
+ */
+function isPasetoKey(key, purpose) {
+  return key instanceof PasetoKey && key.purpose === purpose;
 }
