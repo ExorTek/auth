@@ -92,9 +92,16 @@ export function decryptHybrid(envelope, privateKey, options) {
   assertOptionalObject(options, 'options');
   const algo = options?.algo ?? 'rsa-oaep-256';
 
+  // Pin the GCM tag (and IV) length — a truncated tag must not verify.
+  if (envelope.iv.length !== 12 || envelope.tag.length !== 16) {
+    throw new CryptoError(
+      ErrorCode.DECRYPT_FAILED,
+      `hybrid envelope needs a 12-byte iv and a 16-byte tag; got iv ${envelope.iv.length}, tag ${envelope.tag.length}`,
+    );
+  }
   const aesKey = decryptAsymmetric(envelope.encryptedKey, privateKey, { algo });
   try {
-    const decipher = crypto.createDecipheriv('aes-256-gcm', aesKey, envelope.iv);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', aesKey, envelope.iv, { authTagLength: 16 });
     decipher.setAuthTag(envelope.tag);
     return Buffer.concat([decipher.update(envelope.ciphertext), decipher.final()]);
   } catch (err) {

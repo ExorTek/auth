@@ -56,3 +56,14 @@ describe('cipher hybrid (RSA-wrapped AES)', () => {
     );
   });
 });
+
+describe('decryptHybrid — truncated tags', () => {
+  it('rejects a tag shorter than 16 bytes', async () => {
+    const { publicKey, privateKey } = await cipher.generateKeyPair('rsa-oaep-256');
+    const envelope = cipher.encryptHybrid('hello', publicKey);
+    assert.throws(
+      () => cipher.decryptHybrid({ ...envelope, tag: envelope.tag.subarray(0, 4) }, privateKey),
+      err => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
+    );
+  });
+});
