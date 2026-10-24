@@ -18,6 +18,11 @@ export const ErrorCode = Object.freeze({
   // `end_session_endpoint` for RP-Initiated Logout — the main login flow's
   // discovery is delegated to @exortek/oauth2 and surfaces as OAuth2Error).
   DISCOVERY_FAILED: 'DISCOVERY_FAILED',
+
+  // The id_token verified, but the authentication it describes does not meet
+  // what the client asked for: `auth_time` older than the requested
+  // `max_age`, or an `acr` outside the requested `acr_values`.
+  AUTHENTICATION_REQUIREMENTS_NOT_MET: 'AUTHENTICATION_REQUIREMENTS_NOT_MET',
 });
 
 /**
@@ -31,6 +36,7 @@ export class OidcError extends BaseError {
   static statuses = {
     INVALID_ARGUMENT: 400,
     DISCOVERY_FAILED: 502,
+    AUTHENTICATION_REQUIREMENTS_NOT_MET: 401,
   };
 
   static defaultStatus = 500;
@@ -44,4 +50,12 @@ export class OidcError extends BaseError {
  */
 export function invalidArgument(message) {
   throw new OidcError(ErrorCode.INVALID_ARGUMENT, message);
+}
+
+/**
+ * @param {string} message
+ * @returns {never}
+ */
+export function authenticationRequirementsNotMet(message) {
+  throw new OidcError(ErrorCode.AUTHENTICATION_REQUIREMENTS_NOT_MET, message);
 }

@@ -21,7 +21,7 @@ afterEach(async () => {
  * exchange (the sync stub handler can't await, but the id_token is known
  * once `authorize` has produced the nonce).
  */
-async function rig({ userinfo } = {}) {
+async function rig({ userinfo, clientConfig } = {}) {
   const signer = await makeSigner();
   const holder = { idToken: '' };
   const as = await startStubAS({
@@ -41,6 +41,7 @@ async function rig({ userinfo } = {}) {
     redirectUri: REDIRECT_URI,
     // The stub AS serves its JWKS over http on loopback.
     jwksOptions: { allowInsecure: true },
+    ...clientConfig,
   });
   return { as, client, signer, holder };
 }
@@ -119,5 +120,49 @@ describe('createClient.handleCallback', () => {
     const params = new URL(url).searchParams;
     holder.idToken = await signer.mint({ iss: as.issuer, sub: 'user-123', aud: CLIENT_ID, nonce: 'wrong-nonce' });
     await assert.rejects(client.handleCallback({ code: 'auth-code', state: params.get('state') }, { session }));
+  });
+});
+
+describe('createClient.handleCallback — max_age / acr_values', () => {
+  async function flow(clientConfig, claims, callbackOptions = {}) {
+    const { as, client, signer, holder } = await rig({ userinfo: () => ({ sub: 'user-1' }), clientConfig });
+    const { url, session } = await client.authorize();
+    const params = new URL(url).searchParams;
+    holder.idToken = await signer.mint({
+      iss: as.issuer,
+      sub: 'user-1',
+      aud: CLIENT_ID,
+      nonce: params.get('nonce'),
+      ...claims,
+    });
+    return {
+      params,
+      run: () => client.handleCallback({ code: 'c', state: params.get('state') }, { session, ...callbackOptions }),
+    };
+  }
+  const now = () => Math.floor(Date.now() / 1000);
+  const notMet = { code: ErrorCode.AUTHENTICATION_REQUIREMENTS_NOT_MET };
+
+  it('sends the configured max_age and rejects a stale auth_time', async () => {
+    const { params, run } = await flow({ maxAge: 60 }, { auth_time: now() - 3600 });
+    assert.equal(params.get('max_age'), '60');
+    await assert.rejects(run(), notMet);
+  });
+
+  it('rejects a missing auth_time when max_age was requested', async () => {
+    const { run } = await flow({}, {}, { maxAge: 60 });
+    await assert.rejects(run(), notMet);
+  });
+
+  it('accepts a fresh auth_time', async () => {
+    const { run } = await flow({ maxAge: 60 }, { auth_time: now() - 5 });
+    assert.equal((await run()).claims.sub, 'user-1');
+  });
+
+  it('rejects an acr outside the requested acr_values', async () => {
+    const { run } = await flow({ acrValues: 'urn:mfa urn:phr' }, { acr: 'urn:pwd' });
+    await assert.rejects(run(), notMet);
+    const ok = await flow({ acrValues: 'urn:mfa urn:phr' }, { acr: 'urn:phr' });
+    assert.equal((await ok.run()).claims.acr, 'urn:phr');
   });
 });
