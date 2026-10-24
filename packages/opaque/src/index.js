@@ -9,7 +9,7 @@ import { hash } from '@exortek/crypto';
 import { parseDuration } from '@exortek/shared/duration';
 import { isNonEmptyString, isFunction } from '@exortek/shared/predicates';
 import { generate } from './token.js';
-import { assertObject, assertNonEmptyString } from './internal/guards.js';
+import { assertObject, assertNonEmptyString, invalidArgument } from './internal/guards.js';
 
 export { generate } from './token.js';
 
@@ -25,7 +25,7 @@ export { generate } from './token.js';
 /**
  * @typedef {import('./token.js').GenerateOptions & {
  *   store: OpaqueStore,
- *   expiresIn?: string | number,
+ *   expiresIn: string | number | null,   // REQUIRED — a duration, or null for a deliberately non-expiring token
  *   metadata?: Record<string, unknown>,
  *   hashAlgo?: import('@exortek/crypto').HashAlgorithm,
  *   now?: number,
@@ -49,12 +49,18 @@ export async function create(options) {
   assertObject(options, 'create.options');
   const { store, expiresIn, metadata, hashAlgo = 'sha256', now = Date.now(), ...tokenOptions } = options;
   assertObject(store, 'create.options.store');
+  // A credential that never expires should be a decision, not an omission.
+  if (expiresIn === undefined) {
+    throw invalidArgument(
+      "create.options.expiresIn is required — pass a duration ('30d', 3600000) or null for a token that never expires",
+    );
+  }
 
   const token = generate(tokenOptions);
   const hashedToken = hashToken(token, hashAlgo);
   // Parse once — stores also accept a number, so a single ms value keeps
   // the returned expiresAt and the store's TTL calculation in lockstep.
-  const expiresMs = expiresIn !== undefined ? parseDuration(expiresIn) : undefined;
+  const expiresMs = expiresIn !== null ? parseDuration(expiresIn) : undefined;
   const expiresAt = expiresMs !== undefined ? new Date(now + expiresMs) : undefined;
 
   await store.set(hashedToken, metadata ?? {}, { expiresIn: expiresMs });

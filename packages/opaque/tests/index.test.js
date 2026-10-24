@@ -8,10 +8,15 @@ import { hash as hashFn } from '@exortek/crypto';
 describe('create / verify / revoke', () => {
   test('round-trips a token through the store', async () => {
     const store = memoryStore();
-    const { token, hash, expiresAt } = await create({ format: 'hex', store, metadata: { userId: 'usr_1' } });
+    const { token, hash, expiresAt } = await create({
+      format: 'hex',
+      expiresIn: null,
+      store,
+      metadata: { userId: 'usr_1' },
+    });
     assert.equal(typeof token, 'string');
     assert.equal(typeof hash, 'string');
-    assert.equal(expiresAt, undefined);
+    assert.equal(expiresAt, undefined, 'expiresIn: null is an explicit non-expiring token');
 
     const result = await verify(token, { store });
     assert.deepEqual(result, { valid: true, metadata: { userId: 'usr_1' } });
@@ -43,7 +48,7 @@ describe('create / verify / revoke', () => {
 
   test('revoke makes a token fail verify, and is idempotent', async () => {
     const store = memoryStore();
-    const { token } = await create({ format: 'hex', store });
+    const { token } = await create({ format: 'hex', expiresIn: '1h', store });
     assert.equal(await revoke(token, { store }), true);
     assert.equal((await verify(token, { store })).valid, false);
     assert.equal(await revoke(token, { store }), false);
@@ -51,12 +56,14 @@ describe('create / verify / revoke', () => {
 
   test('throws on missing store', async () => {
     await assert.rejects(() => create({ format: 'hex' }), OpaqueError);
+    // A forgotten expiresIn is an error, not an immortal credential.
+    await assert.rejects(() => create({ format: 'hex', store: memoryStore() }), OpaqueError);
     await assert.rejects(() => verify('tok', {}), OpaqueError);
   });
 
   test('honors a non-default hashAlgo end-to-end', async () => {
     const store = memoryStore();
-    const { token } = await create({ format: 'hex', store, hashAlgo: 'sha512' });
+    const { token } = await create({ format: 'hex', expiresIn: '1h', store, hashAlgo: 'sha512' });
     assert.equal((await verify(token, { store, hashAlgo: 'sha512' })).valid, true);
     // Wrong algo hashes to a different key, so it should miss.
     assert.equal((await verify(token, { store })).valid, false);
@@ -64,7 +71,7 @@ describe('create / verify / revoke', () => {
 
   test('create returns hash === hashFn(token) for the default algo', async () => {
     const store = memoryStore();
-    const { token, hash } = await create({ format: 'hex', store });
+    const { token, hash } = await create({ format: 'hex', expiresIn: '1h', store });
     assert.equal(hash, hashFn(token, { algo: 'sha256' }));
   });
 
@@ -75,7 +82,7 @@ describe('create / verify / revoke', () => {
       get: k => raw.get(k) ?? null,
       delete: k => raw.delete(k),
     });
-    const { token, hash } = await create({ format: 'hex', store: spy });
+    const { token, hash } = await create({ format: 'hex', expiresIn: '1h', store: spy });
     assert.equal(raw.has(token), false, 'raw token must NOT be a key');
     assert.equal(raw.has(hash), true, 'hash IS the key');
     assert.equal(raw.size, 1);
@@ -95,7 +102,7 @@ describe('mask', () => {
 describe('introspectionHandler', () => {
   test('active: true for a valid token', async () => {
     const store = memoryStore();
-    const { token } = await create({ format: 'hex', store, metadata: { userId: 'usr_1' } });
+    const { token } = await create({ format: 'hex', expiresIn: '1h', store, metadata: { userId: 'usr_1' } });
     const handler = introspectionHandler({ store });
     const result = await handler({ body: { token } });
     assert.equal(result.status, 200);
@@ -121,7 +128,7 @@ describe('introspectionHandler', () => {
 
   test('honors a custom tokenField', async () => {
     const store = memoryStore();
-    const { token } = await create({ format: 'hex', store, metadata: { userId: 'u' } });
+    const { token } = await create({ format: 'hex', expiresIn: '1h', store, metadata: { userId: 'u' } });
     const handler = introspectionHandler({ store, tokenField: 'access_token' });
     const result = await handler({ body: { access_token: token } });
     assert.deepEqual(result.body, { userId: 'u', active: true });
@@ -159,7 +166,7 @@ describe('introspectionHandler — store failure', () => {
 describe('revocationHandler', () => {
   test('revokes a known token and returns 200 with {} body (RFC 7009 §2.2)', async () => {
     const store = memoryStore();
-    const { token } = await create({ format: 'hex', store });
+    const { token } = await create({ format: 'hex', expiresIn: '1h', store });
     const handler = revocationHandler({ store });
     const result = await handler({ body: { token } });
     assert.equal(result.status, 200);

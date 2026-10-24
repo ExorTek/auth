@@ -43,7 +43,7 @@ test('works end-to-end through create/verify/revoke', async () => {
     },
   });
 
-  const { token } = await create({ format: 'hex', store, metadata: { userId: 'usr_1' } });
+  const { token } = await create({ format: 'hex', expiresIn: '1h', store, metadata: { userId: 'usr_1' } });
   assert.deepEqual(await verify(token, { store }), { valid: true, metadata: { userId: 'usr_1' } });
   await revoke(token, { store });
   assert.equal((await verify(token, { store })).valid, false);
