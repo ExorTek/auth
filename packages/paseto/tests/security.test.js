@@ -146,3 +146,10 @@ test('keys.local / keys.public wrap existing raw material', () => {
   const { secretKey, publicKey } = generateKeyPair();
   assert.equal(verify(sign({ ok: 2 }, secretKey), keys.public(publicKey.export())).ok, 2);
 });
+
+test('a trailing "." (empty footer) is not a second spelling of the token', () => {
+  const key = generateKey();
+  const { secretKey, publicKey } = generateKeyPair();
+  assert.throws(() => decrypt(`${encrypt({ a: 1 }, key)}.`, key), { code: 'INVALID_TOKEN' });
+  assert.throws(() => verify(`${sign({ a: 1 }, secretKey)}.`, publicKey), { code: 'INVALID_TOKEN' });
+});

@@ -83,7 +83,12 @@ export function decryptRaw({ token, key, implicit = Buffer.alloc(0) }) {
   if (parts.length < 3 || parts.length > 4 || `${parts[0]}.${parts[1]}.` !== HEADER) {
     throw new PasetoError(ErrorCode.INVALID_TOKEN, 'not a v4.local token');
   }
-  const footer = parts.length >= 4 && parts[3] ? b64.decode(parts[3]) : Buffer.alloc(0);
+  // An empty fourth segment (`…payload.`) is not "no footer": accepting it
+  // would give one token two valid spellings.
+  if (parts.length === 4 && parts[3].length === 0) {
+    throw new PasetoError(ErrorCode.INVALID_TOKEN, 'token has an empty footer segment');
+  }
+  const footer = parts.length === 4 ? b64.decode(parts[3]) : Buffer.alloc(0);
 
   const raw = b64.decode(parts[2]);
   if (raw.length < 32 + 32) {
