@@ -138,6 +138,7 @@ function adapt(handler) {
         query: request.query,
         body: request.body,
         clientCertificate: readPeerCertificate(request),
+        clientCertificateAuthorized: peerCertificateAuthorized(request),
       });
     } catch (err) {
       out = errorResponse(err);
@@ -163,6 +164,20 @@ function readPeerCertificate(request) {
     return cert && Object.keys(cert).length > 0 ? cert : undefined;
   }
   return undefined;
+}
+
+/**
+ * Whether the TLS layer verified the client certificate against the
+ * server's trusted CAs. A listener run with `rejectUnauthorized: false`
+ * (needed for `self_signed_tls_client_auth`) still accepts unverified
+ * certificates, so `tls_client_auth` must not trust the subject DN alone.
+ *
+ * @param {any} request
+ * @returns {boolean}
+ */
+function peerCertificateAuthorized(request) {
+  const socket = request.socket ?? request.raw?.socket;
+  return socket?.authorized === true;
 }
 
 export const oauth2ServerPlugin = fastifyPlugin(oauth2ServerPluginFn, {

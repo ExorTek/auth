@@ -114,3 +114,78 @@ test('PAR: a pushed request object is verified at push time', async () => {
   assert.equal(res.status, 400);
   assert.equal(body(res).error, 'invalid_request');
 });
+
+// mTLS (tls_client_auth)
+
+const PKI_CLIENT = {
+  clientId: 'pki',
+  tokenEndpointAuthMethod: 'tls_client_auth',
+  tlsClientAuthSubjectDn: 'CN=pki-client,O=Bank',
+  redirectUris: ['https://x.example.com/cb'],
+  grantTypes: ['client_credentials'],
+  scope: ['read'],
+};
+
+function mtlsRequest(subject, authorized) {
+  return {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: 'pki' }).toString(),
+    clientCertificate: { raw: Buffer.from('der'), subject },
+    clientCertificateAuthorized: authorized,
+  };
+}
+
+test('tls_client_auth: an unverified certificate with a matching DN is refused', async () => {
+  const { server } = buildServer({ clients: [PKI_CLIENT], grants: ['client_credentials'] });
+  const res = await server.token(mtlsRequest({ CN: 'pki-client', O: 'Bank' }, false));
+  assert.equal(res.status, 401);
+  assert.equal(body(res).error, 'invalid_client');
+
+  const ok = await server.token(mtlsRequest({ O: 'Bank', CN: 'pki-client' }, true));
+  assert.equal(ok.status, 200);
+});
+
+test('tls_client_auth: DN values are compared structurally, not as joined strings', async () => {
+  const { server } = buildServer({
+    clients: [{ ...PKI_CLIENT, tlsClientAuthSubjectDn: 'CN=foo\\,O=Bank' }],
+    grants: ['client_credentials'],
+  });
+  // Joined naively this subject renders as "CN=foo,O=Bank" too.
+  const forged = await server.token(mtlsRequest({ CN: 'foo', O: 'Bank' }, true));
+  assert.equal(forged.status, 401);
+
+  const real = await server.token(mtlsRequest({ CN: 'foo,O=Bank' }, true));
+  assert.equal(real.status, 200);
+});
+
+test('express adapter passes socket.authorized through', async () => {
+  const { server } = buildServer({ clients: [PKI_CLIENT], grants: ['client_credentials'] });
+  const { expressHandler } = await import('../src/server/middleware/express.js');
+  const handle = expressHandler(server.token);
+  const statuses = [];
+  for (const authorized of [false, true]) {
+    const socket = {
+      authorized,
+      getPeerCertificate: () => ({ raw: Buffer.from('der'), subject: { CN: 'pki-client', O: 'Bank' } }),
+    };
+    const req = {
+      method: 'POST',
+      url: '/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { grant_type: 'client_credentials', client_id: 'pki' },
+      query: {},
+      socket,
+    };
+    const res = {
+      status(code) {
+        statuses.push(code);
+        return this;
+      },
+      setHeader() {},
+      send() {},
+    };
+    await handle(req, res);
+  }
+  assert.deepEqual(statuses, [401, 200]);
+});

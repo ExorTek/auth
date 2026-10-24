@@ -25,6 +25,7 @@ import { isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates
 import { ProtocolError, ServerError } from '../errors.js';
 import { readClientCredentials } from '../request.js';
 import { resolveClientKeys } from './client-keys.js';
+import { parseDn, sameDn, subjectAttributes } from './dn.js';
 import { createReplayCache } from './replay-cache.js';
 
 const JWT_BEARER_ASSERTION = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
@@ -245,10 +246,17 @@ async function authenticateByCertificate(req, client) {
   }
 
   if (client.tokenEndpointAuthMethod === 'tls_client_auth') {
-    // PKI mTLS: the certificate's subject DN must match the registered
-    // expected value (RFC 8705 §2.1).
-    const subject = certSubjectString(cert);
-    if (!isNonEmptyString(client.tlsClientAuthSubjectDn) || client.tlsClientAuthSubjectDn !== subject) {
+    // PKI mTLS (RFC 8705 §2.1): the chain must have been verified by the TLS
+    // layer — otherwise any self-signed certificate carrying the right
+    // subject would pass — and the subject DN must match the registered one.
+    if (req.clientCertificateAuthorized !== true) {
+      throw new ServerError(ProtocolError.INVALID_CLIENT, 'client certificate chain was not verified');
+    }
+    const presented = subjectAttributes(/** @type {any} */ (cert).subject);
+    const registered = isNonEmptyString(client.tlsClientAuthSubjectDn)
+      ? parseDn(client.tlsClientAuthSubjectDn)
+      : undefined;
+    if (!presented || !registered || !sameDn(presented, registered)) {
       throw new ServerError(
         ProtocolError.INVALID_CLIENT,
         'client certificate subject does not match the registered value',
@@ -257,10 +265,10 @@ async function authenticateByCertificate(req, client) {
     return client;
   }
   if (client.tokenEndpointAuthMethod === 'self_signed_tls_client_auth') {
-    // Self-signed mTLS: the certificate thumbprint must be present in the
-    // client's registered JWKS (RFC 8705 §2.2).
+    // Self-signed mTLS: the certificate itself is the credential, so its
+    // thumbprint must equal the registered one (RFC 8705 §2.2).
     const thumb = certThumbprint(cert);
-    if (!certInJwks(client, thumb)) {
+    if (!thumbprintMatches(client, thumb)) {
       throw new ServerError(ProtocolError.INVALID_CLIENT, 'client certificate is not registered for this client');
     }
     return client;
@@ -283,29 +291,19 @@ function certThumbprint(cert) {
   return base64urlEncode(createHash('sha256').update(der).digest());
 }
 
-/** @param {object} cert @returns {string} */
-function certSubjectString(cert) {
-  const subject = /** @type {any} */ (cert).subject;
-  if (isNonEmptyString(subject)) {
-    return subject;
-  }
-  if (isObject(subject)) {
-    // Node parses the subject into an object; render a stable DN string.
-    return Object.entries(subject)
-      .map(([k, v]) => `${k}=${v}`)
-      .join(',');
-  }
-  throw new ServerError(ProtocolError.INVALID_CLIENT, 'client certificate has no subject');
-}
-
 /**
+ * Compare the presented certificate's thumbprint with the one registered
+ * for a `self_signed_tls_client_auth` client (RFC 8705 §2.2).
+ *
  * @param {import('../clients.js').Client} client
  * @param {string} thumb
  * @returns {boolean}
  */
-function certInJwks(client, thumb) {
-  if (isNonEmptyString(client.certificateThumbprint)) {
-    return client.certificateThumbprint === thumb;
+function thumbprintMatches(client, thumb) {
+  if (!isNonEmptyString(client.certificateThumbprint)) {
+    return false;
   }
-  return false;
+  const a = Buffer.from(client.certificateThumbprint, 'utf8');
+  const b = Buffer.from(thumb, 'utf8');
+  return a.length === b.length && timingSafeEqual(a, b);
 }
