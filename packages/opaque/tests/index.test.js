@@ -103,7 +103,7 @@ describe('introspectionHandler', () => {
   test('active: true for a valid token', async () => {
     const store = memoryStore();
     const { token } = await create({ format: 'hex', expiresIn: '1h', store, metadata: { userId: 'usr_1' } });
-    const handler = introspectionHandler({ store });
+    const handler = introspectionHandler({ authorize: () => true, store });
     const result = await handler({ body: { token } });
     assert.equal(result.status, 200);
     assert.deepEqual(result.body, { userId: 'usr_1', active: true });
@@ -113,7 +113,7 @@ describe('introspectionHandler', () => {
 
   test('active: false for an unknown token', async () => {
     const store = memoryStore();
-    const handler = introspectionHandler({ store });
+    const handler = introspectionHandler({ authorize: () => true, store });
     const result = await handler({ body: { token: 'nope' } });
     assert.deepEqual(result.body, { active: false });
     assert.equal(result.status, 200);
@@ -121,7 +121,7 @@ describe('introspectionHandler', () => {
 
   test('active: false when body is missing the token field', async () => {
     const store = memoryStore();
-    const handler = introspectionHandler({ store });
+    const handler = introspectionHandler({ authorize: () => true, store });
     const result = await handler({ body: {} });
     assert.deepEqual(result.body, { active: false });
   });
@@ -129,14 +129,14 @@ describe('introspectionHandler', () => {
   test('honors a custom tokenField', async () => {
     const store = memoryStore();
     const { token } = await create({ format: 'hex', expiresIn: '1h', store, metadata: { userId: 'u' } });
-    const handler = introspectionHandler({ store, tokenField: 'access_token' });
+    const handler = introspectionHandler({ authorize: () => true, store, tokenField: 'access_token' });
     const result = await handler({ body: { access_token: token } });
     assert.deepEqual(result.body, { userId: 'u', active: true });
   });
 
   test('caller can mutate returned headers without touching later calls', async () => {
     const store = memoryStore();
-    const handler = introspectionHandler({ store });
+    const handler = introspectionHandler({ authorize: () => true, store });
     const first = await handler({ body: {} });
     first.headers['X-Custom'] = 'yes';
     const second = await handler({ body: {} });
@@ -155,7 +155,7 @@ describe('introspectionHandler — store failure', () => {
       delete: async () => false,
     };
     const seen = [];
-    const handler = introspectionHandler({ store: throwing, onError: e => seen.push(e) });
+    const handler = introspectionHandler({ authorize: () => true, store: throwing, onError: e => seen.push(e) });
     const result = await handler({ body: { token: 'anything' } });
     assert.equal(result.status, 200);
     assert.deepEqual(result.body, { active: false });
@@ -181,5 +181,23 @@ describe('revocationHandler', () => {
     const result = await handler({ body: { token: 'nope' } });
     assert.equal(result.status, 200);
     assert.deepEqual(result.body, {});
+  });
+});
+
+describe('introspectionHandler — caller authorization', () => {
+  test('requires an authorize hook and refuses unauthorized callers', async () => {
+    const store = memoryStore();
+    assert.throws(() => introspectionHandler({ store }), OpaqueError);
+    const { token } = await create({ format: 'hex', expiresIn: '1h', store, metadata: { userId: 'u' } });
+    const handler = introspectionHandler({
+      store,
+      authorize: req => req.headers?.authorization === 'Bearer rs-secret',
+    });
+    const denied = await handler({ body: { token }, headers: {} });
+    assert.equal(denied.status, 401);
+    assert.equal(denied.body.userId, undefined);
+    const ok = await handler({ body: { token }, headers: { authorization: 'Bearer rs-secret' } });
+    assert.equal(ok.body.active, true);
+    store._stop?.();
   });
 });

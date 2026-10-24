@@ -155,6 +155,8 @@ const JSON_HEADERS = Object.freeze({
  *   throws. The handler still returns the no-oracle default so the endpoint
  *   never leaks store-health signals — this hook exists so the app can still
  *   log the failure.
+ * @property {(req: any) => boolean | Promise<boolean>} [authorize]  Authenticates the CALLER of the
+ *   endpoint (RFC 7662 §2.1). Required by `introspectionHandler`; optional for `revocationHandler`.
  */
 
 /**
@@ -173,10 +175,20 @@ const JSON_HEADERS = Object.freeze({
  */
 export function introspectionHandler(options) {
   assertObject(options, 'introspectionHandler.options');
-  const { store, hashAlgo = 'sha256', tokenField = 'token', onError } = options;
+  const { store, hashAlgo = 'sha256', tokenField = 'token', onError, authorize } = options;
   assertObject(store, 'introspectionHandler.options.store');
+  // RFC 7662 §2.1: the endpoint MUST require caller authorization, or it is
+  // an open oracle — anyone holding a token reads its metadata back.
+  if (!isFunction(authorize)) {
+    throw invalidArgument(
+      'introspectionHandler.options.authorize is required — authenticate the calling resource server',
+    );
+  }
 
   return async function introspection(req) {
+    if ((await authorize(req)) !== true) {
+      return { status: 401, body: { error: 'invalid_client' }, headers: { ...JSON_HEADERS } };
+    }
     const token = req?.body?.[tokenField];
     if (!isNonEmptyString(token)) {
       return { status: 200, body: { active: false }, headers: { ...JSON_HEADERS } };
@@ -210,10 +222,15 @@ export function introspectionHandler(options) {
  */
 export function revocationHandler(options) {
   assertObject(options, 'revocationHandler.options');
-  const { store, hashAlgo = 'sha256', tokenField = 'token', onError } = options;
+  const { store, hashAlgo = 'sha256', tokenField = 'token', onError, authorize } = options;
   assertObject(store, 'revocationHandler.options.store');
 
   return async function revocation(req) {
+    // Optional: revoking a token you hold is harmless self-service, but a
+    // deployment may still restrict the endpoint to authenticated clients.
+    if (isFunction(authorize) && (await authorize(req)) !== true) {
+      return { status: 401, body: { error: 'invalid_client' }, headers: { ...JSON_HEADERS } };
+    }
     const token = req?.body?.[tokenField];
     try {
       if (isNonEmptyString(token)) {
