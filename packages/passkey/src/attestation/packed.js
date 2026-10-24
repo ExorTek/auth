@@ -22,6 +22,7 @@ import { verifyChain, toCertificates } from '../x509/chain.js';
 import { bytesEqual, concat } from '../internal/bytes.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
 import { readCertAaguid } from './aaguid.js';
+import { hasSubjectAttribute } from '../x509/subject.js';
 import { isArray } from '@exortek/shared/predicates';
 
 /**
@@ -112,10 +113,11 @@ export function verifyPacked({ attStmt, authDataBytes, clientDataHash, attestedC
   // Basic packed leaf-cert sanity per WebAuthn L3 §8.2 step 2.3:
   //   version=3, subject-OU="Authenticator Attestation", subject-CN/O
   //   present, basicConstraints CA:FALSE.
-  // Node exposes .subject as multi-line text; parse loosely to avoid
-  // rejecting minor formatting differences.
+  // Compare the parsed OU attribute exactly — a substring match was
+  // satisfied by any value containing the text (`O=Evil OU=Authenticator
+  // Attestation`).
   const subject = leaf.subject.replace(/\r/g, '');
-  if (!/OU=Authenticator Attestation/i.test(subject)) {
+  if (!hasSubjectAttribute(subject, 'OU', 'Authenticator Attestation')) {
     throw new PasskeyError(
       ErrorCode.ATTESTATION_INVALID,
       `packed attestation: leaf subject missing "OU=Authenticator Attestation" per §8.2 step 2.3 (got: ${subject.replace(/\n/g, ' ')})`,
