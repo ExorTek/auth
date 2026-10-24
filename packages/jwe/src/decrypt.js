@@ -37,7 +37,9 @@ import { JweError, ErrorCode } from './internal/errors.js';
 
 /**
  * @typedef {Object} DecryptResult
- * @property {Record<string, unknown>} protectedHeader
+ * @property {Record<string, unknown>} protectedHeader  only the integrity-protected header
+ * @property {Record<string, unknown>} [unprotectedHeader]  JSON serialization: shared + per-recipient unprotected members
+ * @property {Record<string, unknown>} [header]  JSON serialization: the joint header the recipient was processed with
  * @property {unknown} payload  Parsed JSON when the plaintext is JSON, else the raw `Buffer`.
  */
 
