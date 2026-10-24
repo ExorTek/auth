@@ -61,14 +61,22 @@ verified targets. Pass `{ keyPrefix }` to namespace the keys.
 Any object satisfying a store's contract works — a SQL table, a KV
 service, whatever. `createServer` validates the shape at construction, so
 a store missing a method is caught immediately rather than at the first
-request. The four contracts:
+request. The contracts:
 
 | Store      | Methods                                                   |
 | ---------- | -------------------------------------------------------- |
 | `authCode` | `save(code, record, ttl)` · `consume(code)`              |
 | `refresh`  | `save(record)` · `get(token)` · `rotate(old, next)` · `revokeFamily(familyId)` |
 | `par`      | `save(uri, params, ttl)` · `consume(uri)`                |
-| `device`   | `save(record, ttl)` · `getByDeviceCode` · `getByUserCode` · `update` |
+| `device`   | `save(record, ttl)` · `getByDeviceCode` · `getByUserCode` · `update` · `redeem?` |
+| `replay`   | `incr(key, ttl)` → `{ count }` (optional; shares jti replay checks) |
+
+`rotate(old, next)` must be a compare-and-set: resolve `false` when `old`
+was already rotated or revoked, and the grant treats it as reuse. `update`
+must not extend a device record's lifetime; the optional `redeem(deviceCode)`
+flips `approved` → `redeemed` atomically. The built-in memory and Redis
+stores do all of this; `createRedisReplayStore(redis)` is the Redis
+`replay` store.
 
 Every method may be sync or return a Promise — a Redis-backed
 (Promise-returning) store drops in unchanged.

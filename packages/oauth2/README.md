@@ -161,13 +161,28 @@ challenge), PKCE, PAR (RFC 9126), resource indicators (RFC 8707), RAR
 profile. Resource servers get `verifyDpopForResource` for the `ath` /
 `cnf.jkt` check.
 
+A few of those are deliberately strict:
+
+- **Scope ceiling.** Every grant caps the scope at the client's registered
+  `scope` ∩ the server's `scopes`.
+- **Token exchange** only accepts a subject token issued to the exchanging
+  client, naming it in `aud`, or permitting it via `may_act`; a DPoP- or
+  certificate-bound subject token needs the same key; and the target must be
+  listed in `tokenExchange: { audiences: [...] }`.
+- **`tls_client_auth`** requires a chain the TLS layer verified. The express /
+  fastify adapters pass `socket.authorized` through; on a bare `node:http`
+  listener set `clientCertificateAuthorized: socket.authorized` on the request
+  descriptor yourself.
+- **Redirect URIs** must be `https`, loopback `http`, or a reverse-domain
+  private-use scheme (`com.example.app:/cb`), with no fragment.
+
 ### Storage (read this before you run two instances)
 
 `createServer` defaults every store to memory: authorization codes, PAR
-request URIs, refresh families, device codes, and the DPoP replay cache. That
-is fine for one process and wrong for two — a code issued on instance A cannot
-be redeemed on instance B, and a DPoP proof replayed against a different
-instance is not seen as a replay.
+request URIs, refresh families, device codes, and the jti replay checks (DPoP
+proofs, client assertions, request objects). That is fine for one process and
+wrong for two — a code issued on instance A cannot be redeemed on instance B,
+and a DPoP proof replayed against a different instance is not seen as a replay.
 
 Pass Redis-backed stores for any deployment with more than one process:
 
@@ -178,6 +193,7 @@ import {
   createRedisRefreshStore,
   createRedisParStore,
   createRedisDeviceStore,
+  createRedisReplayStore,
 } from '@exortek/oauth2/server';
 
 const server = createServer({
@@ -187,9 +203,17 @@ const server = createServer({
     refresh: createRedisRefreshStore(redis),
     par: createRedisParStore(redis),
     device: createRedisDeviceStore(redis),
+    replay: createRedisReplayStore(redis), // or any store with incr(key, ttlMs)
   },
+  // With DPoP nonces on, every instance must share the nonce secret (≥ 32 bytes).
+  security: { dpop: { nonce: true, nonceSecret: process.env.DPOP_NONCE_SECRET } },
 });
 ```
+
+Refresh rotation and device-code redemption are compare-and-set in the
+built-in stores: of two simultaneous redemptions exactly one wins (a lost
+refresh race is treated as reuse and revokes the family). A custom refresh
+store's `rotate` should resolve `false` when the token was already rotated.
 
 `redis` is your own client — `ioredis` or `node-redis`, both supported and
 both covered by the integration suite. They are peer dependencies, so install
@@ -237,6 +261,12 @@ const server = createServer({
 // POST /register  Authorization: Bearer <token>  { "redirect_uris": ["https://c/cb"], … }
 // → 201 { client_id, client_secret, … }
 ```
+
+A registrant may only ask for `authorization_code` + `refresh_token` unless you
+widen `registration.allowedGrants`, only for scopes the server advertises, and
+only for the non-mTLS auth methods (`registration.allowedAuthMethods`). With
+registration enabled and no `allowJwksHost`, `jwks_uri` hosts on loopback,
+private or link-local addresses are refused.
 
 ## Modules
 

@@ -120,6 +120,10 @@ export const acme = defineProvider({
 });
 ```
 
+An OIDC provider must declare its `issuer` (a string, or a validator
+function for multi-tenant issuers) — without one the id_token's `iss` could
+not be checked, so `defineProvider` refuses it.
+
 This is exactly how the shipped presets are written — nothing is
 special-cased for the built-ins. If a provider we don't ship is common,
 open an issue and it can become a preset; until then your `defineProvider`

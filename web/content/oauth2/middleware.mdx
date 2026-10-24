@@ -98,7 +98,7 @@ app.post('/auth/:provider/callback', login.callback); // body: { session, ...que
 | `loginPath`    | `/auth/:provider`           | default start route (used by `mountOAuthLogin`)          |
 | `callbackPath` | `/auth/:provider/callback`  | must sit at the `callback` template of `createOAuth`     |
 | `cookie`       | —                           | `{ secret, name, path, secure, sameSite, maxAge }` (web) |
-| `secret`       | —                           | protects the client-held session (`api` mode)            |
+| `secret`       | —                           | protects the client-held session; **required** in `api` mode, ≥ 32 bytes (as is `cookie.secret`) |
 | `seal`         | `'sign'`                    | `'sign'` (HMAC) or `'jwe'` (also encrypts the session)   |
 | `onSuccess`    | redirect / JSON             | `({ req, res, user, tokens })` — Fastify: `{ request, reply, … }` |
 | `onError`      | `next(err)` / 400           | `({ req, res, error })`                                  |
