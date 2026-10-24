@@ -109,3 +109,59 @@ describe('provider.endSessionHandler', () => {
     assert.equal(JSON.parse(res.body).logged_out, true);
   });
 });
+
+describe('provider.endSessionHandler — id_token_hint verification', () => {
+  async function providerWith(logout) {
+    const signer = await makeSigner();
+    const seen = [];
+    const provider = createProvider({
+      issuer: ISSUER,
+      signing: { key: signer.privateJwk, alg: signer.alg, kid: signer.kid },
+      jwks: [signer.publicJwk],
+      endpoints: { authorization: '/authorize', token: '/token' },
+      logout: { onLogout: ctx => seen.push(ctx), ...logout },
+    });
+    return { provider, signer, seen };
+  }
+
+  it('a hint signed by anyone else names no subject', async () => {
+    const { provider, seen } = await providerWith({});
+    const attacker = await makeSigner({ kid: 'test-key-1' });
+    const forged = await attacker.mint({ iss: ISSUER, sub: 'victim', aud: CLIENT_ID });
+    await provider.endSessionHandler()({ query: { id_token_hint: forged } });
+    assert.equal(seen[0].sub, undefined);
+  });
+
+  it('an expired but genuine hint still identifies the user', async () => {
+    const { provider, signer, seen } = await providerWith({});
+    const now = Math.floor(Date.now() / 1000);
+    const hint = await signer.mint({ iss: ISSUER, sub: 'user-1', aud: CLIENT_ID, iat: now - 7200, exp: now - 3600 });
+    await provider.endSessionHandler()({ query: { id_token_hint: hint } });
+    assert.equal(seen[0].sub, 'user-1');
+    assert.equal(seen[0].clientId, CLIENT_ID);
+  });
+
+  it('client_id must match the hint audience', async () => {
+    const { provider, signer } = await providerWith({});
+    const hint = await signer.mint({ iss: ISSUER, sub: 'user-1', aud: CLIENT_ID });
+    const res = await provider.endSessionHandler()({ query: { id_token_hint: hint, client_id: 'other-client' } });
+    assert.equal(res.status, 400);
+  });
+
+  it('per-client post_logout_redirect_uris follow the verified audience', async () => {
+    const { provider, signer } = await providerWith({
+      postLogoutRedirectUris: { [CLIENT_ID]: [POST_LOGOUT], other: ['https://other.example.com/out'] },
+    });
+    const hint = await signer.mint({ iss: ISSUER, sub: 'user-1', aud: CLIENT_ID });
+    const ok = await provider.endSessionHandler()({
+      query: { id_token_hint: hint, post_logout_redirect_uri: POST_LOGOUT },
+    });
+    assert.equal(ok.status, 302);
+    const cross = await provider.endSessionHandler()({
+      query: { id_token_hint: hint, post_logout_redirect_uri: 'https://other.example.com/out' },
+    });
+    assert.equal(cross.status, 400);
+    const noHint = await provider.endSessionHandler()({ query: { post_logout_redirect_uri: POST_LOGOUT } });
+    assert.equal(noHint.status, 400);
+  });
+});
