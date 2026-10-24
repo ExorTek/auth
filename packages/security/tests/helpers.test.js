@@ -578,3 +578,10 @@ test('webhookVerify / webhookVerifyStripe: an empty Buffer secret is rejected', 
   assert.throws(() => webhookVerifyStripe('{}', 't=1,v1=00', Buffer.alloc(0)), /secret/);
   assert.throws(() => webhookVerifyStripe('{}', 't=1,v1=00', ['ok-secret', Buffer.alloc(0)]), /secret/);
 });
+
+test('checkOrigin: a /g allowlist pattern is stateless', () => {
+  const opts = { allowedOrigins: [/^https:\/\/app\.example\.com$/g] };
+  const req = { method: 'POST', headers: { origin: 'https://app.example.com' } };
+  assert.equal(checkOrigin(req, opts), true);
+  assert.equal(checkOrigin(req, opts), true);
+});

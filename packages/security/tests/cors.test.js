@@ -215,3 +215,17 @@ test('cors: rejects non-2xx optionsSuccessStatus', () => {
   assert.throws(() => cors({ optionsSuccessStatus: 500 }), SecurityError);
   assert.throws(() => cors({ optionsSuccessStatus: 100 }), SecurityError);
 });
+
+test('cors: a /g origin pattern matches on every request, not every other one', () => {
+  const check = cors({ origin: [/^https:\/\/app\.example\.com$/g], credentials: true });
+  for (let i = 0; i < 4; i++) {
+    assert.equal(check({ method: 'GET', origin: 'https://app.example.com' }).allowed, true, `request ${i}`);
+  }
+});
+
+test('cors: a denied allowlist response still varies on Origin', () => {
+  const check = cors({ origin: ['https://app.example.com'] });
+  const d = check({ method: 'GET', origin: 'https://evil.example' });
+  assert.equal(d.allowed, false);
+  assert.equal(d.headers.Vary, 'Origin');
+});

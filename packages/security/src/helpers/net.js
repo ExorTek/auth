@@ -4,6 +4,8 @@ import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { isArray, isBuffer, isInteger, isString } from '@exortek/shared/predicates';
 
 import { invalidArgument } from '../internal/guards.js';
+import { statelessPattern } from '../internal/patterns.js';
+
 
 /**
  * Extract the real client IP from a request-like object, honouring a
@@ -209,7 +211,7 @@ export function checkOrigin(req, options) {
     if (isString(rule) && rule === compared) {
       return true;
     }
-    if (rule instanceof RegExp && rule.test(compared)) {
+    if (rule instanceof RegExp && statelessPattern(rule, 'checkOrigin.allowedOrigins').test(compared)) {
       return true;
     }
   }
