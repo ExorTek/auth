@@ -244,3 +244,17 @@ test('caller params cannot override the flow-managed authorize parameters', asyn
   const { url } = await oauth.authorize('test', { params: { prompt: 'consent' } });
   assert.equal(new URL(url).searchParams.get('prompt'), 'consent');
 });
+
+test('an OIDC provider without an issuer is a definition error', () => {
+  assert.throws(
+    () =>
+      defineProvider({
+        id: 'bare',
+        kind: 'oidc',
+        authorizationEndpoint: 'https://x/a',
+        tokenEndpoint: 'https://x/t',
+        mapUser: r => r,
+      }),
+    { code: ErrorCode.INVALID_ARGUMENT },
+  );
+});

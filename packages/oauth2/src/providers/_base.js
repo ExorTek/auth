@@ -81,6 +81,11 @@ export function defineProvider(def) {
   if (!isFunction(def.mapUser)) {
     throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, `provider ${def.id} must supply a mapUser function`);
   }
+  // An OIDC provider's id_token is verified against its issuer; with none
+  // configured the `iss` check would silently be skipped.
+  if (def.kind === 'oidc' && !isNonEmptyString(def.issuer) && !isFunction(def.issuer)) {
+    throw new OAuth2Error(ErrorCode.INVALID_ARGUMENT, `OIDC provider ${def.id} requires an issuer`);
+  }
 
   return function createProvider(appOptions = {}) {
     if (!isNonEmptyString(appOptions.clientId)) {
