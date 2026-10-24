@@ -391,6 +391,17 @@ export async function rehashApiKey(rawKey, options) {
   if (!parsed) {
     return false;
   }
+  // Prove the caller holds the real secret before replacing its hash —
+  // otherwise anyone who knows a key id (it is in every masked key) could
+  // overwrite that key's hash with one for a secret of their choosing.
+  const record = await options.store.getById(parsed.id);
+  if (!record) {
+    return false;
+  }
+  const { candidateHashes: existing } = candidateHashesFor(parsed.secret, peppers);
+  if (!existing.some(candidate => hashesMatch(candidate, record.hash))) {
+    return false;
+  }
   const { candidateHashes } = candidateHashesFor(parsed.secret, [peppers[0]]);
   const newHash = candidateHashes[0];
   const updated = await options.store.update(parsed.id, { hash: newHash, pepperVersion: 0 });
