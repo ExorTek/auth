@@ -189,3 +189,46 @@ test('express adapter passes socket.authorized through', async () => {
   }
   assert.deepEqual(statuses, [401, 200]);
 });
+
+// REFRESH ROTATION
+
+async function issueRefresh(server) {
+  const { code, pkce, redirectUri } = await getAuthorizationCode(server, { scope: 'read write' });
+  return body(
+    await server.token(
+      post({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        client_id: 'app',
+        client_secret: 's3cret-value-strong',
+        code_verifier: pkce.codeVerifier,
+      }),
+    ),
+  );
+}
+
+function refresh(server, token, extra = {}) {
+  return server.token(
+    post({
+      grant_type: 'refresh_token',
+      refresh_token: token,
+      client_id: 'app',
+      client_secret: 's3cret-value-strong',
+      ...extra,
+    }),
+  );
+}
+
+test('refresh: a rotated token keeps the family expiry', async () => {
+  const { server } = buildServer({ security: { refreshTokenTtl: 80 } });
+  const first = await issueRefresh(server);
+  const rotated = body(await refresh(server, first.refresh_token));
+  assert.ok(rotated.refresh_token);
+
+  const record = await server._config.stores.refresh.get(rotated.refresh_token);
+  assert.equal(typeof record.expiresAt, 'number');
+
+  await new Promise(r => setTimeout(r, 100));
+  assert.equal(body(await refresh(server, rotated.refresh_token)).error, 'invalid_grant');
+});

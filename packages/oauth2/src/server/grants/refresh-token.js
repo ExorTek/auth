@@ -5,7 +5,7 @@
  * revokes the whole family. Scope may be narrowed but never widened, and
  * a DPoP-bound token stays bound to the same key.
  */
-import { isNonEmptyString } from '@exortek/shared/predicates';
+import { isNonEmptyString, isNumber } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 import { randomState } from '../../internal/state.js';
@@ -72,6 +72,11 @@ export async function refreshTokenGrant(req, ctx) {
   // reuse check before either marks it used. The security guarantee that
   // still holds unconditionally is the important one — any later replay of
   // the now-rotated token trips reuse detection and burns the family.
+  //
+  // The successor inherits the family's absolute expiry: rotation renews the
+  // token, not the grant, so a refresh family still dies `refreshTokenTtl`
+  // after the user authorized it. (A record written before expiries were
+  // carried gets a fresh one rather than none.)
   const nextToken = randomState();
   await config.stores.refresh.rotate(presented, {
     token: nextToken,
@@ -81,6 +86,7 @@ export async function refreshTokenGrant(req, ctx) {
     subject: record.subject,
     resource: record.resource,
     dpopJkt: record.dpopJkt,
+    expiresAt: isNumber(record.expiresAt) ? record.expiresAt : Date.now() + config.refreshTokenTtlMs,
   });
   body.refresh_token = nextToken;
 

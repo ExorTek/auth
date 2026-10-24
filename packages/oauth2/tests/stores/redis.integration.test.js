@@ -44,6 +44,19 @@ forEachRedisDriver('oauth2 server stores', ({ test, client, ns, raw }) => {
     assert.equal((await store.get('t2')).revoked, true);
   });
 
+  test('refresh rotation keeps both tokens on a TTL', async () => {
+    const keyPrefix = ns('c2');
+    const store = createRedisRefreshStore(client(), { keyPrefix });
+    const base = { familyId: 'f1', clientId: 'app', scope: [], expiresAt: Date.now() + 60_000 };
+
+    await store.save({ ...base, token: 't1' });
+    await store.rotate('t1', { ...base, token: 't2' });
+    for (const token of ['t1', 't2']) {
+      const pttl = await raw.pttl(`${keyPrefix}refresh:${token}`);
+      assert.ok(pttl > 0 && pttl <= 60_000, `${token} must keep an expiry; got PTTL ${pttl}`);
+    }
+  });
+
   test('an expired refresh record reads as absent', async () => {
     const store = createRedisRefreshStore(client(), { keyPrefix: ns('d') });
     await store.save({ token: 't1', familyId: 'f1', clientId: 'app', scope: [], expiresAt: Date.now() - 1 });
