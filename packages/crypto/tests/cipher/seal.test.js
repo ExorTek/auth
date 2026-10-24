@@ -272,3 +272,20 @@ describe('seal — secret strength', () => {
     );
   });
 });
+
+describe('unseal — clockSkew', () => {
+  it('rejects a non-finite or negative clockSkew instead of disabling expiry', () => {
+    const secret = 'k'.repeat(32);
+    const token = seal({ a: 1 }, secret, { ttl: 1, now: 0 });
+    for (const clockSkew of [NaN, Infinity, -1]) {
+      assert.throws(
+        () => unseal(token, secret, { clockSkew }),
+        err => err.code === ErrorCode.INVALID_ARGUMENT,
+      );
+    }
+    assert.throws(
+      () => unseal(token, secret, { clockSkew: 5 }),
+      err => err.code === ErrorCode.TOKEN_EXPIRED,
+    );
+  });
+});

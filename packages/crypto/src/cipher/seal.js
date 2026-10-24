@@ -230,7 +230,13 @@ export function unseal(token, secret, options) {
 
   // Expiry is inside the AAD, so we only trust it after auth succeeds.
   const now = options?.now ?? Date.now();
-  const skewMs = (options?.clockSkew ?? 0) * 1000;
+  const skew = options?.clockSkew ?? 0;
+  // NaN / Infinity / negative would turn the expiry comparison into a
+  // no-op (`now - NaN > exp` is always false) and never expire a token.
+  if (!Number.isFinite(skew) || skew < 0) {
+    throw invalidArgument(`options.clockSkew must be a non-negative finite number of seconds; got ${_describe(skew)}`);
+  }
+  const skewMs = skew * 1000;
   if (now > expiresAt + skewMs) {
     const overdueSec = Math.round((now - expiresAt) / 1000);
     throw new CryptoError(
