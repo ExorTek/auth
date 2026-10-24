@@ -312,9 +312,9 @@ function bearerToken(req) {
   if (isNonEmptyString(auth) && auth.slice(0, 7).toLowerCase() === 'bearer ') {
     return auth.slice(7).trim();
   }
-  // OIDC Core §5.3.1 also permits the token as an `access_token` form/query param.
-  const param = req.param('access_token');
-  return isNonEmptyString(param) ? param : undefined;
+  // Header only: a token in the query string (RFC 6750 §2.3) ends up in
+  // access logs, browser history and Referer headers.
+  return undefined;
 }
 
 /** @param {string|string[]|undefined} scope */
