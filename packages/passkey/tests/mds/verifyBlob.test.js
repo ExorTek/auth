@@ -160,3 +160,20 @@ describe('mds — buildAaguidIndex', () => {
     assert.throws(() => buildAaguidIndex({}), /entries/);
   });
 });
+
+describe('mds — buildAaguidIndex keeps status reports', () => {
+  test('exposes statusReports and the latest status', async () => {
+    const { buildAaguidIndex } = await import('../../src/mds.js');
+    const index = buildAaguidIndex({
+      entries: [
+        {
+          aaguid: 'aa-1',
+          metadataStatement: { aaguid: 'aa-1', description: 'Key' },
+          statusReports: [{ status: 'FIDO_CERTIFIED' }, { status: 'REVOKED' }],
+        },
+      ],
+    });
+    assert.equal(index['aa-1'].status, 'REVOKED');
+    assert.equal(index['aa-1'].statusReports.length, 2);
+  });
+});
