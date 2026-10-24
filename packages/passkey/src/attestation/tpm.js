@@ -49,6 +49,7 @@ import { verifyChain, toCertificates } from '../x509/chain.js';
 import { findExtension, readTlv, readChildren, decodeOid, TAG } from '../asn1/der.js';
 import { bytesEqual, concat } from '../internal/bytes.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { readCertAaguid } from './aaguid.js';
 import { isArray } from '@exortek/shared/predicates';
 
 const TPM_GENERATED_VALUE = 0xff544347;
@@ -467,6 +468,16 @@ export function verifyTpm({ attStmt, authDataBytes, clientDataHash, attestedCred
 
   // 6. AIK cert profile.
   assertAikProfile(leaf, x5cRaw[0]);
+
+  // WebAuthn L3 §8.3: an AIK certificate carrying the FIDO AAGUID
+  // extension must name the same authenticator model as authData.
+  const certAaguid = readCertAaguid(x5cRaw[0]);
+  if (certAaguid !== null && !bytesEqual(certAaguid, attestedCredentialData.aaguid)) {
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      'tpm: AIK cert AAGUID extension does not match authData AAGUID',
+    );
+  }
 
   // 7. Chain verification.
   let trustPath = 'no-anchor';
