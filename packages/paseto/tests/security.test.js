@@ -153,3 +153,12 @@ test('a trailing "." (empty footer) is not a second spelling of the token', () =
   assert.throws(() => decrypt(`${encrypt({ a: 1 }, key)}.`, key), { code: 'INVALID_TOKEN' });
   assert.throws(() => verify(`${sign({ a: 1 }, secretKey)}.`, publicKey), { code: 'INVALID_TOKEN' });
 });
+
+test('claim requirements reject a payload that is not a claims object', () => {
+  const { secretKey, publicKey } = generateKeyPair();
+  const token = sign('user@x', secretKey);
+  assert.throws(() => verify(token, publicKey, { issuer: 'https://as', audience: 'api' }), {
+    code: 'CLAIM_MISMATCH',
+  });
+  assert.equal(verify(token, publicKey), 'user@x');
+});
