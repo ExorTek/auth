@@ -53,18 +53,24 @@ const ip = getClientIp(req, {
 });
 
 // Chain-depth allowlist — Cloudflare + a k8s ingress, addresses unstable.
+// Same meaning as Express `trust proxy: 2`.
 const ip = getClientIp(req, {
   proxyCount: 2,
 });
 ```
 
+The walk runs over `[socket.remoteAddress, ...X-Forwarded-For right-to-left]`, every repeated `X-Forwarded-For` line
+included, with IPv4-mapped IPv6 (`::ffff:10.0.0.1`) folded to IPv4. Only `X-Forwarded-For` is read by default —
+`X-Real-IP` is trusted only when you name it in `headers`.
+
 - `trustProxy: false` (default) — return `req.socket.remoteAddress`; ignore XFF. Correct when Node is edge-facing.
 - `trustProxy: true` — trust every hop and return the **left-most** XFF entry. **Spoofable unless the first proxy
   strips inbound XFF headers** — prefer `trustProxy: string[]` or `proxyCount` in production.
-- `trustProxy: string[]` — walk XFF right-to-left, skipping entries whose value is in the set. Return the first
-  untrusted hop.
-- `proxyCount: N` — skip **N** rightmost XFF entries and return the `(N + 1)`-th from the right. Wins over
-  `trustProxy` when both are set.
+- `trustProxy: string[]` — skip addresses in the set, starting with the socket peer, and return the first untrusted
+  one (the furthest address when every hop is trusted).
+- `proxyCount: N` — exactly Express's `trust proxy: N`: the N hops closest to Node, counting the socket peer as the
+  first, are trusted and the next address out is the client. `0` returns the socket peer; a chain shorter than N
+  returns its furthest address. Must be a non-negative integer. Wins over `trustProxy` when both are set.
 
 ## `bearer`
 
