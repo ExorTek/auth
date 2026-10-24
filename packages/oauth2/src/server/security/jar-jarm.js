@@ -15,7 +15,6 @@ import { sign as jwtSign, verify as jwtVerify, decode as jwtDecode, JwtError } f
 import { isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
-import { resolveClientKeys } from './client-keys.js';
 import { createReplayCache } from './replay-cache.js';
 
 // A JAR request object is short-lived; bound its accepted lifetime so a
@@ -74,7 +73,7 @@ export async function verifyRequestObject(requestJwt, outerClientId, config) {
 
   let payload;
   try {
-    const keys = await resolveClientKeys(client, { allowJwksHost: config.security?.allowJwksHost });
+    const keys = await config.clientKeys(client);
     payload = (await jwtVerify(requestJwt, keys, { alg: [alg], audience: config.issuer })).payload;
   } catch (err) {
     if (err instanceof JwtError) {

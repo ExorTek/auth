@@ -28,6 +28,7 @@ import { createDeviceHandler, createDeviceApproval } from './handlers/device.js'
 import { createRegisterHandler } from './handlers/register.js';
 import { applyFapiProfile } from './security/fapi.js';
 import { createIdTokenSigner } from './issuers/id-token.js';
+import { createClientKeyResolver } from './security/client-keys.js';
 
 export { defineClient, createClientRegistry, AUTH_METHODS } from './clients.js';
 export { jwtIssuer } from './issuers/jwt.js';
@@ -57,7 +58,7 @@ const DEFAULT_REFRESH_TTL = '30d';
  * @property {{ required?: boolean, algs?: string[], nonce?: boolean }} [dpop]   RFC 9449
  * @property {{ required?: boolean, ttl?: string|number }} [par]                 RFC 9126
  * @property {boolean} [fapi]                      FAPI 2.0 profile (bundles PAR + PKCE + DPoP/mTLS + iss)
- * @property {(hostname: string, url: URL) => boolean} [allowJwksHost]  gate the hosts the server will fetch a client's `jwks_uri` from; return false to refuse. Recommended wherever dynamic client registration is enabled, since the URI is then chosen by the registrant.
+ * @property {(hostname: string, url: URL) => boolean} [allowJwksHost]  gate the hosts the server will fetch a client's `jwks_uri` from; return false to refuse. With dynamic registration enabled and no gate set, loopback / private / link-local hosts are refused by default, since the URI is then chosen by the registrant.
  *
  * @typedef {Object} ServerConfig
  * @property {string} issuer                       AS issuer identifier (https, no trailing slash)
@@ -210,6 +211,11 @@ export function createServer(config) {
     // `registration` config is present AND the registry can persist.
     registration: isObject(config.registration) ? config.registration : undefined,
     registrationEnabled: isObject(config.registration) && isFunction(registry.register),
+    // Per-server client JWKS resolver cache (private_key_jwt, JAR).
+    clientKeys: createClientKeyResolver({
+      allowJwksHost: security.allowJwksHost,
+      registrationEnabled: isObject(config.registration) && isFunction(registry.register),
+    }),
   };
 
   return {

@@ -428,3 +428,90 @@ test('device: two concurrent polls of an approved code redeem it once', async ()
   assert.equal(results.filter(r => r.access_token).length, 1);
   assert.equal(results.find(r => !r.access_token).error, 'invalid_grant');
 });
+
+// CLIENT JWKS
+
+test('client jwks_uri: the resolver is cached across token requests', async () => {
+  const { assertionClient } = await import('./helpers/server.js');
+  const pk = await assertionClient('pk');
+  const { server } = buildServer({
+    clients: [
+      {
+        clientId: 'pk',
+        tokenEndpointAuthMethod: 'private_key_jwt',
+        jwksUri: 'https://keys.example.com/jwks.json',
+        redirectUris: ['https://x.example.com/cb'],
+        grantTypes: ['client_credentials'],
+        scope: ['read'],
+      },
+    ],
+    grants: ['client_credentials'],
+  });
+  const realFetch = globalThis.fetch;
+  let fetches = 0;
+  globalThis.fetch = async () => {
+    fetches += 1;
+    return new Response(JSON.stringify({ keys: [pk.jwk] }), { headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    for (const jti of ['a1', 'a2', 'a3']) {
+      const res = await server.token(
+        post({
+          grant_type: 'client_credentials',
+          client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+          client_assertion: await pk.assertion(jti),
+        }),
+      );
+      assert.equal(res.status, 200);
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(fetches, 1);
+});
+
+test('client jwks_uri: private hosts are refused when registration is enabled', async () => {
+  const { isPublicHost } = await import('../src/server/security/client-keys.js');
+  for (const host of [
+    'localhost',
+    '127.0.0.1',
+    '10.1.2.3',
+    '172.20.0.1',
+    '192.168.1.1',
+    '169.254.169.254',
+    '[::1]',
+    '[fd00::1]',
+    '[::ffff:127.0.0.1]',
+  ]) {
+    assert.equal(isPublicHost(host), false, host);
+  }
+  for (const host of ['keys.example.com', '8.8.8.8', '[2606:4700::1111]']) {
+    assert.equal(isPublicHost(host), true, host);
+  }
+
+  const { createClientRegistry } = await import('../src/server/index.js');
+  const { server } = buildServer({
+    clients: createClientRegistry([
+      {
+        clientId: 'ssrf',
+        tokenEndpointAuthMethod: 'private_key_jwt',
+        jwksUri: 'https://169.254.169.254/latest/meta-data',
+        redirectUris: ['https://x.example.com/cb'],
+        grantTypes: ['client_credentials'],
+      },
+    ]),
+    grants: ['client_credentials'],
+    registration: { initialAccessToken: 'iat-value-strong-enough' },
+  });
+  const { assertionClient } = await import('./helpers/server.js');
+  const attacker = await assertionClient('ssrf');
+  const res = await server.token(
+    post({
+      grant_type: 'client_credentials',
+      client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      client_assertion: await attacker.assertion('x1'),
+    }),
+  );
+  assert.equal(res.status, 401);
+  assert.equal(body(res).error, 'invalid_client');
+});

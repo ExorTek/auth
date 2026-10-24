@@ -24,7 +24,6 @@ import { isNonEmptyString, isNumber, isObject } from '@exortek/shared/predicates
 
 import { ProtocolError, ServerError } from '../errors.js';
 import { readClientCredentials } from '../request.js';
-import { resolveClientKeys } from './client-keys.js';
 import { parseDn, sameDn, subjectAttributes } from './dn.js';
 import { createReplayCache } from './replay-cache.js';
 
@@ -189,7 +188,7 @@ async function authenticateAssertion(req, config, assertionType) {
         `private_key_jwt alg ${JSON.stringify(alg)} is not an accepted asymmetric algorithm`,
       );
     }
-    keyish = await resolveClientKeys(client, { allowJwksHost: config.security?.allowJwksHost });
+    keyish = await config.clientKeys(client);
   } else {
     throw new ServerError(
       ProtocolError.INVALID_CLIENT,
