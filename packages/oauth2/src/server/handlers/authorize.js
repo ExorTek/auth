@@ -33,7 +33,7 @@ export function createAuthorizeHandler(config) {
     // Untrusted until the client + redirect URI are validated.
     let redirectUri;
     try {
-      const params = await resolveRequestParams(req, config);
+      const { params, fromPar } = await resolveRequestParams(req, config);
       const client = await requireClient(params.client_id, config);
 
       redirectUri = requireRegisteredRedirectUri(params.redirect_uri, client);
@@ -69,7 +69,7 @@ export function createAuthorizeHandler(config) {
         }
       }
       // PAR is required by the server OR by this client's registration.
-      if ((config.requirePar || client.requirePushedAuthorizationRequests === true) && !params._fromPar) {
+      if ((config.requirePar || client.requirePushedAuthorizationRequests === true) && !fromPar) {
         throw new ServerError(ProtocolError.INVALID_REQUEST, 'this client requires a pushed authorization request', {
           redirectable: true,
           state,
@@ -143,9 +143,14 @@ export function createAuthorizeHandler(config) {
  * (RFC 9126); the JAR signed-request-object path (RFC 9101) is layered in
  * `security/jar-jarm.js`. Plain front-channel query params are the base.
  *
+ * Whether the params came from PAR is returned out of band (`fromPar`),
+ * never as a parameter: anything inside `params` is attacker-reachable
+ * (query string, form body, request object), so a flag carried there could
+ * be forged to skip a PAR requirement.
+ *
  * @param {import('../request.js').ServerRequest} req
  * @param {Record<string, any>} config
- * @returns {Promise<Record<string, any>>}
+ * @returns {Promise<{ params: Record<string, any>, fromPar: boolean }>}
  */
 async function resolveRequestParams(req, config) {
   // RFC 6749 §3.1 allows the authorization request over POST too; Apple's
@@ -155,17 +160,25 @@ async function resolveRequestParams(req, config) {
 
   const requestUri = src.request_uri;
   if (isNonEmptyString(requestUri)) {
+    // RFC 9126 §4: client_id is still sent on the front channel and must
+    // name the client that pushed the request.
+    if (!isNonEmptyString(src.client_id)) {
+      throw new ServerError(ProtocolError.INVALID_REQUEST, 'client_id is required alongside request_uri');
+    }
     const pushed = await config.stores.par.consume(requestUri);
     if (!pushed) {
       throw new ServerError(ProtocolError.INVALID_REQUEST, 'request_uri is unknown, expired, or already used');
     }
-    return { ...pushed, _fromPar: true };
+    if (pushed.client_id !== src.client_id) {
+      throw new ServerError(ProtocolError.INVALID_REQUEST, 'request_uri was pushed by a different client');
+    }
+    return { params: { ...pushed }, fromPar: true };
   }
   // JAR (RFC 9101): a signed request object supersedes the query params.
   if (isNonEmptyString(src.request)) {
-    return verifyRequestObject(src.request, src.client_id, config);
+    return { params: await verifyRequestObject(src.request, src.client_id, config), fromPar: false };
   }
-  return { ...src };
+  return { params: { ...src }, fromPar: false };
 }
 
 /**

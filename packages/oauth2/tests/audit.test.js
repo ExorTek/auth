@@ -373,7 +373,7 @@ test('D3: async (Promise-returning) PAR / auth-code stores drive a full flow', a
     ),
   );
   assert.ok(pushed.request_uri.startsWith('urn:ietf:params:oauth:request_uri:'));
-  const authed = await server.authorize(get('/authorize', { request_uri: pushed.request_uri }));
+  const authed = await server.authorize(get('/authorize', { client_id: 'app', request_uri: pushed.request_uri }));
   assert.ok(new URL(authed.headers.location).searchParams.get('code'));
 });
 
