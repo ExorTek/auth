@@ -159,3 +159,20 @@ test('a numeric expiresIn is seconds for both the token exp and the reported exp
   assert.ok(Math.abs(Date.parse(refresh.exp) - res.refreshExpiresAt.getTime()) < 2000, `refresh exp ${refresh.exp}`);
   store._stop();
 });
+
+test('opaque:false refuses a refresh key equal to the access key', async () => {
+  const store = createStore('memory');
+  const key = generateKey();
+  await assert.rejects(
+    create(
+      { userId: 1 },
+      {
+        secret: { access: key, refresh: key },
+        access: { expiresIn: '15m' },
+        refresh: { expiresIn: '7d', opaque: false, store },
+      },
+    ),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  store._stop();
+});
