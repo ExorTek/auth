@@ -221,6 +221,8 @@ base58.decode('Cn8eVZg'); // <Buffer 68 65 6c 6c 6f>
 base58.encode(Buffer.from([0, 0, 0xff])); // '115Q' — leading zeros → leading 1s
 ```
 
+`decode` refuses input over 1024 characters (the conversion is quadratic in length); pass `{ maxLength }` to raise it.
+
 Satoshi's alphabet: `1-9 A-Z a-z` minus `0`, `O`, `I`, `l`. Denser than hex, safer to read out loud, standard for
 cryptocurrency addresses.
 
