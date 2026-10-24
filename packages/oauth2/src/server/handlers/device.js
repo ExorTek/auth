@@ -20,6 +20,7 @@ import { randomState } from '../../internal/state.js';
 import { normalizeRequest } from '../request.js';
 import { json, jsonError } from '../response.js';
 import { authenticateClient } from '../security/client-auth.js';
+import { assertWithinCeiling, parseScope, scopeCeiling } from '../security/scope.js';
 
 const DEFAULT_TTL_MS = 600_000; // 10 minutes
 const DEFAULT_INTERVAL_SEC = 5;
@@ -51,7 +52,8 @@ export function createDeviceHandler(config) {
         throw new ServerError(ProtocolError.UNAUTHORIZED_CLIENT, 'client may not use the device grant');
       }
 
-      const scope = isNonEmptyString(req.form.scope) ? req.form.scope.split(/\s+/).filter(Boolean) : [];
+      const scope = parseScope(req.form.scope);
+      assertWithinCeiling(scope, scopeCeiling(client, config));
       const deviceCode = randomState();
       const userCode = generateUserCode();
 

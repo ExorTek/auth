@@ -26,6 +26,7 @@ test('client_credentials issues a token with no refresh (RFC 6749 §4.4)', async
       },
     ],
     grants: [CC],
+    scopes: ['api'],
   });
   const tok = body(
     await server.token(
@@ -40,6 +41,7 @@ test('a public client cannot use client_credentials', async () => {
   const { server } = buildServer({
     clients: [{ clientId: 'pub', tokenEndpointAuthMethod: 'none', redirectUris: ['https://x/cb'], grantTypes: [CC] }],
     grants: [CC],
+    scopes: ['api'],
   });
   const res = body(await server.token(post({ grant_type: CC, client_id: 'pub' })));
   assert.equal(res.error, 'unauthorized_client');
@@ -59,6 +61,7 @@ test('private_key_jwt client auth with assertion replay defense (RFC 7523, threa
       },
     ],
     grants: [CC],
+    scopes: ['api'],
   });
 
   const ok = await server.token(
@@ -112,6 +115,7 @@ test('client_secret_jwt client auth (HS256)', async () => {
       },
     ],
     grants: [CC],
+    scopes: ['api'],
   });
   const now = Math.floor(Date.now() / 1000);
   const assertion = await jwtSign(
@@ -140,6 +144,7 @@ test('mTLS self_signed client auth binds a certificate-bound token (RFC 8705)', 
       },
     ],
     grants: [CC],
+    scopes: ['api'],
   });
 
   const req = {
@@ -218,6 +223,7 @@ test('token exchange delegates a subject token to a new audience (RFC 8693)', as
       },
     ],
     grants: [CC, EXCHANGE],
+    scopes: ['api'],
   });
 
   const subjectTok = body(
@@ -309,6 +315,7 @@ test('a confidential client cannot authenticate with the wrong method', async ()
       },
     ],
     grants: [CC],
+    scopes: ['api'],
   });
   // Registered basic, presenting post → refused.
   const res = body(

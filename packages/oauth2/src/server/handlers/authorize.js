@@ -11,7 +11,7 @@
  * handler only once the user has authenticated and approved the request.
  * A `null` result is treated as the user declining (`access_denied`).
  */
-import { isArray, isNonEmptyString } from '@exortek/shared/predicates';
+import { isNonEmptyString } from '@exortek/shared/predicates';
 
 import { randomState } from '../../internal/state.js';
 import { ProtocolError, ServerError } from '../errors.js';
@@ -21,6 +21,7 @@ import { resolvePkceChallenge } from '../security/pkce.js';
 import { validateResource } from '../security/resource.js';
 import { validateAuthorizationDetails } from '../security/rar.js';
 import { verifyRequestObject, signJarmResponse } from '../security/jar-jarm.js';
+import { assertWithinCeiling, parseScope, scopeCeiling } from '../security/scope.js';
 
 /**
  * @param {import('../index.js').ResolvedServerConfig & Record<string, any>} config
@@ -202,9 +203,9 @@ function requireRegisteredRedirectUri(redirectUri, client) {
 }
 
 /**
- * Requested scope must be a subset of the server's advertised scopes and,
- * when the client registers its own `scope`, of that too (RFC 6749
- * §4.1.2.1). An out-of-bounds scope is `invalid_scope`.
+ * Requested scope must be a subset of both the server's advertised scopes
+ * and the client's registered `scope` (RFC 6749 §4.1.2.1). An
+ * out-of-bounds scope is `invalid_scope`.
  *
  * @param {string | undefined} raw
  * @param {import('../clients.js').Client} client
@@ -213,20 +214,8 @@ function requireRegisteredRedirectUri(redirectUri, client) {
  * @returns {string[]}
  */
 function resolveScope(raw, client, config, state) {
-  const requested = isNonEmptyString(raw) ? raw.split(/\s+/).filter(Boolean) : [];
-  // The client's registered scope is the tighter ceiling when present;
-  // otherwise the server-wide list gates.
-  const allowed = isArray(client.scope) ? client.scope : config.scopes;
-  if (isArray(allowed)) {
-    for (const s of requested) {
-      if (!allowed.includes(s)) {
-        throw new ServerError(ProtocolError.INVALID_SCOPE, `scope ${JSON.stringify(s)} is not permitted`, {
-          redirectable: true,
-          state,
-        });
-      }
-    }
-  }
+  const requested = parseScope(raw);
+  assertWithinCeiling(requested, scopeCeiling(client, config), { redirectable: true, state });
   return requested;
 }
 

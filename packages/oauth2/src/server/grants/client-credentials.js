@@ -8,6 +8,7 @@ import { isArray, isNonEmptyString } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 import { resolveTokenAudience } from '../security/resource.js';
+import { assertWithinCeiling, parseScope, scopeCeiling } from '../security/scope.js';
 import { buildAccessResponse } from './_issue.js';
 
 /**
@@ -40,10 +41,11 @@ export async function clientCredentialsGrant(req, ctx) {
 }
 
 /**
- * A requested scope is validated against the client's registered `scope` (or
- * the server's advertised `scopes` when the client declares none). With no
- * `scope` requested, the client's registered scope is granted — or an empty
- * scope when it registers none; never the full server scope list by default.
+ * A requested scope is validated against the client's scope ceiling (its
+ * registered `scope` ∩ the server's advertised `scopes`). With no `scope`
+ * requested, the client's registered scope (within that ceiling) is granted —
+ * or an empty scope when it registers none; never the full server scope list
+ * by default.
  *
  * @param {string | undefined} requested
  * @param {import('../clients.js').Client} client
@@ -51,20 +53,11 @@ export async function clientCredentialsGrant(req, ctx) {
  * @returns {string[]}
  */
 function resolveScope(requested, client, config) {
+  const ceiling = scopeCeiling(client, config);
   if (!isNonEmptyString(requested)) {
-    return isArray(client.scope) ? client.scope : [];
+    return isArray(client.scope) ? (ceiling ?? []) : [];
   }
-  const asked = requested.split(/\s+/).filter(Boolean);
-  const allowed = isArray(client.scope) ? client.scope : config.scopes;
-  if (isArray(allowed)) {
-    for (const s of asked) {
-      if (!allowed.includes(s)) {
-        throw new ServerError(
-          ProtocolError.INVALID_SCOPE,
-          `scope ${JSON.stringify(s)} is not permitted for this client`,
-        );
-      }
-    }
-  }
+  const asked = parseScope(requested);
+  assertWithinCeiling(asked, ceiling);
   return asked;
 }
