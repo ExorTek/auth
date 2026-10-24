@@ -64,3 +64,12 @@ test('extraClaims cannot clobber the reserved uid/iat/exp fields', () => {
   assert.equal(td.verify(mkReq(`__Host-td=${encodeURIComponent(cookieVal)}`), 'u1'), true);
   assert.equal(td.verify(mkReq(`__Host-td=${encodeURIComponent(cookieVal)}`), 'attacker'), false);
 });
+
+test('createTrustedDeviceCookie rejects an empty or short secret', () => {
+  for (const secret of ['', Buffer.alloc(0), 'short']) {
+    assert.throws(
+      () => createTrustedDeviceCookie({ secret, ttl: '30d' }),
+      err => err.code === 'INVALID_ARGUMENT',
+    );
+  }
+});

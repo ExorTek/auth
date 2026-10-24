@@ -2,6 +2,7 @@ import { seal, unseal, CryptoError, ErrorCode as CryptoErrorCode } from '@exorte
 import { isArray, isBytes, isFunction, isString } from '@exortek/shared/predicates';
 
 import { assertNonEmptyString, assertObject, invalidArgument } from './internal/guards.js';
+import { assertSecretLength } from './internal/secret.js';
 import { parseCookies, serialiseCookie, serialiseDeleteCookie } from './cookie.js';
 import { parseDuration } from './internal/duration.js';
 
@@ -30,6 +31,9 @@ export function createTrustedDeviceCookie(config) {
     throw invalidArgument(
       'createTrustedDeviceCookie.config.secret must be a non-empty string / Buffer / Uint8Array (or an array of those)',
     );
+  }
+  for (const s of secret) {
+    assertSecretLength(s, 'createTrustedDeviceCookie.config.secret');
   }
   const ttlMs = parseDuration(config.ttl, 'ttl');
   const cookieName = config.cookie?.name ?? '__Host-td';

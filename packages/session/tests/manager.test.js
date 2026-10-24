@@ -240,3 +240,12 @@ test('touchEvery: lastSeenAt is only persisted after the sampling interval', asy
   assert.equal((await sessions.store.get(session.id)).lastSeenAt, t0 + 61_000);
   sessions.store._stop();
 });
+
+test('createSessionManager rejects an empty or short secret', () => {
+  for (const secret of ['', 'short', Buffer.alloc(16), ['x'.repeat(32), 'weak']]) {
+    assert.throws(
+      () => createSessionManager({ secret }),
+      err => err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+  }
+});

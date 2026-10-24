@@ -3,6 +3,7 @@ import { isArray, isBytes, isFunction, isObject, isString } from '@exortek/share
 
 import { SessionError, ErrorCode } from './errors.js';
 import { assertNonEmptyString, invalidArgument, parse } from './internal/guards.js';
+import { assertSecretLength } from './internal/secret.js';
 import { generateSessionId, encodeToken, decodeToken } from './token.js';
 import { memoryStore } from './stores/memory.js';
 import { parseDuration } from './internal/duration.js';
@@ -919,6 +920,7 @@ function normaliseSecret(input) {
         `createSessionManager.config.secret entries must be string / Buffer / Uint8Array; got ${typeof s}`,
       );
     }
+    assertSecretLength(s, 'createSessionManager.config.secret');
   }
   return list;
 }
