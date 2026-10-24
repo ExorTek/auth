@@ -242,10 +242,15 @@ function readItem(c, depth = 0) {
       throw new PasskeyError(ErrorCode.DECODE_ERROR, `cbor: map length ${len} exceeds Number.MAX_SAFE_INTEGER`);
     }
     const out = new Map();
+    // Byte-string keys are fresh Uint8Arrays, so Map#has never sees two
+    // equal ones as the same key — track them by content separately.
+    const byteKeys = new Set();
     for (let i = 0; i < len; i += 1) {
       const key = readItem(c, depth + 1);
       const value = readItem(c, depth + 1);
-      if (out.has(key)) {
+      const duplicateBytes =
+        key instanceof Uint8Array && byteKeys.size === byteKeys.add(Buffer.from(key).toString('hex')).size;
+      if (out.has(key) || duplicateBytes) {
         // Duplicate keys are legal CBOR but not deterministic — for a
         // security-critical parser we reject rather than silently pick
         // one, matching the RFC 8949 §5.6 "strict decoder" guidance.

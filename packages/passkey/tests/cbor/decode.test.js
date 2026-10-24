@@ -219,3 +219,10 @@ describe('cbor — recursion depth cap (DoS hardening)', () => {
     assert.ok(Array.isArray(value));
   });
 });
+
+describe('cbor — duplicate byte-string keys', () => {
+  test('two equal byte-string keys are a duplicate', () => {
+    assert.throws(() => decode(Uint8Array.from([0xa2, 0x41, 0x01, 0x00, 0x41, 0x01, 0x01])), /duplicate map key/);
+    assert.equal(decode(Uint8Array.from([0xa2, 0x41, 0x01, 0x00, 0x41, 0x02, 0x01])).size, 2);
+  });
+});
