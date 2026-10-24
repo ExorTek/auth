@@ -26,6 +26,22 @@ import { SYMMETRIC, SYMMETRIC_ALGOS } from './algorithms.js';
  */
 
 /**
+ * AAD is only bound by an AEAD mode. CBC has no tag, so an `aad` there
+ * would be silently ignored — the caller would believe the ciphertext is
+ * tied to a context it is not tied to.
+ *
+ * @param {{ algo: string, spec: { mode: string } }} spec
+ */
+function assertAadSupported(spec) {
+  if (spec.spec.mode !== 'aead') {
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `options.aad is only supported by AEAD algorithms; ${spec.algo} cannot authenticate it`,
+    );
+  }
+}
+
+/**
  * Encrypt `data` with a symmetric key.
  *
  * Generates a fresh random IV per call, so encrypting the same plaintext
@@ -60,6 +76,7 @@ export function encryptSymmetric(data, key, options) {
   const spec = _resolveSymmetric(options);
   if (options?.aad !== undefined) {
     assertBytesOrString(options.aad, 'options.aad');
+    assertAadSupported(spec);
   }
 
   const iv = crypto.randomBytes(spec.spec.ivLength);
@@ -124,6 +141,7 @@ export function decryptSymmetric(ciphertext, key, options) {
   }
   if (options.aad !== undefined) {
     assertBytesOrString(options.aad, 'options.aad');
+    assertAadSupported(spec);
   }
 
   // A short tag is a weaker MAC: GCM happily verifies a 4-byte tag unless

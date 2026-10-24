@@ -184,3 +184,13 @@ describe('decryptSymmetric — truncated tags', () => {
     }
   });
 });
+
+describe('symmetric — AAD on a non-AEAD mode', () => {
+  it('refuses aad with aes-256-cbc instead of ignoring it', async () => {
+    const key = await cipher.generateKey('aes-256-cbc');
+    assert.throws(
+      () => encryptSymmetric('x', key, { algo: 'aes-256-cbc', aad: 'ctx' }),
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+  });
+});
