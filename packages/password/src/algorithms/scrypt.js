@@ -4,6 +4,7 @@ import { timingSafeEqual } from '@exortek/shared/timing-safe';
 import { assertPositiveInt, invalidArgument } from '../internal/guards.js';
 import { normalizePassword } from '../internal/normalize.js';
 import { parseHash, serialiseHash } from '../phc.js';
+import { isSaneHashLength } from '../internal/limits.js';
 
 const scryptAsync = promisify(scryptCb);
 
@@ -98,6 +99,11 @@ export async function hash(password, options = {}) {
   });
 }
 
+// Verify-side ceilings for parameters read from a stored hash: 1 GiB of
+// memory, 4 GiB-equivalent of total mixing work.
+const MAX_VERIFY_MEMORY = 1024 * 1024 * 1024;
+const MAX_VERIFY_WORK = 4 * 1024 * 1024 * 1024;
+
 /**
  * Verify a candidate password against a scrypt PHC hash in constant
  * time. Returns `false` on any mismatch — including malformed hashes
@@ -129,18 +135,31 @@ export async function verify(password, phcHash, options = {}) {
     return false;
   }
   const N = 1 << ln;
+  // The per-parameter caps above still allow ln=24, r=32 — a 64 GiB
+  // working set — and p multiplies the work. Bound the products too, and
+  // the output length (scrypt's final PBKDF2 stage scales with it).
+  if (128 * N * r > MAX_VERIFY_MEMORY || 128 * N * r * p > MAX_VERIFY_WORK || !isSaneHashLength(record.hash)) {
+    return false;
+  }
   let pwBytes;
   try {
     pwBytes = normalizePassword(password);
   } catch {
     return false;
   }
-  const derived = await scryptAsync(pwBytes, record.salt, record.hash.length, {
-    N,
-    r,
-    p,
-    maxmem: options.maxmem ?? autoMaxmem(N, r),
-  });
+  let derived;
+  try {
+    derived = await scryptAsync(pwBytes, record.salt, record.hash.length, {
+      N,
+      r,
+      p,
+      maxmem: options.maxmem ?? autoMaxmem(N, r),
+    });
+  } catch {
+    // A stored hash whose parameters node:crypto rejects is a mismatch,
+    // not an exception — verify promises a boolean.
+    return false;
+  }
   return timingSafeEqual(derived, record.hash);
 }
 

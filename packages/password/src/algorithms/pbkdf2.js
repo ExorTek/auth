@@ -5,6 +5,7 @@ import { PasswordError, ErrorCode } from '../errors.js';
 import { assertPositiveInt } from '../internal/guards.js';
 import { normalizePassword } from '../internal/normalize.js';
 import { parseHash, serialiseHash } from '../phc.js';
+import { isSaneHashLength } from '../internal/limits.js';
 
 const pbkdf2Async = promisify(pbkdf2Cb);
 
@@ -114,13 +115,23 @@ export async function verify(password, phcHash) {
   if (!Number.isInteger(iterations) || iterations < 1 || iterations > MAX_VERIFY_ITERATIONS) {
     return false;
   }
+  // Each extra output block repeats all `iterations` rounds, so an
+  // oversized stored hash length multiplies the cost.
+  if (!isSaneHashLength(record.hash)) {
+    return false;
+  }
   let pwBytes;
   try {
     pwBytes = normalizePassword(password);
   } catch {
     return false;
   }
-  const derived = await pbkdf2Async(pwBytes, record.salt, iterations, record.hash.length, hashName);
+  let derived;
+  try {
+    derived = await pbkdf2Async(pwBytes, record.salt, iterations, record.hash.length, hashName);
+  } catch {
+    return false;
+  }
   return timingSafeEqual(derived, record.hash);
 }
 

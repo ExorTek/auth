@@ -60,3 +60,11 @@ test('pbkdf2.verify: rejects poisoned iteration counts (DoS ceiling)', async () 
   assert.equal(ok, false);
   assert.ok(elapsed < 100, `poisoned verify should short-circuit, took ${elapsed}ms`);
 });
+
+test('pbkdf2.verify: an oversized stored hash length → false', async () => {
+  const good = await pbkdf2.hash('pw');
+  const longHash = `${good.slice(0, good.lastIndexOf('$') + 1)}${Buffer.alloc(1_000_000).toString('base64').replace(/=+$/, '')}`;
+  const started = Date.now();
+  assert.equal(await pbkdf2.verify('pw', longHash), false);
+  assert.ok(Date.now() - started < 1000);
+});

@@ -54,3 +54,11 @@ test(
 test('argon2.hash: unknown type rejected', async () => {
   await assert.rejects(argon2.hash('pw', { type: 'argon2xyz' }));
 });
+
+test('argon2.verify: oversized cost parameters → false without hashing', async () => {
+  const forged = '$argon2id$v=19$m=4194304,t=3,p=1$c2FsdHNhbHRzYWx0c2FsdA$aGFzaGhhc2hoYXNoaGFzaGhhc2hoYXNoaGFzaGhhcw';
+  const started = Date.now();
+  assert.equal(await argon2.verify('pw', forged), false);
+  assert.equal(await argon2.verify('pw', forged.replace('m=4194304,t=3', 'm=65536,t=1000')), false);
+  assert.ok(Date.now() - started < 1000);
+});
