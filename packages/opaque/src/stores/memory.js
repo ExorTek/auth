@@ -17,6 +17,7 @@ import { parseDuration } from '@exortek/shared/duration';
 /**
  * @typedef {object} MemoryStoreOptions
  * @property {number} [sweepMs=60000]  Interval for the background TTL sweep.
+ * @property {number} [maxEntries=100000]  Oldest tokens are evicted beyond this — a memory store must not grow without bound.
  */
 
 /**
@@ -24,7 +25,7 @@ import { parseDuration } from '@exortek/shared/duration';
  * @returns {import('../index.js').OpaqueStore & { _size: () => number, stop: () => void }}
  */
 export function memoryStore(options = {}) {
-  const { sweepMs = 60000 } = options;
+  const { sweepMs = 60000, maxEntries = 100_000 } = options;
 
   /** @type {Map<string, { value: Record<string, unknown>, expiresAt: number | null }>} */
   const map = new Map();
@@ -47,6 +48,11 @@ export function memoryStore(options = {}) {
   return {
     async set(key, value, opts = {}) {
       const expiresAt = opts.expiresIn !== undefined ? Date.now() + parseDuration(opts.expiresIn) : null;
+      map.delete(key);
+      if (map.size >= maxEntries) {
+        // Map iteration order is insertion order: the first key is the oldest.
+        map.delete(map.keys().next().value);
+      }
       map.set(key, { value, expiresAt });
     },
 
