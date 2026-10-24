@@ -168,13 +168,11 @@ export function createRedisDeviceStore(client, options = {}) {
   const dk = deviceCode => `${prefix}d:${deviceCode}`;
   const uk = userCode => `${prefix}u:${userCode}`;
   const helpers = createRedisHelpers(client);
-  // Re-arm window for an update that carries no explicit TTL (mirrors the
-  // in-memory store): a device flow is minutes-long.
-  const REEARM_MS = 600_000;
 
   const self = {
     async save(record, ttlMs) {
-      await helpers.setWithTTL(dk(record.deviceCode), JSON.stringify(record), ttlMs);
+      const expiresAt = Date.now() + ttlMs;
+      await helpers.setWithTTL(dk(record.deviceCode), JSON.stringify({ ...record, expiresAt }), ttlMs);
       await helpers.setWithTTL(uk(record.userCode), record.deviceCode, ttlMs);
     },
     async getByDeviceCode(deviceCode) {
@@ -187,15 +185,31 @@ export function createRedisDeviceStore(client, options = {}) {
       }
       return self.getByDeviceCode(deviceCode);
     },
+    // KEEPTTL: an update (every poll writes lastPolledAt) never extends the
+    // code's life.
     async update(deviceCode, patch) {
       const existing = await self.getByDeviceCode(deviceCode);
       if (!existing) {
         return;
       }
-      await helpers.setWithTTL(dk(deviceCode), JSON.stringify({ ...existing, ...patch }), REEARM_MS);
+      await helpers.setKeepTTL(dk(deviceCode), JSON.stringify({ ...existing, ...patch }));
       if (patch.status === 'redeemed' || patch.status === 'denied') {
         await client.del(uk(existing.userCode));
       }
+    },
+    // Single redemption across nodes: the first poll to create the redeem
+    // claim (SET NX) wins; any concurrent poll resolves false.
+    async redeem(deviceCode) {
+      const existing = await self.getByDeviceCode(deviceCode);
+      if (!existing || existing.status !== 'approved') {
+        return false;
+      }
+      const ttlMs = Math.max(1, (existing.expiresAt ?? Date.now() + 1000) - Date.now());
+      if (!(await helpers.setIfAbsent(`${dk(deviceCode)}:redeemed`, '1', ttlMs))) {
+        return false;
+      }
+      await self.update(deviceCode, { status: 'redeemed' });
+      return true;
     },
   };
   return self;

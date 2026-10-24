@@ -6,7 +6,7 @@
  * the code is redeemed exactly once for tokens; a denied or expired
  * request returns the matching error.
  */
-import { isNonEmptyString, isNumber } from '@exortek/shared/predicates';
+import { isFunction, isNonEmptyString, isNumber } from '@exortek/shared/predicates';
 
 import { ProtocolError, ServerError } from '../errors.js';
 import { buildAccessResponse, refreshAllowed, mintRefreshToken } from './_issue.js';
@@ -66,7 +66,15 @@ export async function deviceCodeGrant(req, ctx) {
   }
 
   // Redeem once: flip to a terminal state so a repeat poll can't re-issue.
-  await config.stores.device.update(deviceCode, { status: 'redeemed' });
+  // The built-in stores do it atomically, so two concurrent polls of an
+  // approved code cannot both get tokens.
+  if (isFunction(config.stores.device.redeem)) {
+    if (!(await config.stores.device.redeem(deviceCode))) {
+      throw new ServerError(ProtocolError.INVALID_GRANT, 'the device_code has already been used');
+    }
+  } else {
+    await config.stores.device.update(deviceCode, { status: 'redeemed' });
+  }
 
   const body = await buildAccessResponse(config, {
     subject: record.subject,

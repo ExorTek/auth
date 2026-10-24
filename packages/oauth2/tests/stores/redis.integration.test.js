@@ -75,6 +75,22 @@ forEachRedisDriver('oauth2 server stores', ({ test, client, ns, raw }) => {
     assert.equal(await store.get('t1'), null);
   });
 
+  test('device updates keep the original expiry and redeem once', async () => {
+    const keyPrefix = ns('e2');
+    const store = createRedisDeviceStore(client(), { keyPrefix });
+    await store.save(
+      { deviceCode: 'd2', userCode: 'BCDF-2345', clientId: 'app', scope: [], status: 'pending' },
+      60_000,
+    );
+    await store.update('d2', { status: 'approved', subject: 'u' });
+    const pttl = await raw.pttl(`${keyPrefix}device:d:d2`);
+    assert.ok(pttl > 0 && pttl <= 60_000, `update must keep the expiry; got PTTL ${pttl}`);
+    assert.deepEqual((await store.getByDeviceCode('d2')).scope, []);
+
+    const outcomes = await Promise.all([store.redeem('d2'), store.redeem('d2')]);
+    assert.deepEqual(outcomes.sort(), [false, true]);
+  });
+
   test('device lookup + reverse-index cleanup', async () => {
     const store = createRedisDeviceStore(client(), { keyPrefix: ns('e') });
     await store.save({ deviceCode: 'd1', userCode: 'WXYZ-2345', clientId: 'app', scope: [], status: 'pending' }, 5_000);

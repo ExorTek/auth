@@ -388,3 +388,43 @@ test('refresh and device grants keep mTLS certificate binding', async () => {
   const refreshed = body(await call(server.token, { grant_type: 'refresh_token', refresh_token: tok.refresh_token }));
   assert.equal(cnfOf(refreshed.access_token)['x5t#S256'], thumb);
 });
+
+// DEVICE CODE LIFETIME
+
+function deviceServer(device) {
+  const DEVICE = 'urn:ietf:params:oauth:grant-type:device_code';
+  const { server } = buildServer({
+    clients: [
+      {
+        clientId: 'tv',
+        tokenEndpointAuthMethod: 'none',
+        redirectUris: ['https://x.example.com/cb'],
+        grantTypes: [DEVICE],
+      },
+    ],
+    grants: [DEVICE],
+    device,
+  });
+  const poll = deviceCode => server.token(post({ grant_type: DEVICE, device_code: deviceCode, client_id: 'tv' }));
+  return { server, poll };
+}
+
+test('device: polling never extends the device code past its lifetime', async () => {
+  const { server, poll } = deviceServer({ ttl: 80, interval: 0 });
+  const da = body(await server.deviceAuthorization(post({ client_id: 'tv' })));
+  assert.equal(body(await poll(da.device_code)).error, 'authorization_pending');
+  await new Promise(r => setTimeout(r, 40));
+  assert.equal(body(await poll(da.device_code)).error, 'authorization_pending');
+  await new Promise(r => setTimeout(r, 60));
+  assert.equal(body(await poll(da.device_code)).error, 'expired_token');
+  assert.equal(await server.device.getByUserCode(da.user_code), undefined);
+});
+
+test('device: two concurrent polls of an approved code redeem it once', async () => {
+  const { server, poll } = deviceServer({ interval: 0 });
+  const da = body(await server.deviceAuthorization(post({ client_id: 'tv' })));
+  await server.device.approve(da.user_code, { subject: 'user-1' });
+  const results = (await Promise.all([poll(da.device_code), poll(da.device_code)])).map(body);
+  assert.equal(results.filter(r => r.access_token).length, 1);
+  assert.equal(results.find(r => !r.access_token).error, 'invalid_grant');
+});

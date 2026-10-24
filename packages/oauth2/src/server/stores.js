@@ -242,51 +242,47 @@ export function createParStore() {
  * @property {'pending' | 'approved' | 'denied' | 'redeemed'} status
  * @property {string} [subject]           set on approval
  * @property {number} [lastPolledAt]      for slow_down enforcement
+ * @property {number} [expiresAt]         epoch ms; set by the store on save and never extended
  *
  * @typedef {Object} DeviceStore
  * @property {(record: DeviceRecord, ttlMs: number) => void | Promise<void>} save
  * @property {(deviceCode: string) => (DeviceRecord | undefined) | Promise<DeviceRecord | undefined>} getByDeviceCode
  * @property {(userCode: string) => (DeviceRecord | undefined) | Promise<DeviceRecord | undefined>} getByUserCode
  * @property {(deviceCode: string, patch: Partial<DeviceRecord>) => void | Promise<void>} update
+ *   Patch a record without extending its lifetime.
+ * @property {(deviceCode: string) => boolean | Promise<boolean>} [redeem]
+ *   Atomically flip an `approved` record to `redeemed`; resolve whether this
+ *   call did it. Optional for custom stores (the grant then falls back to a
+ *   non-atomic `update`), implemented by the built-in stores.
  */
 
 /** @returns {DeviceStore} */
 export function createDeviceStore() {
   const byDeviceCode = createTtlMap();
-  /** @type {Map<string, string>} user_code → device_code */
-  const userToDevice = new Map();
+  // user_code → device_code, on the same TTL as the record it points at.
+  const userToDevice = createTtlMap();
 
   return {
     save(record, ttlMs) {
-      byDeviceCode.set(record.deviceCode, record, ttlMs);
-      userToDevice.set(record.userCode, record.deviceCode);
+      const expiresAt = Date.now() + ttlMs;
+      byDeviceCode.set(record.deviceCode, { ...record, expiresAt }, ttlMs);
+      userToDevice.set(record.userCode, record.deviceCode, ttlMs);
     },
     getByDeviceCode(deviceCode) {
       return /** @type {DeviceRecord | undefined} */ (byDeviceCode.get(deviceCode));
     },
     getByUserCode(userCode) {
-      const deviceCode = userToDevice.get(userCode);
-      if (!deviceCode) {
-        return undefined;
-      }
-      const record = this.getByDeviceCode(deviceCode);
-      // The device record expired out from under the reverse index — drop
-      // the dangling `user_code` mapping so it cannot leak.
-      if (!record) {
-        userToDevice.delete(userCode);
-        return undefined;
-      }
-      return record;
+      const deviceCode = /** @type {string | undefined} */ (userToDevice.get(userCode));
+      return deviceCode ? this.getByDeviceCode(deviceCode) : undefined;
     },
     update(deviceCode, patch) {
       const existing = /** @type {DeviceRecord | undefined} */ (byDeviceCode.get(deviceCode));
       if (!existing) {
         return;
       }
-      // Preserve the remaining TTL by not resetting it — re-save with the
-      // original expiry window is unnecessary here since getByDeviceCode
-      // already evicts past expiry; a short re-arm is acceptable.
-      byDeviceCode.set(deviceCode, { ...existing, ...patch }, DEVICE_REEARM_MS);
+      // Keep the original expiry: polling must never extend a device code.
+      const remaining = /** @type {number} */ (existing.expiresAt) - Date.now();
+      byDeviceCode.set(deviceCode, { ...existing, ...patch }, remaining);
       // Once the code is spent (redeemed/denied), the one-time `user_code`
       // is done — free the reverse index eagerly rather than waiting for
       // TTL, so a verified device flow leaves nothing behind.
@@ -294,12 +290,17 @@ export function createDeviceStore() {
         userToDevice.delete(existing.userCode);
       }
     },
+    // Check-and-flip in one synchronous step: exactly one poll redeems.
+    redeem(deviceCode) {
+      const existing = /** @type {DeviceRecord | undefined} */ (byDeviceCode.get(deviceCode));
+      if (!existing || existing.status !== 'approved') {
+        return false;
+      }
+      this.update(deviceCode, { status: 'redeemed' });
+      return true;
+    },
   };
 }
-
-// A device flow is minutes-long; re-arming an update for 10 min keeps a
-// pending record alive across polls without a separate expiry field.
-const DEVICE_REEARM_MS = 600_000;
 
 /**
  * @param {unknown} store
