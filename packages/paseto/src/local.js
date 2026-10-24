@@ -12,6 +12,7 @@ import { encryptRaw, decryptRaw } from './internal/v4local.js';
 import { serializePayload, serializeFooter, finalize, toBuffer } from './internal/message.js';
 import { assertNonEmptyString } from './internal/guards.js';
 import { assertTokenSize, DEFAULT_MAX_TOKEN_SIZE } from './internal/size.js';
+import { resolveKey } from './key.js';
 
 /**
  * @typedef {import('./internal/claims.js')} _claims
@@ -42,14 +43,15 @@ import { assertTokenSize, DEFAULT_MAX_TOKEN_SIZE } from './internal/size.js';
  * Encrypt a payload into a `v4.local` token.
  *
  * @param {Record<string, unknown> | string | Uint8Array} payload
- * @param {Uint8Array} key   32-byte symmetric key
+ * @param {import('./key.js').PasetoKey} key   a v4 `local` key
  * @param {EncryptOptions} [options]
  * @returns {string}
  */
 export function encrypt(payload, key, options = {}) {
+  const k = resolveKey(key, 'local', 'encrypt');
   return encryptRaw({
     message: serializePayload(payload, options),
-    key,
+    key: k,
     footer: serializeFooter(options.footer),
     implicit: toBuffer(options.assertion, 'assertion'),
   });
@@ -59,16 +61,17 @@ export function encrypt(payload, key, options = {}) {
  * Decrypt and validate a `v4.local` token.
  *
  * @param {string} token
- * @param {Uint8Array} key
+ * @param {import('./key.js').PasetoKey} key   a v4 `local` key
  * @param {DecryptOptions} [options]
  * @returns {Record<string, unknown> | string | { payload: unknown, footer: string, version: string, purpose: string }}
  */
 export function decrypt(token, key, options = {}) {
+  const k = resolveKey(key, 'local', 'decrypt');
   assertNonEmptyString(token, 'decrypt.token');
   assertTokenSize(token, options.maxTokenSize ?? DEFAULT_MAX_TOKEN_SIZE);
   const { message, footer } = decryptRaw({
     token,
-    key,
+    key: k,
     implicit: toBuffer(options.assertion, 'assertion'),
   });
   return finalize(message, footer, options, 'local');

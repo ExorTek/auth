@@ -6,7 +6,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { encrypt, decrypt, sign, verify, generateKey, generateKeyPair, PasetoError, ErrorCode } from '../src/index.js';
+import {
+  encrypt,
+  decrypt,
+  sign,
+  verify,
+  generateKey,
+  generateKeyPair,
+  keys,
+  PasetoError,
+  ErrorCode,
+} from '../src/index.js';
 
 test('expired token is rejected with TOKEN_EXPIRED', () => {
   const key = generateKey();
@@ -108,4 +118,31 @@ test('a v4.local token is rejected by verify()', () => {
     () => verify(local, publicKey),
     err => err instanceof PasetoError && err.code === ErrorCode.INVALID_TOKEN,
   );
+});
+
+// KEY PURPOSE (algorithm lucidity)
+
+test('a public key can never be used as a v4.local key', () => {
+  const { publicKey } = generateKeyPair();
+  assert.throws(() => encrypt({ sub: 'forged' }, publicKey), { code: 'INVALID_KEY_PURPOSE' });
+  // The raw bytes alone are refused too — they must be wrapped explicitly.
+  assert.throws(() => encrypt({ sub: 'forged' }, publicKey.export()), { code: 'INVALID_KEY_PURPOSE' });
+});
+
+test('each operation only takes its own key purpose', () => {
+  const local = generateKey();
+  const { secretKey, publicKey } = generateKeyPair();
+  assert.throws(() => sign({}, local), { code: 'INVALID_KEY_PURPOSE' });
+  assert.throws(() => sign({}, publicKey), { code: 'INVALID_KEY_PURPOSE' });
+  assert.throws(() => verify(sign({}, secretKey), secretKey), { code: 'INVALID_KEY_PURPOSE' });
+  assert.throws(() => decrypt(encrypt({}, local), secretKey), { code: 'INVALID_KEY_PURPOSE' });
+  assert.throws(() => encrypt({}, { version: 'v4', purpose: 'local' }), { code: 'INVALID_KEY_PURPOSE' });
+});
+
+test('keys.local / keys.public wrap existing raw material', () => {
+  const raw = generateKey().export();
+  const token = encrypt({ ok: 1 }, keys.local(raw));
+  assert.equal(decrypt(token, keys.local(raw)).ok, 1);
+  const { secretKey, publicKey } = generateKeyPair();
+  assert.equal(verify(sign({ ok: 2 }, secretKey), keys.public(publicKey.export())).ok, 2);
 });

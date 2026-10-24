@@ -13,6 +13,7 @@ import {
   decode,
   generateKey,
   generateKeyPair,
+  keys,
   PasetoError,
   ErrorCode,
 } from '../src/index.js';
@@ -61,9 +62,9 @@ test('v4.public round-trips and verifies', () => {
   assert.equal(payload.userId, 2);
 });
 
-test('v4.public accepts a 32-byte seed as the secret key', () => {
+test('keys.secret accepts a 32-byte seed as the secret key', () => {
   const { secretKey, publicKey } = generateKeyPair();
-  const seedOnly = secretKey.subarray(0, 32);
+  const seedOnly = keys.secret(secretKey.export().subarray(0, 32));
   const token = sign({ ok: true }, seedOnly);
   assert.equal(verify(token, publicKey).ok, true);
 });

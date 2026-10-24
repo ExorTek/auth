@@ -8,6 +8,8 @@ export const ErrorCode = Object.freeze({
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   INVALID_TOKEN: 'INVALID_TOKEN',
   INVALID_KEY: 'INVALID_KEY',
+  // A key of the wrong version/purpose (or a bare buffer) for the operation.
+  INVALID_KEY_PURPOSE: 'INVALID_KEY_PURPOSE',
   UNSUPPORTED_VERSION: 'UNSUPPORTED_VERSION',
   TOKEN_TOO_LARGE: 'TOKEN_TOO_LARGE',
   DECRYPTION_FAILED: 'DECRYPTION_FAILED',
@@ -32,6 +34,7 @@ export class PasetoError extends BaseError {
     [ErrorCode.UNSUPPORTED_VERSION]: 400,
     [ErrorCode.INVALID_TOKEN]: 401,
     [ErrorCode.INVALID_KEY]: 401,
+    [ErrorCode.INVALID_KEY_PURPOSE]: 500,
     [ErrorCode.TOKEN_TOO_LARGE]: 413,
     [ErrorCode.DECRYPTION_FAILED]: 401,
     [ErrorCode.SIGNATURE_INVALID]: 401,
