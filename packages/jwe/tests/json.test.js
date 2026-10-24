@@ -97,3 +97,14 @@ test('decryptJson enforces the allowlist', async () => {
     isCode(ErrorCode.ALGORITHM_MISMATCH),
   );
 });
+
+test('decryptJson: recipient count and size are bounded before any unwrap', async () => {
+  const jwe = await encryptJson(PAYLOAD, [{ key: rsa.publicKey, alg: 'RSA-OAEP-256' }], { enc: 'A256GCM' });
+  const opts = { alg: ['RSA-OAEP-256'], enc: ['A256GCM'] };
+  const flood = { ...jwe, recipients: Array.from({ length: 9 }, () => jwe.recipients[0]) };
+  await assert.rejects(decryptJson(flood, rsa.privateKey, opts), isCode(ErrorCode.INVALID_TOKEN));
+  await assert.rejects(
+    decryptJson({ ...jwe, ciphertext: 'A'.repeat(70_000) }, rsa.privateKey, opts),
+    isCode(ErrorCode.TOKEN_TOO_LARGE),
+  );
+});

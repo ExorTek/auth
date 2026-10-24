@@ -149,12 +149,19 @@ export async function encryptJson(payload, recipients, options) {
  * @typedef {import('./decrypt.js').DecryptOptions} DecryptOptions
  */
 
+// A JSON serialization carries several recipients, so its default ceiling
+// is wider than the compact form's 8 KiB.
+const DEFAULT_MAX_JSON_SIZE = 65_536;
+const DEFAULT_MAX_RECIPIENTS = 8;
+
 /**
- * Decrypt a General or Flattened JWE JSON serialization.
+ * Decrypt a General or Flattened JWE JSON serialization. `maxTokenSize`
+ * (default 64 KiB, the serialized JSON) and `maxRecipients` (default 8)
+ * bound the work before any recipient is tried.
  *
  * @param {GeneralJwe | Record<string, unknown>} jwe
  * @param {KeyInput} key
- * @param {DecryptOptions} options
+ * @param {DecryptOptions & { maxRecipients?: number }} options
  * @returns {Promise<DecryptResult>}
  */
 export async function decryptJson(jwe, key, options) {
@@ -165,8 +172,23 @@ export async function decryptJson(jwe, key, options) {
     throw new JweError(ErrorCode.INVALID_TOKEN, 'decryptJson: expected a JWE JSON object with a "protected" member.');
   }
 
-  const protectedHeader = assertHeaderObject(b64uDecodeJson(/** @type {string} */ (jwe.protected)));
+  // Bound the work before decoding anything: each recipient is a key
+  // unwrap attempt (potentially an ECDH / RSA operation).
+  const maxSize = options.maxTokenSize ?? DEFAULT_MAX_JSON_SIZE;
+  const size = Buffer.byteLength(JSON.stringify(jwe), 'utf8');
+  if (size > maxSize) {
+    throw new JweError(ErrorCode.TOKEN_TOO_LARGE, `decryptJson: JWE is ${size} bytes, over the ${maxSize} limit.`);
+  }
   const recipientList = normalizeRecipients(jwe);
+  const maxRecipients = options.maxRecipients ?? DEFAULT_MAX_RECIPIENTS;
+  if (recipientList.length > maxRecipients) {
+    throw new JweError(
+      ErrorCode.INVALID_TOKEN,
+      `decryptJson: JWE has ${recipientList.length} recipients, over maxRecipients=${maxRecipients}.`,
+    );
+  }
+
+  const protectedHeader = assertHeaderObject(b64uDecodeJson(/** @type {string} */ (jwe.protected)));
   const encodedAad = jwe.aad === undefined ? undefined : /** @type {string} */ (jwe.aad);
   const aad = buildAad(/** @type {string} */ (jwe.protected), encodedAad);
 
