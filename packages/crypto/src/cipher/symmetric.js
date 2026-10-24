@@ -4,6 +4,7 @@ import { assertBytes, assertBytesOrString, assertObject, assertString } from '..
 
 import { assertKeyObject } from '../internal/validate.js';
 import { toBuffer } from '../internal/bytes.js';
+import { decodeStrict } from '../internal/token-encoding.js';
 import { SYMMETRIC, SYMMETRIC_ALGOS } from './algorithms.js';
 
 /**
@@ -207,7 +208,7 @@ export function encryptToString(data, key, options) {
 export function decryptFromString(token, key, options) {
   assertString(token, 'token');
   const spec = _resolveSymmetric(options);
-  const packed = Buffer.from(token, 'base64url');
+  const packed = decodeStrict(token, ErrorCode.INVALID_CIPHERTEXT);
   const minLen = spec.spec.ivLength + spec.spec.tagLength;
   if (packed.length < minLen) {
     throw new CryptoError(

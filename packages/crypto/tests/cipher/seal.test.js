@@ -241,3 +241,18 @@ describe('unseal — secret rotation', () => {
     );
   });
 });
+
+describe('unseal — one canonical spelling per token', () => {
+  it('rejects padded, whitespace-wrapped or junk-bearing variants', () => {
+    const secret = 'a'.repeat(32);
+    const token = seal({ a: 1 }, secret, { ttl: 60 });
+    for (const variant of [`${token}=`, `${token}\n`, ` ${token}`, `${token.slice(0, 10)}!${token.slice(10)}`]) {
+      assert.throws(
+        () => unseal(variant, secret),
+        err => err.code === ErrorCode.TOKEN_MALFORMED,
+        JSON.stringify(variant),
+      );
+    }
+    assert.deepEqual(unseal(token, secret).payload, { a: 1 });
+  });
+});

@@ -3,6 +3,7 @@ import { CryptoError, ErrorCode } from '../errors.js';
 import { assertBytesOrString, assertOptionalObject, invalidArgument } from '../internal/guards.js';
 import { hkdf } from '../hash/hkdf.js';
 import { toBuffer } from '../internal/bytes.js';
+import { decodeStrict } from '../internal/token-encoding.js';
 import { isArray, isBoolean, isBuffer, isObject, isString, isUndefined } from '@exortek/shared/predicates';
 
 const VERSION = 0x01;
@@ -166,7 +167,7 @@ export function unseal(token, secret, options) {
     assertBytesOrString(s, 'secret');
   }
   assertOptionalObject(options, 'options');
-  const bytes = Buffer.from(token, 'base64url');
+  const bytes = decodeStrict(token, ErrorCode.TOKEN_MALFORMED);
   if (bytes.length < HEADER_LEN + TAG_LEN) {
     throw new CryptoError(
       ErrorCode.TOKEN_MALFORMED,
