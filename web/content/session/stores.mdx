@@ -119,7 +119,7 @@ Implement this interface — every method returns a Promise:
 interface SessionStore {
   get(sid):                            Promise<SessionRecord | null>
   put(record):                         Promise<void>
-  update(sid, patch):                  Promise<SessionRecord | null>
+  update(sid, patch, current?):        Promise<SessionRecord | null>   // current: the record just read — may skip a re-read
   revoke(sid, reason?):                Promise<boolean>
   revokeAllForUser(uid, reason?):      Promise<number>
   revokeAllExcept(uid, keepSid, r?):   Promise<number>

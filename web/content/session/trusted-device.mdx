@@ -110,6 +110,22 @@ trusted-device cookie whose sealed payload's `uid === userId` and
 whose `exp` is in the future. Returns `false` for missing cookie,
 expired cookie, wrong user, malformed cookie — never throws.
 
+### Server-side revocation — `revokedBefore`
+
+A trusted-device cookie is otherwise valid until it expires, wherever it
+was copied. Give `createTrustedDeviceCookie` a `revokedBefore(userId)`
+that returns an epoch-ms cutoff, and every cookie for that user issued
+before it stops verifying — "forget all devices" or a password change
+is one timestamp:
+
+```js
+const trusted = createTrustedDeviceCookie({
+  secret: process.env.TD_SECRET, // ≥ 32 bytes
+  ttl: '30d',
+  revokedBefore: userId => deviceCutoffs.get(userId), // sync lookup (cache it)
+});
+```
+
 ### `trusted.revoke()`
 
 Returns a delete-cookie header. Wire this into a "forget this

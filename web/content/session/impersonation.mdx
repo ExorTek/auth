@@ -12,14 +12,19 @@ app **as another user** — to reproduce a bug, check a permission
 issue, verify a support-ticket claim. Impersonation is that flow,
 audit-trailed so the identity of the real actor is never lost.
 
-Opt-in — pass `impersonation: true` to `createSessionManager` to
-enable the `impersonate()` method.
+Opt-in — pass `impersonation: true` **and an `impersonationAuthorize`
+hook** to `createSessionManager` to enable the `impersonate()` method. A
+valid session alone is not authority: the hook decides whether this
+admin may become this user, and anything but `true` is a `FORBIDDEN`
+(403) error. Without the hook, `createSessionManager` throws.
 
 ```js
 const sessions = createSessionManager({
   secret, ttl: '7d', idleTtl: '30m',
   impersonation:    true,
   impersonationTtl: '30m',    // default
+  impersonationAuthorize: async ({ admin, targetUserId, reason, req }) =>
+    (await roles.of(admin.userId)).includes('support') && !(await roles.isAdmin(targetUserId)),
 });
 ```
 
@@ -55,8 +60,9 @@ Two knobs, per-call wins:
    impersonation is a high-risk mode; a stolen admin cookie should
    not be able to keep the borrowed identity alive for a full 7-day
    session window.
-2. **`options.ttl` on the impersonate call** — override for this
-   specific ceremony. Common patterns: `'5m'` for a quick debug,
+2. **`options.ttl` on the impersonate call** — shorten it for this
+   specific ceremony (it can never exceed `impersonationTtl`; a longer
+   or non-positive value is `INVALID_ARGUMENT`). Common patterns: `'5m'` for a quick debug,
    `'15m'` for a longer investigation.
 
 ```js
