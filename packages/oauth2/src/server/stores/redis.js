@@ -24,6 +24,7 @@
  */
 import { createRedisHelpers } from '@exortek/shared/redis-helpers';
 import { createRedisRecordStore } from '@exortek/shared/record-store';
+import { createRedisIncrStore } from '@exortek/shared/incr-store';
 import { isFunction } from '@exortek/shared/predicates';
 
 const DEFAULT_PREFIX = 'oauth2:';
@@ -213,4 +214,17 @@ export function createRedisDeviceStore(client, options = {}) {
     },
   };
   return self;
+}
+
+/**
+ * Shared jti replay store (`stores.replay`) — DPoP proofs, client assertions
+ * and request objects replayed against a different node are caught. Each id
+ * is an INCR with a TTL; the first sighting counts 1.
+ *
+ * @param {any} client
+ * @param {{ keyPrefix?: string }} [options]
+ * @returns {import('../security/replay.js').ReplayStore}
+ */
+export function createRedisReplayStore(client, options = {}) {
+  return createRedisIncrStore(client, { keyPrefix: `${options.keyPrefix ?? DEFAULT_PREFIX}replay:` });
 }

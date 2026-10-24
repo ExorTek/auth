@@ -9,7 +9,13 @@ import assert from 'node:assert/strict';
 
 import { forEachRedisDriver } from '@exortek/shared/test-helpers/redis-drivers';
 
-import { createRedisAuthCodeStore, createRedisRefreshStore, createRedisDeviceStore } from '../../src/server/index.js';
+import {
+  createRedisAuthCodeStore,
+  createRedisRefreshStore,
+  createRedisDeviceStore,
+  createRedisReplayStore,
+} from '../../src/server/index.js';
+import { createReplayGuard } from '../../src/server/security/replay.js';
 
 forEachRedisDriver('oauth2 server stores', ({ test, client, ns, raw }) => {
   test('auth-code single-use consume', async () => {
@@ -89,6 +95,14 @@ forEachRedisDriver('oauth2 server stores', ({ test, client, ns, raw }) => {
 
     const outcomes = await Promise.all([store.redeem('d2'), store.redeem('d2')]);
     assert.deepEqual(outcomes.sort(), [false, true]);
+  });
+
+  test('replay store: a jti is seen once across guards', async () => {
+    const store = createRedisReplayStore(client(), { keyPrefix: ns('f') });
+    const nodeA = createReplayGuard(store);
+    const nodeB = createReplayGuard(store);
+    assert.equal(await nodeA.seen('dpop', 'jti-1', 60_000), false);
+    assert.equal(await nodeB.seen('dpop', 'jti-1', 60_000), true);
   });
 
   test('device lookup + reverse-index cleanup', async () => {

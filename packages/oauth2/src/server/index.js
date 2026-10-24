@@ -43,6 +43,7 @@ export {
   createRedisRefreshStore,
   createRedisParStore,
   createRedisDeviceStore,
+  createRedisReplayStore,
 } from './stores/redis.js';
 
 const DEFAULT_GRANTS = ['authorization_code', 'refresh_token', 'client_credentials'];
