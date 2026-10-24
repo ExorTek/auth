@@ -22,6 +22,7 @@ import { parseDuration } from './internal/duration.js';
  *   secret:   string | Buffer | Uint8Array | Array<string | Buffer | Uint8Array>,
  *   ttl:      string | number,           // e.g. '30d'
  *   cookie?:  Omit<import('./cookie.js').CookieOptions, 'maxAge' | 'expires'> & { name?: string },
+ *   revokedBefore?: (userId: string) => number | undefined,  // epoch ms; cookies issued earlier are refused
  * }} config
  */
 export function createTrustedDeviceCookie(config) {
@@ -36,6 +37,14 @@ export function createTrustedDeviceCookie(config) {
     assertSecretLength(s, 'createTrustedDeviceCookie.config.secret');
   }
   const ttlMs = parseDuration(config.ttl, 'ttl');
+  // A sealed cookie is otherwise valid until it expires, wherever it was
+  // copied to. `revokedBefore` lets the app invalidate a user's devices
+  // server-side ("forget all devices", password change) by recording a
+  // timestamp — every cookie issued before it stops verifying.
+  const revokedBefore = config.revokedBefore;
+  if (revokedBefore !== undefined && !isFunction(revokedBefore)) {
+    throw invalidArgument('createTrustedDeviceCookie.config.revokedBefore must be a function');
+  }
   const cookieName = config.cookie?.name ?? '__Host-td';
   const cookieOptions = { ...config.cookie };
   delete cookieOptions.name;
@@ -102,7 +111,11 @@ export function createTrustedDeviceCookie(config) {
       const now = options.now ?? Date.now();
       try {
         const { payload } = unseal(token, secret, { now });
-        return payload && payload.uid === userId;
+        if (!payload || payload.uid !== userId) {
+          return false;
+        }
+        const cutoff = revokedBefore ? revokedBefore(userId) : undefined;
+        return !(typeof cutoff === 'number' && payload.iat < cutoff);
       } catch (err) {
         if (err instanceof CryptoError && err.code === CryptoErrorCode.TOKEN_EXPIRED) {
           return false;
