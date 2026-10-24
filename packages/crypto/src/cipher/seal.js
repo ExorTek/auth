@@ -3,6 +3,7 @@ import { CryptoError, ErrorCode } from '../errors.js';
 import { assertBytesOrString, assertOptionalObject, invalidArgument } from '../internal/guards.js';
 import { hkdf } from '../hash/hkdf.js';
 import { toBuffer } from '../internal/bytes.js';
+import { decodeStrict } from '../internal/token-encoding.js';
 import { isArray, isBoolean, isBuffer, isObject, isString, isUndefined } from '@exortek/shared/predicates';
 
 const VERSION = 0x01;
@@ -39,6 +40,26 @@ const DURATION_RE = /^(\d+)(ms|s|m|h|d|w)$/;
  * @property {any}    payload      The deserialised payload.
  * @property {number} expiresAt    Millisecond Unix timestamp.
  */
+
+const MIN_SECRET_BYTES = 32;
+
+/**
+ * A seal secret is the HKDF input key: an empty string or a short
+ * password-like value gives no real protection (`seal(x, '')` used to
+ * work). Require at least 32 bytes — `crypto.randomBytes(32)` or 32+
+ * characters of a high-entropy string.
+ *
+ * @param {unknown} secret
+ */
+function assertSealSecret(secret) {
+  assertBytesOrString(secret, 'secret');
+  const length = isString(secret) ? Buffer.byteLength(secret, 'utf8') : /** @type {Uint8Array} */ (secret).length;
+  if (length < MIN_SECRET_BYTES) {
+    throw invalidArgument(
+      `secret must be at least ${MIN_SECRET_BYTES} bytes; got ${length}. Generate one with crypto.randomBytes(32).`,
+    );
+  }
+}
 
 /**
  * Encrypt and time-stamp an arbitrary JSON-serialisable payload into a short
@@ -80,7 +101,7 @@ const DURATION_RE = /^(\d+)(ms|s|m|h|d|w)$/;
  * const token = seal({ email }, VERIFY_SECRET, { ttl: '24h' })
  */
 export function seal(payload, secret, options) {
-  assertBytesOrString(secret, 'secret');
+  assertSealSecret(secret);
   assertOptionalObject(options, 'options');
   if (isUndefined(options) || isUndefined(options.ttl)) {
     throw invalidArgument(
@@ -163,10 +184,10 @@ export function unseal(token, secret, options) {
     throw invalidArgument('secret list is empty — pass at least one key (or an array of keys for rotation)');
   }
   for (const s of secrets) {
-    assertBytesOrString(s, 'secret');
+    assertSealSecret(s);
   }
   assertOptionalObject(options, 'options');
-  const bytes = Buffer.from(token, 'base64url');
+  const bytes = decodeStrict(token, ErrorCode.TOKEN_MALFORMED);
   if (bytes.length < HEADER_LEN + TAG_LEN) {
     throw new CryptoError(
       ErrorCode.TOKEN_MALFORMED,
@@ -209,7 +230,13 @@ export function unseal(token, secret, options) {
 
   // Expiry is inside the AAD, so we only trust it after auth succeeds.
   const now = options?.now ?? Date.now();
-  const skewMs = (options?.clockSkew ?? 0) * 1000;
+  const skew = options?.clockSkew ?? 0;
+  // NaN / Infinity / negative would turn the expiry comparison into a
+  // no-op (`now - NaN > exp` is always false) and never expire a token.
+  if (!Number.isFinite(skew) || skew < 0) {
+    throw invalidArgument(`options.clockSkew must be a non-negative finite number of seconds; got ${_describe(skew)}`);
+  }
+  const skewMs = skew * 1000;
   if (now > expiresAt + skewMs) {
     const overdueSec = Math.round((now - expiresAt) / 1000);
     throw new CryptoError(

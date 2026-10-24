@@ -22,8 +22,8 @@ adds no cost when unused.
 ```
 
 - **`secret`** — the AES-256-GCM key material for the sealed cookie.
-  Anything with ≥ 16 bytes of entropy is fine; short passphrases
-  weaken it. Pass an array `[newest, …older]` to rotate: new hashes
+  Every entry must be at least **32 bytes** (`crypto.randomBytes(32)`);
+  shorter secrets are rejected at configuration time. Pass an array `[newest, …older]` to rotate: new hashes
   use the first entry, verify walks the list.
 - **`ttl`** — absolute maximum session lifetime. A session that started
   N ms ago dies regardless of activity when N > ttl.
@@ -87,8 +87,9 @@ anonymous?:          boolean,             // guest sessions with userId: null
 concurrentLimit?:    number,              // e.g. 3 → oldest kicked
 bindTo?:             Array<'ip' | 'ua'>,  // fingerprint binding
 bindStrictness?:     'strict' | 'soft',   // default 'strict'
-impersonation?:      boolean,             // enable impersonate() API
+impersonation?:      boolean,             // enable impersonate() API (needs impersonationAuthorize)
 impersonationTtl?:   string | number,     // default '30m'
+impersonationAuthorize?: (ctx) => boolean | Promise<boolean>, // required with impersonation: true
 deviceLabels?:       boolean,             // auto 'iPhone 14 · Chrome'
 events?: {
   onIssue, onVerify, onRotate, onRevoke, onDeny, onSuspicious,
@@ -107,7 +108,9 @@ suspiciousActivity?: boolean | { onDetected },
 
 Impersonation sessions carry `impersonatedBy` on the record and default
 to a short **30-minute TTL** regardless of the manager's global `ttl`.
-Override per-call with `impersonate(req, uid, { ttl: '5m' })`. Nested
+A per-call `impersonate(req, uid, { ttl: '5m' })` may shorten it, never
+extend it. `impersonationAuthorize({ admin, targetUserId, reason, req })`
+is required and decides every impersonation. Nested
 impersonation is refused — an admin session that is itself
 impersonated cannot start a second layer.
 

@@ -17,6 +17,7 @@ test('impersonate: admin becomes target, audit trail carried', async () => {
     ttl: '7d',
     idleTtl: '30m',
     impersonation: true,
+    impersonationAuthorize: () => true,
   });
   const admin = await sessions.issue({ userId: 'admin' });
   const adminReq = mkReq(`__Host-sid=${encodeURIComponent(admin.token)}`);
@@ -38,6 +39,7 @@ test('impersonate: rejects missing admin session', async () => {
     ttl: '7d',
     idleTtl: '30m',
     impersonation: true,
+    impersonationAuthorize: () => true,
   });
   await assert.rejects(
     sessions.impersonate(mkReq(), 'target'),
@@ -52,6 +54,7 @@ test('impersonate: rejects missing targetUserId', async () => {
     ttl: '7d',
     idleTtl: '30m',
     impersonation: true,
+    impersonationAuthorize: () => true,
   });
   const admin = await sessions.issue({ userId: 'admin' });
   const adminReq = mkReq(`__Host-sid=${encodeURIComponent(admin.token)}`);
@@ -65,6 +68,7 @@ test('impersonation cannot be chained from an impersonated session', async () =>
     ttl: '7d',
     idleTtl: '30m',
     impersonation: true,
+    impersonationAuthorize: () => true,
   });
   const admin = await sessions.issue({ userId: 'admin' });
   const first = await sessions.impersonate(mkReq(`__Host-sid=${encodeURIComponent(admin.token)}`), 'victim');
@@ -72,5 +76,57 @@ test('impersonation cannot be chained from an impersonated session', async () =>
     sessions.impersonate(mkReq(`__Host-sid=${encodeURIComponent(first.token)}`), 'other-user'),
     err => err instanceof SessionError && err.code === ErrorCode.INVALID_ARGUMENT,
   );
+  sessions.store._stop();
+});
+
+test('impersonation needs an authorize hook, and the hook decides', async () => {
+  assert.throws(
+    () => createSessionManager({ secret: SECRET, ttl: '7d', idleTtl: '30m', impersonation: true }),
+    err => err.code === ErrorCode.INVALID_ARGUMENT,
+  );
+  const seen = [];
+  const sessions = createSessionManager({
+    secret: SECRET,
+    ttl: '7d',
+    idleTtl: '30m',
+    impersonation: true,
+    impersonationAuthorize: ({ admin, targetUserId }) => {
+      seen.push([admin.userId, targetUserId]);
+      return admin.userId === 'admin' && targetUserId !== 'other-admin';
+    },
+  });
+  const user = await sessions.issue({ userId: 'regular-user' });
+  await assert.rejects(
+    sessions.impersonate(mkReq(`__Host-sid=${encodeURIComponent(user.token)}`), 'victim'),
+    err => err instanceof SessionError && err.code === ErrorCode.FORBIDDEN,
+  );
+  const admin = await sessions.issue({ userId: 'admin' });
+  const adminReq = mkReq(`__Host-sid=${encodeURIComponent(admin.token)}`);
+  await assert.rejects(sessions.impersonate(adminReq, 'other-admin'), err => err.code === ErrorCode.FORBIDDEN);
+  assert.equal((await sessions.impersonate(adminReq, 'target')).session.userId, 'target');
+  assert.deepEqual(seen.at(-1), ['admin', 'target']);
+  sessions.store._stop();
+});
+
+test('a per-call impersonation ttl can shorten but not extend the configured one', async () => {
+  const sessions = createSessionManager({
+    secret: SECRET,
+    ttl: '7d',
+    idleTtl: '30m',
+    impersonation: true,
+    impersonationAuthorize: () => true,
+  });
+  const admin = await sessions.issue({ userId: 'admin' });
+  const adminReq = mkReq(`__Host-sid=${encodeURIComponent(admin.token)}`);
+  await assert.rejects(
+    sessions.impersonate(adminReq, 'target', { ttl: '7d' }),
+    err => err.code === ErrorCode.INVALID_ARGUMENT,
+  );
+  await assert.rejects(
+    sessions.impersonate(adminReq, 'target', { ttl: 0 }),
+    err => err.code === ErrorCode.INVALID_ARGUMENT,
+  );
+  const short = await sessions.impersonate(adminReq, 'target', { ttl: '5m' });
+  assert.ok(short.session.expiresAt - Date.now() <= 5 * 60 * 1000 + 1000);
   sessions.store._stop();
 });

@@ -11,6 +11,7 @@ test('impersonation default TTL is 30 minutes, not 7 days', async () => {
     ttl: '7d',
     idleTtl: '30m',
     impersonation: true,
+    impersonationAuthorize: () => true,
   });
   const now = Date.now();
   const admin = await sessions.issue({ userId: 'admin', now });
@@ -27,6 +28,7 @@ test('impersonationTtl config overrides the default', async () => {
     ttl: '7d',
     idleTtl: '30m',
     impersonation: true,
+    impersonationAuthorize: () => true,
     impersonationTtl: '10m',
   });
   const now = Date.now();
@@ -43,6 +45,7 @@ test('impersonate options.ttl overrides both config default and defaults', async
     ttl: '7d',
     idleTtl: '30m',
     impersonation: true,
+    impersonationAuthorize: () => true,
     impersonationTtl: '30m',
   });
   const now = Date.now();

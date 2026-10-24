@@ -9,6 +9,8 @@ for (let i = 0; i < BASE58.length; i++) {
   DECODE_TABLE[BASE58.charCodeAt(i)] = i;
 }
 
+const DEFAULT_MAX_DECODE_LENGTH = 1024;
+
 /**
  * Encode `input` as a Bitcoin-style Base58 string.
  *
@@ -62,6 +64,7 @@ export function encode(input) {
  * leading zero bytes, matching the Base58Check convention.
  *
  * @param {string} input
+ * @param {{ maxLength?: number }} [options]   reject longer input (default 1024 characters)
  * @returns {Buffer}
  * @throws {CryptoError}   `INVALID_ARGUMENT` if `input` is not a string,
  *                          or `INVALID_ENCODING` if it contains characters
@@ -72,10 +75,21 @@ export function encode(input) {
  * decode('Cn8eVZg')   // Buffer('hello')
  * decode('112C')      // Buffer([0x00, 0x00, 0xff])
  */
-export function decode(input) {
+export function decode(input, options) {
   assertString(input, 'input');
   if (input.length === 0) {
     return Buffer.alloc(0);
+  }
+  // Base58 decoding is quadratic in the input length (big-integer
+  // multiply per character), so an attacker-supplied string must be
+  // bounded before the loop. 1024 characters is ~750 bytes — far beyond
+  // any key, address or identifier this encoding is used for.
+  const maxLength = options?.maxLength ?? DEFAULT_MAX_DECODE_LENGTH;
+  if (input.length > maxLength) {
+    throw new CryptoError(
+      ErrorCode.INVALID_ENCODING,
+      `input is ${input.length} characters, over the ${maxLength}-character base58 decode limit (pass { maxLength } to raise it)`,
+    );
   }
 
   let n = 0n;

@@ -103,3 +103,17 @@ describe('fingerprint', () => {
     );
   });
 });
+
+describe('fingerprint — shared references', () => {
+  it('hashes an object reached twice through siblings like a copy', () => {
+    const shared = { a: 1 };
+    assert.equal(fingerprint({ x: shared, y: shared }), fingerprint({ x: { a: 1 }, y: { a: 1 } }));
+    assert.equal(fingerprint([shared, shared]), fingerprint([{ a: 1 }, { a: 1 }]));
+  });
+
+  it('still rejects a real cycle', () => {
+    const loop = { a: 1 };
+    loop.self = loop;
+    assert.throws(() => fingerprint(loop), /cyclic/);
+  });
+});

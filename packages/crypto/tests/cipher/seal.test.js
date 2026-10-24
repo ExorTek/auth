@@ -68,9 +68,9 @@ describe('seal / unseal', () => {
 
 describe('unseal — failure modes', () => {
   it('TOKEN_TAMPERED for wrong secret', () => {
-    const token = seal({ a: 1 }, 'right', { ttl: 60 });
+    const token = seal({ a: 1 }, 'r'.repeat(32), { ttl: 60 });
     assert.throws(
-      () => unseal(token, 'wrong'),
+      () => unseal(token, 'w'.repeat(32)),
       err => err instanceof CryptoError && err.code === ErrorCode.TOKEN_TAMPERED,
     );
   });
@@ -238,6 +238,54 @@ describe('unseal — secret rotation', () => {
     assert.throws(
       () => unseal(token, [NEW, OLD], { now: now + 120_000 }),
       err => err instanceof CryptoError && err.code === ErrorCode.TOKEN_EXPIRED,
+    );
+  });
+});
+
+describe('unseal — one canonical spelling per token', () => {
+  it('rejects padded, whitespace-wrapped or junk-bearing variants', () => {
+    const secret = 'a'.repeat(32);
+    const token = seal({ a: 1 }, secret, { ttl: 60 });
+    for (const variant of [`${token}=`, `${token}\n`, ` ${token}`, `${token.slice(0, 10)}!${token.slice(10)}`]) {
+      assert.throws(
+        () => unseal(variant, secret),
+        err => err.code === ErrorCode.TOKEN_MALFORMED,
+        JSON.stringify(variant),
+      );
+    }
+    assert.deepEqual(unseal(token, secret).payload, { a: 1 });
+  });
+});
+
+describe('seal — secret strength', () => {
+  it('rejects an empty or short secret on seal and unseal', () => {
+    for (const weak of ['', 'short', Buffer.alloc(0), Buffer.alloc(31)]) {
+      assert.throws(
+        () => seal({ a: 1 }, weak, { ttl: 60 }),
+        err => err.code === ErrorCode.INVALID_ARGUMENT,
+      );
+    }
+    const token = seal({ a: 1 }, 'k'.repeat(32), { ttl: 60 });
+    assert.throws(
+      () => unseal(token, ['k'.repeat(32), 'weak']),
+      err => err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+  });
+});
+
+describe('unseal — clockSkew', () => {
+  it('rejects a non-finite or negative clockSkew instead of disabling expiry', () => {
+    const secret = 'k'.repeat(32);
+    const token = seal({ a: 1 }, secret, { ttl: 1, now: 0 });
+    for (const clockSkew of [NaN, Infinity, -1]) {
+      assert.throws(
+        () => unseal(token, secret, { clockSkew }),
+        err => err.code === ErrorCode.INVALID_ARGUMENT,
+      );
+    }
+    assert.throws(
+      () => unseal(token, secret, { clockSkew: 5 }),
+      err => err.code === ErrorCode.TOKEN_EXPIRED,
     );
   });
 });

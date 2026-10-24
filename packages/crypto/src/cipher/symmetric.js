@@ -4,6 +4,7 @@ import { assertBytes, assertBytesOrString, assertObject, assertString } from '..
 
 import { assertKeyObject } from '../internal/validate.js';
 import { toBuffer } from '../internal/bytes.js';
+import { decodeStrict } from '../internal/token-encoding.js';
 import { SYMMETRIC, SYMMETRIC_ALGOS } from './algorithms.js';
 
 /**
@@ -23,6 +24,22 @@ import { SYMMETRIC, SYMMETRIC_ALGOS } from './algorithms.js';
  * @property {SymmetricAlgorithm} [algo='aes-256-gcm']
  * @property {string | Buffer | Uint8Array} [aad]  Additional authenticated data (AEAD modes only).
  */
+
+/**
+ * AAD is only bound by an AEAD mode. CBC has no tag, so an `aad` there
+ * would be silently ignored — the caller would believe the ciphertext is
+ * tied to a context it is not tied to.
+ *
+ * @param {{ algo: string, spec: { mode: string } }} spec
+ */
+function assertAadSupported(spec) {
+  if (spec.spec.mode !== 'aead') {
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `options.aad is only supported by AEAD algorithms; ${spec.algo} cannot authenticate it`,
+    );
+  }
+}
 
 /**
  * Encrypt `data` with a symmetric key.
@@ -59,6 +76,7 @@ export function encryptSymmetric(data, key, options) {
   const spec = _resolveSymmetric(options);
   if (options?.aad !== undefined) {
     assertBytesOrString(options.aad, 'options.aad');
+    assertAadSupported(spec);
   }
 
   const iv = crypto.randomBytes(spec.spec.ivLength);
@@ -123,10 +141,29 @@ export function decryptSymmetric(ciphertext, key, options) {
   }
   if (options.aad !== undefined) {
     assertBytesOrString(options.aad, 'options.aad');
+    assertAadSupported(spec);
+  }
+
+  // A short tag is a weaker MAC: GCM happily verifies a 4-byte tag unless
+  // the expected length is pinned, giving a forger 2^32 instead of 2^128.
+  if (options.iv.length !== spec.spec.ivLength) {
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `options.iv must be ${spec.spec.ivLength} bytes for ${spec.algo}; got ${options.iv.length}`,
+    );
+  }
+  if (spec.spec.mode === 'aead' && options.tag.length !== spec.spec.tagLength) {
+    throw new CryptoError(
+      ErrorCode.DECRYPT_FAILED,
+      `authentication tag must be ${spec.spec.tagLength} bytes for ${spec.algo}; got ${options.tag.length}`,
+    );
   }
 
   try {
-    const decipher = crypto.createDecipheriv(spec.algo, key, options.iv);
+    const decipher =
+      spec.spec.mode === 'aead'
+        ? crypto.createDecipheriv(spec.algo, key, options.iv, { authTagLength: spec.spec.tagLength })
+        : crypto.createDecipheriv(spec.algo, key, options.iv);
     if (spec.spec.mode === 'aead') {
       decipher.setAuthTag(options.tag);
       if (options.aad !== undefined) {
@@ -189,7 +226,7 @@ export function encryptToString(data, key, options) {
 export function decryptFromString(token, key, options) {
   assertString(token, 'token');
   const spec = _resolveSymmetric(options);
-  const packed = Buffer.from(token, 'base64url');
+  const packed = decodeStrict(token, ErrorCode.INVALID_CIPHERTEXT);
   const minLen = spec.spec.ivLength + spec.spec.tagLength;
   if (packed.length < minLen) {
     throw new CryptoError(

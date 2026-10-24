@@ -178,7 +178,9 @@ decryptSymmetric(ciphertext: Buffer | Uint8Array,
 ```
 
 Reverse of the above. Throws `CryptoError(DECRYPT_FAILED)` on any authentication failure — wrong key, tampered bytes,
-wrong AAD.
+wrong AAD, or a tag shorter than the algorithm's full 16 bytes (a truncated GCM tag is never accepted). `aad` is only
+valid with an AEAD algorithm; passing it with `aes-256-cbc` is `INVALID_ARGUMENT` rather than silently unbound.
+`decryptFromString` accepts only the canonical unpadded base64url token.
 
 ```js
 try {
@@ -223,7 +225,8 @@ decryptWithPassphrase(token:      string,
                       options?:   PassphraseOptions): Promise<Buffer>
 
 interface PassphraseOptions {
-  iterations?: number                                  // default 210_000 (OWASP)
+  iterations?: number                                  // default 210_000 (OWASP); encryption refuses less than the
+                                                       // floor for the digest: SHA-512 210k, SHA-256 / SHA-384 600k
   kdf?:        'sha256' | 'sha384' | 'sha512'          // default 'sha512'
   encoding?:   'hex' | 'base64url'                     // default 'base64url'
 }
@@ -260,7 +263,7 @@ seal(payload: any,
 unseal(token:  string,
        secret: string | Buffer | Uint8Array
              | Array<string | Buffer | Uint8Array>,   // for rotation — [newest, …older]
-       options?: { now?: number, clockSkew?: number }
+       options?: { now?: number, clockSkew?: number }   // clockSkew: non-negative finite seconds
       ): { payload: any, expiresAt: number }
 
 interface SealOptions {
@@ -270,7 +273,9 @@ interface SealOptions {
 ```
 
 Encrypt and time-stamp a payload into a short opaque token, suitable for password-reset links, email-verification codes,
-magic-link tokens, or any single-use ticket that needs to expire on its own.
+magic-link tokens, or any single-use ticket that needs to expire on its own. Every secret must be at least **32 bytes**
+(`crypto.randomBytes(32)`), and a token has exactly one valid spelling — padded, whitespace-wrapped or otherwise
+non-canonical variants are `TOKEN_MALFORMED`.
 
 ```js
 // Mint a 1-hour password-reset ticket

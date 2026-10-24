@@ -49,6 +49,7 @@ suspicious activity) is a **denial or an event**, not a throw. See
 | `INVALID_TOKEN`     | 401  | Sealed cookie failed authentication (tampered bytes, wrong secret, wrong shape), or the call requires a valid session on the request and there isn't one (`rotate`, `markFresh`, `impersonate`'s admin check, `upgrade`). |
 | `EXPIRED`           | 401  | Absolute TTL passed — thrown only from `decodeToken` directly; the higher-level `verify(req)` returns `null` instead. |
 | `SESSION_NOT_FOUND` | 401  | Concurrent rotate already consumed the sid, or a store dropout.                             |
+| `FORBIDDEN`         | 403  | `impersonationAuthorize` refused the impersonation.                                          |
 
 ## `status` field
 

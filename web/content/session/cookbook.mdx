@@ -166,6 +166,7 @@ const sessions = createSessionManager({
   secret, ttl: '7d', idleTtl: '30m',
   impersonation: true,
   impersonationTtl: '15m',                 // short window on purpose
+  impersonationAuthorize: ({ admin }) => supportTeam.has(admin.userId),
   events: {
     onIssue: session => {
       if (session.impersonatedBy) {

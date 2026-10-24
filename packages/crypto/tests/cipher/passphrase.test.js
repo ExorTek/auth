@@ -6,7 +6,8 @@ import { CryptoError, ErrorCode } from '../../src/errors.js';
 
 // Use a small iteration count throughout to keep the test suite fast; the
 // pipeline is identical to production-grade values.
-const FAST = { iterations: 1000 };
+// The minimum PBKDF2-SHA512 cost new tokens may be minted with.
+const FAST = { iterations: 210_000 };
 
 describe('cipher.encryptWithPassphrase / decryptWithPassphrase', () => {
   it('round-trips a UTF-8 string', async () => {
@@ -49,17 +50,17 @@ describe('cipher.encryptWithPassphrase / decryptWithPassphrase', () => {
   });
 
   it('rejects mismatched iteration count at decrypt', async () => {
-    const t = await encryptWithPassphrase('secret', 'pw', { iterations: 1000 });
+    const t = await encryptWithPassphrase('secret', 'pw', { iterations: 210_000 });
     await assert.rejects(
-      () => decryptWithPassphrase(t, 'pw', { iterations: 2000 }),
+      () => decryptWithPassphrase(t, 'pw', { iterations: 210_001 }),
       err => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
     );
   });
 
   it('rejects mismatched kdf digest at decrypt', async () => {
-    const t = await encryptWithPassphrase('secret', 'pw', { ...FAST, kdf: 'sha256' });
+    const t = await encryptWithPassphrase('secret', 'pw', { iterations: 600_000, kdf: 'sha256' });
     await assert.rejects(
-      () => decryptWithPassphrase(t, 'pw', { ...FAST, kdf: 'sha512' }),
+      () => decryptWithPassphrase(t, 'pw', { iterations: 600_000, kdf: 'sha512' }),
       err => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
     );
   });
@@ -96,5 +97,18 @@ describe('cipher.encryptWithPassphrase / decryptWithPassphrase', () => {
         err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
       );
     }
+  });
+});
+
+describe('encryptWithPassphrase — iteration floor', () => {
+  it('refuses PBKDF2 iterations below the OWASP floor for the digest', async () => {
+    await assert.rejects(
+      encryptWithPassphrase('x', 'pw', { iterations: 1 }),
+      err => err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+    await assert.rejects(
+      encryptWithPassphrase('x', 'pw', { kdf: 'sha256', iterations: 210_000 }),
+      err => err.code === ErrorCode.INVALID_ARGUMENT,
+    );
   });
 });

@@ -64,3 +64,26 @@ test('extraClaims cannot clobber the reserved uid/iat/exp fields', () => {
   assert.equal(td.verify(mkReq(`__Host-td=${encodeURIComponent(cookieVal)}`), 'u1'), true);
   assert.equal(td.verify(mkReq(`__Host-td=${encodeURIComponent(cookieVal)}`), 'attacker'), false);
 });
+
+test('createTrustedDeviceCookie rejects an empty or short secret', () => {
+  for (const secret of ['', Buffer.alloc(0), 'short']) {
+    assert.throws(
+      () => createTrustedDeviceCookie({ secret, ttl: '30d' }),
+      err => err.code === 'INVALID_ARGUMENT',
+    );
+  }
+});
+
+test('revokedBefore invalidates cookies issued before a cutoff', () => {
+  const cutoffs = new Map();
+  const td = createTrustedDeviceCookie({
+    secret: 'x'.repeat(32),
+    ttl: '30d',
+    revokedBefore: userId => cutoffs.get(userId),
+  });
+  const cookie = td.issue('u1', { now: 1_000 }).split(';')[0];
+  const req = { headers: { cookie } };
+  assert.equal(td.verify(req, 'u1', { now: 2_000 }), true);
+  cutoffs.set('u1', 1_500); // "forget all devices"
+  assert.equal(td.verify(req, 'u1', { now: 2_000 }), false);
+});

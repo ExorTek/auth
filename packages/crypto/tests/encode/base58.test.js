@@ -102,3 +102,14 @@ describe('decode.base58', () => {
     assert.fail('expected throw');
   });
 });
+
+describe('base58.decode — length cap', () => {
+  it('refuses input over the limit before doing any work', () => {
+    assert.throws(
+      () => decode('2'.repeat(1025)),
+      err => err.code === ErrorCode.INVALID_ENCODING,
+    );
+    assert.ok(decode('2'.repeat(1024)).length > 0);
+    assert.ok(decode('2'.repeat(2000), { maxLength: 2000 }).length > 0);
+  });
+});

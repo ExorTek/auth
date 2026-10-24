@@ -167,3 +167,30 @@ describe('cipher encryptToString / decryptFromString', () => {
     );
   });
 });
+
+describe('decryptSymmetric — truncated tags', () => {
+  it('rejects an AEAD tag shorter than the full length', async () => {
+    for (const algo of ['aes-256-gcm', 'chacha20-poly1305']) {
+      const key = await cipher.generateKey(algo);
+      const { ciphertext, iv, tag } = encryptSymmetric('hello', key, { algo });
+      for (const len of [4, 8, 12, 15]) {
+        assert.throws(
+          () => decryptSymmetric(ciphertext, key, { algo, iv, tag: tag.subarray(0, len) }),
+          err => err instanceof CryptoError && err.code === ErrorCode.DECRYPT_FAILED,
+          `${algo} ${len}-byte tag`,
+        );
+      }
+      assert.equal(decryptSymmetric(ciphertext, key, { algo, iv, tag }).toString(), 'hello');
+    }
+  });
+});
+
+describe('symmetric — AAD on a non-AEAD mode', () => {
+  it('refuses aad with aes-256-cbc instead of ignoring it', async () => {
+    const key = await cipher.generateKey('aes-256-cbc');
+    assert.throws(
+      () => encryptSymmetric('x', key, { algo: 'aes-256-cbc', aad: 'ctx' }),
+      err => err instanceof CryptoError && err.code === ErrorCode.INVALID_ARGUMENT,
+    );
+  });
+});
