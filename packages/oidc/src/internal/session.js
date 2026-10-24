@@ -16,6 +16,11 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import { encode as base64urlEncode } from '@exortek/shared/base64url';
 
+import { invalidArgument } from './errors.js';
+
+// RFC 6265 §4.1.1 cookie-name = token (RFC 2616 §2.2).
+const COOKIE_NAME_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
 /**
  * Compute a `session_state` value (OIDC Session Management §4.2):
  * `base64url(sha256(client_id + " " + origin + " " + op_browser_state + " " +
@@ -42,19 +47,23 @@ export function computeSessionState(input) {
  */
 export function checkSessionIframeHtml(options = {}) {
   const cookieName = options.cookieName ?? 'op_browser_state';
-  // The cookie name is the only injected value; JSON.stringify keeps it a safe
-  // string literal inside the script.
-  const cookieLiteral = JSON.stringify(cookieName);
+  // The cookie name is the only injected value. Restricting it to an
+  // RFC 6265 token keeps `<`, quotes and whitespace out of the script
+  // entirely, and it is regex-escaped before it reaches `new RegExp`.
+  if (!COOKIE_NAME_TOKEN.test(cookieName)) {
+    invalidArgument('session.cookieName must be an RFC 6265 cookie-name token.');
+  }
+  const cookieLiteral = JSON.stringify(cookieName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>check_session_iframe</title></head>
 <body>
 <script>
 (function () {
-  var COOKIE_NAME = ${cookieLiteral};
+  var COOKIE_NAME_PATTERN = ${cookieLiteral};
 
   function opBrowserState() {
-    var match = document.cookie.match(new RegExp('(?:^|; )' + COOKIE_NAME + '=([^;]*)'));
+    var match = document.cookie.match(new RegExp('(?:^|; )' + COOKIE_NAME_PATTERN + '=([^;]*)'));
     return match ? decodeURIComponent(match[1]) : '';
   }
 
