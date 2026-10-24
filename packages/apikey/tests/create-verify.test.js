@@ -288,3 +288,15 @@ test('verifyApiKey: a wrong secret learns nothing about lifecycle state', async 
   assert.equal((await verifyApiKey(forged, { store, peppers: [pepper] })).reason, 'bad_secret');
   assert.equal((await verifyApiKey(key, { store, peppers: [pepper] })).reason, 'revoked');
 });
+
+test('verifyApiKey: only the canonical spelling of a key verifies', async () => {
+  const store = newStore();
+  const pepper = randomBytes(32);
+  const { key } = await createApiKey({ store, prefix: 'sk_live', userId: 'u', scopes: ['read'], peppers: [pepper] });
+  const cut = key.lastIndexOf('_') + 1;
+  const lower = key.slice(0, cut) + key.slice(cut).toLowerCase();
+  if (lower !== key) {
+    assert.equal((await verifyApiKey(lower, { store, peppers: [pepper] })).valid, false);
+  }
+  assert.equal((await verifyApiKey(key, { store, peppers: [pepper] })).valid, true);
+});
