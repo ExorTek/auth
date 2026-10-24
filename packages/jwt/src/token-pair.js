@@ -8,7 +8,7 @@
  * Subpath entry point (`@exortek/jwt/token-pair`).
  */
 
-import { randomBytes } from 'node:crypto';
+import { KeyObject, randomBytes } from 'node:crypto';
 
 import { isFunction, isNumber, isString } from '@exortek/shared/predicates';
 
@@ -254,12 +254,45 @@ function _assertCreateOptions(options) {
   if (options.refresh.opaque === false && typeof options.refresh.alg !== 'string') {
     throw invalidArgument('tokenPair.options.refresh.alg is required when refresh.opaque is false');
   }
+  // A signed refresh token under the access key is also a valid access
+  // token to any verifier holding that key — the two must not share one.
+  if (options.refresh.opaque === false && sameKey(options.secret.access, options.secret.refresh)) {
+    throw invalidArgument(
+      'tokenPair.options.secret.refresh must differ from secret.access when refresh.opaque is false',
+    );
+  }
   if (options.refresh.expiresIn === undefined) {
     throw invalidArgument('tokenPair.options.refresh.expiresIn is required');
   }
   if (options.refresh.store == null || typeof options.refresh.store.add !== 'function') {
     throw invalidArgument('tokenPair.options.refresh.store must implement the Store shape');
   }
+}
+
+/**
+ * Whether two key inputs are the same key material.
+ *
+ * @param {unknown} a
+ * @param {unknown} b
+ * @returns {boolean}
+ */
+function sameKey(a, b) {
+  if (a === b) {
+    return true;
+  }
+  if (a instanceof KeyObject && b instanceof KeyObject) {
+    return a.equals(b);
+  }
+  const bytes = v => (isString(v) ? Buffer.from(v, 'utf8') : v instanceof Uint8Array ? Buffer.from(v) : null);
+  const x = bytes(a);
+  const y = bytes(b);
+  if (x && y) {
+    return x.equals(y);
+  }
+  if (a !== null && b !== null && typeof a === 'object' && typeof b === 'object') {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+  return false;
 }
 
 /**
@@ -285,8 +318,11 @@ async function _generateRefresh(refresh, payload, secret, expiresAtSec) {
   let plaintext;
   if (refresh.opaque === false) {
     // JWT refresh: sign a small payload containing the family reference
+    // Explicitly typed (RFC 8725 §3.11) so a verifier with a `typ`
+    // allowlist can never mistake it for an access token.
     const signed = await sign({ ...payload, kind: 'refresh' }, secret, {
       alg: refresh.alg,
+      typ: 'refresh+jwt',
       expiresIn: expiresAtSec - Math.floor(Date.now() / 1000),
     });
     plaintext = isString(signed) ? signed : signed.token;
