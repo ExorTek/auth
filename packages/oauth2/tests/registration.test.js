@@ -158,3 +158,17 @@ test('registration.allowedGrants opts a deployment into more grants', async () =
   );
   assert.equal(tok.scope, 'read');
 });
+
+test('a registered redirect_uri must be https, loopback http, or a private-use scheme', async () => {
+  const { server } = buildRegistrationServer({ initialAccessToken: IAT });
+  const auth = { authorization: `Bearer ${IAT}` };
+  for (const uri of ['javascript:alert(1)', 'http://evil.example/cb', 'https://c.example.com/cb#frag', 'myapp:/cb']) {
+    const res = await server.register(jsonPost({ redirect_uris: [uri] }, auth));
+    assert.equal(res.status, 400, uri);
+    assert.equal(body(res).error, 'invalid_client_metadata', uri);
+  }
+  for (const uri of ['http://127.0.0.1:8080/cb', 'com.example.app:/oauth/cb']) {
+    const res = await server.register(jsonPost({ redirect_uris: [uri] }, auth));
+    assert.equal(res.status, 201, uri);
+  }
+});
