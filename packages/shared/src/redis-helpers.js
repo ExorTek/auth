@@ -75,6 +75,7 @@ export function evalScript(client, script, keys, args, dialect = detectDialect(c
  *   setWithTTL: (key: string, value: string, ttlMs: number) => Promise<void>,
  *   setPlain: (key: string, value: string) => Promise<void>,
  *   setKeepTTL: (key: string, value: string) => Promise<void>,
+ *   setIfAbsent: (key: string, value: string, ttlMs: number) => Promise<boolean>,
  *   parseRecord: (raw: string|object|null) => object|null,
  * }}
  */
@@ -153,6 +154,18 @@ export function createRedisHelpers(client) {
       } else {
         await client.set(key, value, { KEEPTTL: true });
       }
+    },
+
+    // Atomic claim: `SET key value PX ttl NX`. Resolves true when this call
+    // created the key, false when it already existed — a cross-process
+    // compare-and-set for "only the first caller wins".
+    async setIfAbsent(key, value, ttlMs) {
+      const px = Math.max(1, Math.ceil(ttlMs));
+      const reply =
+        dialect === 'ioredis'
+          ? await client.set(key, value, 'PX', px, 'NX')
+          : await client.set(key, value, { PX: px, NX: true });
+      return reply === 'OK';
     },
 
     parseRecord(raw) {
