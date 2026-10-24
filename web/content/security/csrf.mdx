@@ -158,7 +158,7 @@ Middleware options:
 | Option             | Default                                               | What                                                 |
 | ------------------ | ----------------------------------------------------- | ---------------------------------------------------- |
 | `secret`           | _required_                                            | ≥ 32 bytes                                           |
-| `cookieName`       | `'__Host-csrf'`                                       | Set-Cookie name (strip `__Host-` for local http dev) |
+| `cookieName`       | `'__Host-csrf'`                                       | Set-Cookie name. Without the `__Host-` prefix a sibling subdomain can plant a valid token pair, so the middleware warns (`EXORTEK_SECURITY_CSRF_COOKIE_PREFIX`) — keep it in production or bind tokens with `generateForSession` |
 | `headerName`       | `'x-csrf-token'`                                      | Header the client submits                            |
 | `ignoreMethods`    | `['GET','HEAD','OPTIONS']`                            | Methods NOT verified                                 |
 | `cookieOptions`    | `{ httpOnly, secure, sameSite: 'strict', path: '/' }` | Override individual flags                            |

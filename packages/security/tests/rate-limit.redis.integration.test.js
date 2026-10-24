@@ -53,6 +53,30 @@ forEachRedisDriver('security rate-limit redis store', ({ test, client, ns, raw, 
     assert.equal(c.count, 2);
   });
 
+  test('set stores the value with its TTL on every driver', async () => {
+    const prefix = ns('set');
+    const store = rateLimit.stores.redis(client(), { prefix });
+    await store.set('k', 1, 5000);
+    const pttl = await raw.pttl(`${prefix}k`);
+    assert.ok(pttl > 0 && pttl <= 5000, `set must keep its TTL; got PTTL ${pttl} (-1 means none)`);
+    const got = await store.get('k');
+    assert.ok(got && got.expiresAt > Date.now());
+  });
+
+  test('withBan bans after the threshold on every driver', async () => {
+    const store = rateLimit.stores.redis(client(), { prefix: ns('ban') });
+    const limiter = rateLimit.withBan(rateLimit.fixed({ requests: 1, window: '2s', store }), {
+      store,
+      threshold: 1,
+      banDuration: '1m',
+    });
+    assert.equal((await limiter.check({ key: 'ip' })).allowed, true);
+    assert.equal((await limiter.check({ key: 'ip' })).allowed, false); // trips the ban
+    const banned = await limiter.check({ key: 'ip' });
+    assert.equal(banned.allowed, false);
+    assert.ok(banned.retryAfter > 2, 'the ban window, not the base window, should drive Retry-After');
+  });
+
   test('read returns null for missing keys', async () => {
     const store = rateLimit.stores.redis(client(), { prefix: ns('miss') });
     assert.equal(await store.read('nope'), null);

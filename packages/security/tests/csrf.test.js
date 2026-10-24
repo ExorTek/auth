@@ -131,3 +131,15 @@ test('session-bound generate throws on empty sessionId', () => {
   assert.throws(() => generateForSession('', SECRET));
   assert.throws(() => generateForSession(123, SECRET));
 });
+
+test('csrf middleware warns when the cookie name drops the __Host- prefix', async () => {
+  const { normalizeCsrf } = await import('../src/middleware/core.js');
+  const warnings = [];
+  const onWarning = w => warnings.push(w.code);
+  process.on('warning', onWarning);
+  normalizeCsrf({ secret: 'x'.repeat(32), cookieName: 'csrf' });
+  normalizeCsrf({ secret: 'x'.repeat(32) });
+  await new Promise(r => setImmediate(r));
+  process.off('warning', onWarning);
+  assert.deepEqual(warnings, ['EXORTEK_SECURITY_CSRF_COOKIE_PREFIX']);
+});

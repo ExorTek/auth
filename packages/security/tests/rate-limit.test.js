@@ -684,3 +684,30 @@ test('tokenBucket: still works on stores without compareAndSet (fallback path)',
   assert.equal((await limiter.check({ key: 'u' })).allowed, false);
   base._stop();
 });
+
+test('token / leaky bucket: polling every millisecond does not speed up the refill', async () => {
+  for (const algo of ['tokenBucket', 'leakyBucket']) {
+    const realNow = Date.now;
+    let now = 1_000_000;
+    Date.now = () => now;
+    const store = rateLimit.stores.memory();
+    try {
+      const rate = 0.6;
+      const lim = rateLimit[algo](
+        algo === 'tokenBucket' ? { capacity: 1, refillRate: rate, store } : { capacity: 1, leakRate: rate, store },
+      );
+      let allowed = 0;
+      for (let t = 0; t < 20_000; t++) {
+        if ((await lim.check({ key: 'k' })).allowed) {
+          allowed++;
+        }
+        now += 1;
+      }
+      // 1 initial + 0.6/s over 20 s.
+      assert.ok(allowed <= 13, `${algo}: ${allowed} allowed in 20 s at 0.6/s`);
+    } finally {
+      Date.now = realNow;
+      store._stop();
+    }
+  }
+});

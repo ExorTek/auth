@@ -77,7 +77,7 @@ Sync predicates keep `check()` synchronous — no allocation, no `await`. Async 
 
 ```ts
 cors({
-  origin?:          boolean | string | RegExp
+  origin?:          boolean | string | RegExp      // RegExp: anchor it with ^…$; g / y flags are ignored
                     | Array<string | RegExp>
                     | ((origin: string | undefined) => boolean | Promise<boolean>),
   methods?:         string | string[],   // default: GET,HEAD,PUT,PATCH,POST,DELETE

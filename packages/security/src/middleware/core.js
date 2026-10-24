@@ -1,5 +1,7 @@
 import { parseCookies as sharedParseCookies, serialiseCookie as sharedSerialiseCookie } from '@exortek/shared/cookie';
-import { isBuffer, isFunction, isObject, isString } from '@exortek/shared/predicates';
+import { isIP } from 'node:net';
+
+import { isBuffer, isFunction, isInteger, isObject, isString } from '@exortek/shared/predicates';
 
 import { cors as buildCorsCheck } from '../cors/index.js';
 import { headers as buildHeaders } from '../headers/index.js';
@@ -26,14 +28,18 @@ import { invalidArgument } from '../internal/guards.js';
  * @property {{ check: Function }} limiter
  * @property {(req: unknown) => string | undefined} [keyGenerator]
  * @property {(req: unknown, res: unknown, result: object) => unknown} [onDenied]
- * @property {boolean} [trustProxy=false]
- *   Whether the default key generator may read the client IP from the
- *   `X-Forwarded-For` header. That header is client-controlled, so trusting
- *   it without a proxy in front lets an attacker rotate it to mint unlimited
- *   rate-limit buckets (limit bypass) or spoof another user's IP. Leave
- *   `false` unless your app sits behind a proxy/CDN that overwrites XFF.
- *   Ignored when `keyGenerator` is supplied. (Express adapter uses `req.ip`,
- *   which already honours the framework's own `trust proxy` setting.)
+ * @property {'shared' | 'deny'} [onMissingKey='shared']
+ *   What to do when no key can be derived (no client IP, or `keyGenerator`
+ *   returned nothing). `'shared'` counts every such request against one
+ *   common bucket; `'deny'` answers 429. Never unlimited.
+ * @property {number} [ipv6Subnet=64]
+ *   The default key groups IPv6 clients by this prefix length — one host
+ *   usually owns a whole /64, so a per-address key lets it rotate through
+ *   2^64 buckets.
+ *
+ * The default key is the framework's client IP (`req.ip` / `request.ip`),
+ * which honours the framework's own trust-proxy setting — configure proxy
+ * trust there (Express `app.set('trust proxy', …)`, Fastify `trustProxy`).
  */
 
 /**
@@ -68,6 +74,17 @@ function assertCsrfSecret(secret) {
  */
 export function normalizeCsrf(options) {
   assertCsrfSecret(options.secret);
+  const cookieName = options.cookieName ?? '__Host-csrf';
+  if (!cookieName.startsWith('__Host-')) {
+    // The signed double-submit token is not bound to a session; what stops
+    // an attacker planting their own valid cookie+token pair is the
+    // __Host- prefix (no Domain, Secure, Path=/ — unwritable from a
+    // sibling subdomain or over plain http).
+    process.emitWarning(
+      `csrf.cookieName ${JSON.stringify(cookieName)} lacks the __Host- prefix; a sibling subdomain can then plant a valid token. Keep __Host- or bind tokens to the session with csrf.generateForSession().`,
+      { code: 'EXORTEK_SECURITY_CSRF_COOKIE_PREFIX' },
+    );
+  }
   return {
     secret: options.secret,
     cookieName: options.cookieName ?? '__Host-csrf',
@@ -89,11 +106,27 @@ export function normalizeRateLimit(options) {
       'rateLimit.limiter must be a compiled limiter (e.g. rateLimit.sliding({...})).',
     );
   }
+  if (options.trustProxy !== undefined) {
+    // Never read: the client IP comes from the framework, which owns proxy
+    // trust. Failing loudly beats letting callers believe it does something.
+    throw invalidArgument(
+      "rateLimit.trustProxy is not supported — configure your framework's trust-proxy setting instead",
+    );
+  }
+  const onMissingKey = options.onMissingKey ?? 'shared';
+  if (onMissingKey !== 'shared' && onMissingKey !== 'deny') {
+    throw invalidArgument("rateLimit.onMissingKey must be 'shared' or 'deny'");
+  }
+  const ipv6Subnet = options.ipv6Subnet ?? 64;
+  if (!isInteger(ipv6Subnet) || ipv6Subnet < 1 || ipv6Subnet > 128) {
+    throw invalidArgument('rateLimit.ipv6Subnet must be an integer between 1 and 128');
+  }
   return {
     limiter: options.limiter,
     keyGenerator: options.keyGenerator,
     onDenied: options.onDenied,
-    trustProxy: options.trustProxy === true,
+    onMissingKey,
+    ipv6Subnet,
     headers: normalizeRateLimitHeaders(options.headers ?? 'legacy'),
   };
 }
@@ -338,15 +371,71 @@ export async function runCors(corsCheck, ctx, staticHeaders = null) {
   return null;
 }
 
+const MISSING_KEY = '__unattributed__';
+
+/**
+ * The default rate-limit key: the client IP, with IPv6 addresses reduced to
+ * their `/subnet` prefix (IPv4-mapped IPv6 is treated as IPv4).
+ *
+ * @param {string | undefined} ip
+ * @param {number} subnet
+ * @returns {string | undefined}
+ */
+export function ipKey(ip, subnet) {
+  if (!isString(ip) || ip.length === 0) {
+    return undefined;
+  }
+  const addr = ip.replace(/%.*$/, '');
+  const mapped = addr.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  if (mapped) {
+    return mapped[1];
+  }
+  if (isIP(addr) !== 6) {
+    return addr;
+  }
+  const groups = expandIpv6(addr);
+  let bits = subnet;
+  const out = groups.map(group => {
+    const keep = Math.max(0, Math.min(16, bits));
+    bits -= 16;
+    const mask = keep === 0 ? 0 : (0xffff << (16 - keep)) & 0xffff;
+    return (group & mask).toString(16);
+  });
+  return `${out.join(':')}/${subnet}`;
+}
+
+/**
+ * @param {string} addr  a valid IPv6 address
+ * @returns {number[]}    eight 16-bit groups
+ */
+function expandIpv6(addr) {
+  let text = addr;
+  // An embedded dotted IPv4 tail (e.g. ::1.2.3.4) becomes two groups.
+  const v4 = text.match(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (v4) {
+    const [a, b, c, d] = v4.slice(1).map(Number);
+    text = `${text.slice(0, -v4[0].length)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const [head, tail] = text.split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail !== undefined && tail.length > 0 ? tail.split(':') : [];
+  const fill = tail === undefined ? [] : new Array(8 - left.length - right.length).fill('0');
+  return [...left, ...fill, ...right].map(h => Number.parseInt(h, 16));
+}
+
 /**
  * @param {ReturnType<typeof normalizeRateLimit>} rateLimit
  * @param {AdapterContext} ctx
  * @returns {Promise<unknown>}
  */
 export async function runRateLimit(rateLimit, ctx) {
-  const key = rateLimit.keyGenerator ? rateLimit.keyGenerator(ctx.rawReq()) : ctx.ip();
-  if (!key) {
-    return null;
+  let key = rateLimit.keyGenerator ? rateLimit.keyGenerator(ctx.rawReq()) : ipKey(ctx.ip(), rateLimit.ipv6Subnet);
+  if (!isString(key) || key.length === 0) {
+    // Fail closed: a request we cannot attribute is still limited.
+    if (rateLimit.onMissingKey === 'deny') {
+      return ctx.json(429, { error: 'RateLimited', message: 'Request could not be attributed to a client' });
+    }
+    key = MISSING_KEY;
   }
   const result = await rateLimit.limiter.check({ key });
   const hn = rateLimit.headers;

@@ -144,7 +144,8 @@ if (!isSameOrigin(req.headers.referer, 'https://app.example.com')) {
 
 Complements [`checkOrigin`](/security/helpers#checkorigin), which reads `Origin` / `Referer` headers off a request.
 `isSameOrigin` is the primitive both callers land on when they need direct URL-to-URL comparison — OAuth callback
-validation, Referer-based flow checks, allowlist-of-one matching.
+validation, Referer-based flow checks, allowlist-of-one matching. Opaque origins (`javascript:`, `data:`, `file:`,
+custom schemes) all serialize as `'null'`, so they never compare as the same origin.
 
 ## A worked example
 

@@ -199,6 +199,10 @@ bucket for all clients.
   </Tabs.Tab>
 </Tabs>
 
+The rate-limit middleware keys on that framework IP, so this is the one place proxy trust is configured (it has no
+`trustProxy` option of its own). Calling `getClientIp` directly? Its `proxyCount: N` means the same as
+`trust proxy: N`.
+
 **Test it:** with trust-proxy off, curl through your proxy — every request should see the same `req.ip`. With
 trust-proxy on, distinct callers should see distinct IPs.
 

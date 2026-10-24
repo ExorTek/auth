@@ -127,8 +127,9 @@ Both adapters accept the same `securityMiddleware(options)` shape:
   } | false,
   rateLimit?: {
     limiter:       Limiter,
-    keyGenerator?: (req) => string | undefined,
-    trustProxy?:   boolean,                        // default false
+    keyGenerator?: (req) => string | undefined,    // default: the framework's client IP
+    onMissingKey?: 'shared' | 'deny',              // default 'shared' — never unlimited
+    ipv6Subnet?:   number,                         // default 64 — IPv6 clients keyed by prefix
     onDenied?:     (req, res, result) => unknown,
     headers?:      'legacy' | 'draft' | false | {  // default 'legacy'
       remaining?:  string | false,                 // default 'X-RateLimit-Remaining'
@@ -138,6 +139,11 @@ Both adapters accept the same `securityMiddleware(options)` shape:
   } | false,
 }
 ```
+
+The default rate-limit key is the framework's client IP (`req.ip` / `request.ip`), so proxy trust is configured where
+the framework expects it (Express `app.set('trust proxy', …)`, Fastify `trustProxy`); passing `rateLimit.trustProxy`
+throws. A request with no derivable key is counted against one shared bucket (`onMissingKey: 'shared'`) or refused
+with 429 (`'deny'`). IPv6 clients are keyed by their `/64` so one host can't rotate through its prefix.
 
 Set any concern to `false` (or omit) to skip. The per-concern middlewares (`corsMiddleware`, `csrfMiddleware`,
 `rateLimitMiddleware`, `headersMiddleware`) accept just that concern's options directly, not nested.

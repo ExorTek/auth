@@ -156,3 +156,54 @@ test('express: securityMiddleware composes all four', async () => {
   assert.ok(r.headers['x-ratelimit-remaining']);
   store._stop();
 });
+
+test('express: an unattributable request is still rate-limited (shared bucket)', async () => {
+  const store = rateLimit.stores.memory();
+  const app = makeApp(a =>
+    a.use(
+      rateLimitMiddleware({
+        limiter: rateLimit.fixed({ requests: 1, window: '1m', store }),
+        keyGenerator: () => undefined,
+      }),
+    ),
+  );
+  assert.equal((await fetchTest(app, { path: '/ping' })).status, 200);
+  assert.equal((await fetchTest(app, { path: '/ping' })).status, 429);
+  store._stop();
+});
+
+test("express: onMissingKey 'deny' refuses an unattributable request", async () => {
+  const store = rateLimit.stores.memory();
+  const app = makeApp(a =>
+    a.use(
+      rateLimitMiddleware({
+        limiter: rateLimit.fixed({ requests: 10, window: '1m', store }),
+        keyGenerator: () => '',
+        onMissingKey: 'deny',
+      }),
+    ),
+  );
+  assert.equal((await fetchTest(app, { path: '/ping' })).status, 429);
+  store._stop();
+});
+
+test('express: IPv6 clients in one /64 share a bucket', async () => {
+  const store = rateLimit.stores.memory();
+  const app = makeApp(a =>
+    a.use(rateLimitMiddleware({ limiter: rateLimit.fixed({ requests: 1, window: '1m', store }) })),
+  );
+  const from = ip => fetchTest(app, { path: '/ping', headers: { 'x-forwarded-for': ip } });
+  assert.equal((await from('2001:db8:1:2::1')).status, 200);
+  assert.equal((await from('2001:db8:1:2::ffff')).status, 429);
+  assert.equal((await from('2001:db8:1:3::1')).status, 200);
+  store._stop();
+});
+
+test('express: the unused rateLimit.trustProxy option is refused', () => {
+  const store = rateLimit.stores.memory();
+  assert.throws(
+    () => rateLimitMiddleware({ limiter: rateLimit.fixed({ requests: 1, window: '1m', store }), trustProxy: true }),
+    /trust-proxy/,
+  );
+  store._stop();
+});

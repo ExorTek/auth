@@ -130,7 +130,9 @@ export const csrfPlugin = fastifyPlugin(
         "@exortek/security: csrf requires '@fastify/cookie' to be registered first. Do `await app.register(import('@fastify/cookie'))` before enabling CSRF.",
       );
     }
-    attachRunner(fastify, ctx => runCsrf(csrf, ctx));
+    // preHandler, not onRequest: the form-field token lives in the body,
+    // which Fastify has not parsed yet during onRequest.
+    attachRunner(fastify, ctx => runCsrf(csrf, ctx), 'preHandler');
   },
   { name: '@exortek/security/csrf', fastify: '>=4' },
 );
@@ -181,7 +183,7 @@ export const securityPlugin = fastifyPlugin(
           "@exortek/security: csrf requires '@fastify/cookie' to be registered first. Do `await app.register(import('@fastify/cookie'))` before enabling CSRF.",
         );
       }
-      attachRunner(fastify, ctx => runCsrf(cfg.csrf, ctx));
+      attachRunner(fastify, ctx => runCsrf(cfg.csrf, ctx), 'preHandler');
     }
   },
   { name: '@exortek/security', fastify: '>=4' },

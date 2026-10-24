@@ -1,5 +1,6 @@
 import { SecurityError, ErrorCode } from '../internal/errors.js';
 import { invalidArgument } from '../internal/guards.js';
+import { statelessPattern } from '../internal/patterns.js';
 import { isArray, isFunction, isNull, isNumber, isString, isUndefined } from '@exortek/shared/predicates';
 
 /**
@@ -87,7 +88,9 @@ function compileOriginCheck(origin) {
   if (isFunction(origin)) {
     return origin;
   }
-  const matchers = isArray(origin) ? origin : [origin];
+  const matchers = (isArray(origin) ? origin : [origin]).map(m =>
+    m instanceof RegExp ? statelessPattern(m, 'cors.origin') : m,
+  );
   return incoming => {
     if (!incoming) {
       return false;
@@ -172,6 +175,11 @@ export function cors(options = {}) {
     /** @type {Record<string, string>} */
     const headers = {};
     if (!allowed) {
+      // The answer depends on Origin whenever an allowlist decides it, so a
+      // shared cache must key the denial on it too.
+      if (!reflectAny) {
+        headers.Vary = 'Origin';
+      }
       return {
         headers,
         allowed: false,
