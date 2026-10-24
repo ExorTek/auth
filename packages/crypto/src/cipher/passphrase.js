@@ -17,6 +17,10 @@ const HEADER_LENGTH = SALT_LENGTH + IV_LENGTH + TAG_LENGTH;
 // KDF defaults — OWASP 2023 for PBKDF2-SHA512.
 const DEFAULT_ITERATIONS = 210_000;
 const DEFAULT_KDF_DIGEST = 'sha512';
+// OWASP Password Storage Cheat Sheet floors for PBKDF2 per digest. New
+// tokens may not be minted below them; decryption still honours whatever
+// the caller pins, so older low-iteration tokens remain readable.
+const MIN_ITERATIONS = Object.freeze({ sha256: 600_000, sha384: 600_000, sha512: 210_000 });
 
 /**
  * @typedef {object} PassphraseOptions
@@ -73,6 +77,13 @@ export async function encryptWithPassphrase(data, passphrase, options) {
 
   const iterations = options?.iterations ?? DEFAULT_ITERATIONS;
   const kdf = options?.kdf ?? DEFAULT_KDF_DIGEST;
+  const floor = MIN_ITERATIONS[/** @type {keyof typeof MIN_ITERATIONS} */ (kdf)] ?? MIN_ITERATIONS.sha256;
+  if (!Number.isSafeInteger(iterations) || iterations < floor) {
+    throw new CryptoError(
+      ErrorCode.INVALID_ARGUMENT,
+      `options.iterations must be an integer ≥ ${floor} for PBKDF2-${kdf.toUpperCase()}; got ${iterations}`,
+    );
+  }
   const encoding = options?.encoding ?? 'base64url';
   if (encoding !== 'hex' && encoding !== 'base64url') {
     throw new CryptoError(
