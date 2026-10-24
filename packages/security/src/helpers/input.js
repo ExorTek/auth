@@ -135,6 +135,11 @@ export function sanitizeParams(query, options = {}) {
   /** @type {Record<string, unknown>} */
   const out = {};
   for (const key of keys) {
+    // Same rule as sanitizeBody: prototype-pollution keys never survive,
+    // so `out[key] = …` can't rewrite the result's prototype.
+    if (PROTO_KEYS.has(key)) {
+      continue;
+    }
     const v = query[key];
     if (!isArray(v)) {
       out[key] = v;

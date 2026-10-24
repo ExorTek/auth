@@ -585,3 +585,11 @@ test('checkOrigin: a /g allowlist pattern is stateless', () => {
   assert.equal(checkOrigin(req, opts), true);
   assert.equal(checkOrigin(req, opts), true);
 });
+
+test('sanitizeParams: a __proto__ key cannot rewrite the result prototype', () => {
+  const query = JSON.parse('{"__proto__": {"isAdmin": true}, "constructor": "x", "a": ["1", "2"]}');
+  const out = sanitizeParams(query);
+  assert.equal(out.isAdmin, undefined);
+  assert.equal(Object.getPrototypeOf(out), Object.prototype);
+  assert.deepEqual(Object.keys(out), ['a']);
+});
