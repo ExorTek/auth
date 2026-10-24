@@ -271,3 +271,22 @@ async function _hashOf(refreshToken) {
   const { createHash } = await import('node:crypto');
   return createHash('sha256').update(refreshToken).digest('hex');
 }
+
+test('create: a signed refresh token is typed refresh+jwt and needs its own key', async () => {
+  const store = createStore('memory', { gc: { strategy: 'lazy' } });
+  const base = {
+    access: { alg: 'HS256', expiresIn: '15m' },
+    refresh: { opaque: false, alg: 'HS256', expiresIn: '7d', store },
+  };
+  await assert.rejects(
+    create({ sub: 'u1' }, { ...base, secret: { access: ACCESS_SECRET, refresh: Buffer.from(ACCESS_SECRET) } }),
+    err => err instanceof JwtError && err.code === ErrorCode.INVALID_ARGUMENT,
+  );
+
+  const res = await create({ sub: 'u1' }, { ...base, secret: { access: ACCESS_SECRET, refresh: REFRESH_SECRET } });
+  const header = JSON.parse(Buffer.from(res.refreshToken.split('.')[0], 'base64url').toString());
+  assert.equal(header.typ, 'refresh+jwt');
+  // The refresh token is not an access token under the access key.
+  await assert.rejects(verify(res.refreshToken, ACCESS_SECRET, { alg: ['HS256'] }));
+  store._stop();
+});

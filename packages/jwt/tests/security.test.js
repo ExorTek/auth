@@ -189,3 +189,10 @@ test('DoS: token above maxTokenSize refused before parsing', async () => {
     err => err.code === ErrorCode.TOKEN_TOO_LARGE,
   );
 });
+
+test('HS256 with a public-key PEM fails with INVALID_KEY, not a TypeError', async () => {
+  const { publicKey } = (await import('node:crypto')).generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const pem = publicKey.export({ type: 'spki', format: 'pem' });
+  const forged = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ4In0.c2ln';
+  await assert.rejects(verify(forged, pem, { alg: ['HS256'] }), err => err.code === 'INVALID_KEY');
+});

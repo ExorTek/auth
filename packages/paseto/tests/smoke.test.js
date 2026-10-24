@@ -30,16 +30,23 @@ test('SUPPORTED lists the curated v4 set and nothing else', () => {
 
 // KEY GENERATION
 
-test('generateKey returns a 32-byte symmetric key', () => {
-  assert.equal(generateKey().length, 32);
+test('generateKey returns a typed v4 local key (32 bytes)', () => {
+  const key = generateKey();
+  assert.equal(key.version, 'v4');
+  assert.equal(key.purpose, 'local');
+  assert.equal(key.export().length, 32);
 });
 
-test('generateKeyPair returns raw Ed25519 keys (64B secret ‖ 32B public)', () => {
+test('generateKeyPair returns typed Ed25519 keys (64B secret ‖ 32B public)', () => {
   const { secretKey, publicKey } = generateKeyPair();
-  assert.equal(secretKey.length, 64);
-  assert.equal(publicKey.length, 32);
+  assert.equal(secretKey.purpose, 'secret');
+  assert.equal(publicKey.purpose, 'public');
+  assert.equal(secretKey.export().length, 64);
+  assert.equal(publicKey.export().length, 32);
   // secretKey is seed ‖ public
-  assert.ok(secretKey.subarray(32).equals(publicKey));
+  assert.ok(secretKey.export().subarray(32).equals(publicKey.export()));
+  // Key bytes never leak through JSON.
+  assert.deepEqual(JSON.parse(JSON.stringify(secretKey)), { version: 'v4', purpose: 'secret' });
 });
 
 test('generateKey / generateKeyPair reject the wrong version', () => {

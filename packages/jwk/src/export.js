@@ -132,6 +132,11 @@ export function toPublic(jwk) {
   if (j.kty === 'oct') {
     throw invalidArgument('toPublic.jwk: `oct` JWKs are symmetric — they have no public projection');
   }
+  // Only key types whose private members are known can be stripped safely;
+  // an unknown kty would be "published" with whatever secret fields it has.
+  if (j.kty !== 'EC' && j.kty !== 'OKP' && j.kty !== 'RSA') {
+    throw invalidArgument(`toPublic.jwk: unsupported kty ${JSON.stringify(j.kty)}`);
+  }
   const clone = { ...j };
   delete clone.d;
   if (j.kty === 'RSA') {

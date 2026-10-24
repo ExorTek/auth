@@ -25,6 +25,10 @@ const { matchedSignatureIndex, header, payload } = await verifyJson(jws, jwks, {
 })
 ```
 
+`verifyJson` bounds the work before decoding: `maxTokenSize` (default
+64 KiB, the serialized JSON) and `maxSignatures` (default 8) — a JWS with
+more is rejected rather than verified signature by signature.
+
 ## Forms
 
 <Tabs items={['Flattened (1 signer)', 'General (n signers)']}>

@@ -53,6 +53,7 @@ decrypt(token, key, options) → Promise<{ protectedHeader, payload }>
 | token's `enc` not in allowlist | `ENCRYPTION_MISMATCH` |
 | bad tag, wrong key, tampered segment | `DECRYPTION_FAILED` |
 | unknown `crit` header | `CRIT_UNSUPPORTED` |
+| `zip` header (compression is not supported) | `INVALID_HEADER` |
 | `exp` in the past | `TOKEN_EXPIRED` |
 | token over `maxTokenSize` | `TOKEN_TOO_LARGE` |
 

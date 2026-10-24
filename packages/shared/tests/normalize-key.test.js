@@ -105,3 +105,27 @@ describe('createKeyNormalizer', () => {
     assert.equal(out, null);
   });
 });
+
+test('createImportCache: reuses an import per input + tag, never caches failures', async () => {
+  const { createImportCache } = await import('../src/normalize-key.js');
+  const cache = createImportCache({ maxStrings: 2 });
+  const jwk = {};
+  let builds = 0;
+  const build = () => ({ id: ++builds });
+  const first = cache.object(jwk, 'ES256:verify', build);
+  assert.equal(cache.object(jwk, 'ES256:verify', build), first);
+  assert.notEqual(cache.object(jwk, 'ES256:sign', build), first);
+
+  assert.throws(() =>
+    cache.string('pem', 't', () => {
+      throw new Error('bad');
+    }),
+  );
+  assert.equal(cache.string('pem', 't', build).id, builds);
+
+  cache.string('a', 't', build);
+  cache.string('b', 't', build);
+  const before = builds;
+  cache.string('pem', 't', build); // evicted by the 2-entry bound
+  assert.equal(builds, before + 1);
+});

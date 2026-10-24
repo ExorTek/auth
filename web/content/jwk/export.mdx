@@ -99,7 +99,9 @@ const publishable = jwk.toPublic(privateJwk)
 ```
 
 `toPublic` refuses `oct` — symmetric keys have no public projection,
-and the throw catches accidental publication of a secret. That guard
+and the throw catches accidental publication of a secret. It also refuses
+any `kty` other than `RSA` / `EC` / `OKP`, whose private members it could
+not know to strip. That guard
 is the whole reason this helper exists at a higher level than a spread
 + `delete`.
 

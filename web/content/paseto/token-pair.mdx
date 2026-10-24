@@ -61,8 +61,11 @@ await revokeAll(familyId, { store });
 
 By default the refresh token is **opaque** — random bytes, hashed before
 storage, carrying nothing. Set `refresh.opaque: false` to mint a PASETO
-refresh token instead (needs `secret.refresh`); `refresh.purpose`
-selects its purpose. `tokenSize`, `encoding`, and `hashAlgo` / `hashFn`
+refresh token instead (needs `secret.refresh`, a key distinct from
+`secret.access` — otherwise the refresh token would also pass as an
+access token); `refresh.purpose` selects its purpose. Numeric `expiresIn`
+values are seconds, and the token's own `exp` always matches
+`accessExpiresAt` / `refreshExpiresAt`. `tokenSize`, `encoding`, and `hashAlgo` / `hashFn`
 tune the opaque form, and a custom `generate()` overrides it entirely.
 
 ## Stores

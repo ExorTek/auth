@@ -273,3 +273,16 @@ test('DoS guard: token larger than 1 MB refused via maxTokenSize=1024', async ()
     err => err instanceof JwsError && err.code === ErrorCode.TOKEN_TOO_LARGE,
   );
 });
+
+test('a JWK is only used for the alg, use and key_ops it declares', async () => {
+  const { exportJWK } = await import('@exortek/jwk');
+  const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+  const token = await sign({ a: 1 }, privateKey, { alg: 'ES256' });
+  const jwk = await exportJWK(publicKey);
+  const rejects = bad =>
+    assert.rejects(verify(token, { ...jwk, ...bad }, { alg: ['ES256'] }), err => err.code === 'INVALID_KEY');
+  await rejects({ alg: 'ES384' });
+  await rejects({ use: 'enc' });
+  await rejects({ key_ops: ['encrypt'] });
+  assert.ok(await verify(token, { ...jwk, alg: 'ES256', use: 'sig', key_ops: ['verify'] }, { alg: ['ES256'] }));
+});

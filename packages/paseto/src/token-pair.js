@@ -22,6 +22,7 @@ import { resolveHashFn, resolveEncoding, randomBuffer } from './internal/polymor
 import { createKeyMutex } from './internal/mutex.js';
 import { encrypt } from './local.js';
 import { sign } from './public.js';
+import { PasetoKey } from './key.js';
 
 // Fallback for stores without atomic markUsed — serialises the
 // get→check→add sequence in-process so two concurrent rotate calls for
@@ -52,8 +53,8 @@ const _rotateLock = createKeyMutex();
  * @property {Store} store                            REQUIRED.
  *
  * @typedef {Object} SecretPair
- * @property {Uint8Array | import('node:crypto').KeyObject} access
- * @property {Uint8Array | import('node:crypto').KeyObject} [refresh]
+ * @property {PasetoKey} access     a v4 `local` key (or `secret` for `access.purpose: 'public'`)
+ * @property {PasetoKey} [refresh]  required, and distinct from `access`, when `refresh.opaque` is false
  *
  * @typedef {Object} CreateOptions
  * @property {SecretPair} secret
@@ -103,7 +104,13 @@ export async function create(payload, options) {
   const accessExpiresAtSec = now + Math.floor(parseDurationSeconds(access.expiresIn));
   const refreshExpiresAtSec = now + Math.floor(parseDurationSeconds(refresh.expiresIn));
 
-  const accessToken = mintAccess(payload, secret.access, access);
+  // Token-pair durations are seconds (a bare number means seconds), while
+  // encrypt/sign read a bare number as milliseconds — hand them an explicit
+  // unit so the token's `exp` matches accessExpiresAt.
+  const accessToken = mintAccess(payload, secret.access, {
+    ...access,
+    expiresIn: `${accessExpiresAtSec - now}s`,
+  });
   const { plaintext: refreshPlaintext, storeKey: refreshStoreKey } = await _generateRefresh(
     refresh,
     payload,
@@ -252,6 +259,13 @@ function _assertCreateOptions(options) {
   if (options.refresh.opaque === false && options.secret.refresh === undefined) {
     throw invalidArgument('tokenPair.options.secret.refresh is required when refresh.opaque is false');
   }
+  // A PASETO refresh token under the access key would also decrypt /
+  // verify as an access token — the two must not share one.
+  if (options.refresh.opaque === false && sameKey(options.secret.access, options.secret.refresh)) {
+    throw invalidArgument(
+      'tokenPair.options.secret.refresh must differ from secret.access when refresh.opaque is false',
+    );
+  }
   if (options.refresh.expiresIn === undefined) {
     throw invalidArgument('tokenPair.options.refresh.expiresIn is required');
   }
@@ -261,13 +275,25 @@ function _assertCreateOptions(options) {
 }
 
 /**
+ * @param {unknown} a
+ * @param {unknown} b
+ * @returns {boolean}
+ */
+function sameKey(a, b) {
+  if (a === b) {
+    return true;
+  }
+  return a instanceof PasetoKey && b instanceof PasetoKey && a.export().equals(b.export());
+}
+
+/**
  * Produce `{ plaintext, storeKey }` for a refresh token. Custom
  * `refresh.generate` wins; otherwise mint random bytes (opaque default)
  * or a PASETO refresh token (`opaque: false`), then hash for storage.
  *
  * @param {RefreshOptions} refresh
  * @param {Record<string, unknown>} payload
- * @param {Uint8Array | import('node:crypto').KeyObject} [secret]
+ * @param {PasetoKey} [secret]
  * @param {number} expiresAtSec
  * @returns {Promise<{ plaintext: string, storeKey: string }>}
  */
@@ -285,7 +311,7 @@ async function _generateRefresh(refresh, payload, secret, expiresAtSec) {
     const expiresIn = expiresAtSec - Math.floor(Date.now() / 1000);
     plaintext = mintAccess({ ...payload, kind: 'refresh' }, secret, {
       purpose: refresh.purpose ?? 'local',
-      expiresIn,
+      expiresIn: `${expiresIn}s`,
     });
   } else {
     const size = refresh.tokenSize ?? 32;

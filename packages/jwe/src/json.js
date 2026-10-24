@@ -126,6 +126,14 @@ export async function encryptJson(payload, recipients, options) {
       header.kid = recipient.kid;
     }
     Object.assign(header, result.header);
+    for (const name of Object.keys(header)) {
+      if (Object.hasOwn(protectedHeader, name)) {
+        throw new JweError(
+          ErrorCode.INVALID_ARGUMENT,
+          `encryptJson: "${name}" is set both in options.header and per recipient; JWE headers must be disjoint.`,
+        );
+      }
+    }
     return { header, encrypted_key: b64uEncode(result.encryptedKey) };
   });
 
@@ -149,12 +157,19 @@ export async function encryptJson(payload, recipients, options) {
  * @typedef {import('./decrypt.js').DecryptOptions} DecryptOptions
  */
 
+// A JSON serialization carries several recipients, so its default ceiling
+// is wider than the compact form's 8 KiB.
+const DEFAULT_MAX_JSON_SIZE = 65_536;
+const DEFAULT_MAX_RECIPIENTS = 8;
+
 /**
- * Decrypt a General or Flattened JWE JSON serialization.
+ * Decrypt a General or Flattened JWE JSON serialization. `maxTokenSize`
+ * (default 64 KiB, the serialized JSON) and `maxRecipients` (default 8)
+ * bound the work before any recipient is tried.
  *
  * @param {GeneralJwe | Record<string, unknown>} jwe
  * @param {KeyInput} key
- * @param {DecryptOptions} options
+ * @param {DecryptOptions & { maxRecipients?: number }} options
  * @returns {Promise<DecryptResult>}
  */
 export async function decryptJson(jwe, key, options) {
@@ -165,8 +180,23 @@ export async function decryptJson(jwe, key, options) {
     throw new JweError(ErrorCode.INVALID_TOKEN, 'decryptJson: expected a JWE JSON object with a "protected" member.');
   }
 
-  const protectedHeader = assertHeaderObject(b64uDecodeJson(/** @type {string} */ (jwe.protected)));
+  // Bound the work before decoding anything: each recipient is a key
+  // unwrap attempt (potentially an ECDH / RSA operation).
+  const maxSize = options.maxTokenSize ?? DEFAULT_MAX_JSON_SIZE;
+  const size = Buffer.byteLength(JSON.stringify(jwe), 'utf8');
+  if (size > maxSize) {
+    throw new JweError(ErrorCode.TOKEN_TOO_LARGE, `decryptJson: JWE is ${size} bytes, over the ${maxSize} limit.`);
+  }
   const recipientList = normalizeRecipients(jwe);
+  const maxRecipients = options.maxRecipients ?? DEFAULT_MAX_RECIPIENTS;
+  if (recipientList.length > maxRecipients) {
+    throw new JweError(
+      ErrorCode.INVALID_TOKEN,
+      `decryptJson: JWE has ${recipientList.length} recipients, over maxRecipients=${maxRecipients}.`,
+    );
+  }
+
+  const protectedHeader = assertHeaderObject(b64uDecodeJson(/** @type {string} */ (jwe.protected)));
   const encodedAad = jwe.aad === undefined ? undefined : /** @type {string} */ (jwe.aad);
   const aad = buildAad(/** @type {string} */ (jwe.protected), encodedAad);
 
@@ -179,8 +209,26 @@ export async function decryptJson(jwe, key, options) {
   /** @type {unknown} */
   let lastError;
 
+  const sharedUnprotected = isObject(jwe.unprotected) ? /** @type {Record<string, unknown>} */ (jwe.unprotected) : {};
+  assertDisjoint(protectedHeader, sharedUnprotected, 'unprotected');
+  // RFC 7516 §4.1.13: `crit` must be integrity protected.
+  if ('crit' in sharedUnprotected) {
+    throw new JweError(ErrorCode.INVALID_HEADER, '"crit" must appear in the protected header only.');
+  }
+  /** @type {Record<string, unknown> | undefined} */
+  let matchedUnprotected;
+
   for (const recipient of recipientList) {
-    const header = { ...protectedHeader, ...(recipient.header ?? {}) };
+    const perRecipient = recipient.header ?? {};
+    // RFC 7516 §7.2.1: protected, shared-unprotected and per-recipient
+    // headers MUST be disjoint — an unprotected copy may never shadow a
+    // protected value (it would also be reported as protected).
+    assertDisjoint(protectedHeader, perRecipient, 'recipient');
+    assertDisjoint(sharedUnprotected, perRecipient, 'recipient');
+    if ('crit' in perRecipient) {
+      throw new JweError(ErrorCode.INVALID_HEADER, '"crit" must appear in the protected header only.');
+    }
+    const header = { ...protectedHeader, ...sharedUnprotected, ...perRecipient };
     try {
       if (!isString(header.alg) || !algAllowlist.includes(/** @type {string} */ (header.alg))) {
         throw new JweError(
@@ -200,6 +248,7 @@ export async function decryptJson(jwe, key, options) {
       const encryptedKey = recipient.encrypted_key ? b64uDecode(recipient.encrypted_key) : Buffer.alloc(0);
       cek = unwrapCek(alg, enc, key, header, encryptedKey);
       matchedHeader = header;
+      matchedUnprotected = { ...sharedUnprotected, ...perRecipient };
       matchedEnc = enc;
       break;
     } catch (err) {
@@ -225,7 +274,26 @@ export async function decryptJson(jwe, key, options) {
 
   const payload = decodePlaintext(plaintext);
   enforceExpiry(payload, options);
-  return { protectedHeader: matchedHeader, payload };
+  // `protectedHeader` is exactly what the tag authenticated; the
+  // unprotected members are reported separately, and `header` is the
+  // joint header the recipient was processed with.
+  return { protectedHeader, unprotectedHeader: matchedUnprotected, header: matchedHeader, payload };
+}
+
+/**
+ * @param {Record<string, unknown>} a
+ * @param {Record<string, unknown>} b
+ * @param {string} which
+ */
+function assertDisjoint(a, b, which) {
+  for (const name of Object.keys(b)) {
+    if (Object.hasOwn(a, name)) {
+      throw new JweError(
+        ErrorCode.INVALID_HEADER,
+        `header parameter "${name}" appears in more than one header (${which}); RFC 7516 §7.2.1 requires them to be disjoint.`,
+      );
+    }
+  }
 }
 
 /**

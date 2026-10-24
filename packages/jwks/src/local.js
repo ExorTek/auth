@@ -6,6 +6,9 @@
 
 import { generate } from '@exortek/jwk/generate';
 import { importJWK } from '@exortek/jwk/import';
+
+/** @type {WeakMap<object, Promise<import('node:crypto').KeyObject>>} */
+const importedKeys = new WeakMap();
 import { toPublic } from '@exortek/jwk/export';
 import { parseDuration } from '@exortek/shared/duration';
 import { isString } from '@exortek/shared/predicates';
@@ -311,7 +314,14 @@ export async function createLocalKeySet(specs, options = {}) {
           `kid=${JSON.stringify(kid)} found but alg mismatch: key has ${entry.alg}, token has ${header.alg}`,
         );
       }
-      return importJWK(entry.publicJwk);
+      // Import once per key entry, not once per verification.
+      let imported = importedKeys.get(entry);
+      if (!imported) {
+        imported = importJWK(entry.publicJwk);
+        importedKeys.set(entry, imported);
+        imported.catch(() => importedKeys.delete(entry));
+      }
+      return imported;
     },
   };
 }

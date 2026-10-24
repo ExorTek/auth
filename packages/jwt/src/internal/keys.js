@@ -20,7 +20,7 @@
 
 import { createPrivateKey, createPublicKey, createSecretKey, X509Certificate } from 'node:crypto';
 
-import { createKeyNormalizer } from '@exortek/shared/normalize-key';
+import { createImportCache, createKeyNormalizer } from '@exortek/shared/normalize-key';
 import { isString } from '@exortek/shared/predicates';
 
 import { JwtError, ErrorCode } from './errors.js';
@@ -29,6 +29,9 @@ import { lookup as lookupAlg } from './algorithms.js';
 /**
  * @typedef {import('node:crypto').KeyObject | Buffer | Uint8Array | string | Record<string, unknown>} KeyInput
  */
+
+// PEM / HMAC-secret strings handed in on every call are parsed once.
+const pemImports = createImportCache();
 
 const shared = createKeyNormalizer({
   ErrorClass: JwtError,
@@ -44,7 +47,7 @@ const shared = createKeyNormalizer({
  */
 export async function normalizeKey(key, alg, direction) {
   if (isString(key)) {
-    return _fromString(key, lookupAlg(alg), direction, alg);
+    return pemImports.string(key, `${alg}:${direction}`, () => _fromString(key, lookupAlg(alg), direction, alg));
   }
   const out = await shared.normalizeCore(key, alg, direction);
   if (out !== null) {
@@ -69,6 +72,15 @@ export async function normalizeKey(key, alg, direction) {
  */
 function _fromString(key, meta, direction, alg) {
   if (key.includes('-----BEGIN ')) {
+    // The classic RS256 → HS256 confusion hands a public PEM to an HMAC alg.
+    // Refuse it outright with a typed error rather than importing the PEM
+    // as an asymmetric key and failing later inside node:crypto.
+    if (meta.family === 'HMAC') {
+      throw new JwtError(
+        ErrorCode.INVALID_KEY,
+        `alg ${alg}: HMAC algorithms take a shared secret, not a PEM key or certificate`,
+      );
+    }
     try {
       if (key.includes('CERTIFICATE-----')) {
         if (direction === 'sign') {

@@ -285,3 +285,8 @@ test('importPEM x509: extracts public key', async () => {
     err => err instanceof JwkError && err.code === ErrorCode.INVALID_KEY,
   );
 });
+
+test('toPublic refuses a kty whose private members it does not know', () => {
+  assert.throws(() => toPublic({ kty: 'AKP', alg: 'ML-DSA-44', pub: 'x', priv: 'secret' }), /kty/);
+  assert.throws(() => toPublic({ d: 'secret' }), /kty/);
+});

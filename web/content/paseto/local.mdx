@@ -31,9 +31,19 @@ const data = decrypt(token, key, {
 
 ## Keys
 
-`generateKey()` returns 32 random bytes (a `Buffer`). Any 32-byte
-`Buffer` / `Uint8Array` works — load your own from a KMS or env. A
-wrong-length or non-byte key throws `INVALID_KEY`.
+`generateKey()` returns a typed `PasetoKey` (version `v4`, purpose
+`local`). Load your own 32 bytes from a KMS or env with
+`keys.local(bytes)` — a bare buffer is refused, because a 32-byte buffer
+could just as well be a v4.public public key, and mixing the two up would
+let anyone holding the public key mint `v4.local` tokens. A key of another
+purpose throws `INVALID_KEY_PURPOSE`; a wrong-length key `INVALID_KEY`.
+`key.export()` returns the raw bytes; `JSON.stringify(key)` never does.
+
+```js
+import { keys } from '@exortek/paseto';
+
+const key = keys.local(Buffer.from(process.env.PASETO_LOCAL_KEY, 'base64url'));
+```
 
 ## `encrypt`
 

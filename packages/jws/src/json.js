@@ -19,6 +19,11 @@ import { assertSignSide as assertCritSign, assertVerifySide as assertCritVerify 
 import { encode as b64uEncode, decode as b64uDecode, decodeJson as b64uDecodeJson } from './internal/base64url.js';
 import { resolveKey } from './internal/resolver.js';
 
+// JSON serializations carry several signatures and their headers, so the
+// default ceiling is wider than the compact form's 8 KiB.
+const DEFAULT_MAX_JSON_SIZE = 65_536;
+const DEFAULT_MAX_SIGNATURES = 8;
+
 /**
  * @typedef {import('./internal/keys.js').KeyInput} KeyInput
  * @typedef {import('./internal/resolver.js').KeyResolverFn} KeyResolverFn
@@ -91,9 +96,12 @@ export async function signJson(payload, signers) {
  * every signature to fail (or providing no resolvable key for any of
  * them) raises {@link ErrorCode.INVALID_SIGNATURE}.
  *
+ * `maxTokenSize` (default 64 KiB, the serialized JSON) and `maxSignatures`
+ * (default 8) bound the work before anything is decoded or verified.
+ *
  * @param {GeneralJws | FlattenedJws} jwsJson
  * @param {KeyInput | KeyInput[] | KeyResolverFn} keyish
- * @param {VerifyOptions} options
+ * @param {VerifyOptions & { maxSignatures?: number }} options
  * @returns {Promise<{ header: Record<string, unknown>, payload: unknown, kid?: string, matchedSignatureIndex: number }>}
  */
 export async function verifyJson(jwsJson, keyish, options) {
@@ -106,9 +114,23 @@ export async function verifyJson(jwsJson, keyish, options) {
     throw new JwsError(ErrorCode.INVALID_TOKEN, 'verifyJson: `payload` must be a base64url string');
   }
 
+  // Bound the work before decoding anything: every signature is a
+  // signature verification, and the payload is decoded up front.
+  const maxSize = options?.maxTokenSize ?? DEFAULT_MAX_JSON_SIZE;
+  const size = Buffer.byteLength(JSON.stringify(jwsJson), 'utf8');
+  if (size > maxSize) {
+    throw new JwsError(ErrorCode.TOKEN_TOO_LARGE, `verifyJson: JWS is ${size} bytes, exceeds maxTokenSize=${maxSize}`);
+  }
   const sigList = _extractSignatures(jwsJson);
   if (sigList.length === 0) {
     throw new JwsError(ErrorCode.INVALID_TOKEN, 'verifyJson: JWS carries no signatures');
+  }
+  const maxSignatures = options?.maxSignatures ?? DEFAULT_MAX_SIGNATURES;
+  if (sigList.length > maxSignatures) {
+    throw new JwsError(
+      ErrorCode.INVALID_TOKEN,
+      `verifyJson: JWS carries ${sigList.length} signatures, exceeds maxSignatures=${maxSignatures}`,
+    );
   }
 
   const bytes = b64uDecode(encPayload);

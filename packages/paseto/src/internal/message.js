@@ -8,6 +8,7 @@ import { isString, isObject, isBytes } from '@exortek/shared/predicates';
 
 import { applyClaims, validateClaims } from './claims.js';
 import { invalidArgument } from './guards.js';
+import { PasetoError, ErrorCode } from './errors.js';
 
 /** Coerce `undefined | string | bytes` to a Buffer. */
 export function toBuffer(value, name) {
@@ -75,6 +76,14 @@ export function finalize(message, footer, options, purpose) {
 
   if (isObject(payload)) {
     validateClaims(payload, options);
+  } else if (options.issuer !== undefined || options.subject !== undefined || options.audience !== undefined) {
+    // A string / bytes / array payload has no claims to check. Silently
+    // passing would let any such token satisfy an issuer / audience
+    // requirement the caller asked for.
+    throw new PasetoError(
+      ErrorCode.CLAIM_MISMATCH,
+      'issuer / subject / audience were required but the payload is not a claims object',
+    );
   }
 
   if (options.complete === true) {

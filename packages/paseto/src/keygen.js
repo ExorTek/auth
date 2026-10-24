@@ -1,33 +1,35 @@
 /**
- * Key generation for the two v4 purposes.
+ * Key generation for the two v4 purposes. Both return typed `PasetoKey`s
+ * (see `key.js`); `.export()` gives the raw wire form.
  *
- *   - `generateKey()`      → 32-byte symmetric key for v4.local
- *   - `generateKeyPair()`  → Ed25519 { secretKey (64B), publicKey (32B) }
- *     in PASETO's raw wire form (`secretKey = seed ‖ public`).
+ *   - `generateKey()`      → v4 `local` key (32 bytes)
+ *   - `generateKeyPair()`  → { secretKey: v4 `secret` (64B seed ‖ public),
+ *                              publicKey: v4 `public` (32B) }
  */
 
 import { randomBytes, generateKeyPairSync } from 'node:crypto';
 
 import { rawFromKeyObject } from './internal/keys.js';
+import { makeKey } from './key.js';
 import { V4_LOCAL, V4_PUBLIC } from './internal/versions.js';
 import { PasetoError, ErrorCode } from './internal/errors.js';
 
 /**
  * Generate a symmetric key for `v4.local`.
  * @param {string} [version='v4.local']
- * @returns {Buffer} 32 random bytes
+ * @returns {import('./key.js').PasetoKey}
  */
 export function generateKey(version = V4_LOCAL) {
   if (version !== V4_LOCAL) {
     throw new PasetoError(ErrorCode.UNSUPPORTED_VERSION, `generateKey supports '${V4_LOCAL}', got '${version}'`);
   }
-  return randomBytes(32);
+  return makeKey('local', randomBytes(32));
 }
 
 /**
  * Generate an Ed25519 key pair for `v4.public`, in raw wire form.
  * @param {string} [version='v4.public']
- * @returns {{ secretKey: Buffer, publicKey: Buffer }}
+ * @returns {{ secretKey: import('./key.js').PasetoKey, publicKey: import('./key.js').PasetoKey }}
  */
 export function generateKeyPair(version = V4_PUBLIC) {
   if (version !== V4_PUBLIC) {
@@ -36,5 +38,5 @@ export function generateKeyPair(version = V4_PUBLIC) {
   const { privateKey, publicKey } = generateKeyPairSync('ed25519');
   const seed = rawFromKeyObject(privateKey);
   const pub = rawFromKeyObject(publicKey);
-  return { secretKey: Buffer.concat([seed, pub]), publicKey: pub };
+  return { secretKey: makeKey('secret', Buffer.concat([seed, pub])), publicKey: makeKey('public', pub) };
 }

@@ -97,3 +97,47 @@ test('decryptJson enforces the allowlist', async () => {
     isCode(ErrorCode.ALGORITHM_MISMATCH),
   );
 });
+
+test('decryptJson: recipient count and size are bounded before any unwrap', async () => {
+  const jwe = await encryptJson(PAYLOAD, [{ key: rsa.publicKey, alg: 'RSA-OAEP-256' }], { enc: 'A256GCM' });
+  const opts = { alg: ['RSA-OAEP-256'], enc: ['A256GCM'] };
+  const flood = { ...jwe, recipients: Array.from({ length: 9 }, () => jwe.recipients[0]) };
+  await assert.rejects(decryptJson(flood, rsa.privateKey, opts), isCode(ErrorCode.INVALID_TOKEN));
+  await assert.rejects(
+    decryptJson({ ...jwe, ciphertext: 'A'.repeat(70_000) }, rsa.privateKey, opts),
+    isCode(ErrorCode.TOKEN_TOO_LARGE),
+  );
+});
+
+test('decryptJson: an unprotected header may not shadow a protected value', async () => {
+  const jwe = await encryptJson(PAYLOAD, [{ key: rsa.publicKey, alg: 'RSA-OAEP-256', kid: 'r1' }], {
+    enc: 'A256GCM',
+    header: { typ: 'secure+jwe' },
+  });
+  const opts = { alg: ['RSA-OAEP-256'], enc: ['A256GCM'] };
+  const shadowed = {
+    ...jwe,
+    recipients: [{ ...jwe.recipients[0], header: { ...jwe.recipients[0].header, typ: 'evil' } }],
+  };
+  await assert.rejects(decryptJson(shadowed, rsa.privateKey, opts), isCode(ErrorCode.INVALID_HEADER));
+  await assert.rejects(
+    decryptJson({ ...jwe, unprotected: { crit: ['x'], x: 1 } }, rsa.privateKey, opts),
+    isCode(ErrorCode.INVALID_HEADER),
+  );
+
+  const ok = await decryptJson(jwe, rsa.privateKey, opts);
+  assert.equal(ok.protectedHeader.typ, 'secure+jwe');
+  assert.equal(ok.protectedHeader.kid, undefined, 'unprotected members are not reported as protected');
+  assert.equal(ok.unprotectedHeader.kid, 'r1');
+  assert.equal(ok.header.kid, 'r1');
+});
+
+test('encryptJson refuses a header set both shared and per recipient', async () => {
+  await assert.rejects(
+    encryptJson(PAYLOAD, [{ key: rsa.publicKey, alg: 'RSA-OAEP-256', kid: 'r1' }], {
+      enc: 'A256GCM',
+      header: { kid: 'shared' },
+    }),
+    isCode(ErrorCode.INVALID_ARGUMENT),
+  );
+});

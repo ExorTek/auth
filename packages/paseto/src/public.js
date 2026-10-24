@@ -12,19 +12,21 @@ import { signRaw, verifyRaw } from './internal/v4public.js';
 import { serializePayload, serializeFooter, finalize, toBuffer } from './internal/message.js';
 import { assertNonEmptyString } from './internal/guards.js';
 import { assertTokenSize, DEFAULT_MAX_TOKEN_SIZE } from './internal/size.js';
+import { resolveKey } from './key.js';
 
 /**
  * Sign a payload into a `v4.public` token.
  *
  * @param {Record<string, unknown> | string | Uint8Array} payload
- * @param {import('node:crypto').KeyObject | Uint8Array} secretKey  Ed25519 secret (32/64B or KeyObject)
+ * @param {import('./key.js').PasetoKey} secretKey  a v4 `secret` key
  * @param {import('./local.js').EncryptOptions} [options]
  * @returns {string}
  */
 export function sign(payload, secretKey, options = {}) {
+  const sk = resolveKey(secretKey, 'secret', 'sign');
   return signRaw({
     message: serializePayload(payload, options),
-    secretKey,
+    secretKey: sk,
     footer: serializeFooter(options.footer),
     implicit: toBuffer(options.assertion, 'assertion'),
   });
@@ -34,16 +36,17 @@ export function sign(payload, secretKey, options = {}) {
  * Verify a `v4.public` token and validate its claims.
  *
  * @param {string} token
- * @param {import('node:crypto').KeyObject | Uint8Array} publicKey  Ed25519 public (32B or KeyObject)
+ * @param {import('./key.js').PasetoKey} publicKey  a v4 `public` key
  * @param {import('./local.js').DecryptOptions} [options]
  * @returns {Record<string, unknown> | string | { payload: unknown, footer: string, version: string, purpose: string }}
  */
 export function verify(token, publicKey, options = {}) {
+  const pk = resolveKey(publicKey, 'public', 'verify');
   assertNonEmptyString(token, 'verify.token');
   assertTokenSize(token, options.maxTokenSize ?? DEFAULT_MAX_TOKEN_SIZE);
   const { message, footer } = verifyRaw({
     token,
-    publicKey,
+    publicKey: pk,
     implicit: toBuffer(options.assertion, 'assertion'),
   });
   return finalize(message, footer, options, 'public');

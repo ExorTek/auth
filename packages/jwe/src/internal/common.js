@@ -9,7 +9,7 @@ import { parseDuration } from '@exortek/shared/duration';
 import { JweError, ErrorCode } from './errors.js';
 
 /** Header parameters this package understands and processes itself. */
-const UNDERSTOOD_HEADERS = new Set(['alg', 'enc', 'epk', 'apu', 'apv', 'kid', 'crit', 'zip']);
+const UNDERSTOOD_HEADERS = new Set(['alg', 'enc', 'epk', 'apu', 'apv', 'kid', 'crit']);
 
 /**
  * @param {unknown} value
@@ -91,6 +91,11 @@ export function enforceExpiry(payload, options) {
  * @param {{ knownCriticalHeaders?: string[] }} options
  */
 export function checkCrit(header, options) {
+  // `zip` (RFC 7516 §4.1.3) is not implemented. Decrypting anyway would hand
+  // back the still-deflated bytes as if they were the plaintext.
+  if (header.zip !== undefined) {
+    throw new JweError(ErrorCode.INVALID_HEADER, `"zip" (${JSON.stringify(header.zip)}) is not supported.`);
+  }
   const crit = header.crit;
   if (crit === undefined) {
     return;

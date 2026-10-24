@@ -41,7 +41,7 @@
 
 import crypto, { constants, createHmac, sign as _sign, verify as _verify } from 'node:crypto';
 
-import { derToRaw, rawToDer, EC_COORD_BYTES } from './ecdsa.js';
+import { EC_COORD_BYTES } from './ecdsa.js';
 
 /** HMAC minimum secret sizes per RFC 7518 §3.2 — key must be ≥ hash output. */
 const HMAC_MIN_BYTES = { HS256: 32, HS384: 48, HS512: 64 };
@@ -98,13 +98,13 @@ export function hmac(alg, hash) {
     hash,
     kty: 'oct',
     hmacMinBytes: HMAC_MIN_BYTES[/** @type {keyof typeof HMAC_MIN_BYTES} */ (alg)],
+    // createHmac takes the secret KeyObject directly — exporting its bytes
+    // on every call is a copy (and a key-material allocation) for nothing.
     async sign(key, message) {
-      const raw = key.export();
-      return createHmac(hash, raw).update(message).digest();
+      return createHmac(hash, key).update(message).digest();
     },
     async verify(key, message, signature) {
-      const raw = key.export();
-      const expected = createHmac(hash, raw).update(message).digest();
+      const expected = createHmac(hash, key).update(message).digest();
       if (signature.length !== expected.length) {
         return false;
       }
@@ -171,8 +171,8 @@ export function rsaPss(alg, hash) {
 }
 
 /**
- * ECDSA entry factory. Wire signature is raw R‖S per RFC 7515 §3.4;
- * we convert on the way in and out through `signing/ecdsa`.
+ * ECDSA entry factory. Wire signature is raw R‖S per RFC 7515 §3.4, which
+ * is exactly node:crypto's `dsaEncoding: 'ieee-p1363'` — no DER round trip.
  *
  * @param {string} alg
  * @param {string} hash
@@ -188,15 +188,13 @@ export function ecdsa(alg, hash, curve) {
     kty: 'EC',
     curve,
     async sign(key, message) {
-      const der = _sign(hash, message, key);
-      return derToRaw(der, curve);
+      return _sign(hash, message, { key, dsaEncoding: 'ieee-p1363' });
     },
     async verify(key, message, signature) {
       if (signature.length !== size * 2) {
         return false;
       }
-      const der = rawToDer(signature, curve);
-      return _verify(hash, message, key, der);
+      return _verify(hash, message, { key, dsaEncoding: 'ieee-p1363' }, signature);
     },
   };
 }
