@@ -1,5 +1,22 @@
 # @exortek/opaque
 
+## 2.0.0
+
+### Major Changes
+
+- d370002: - Tokens are random-only with ≥ 128 bits: `ulid` and `uuid7` are refused (consecutive ULID tokens differed only in their last character), byte generators need `bytes ≥ 16`, `alphanumeric` needs `length ≥ 22`.
+  - `create()` requires `expiresIn` (`null` for a deliberately non-expiring token) instead of silently minting an immortal one.
+  - `introspectionHandler` requires an `authorize(req)` hook and answers `401 invalid_client` without it (RFC 7662 §2.1); `revocationHandler` accepts the hook optionally.
+  - The memory store is bounded (`maxEntries`, default 100,000).
+  
+  **Migration:** switch `ulid` / `uuid7` tokens to `hex` / `base64url` / `base58` / `crockford` / `uuid4`, pass `expiresIn` to `create()`, and give `introspectionHandler` an `authorize` hook.
+
+### Patch Changes
+
+- 9953042: - Duration strings whose unit is the name of an `Object.prototype` member (for example `'1constructor'`) now throw instead of resolving to `NaN`.
+- Updated dependencies [ef623b3]
+  - @exortek/crypto@2.0.0
+
 ## 1.0.4
 
 ### Patch Changes

@@ -1,5 +1,19 @@
 # @exortek/password
 
+## 2.0.0
+
+### Major Changes
+
+- d370002: - `verify` bounds the cost a stored hash can demand: scrypt `128·N·r` ≤ 1 GiB and `128·N·r·p` ≤ 4 GiB, Argon2 `m` ≤ 1 GiB / `t` ≤ 10 / `p` ≤ 16, digests 16–64 bytes; scrypt / PBKDF2 return `false` instead of throwing on parameters node:crypto rejects.
+  - `pepper.wrap` normalizes the password (NFKC, NUL check, length cap) before the HMAC, like the unpeppered path; `wrapAll` also yields the legacy raw-input digest.
+  - The password length cap is applied before Unicode normalization.
+  
+  **Migration:** if you verify peppered hashes with `wrap` (not `wrapAll`), switch to `wrapAll` until users with non-ASCII passwords have been rehashed — their pre-upgrade hashes match only the legacy candidate.
+
+### Minor Changes
+
+- 9953042: - New `createLimiter({ concurrency, maxQueue })` limits how many password hashes run at once, so a login burst cannot take every libuv threadpool thread away from `fs` and DNS. Calls beyond the limit wait in a queue. Once `maxQueue` calls are waiting, further calls reject with the new `QUEUE_FULL` error code (HTTP 503).
+
 ## 1.1.5
 
 ### Patch Changes
