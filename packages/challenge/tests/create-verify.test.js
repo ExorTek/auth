@@ -126,7 +126,7 @@ test('singleUse: consume enforces one-shot; second verify → replay', async () 
   }
 });
 
-test('singleUse: without consume, verify does NOT touch the store', async () => {
+test('singleUse: verifying without consume is refused (and does not touch the store)', async () => {
   const store = memoryStore();
   try {
     const token = await createChallenge({
@@ -135,11 +135,11 @@ test('singleUse: without consume, verify does NOT touch the store', async () => 
       singleUse: true,
       store,
     });
+    // Otherwise the single-use token would verify any number of times.
     const a = await verifyChallenge(token, { secret: SECRET });
-    const b = await verifyChallenge(token, { secret: SECRET });
-    assert.equal(a.valid, true);
-    assert.equal(b.valid, true);
+    assert.deepEqual(a, { valid: false, reason: 'consume_required' });
     assert.equal(store._size(), 0);
+    assert.equal((await verifyChallenge(token, { secret: SECRET, consume: true, store })).valid, true);
   } finally {
     store._stop();
   }

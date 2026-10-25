@@ -247,7 +247,7 @@ export async function verifyMagicLink(token, options) {
       throw invalidArgument('verifyMagicLink.options.expectedEmail must be a string when provided');
     }
     if (isString(payload.eh)) {
-      const expected = hashEmailValue(secret, options.expectedEmail);
+      const expected = hashEmailValue(secret, normalizeEmail(options.expectedEmail));
       if (expected !== payload.eh) {
         return { valid: false, reason: 'email_mismatch' };
       }
@@ -271,7 +271,7 @@ export async function verifyMagicLink(token, options) {
   if (isString(payload.eh) && hashEmailValue(secret, record.email) !== payload.eh) {
     return { valid: false, reason: 'email_binding_mismatch' };
   }
-  if (!isUndefined(options.expectedEmail) && record.email !== options.expectedEmail) {
+  if (!isUndefined(options.expectedEmail) && record.email !== normalizeEmail(options.expectedEmail)) {
     return { valid: false, reason: 'email_mismatch' };
   }
 
@@ -312,12 +312,12 @@ export async function listPendingForEmail(email, options) {
     throw invalidArgument('listPendingForEmail.options must be an object');
   }
   _assertStore(options.store, 'listPendingForEmail.options.store');
-  _requireEmail(email, 'listPendingForEmail.email');
+  const normalized = _requireEmail(email, 'listPendingForEmail.email');
   if (!isFunction(options.store.listByEmail)) {
     throw invalidArgument('listPendingForEmail requires store.listByEmail — the memory + Redis stores support it');
   }
   const now = Date.now();
-  const rows = (await options.store.listByEmail(email)) ?? [];
+  const rows = (await options.store.listByEmail(normalized)) ?? [];
   return rows.filter(r => !r.consumedAt && r.expiresAt > now);
 }
 
@@ -335,11 +335,11 @@ export async function revokeAllForEmail(email, options) {
     throw invalidArgument('revokeAllForEmail.options must be an object');
   }
   _assertStore(options.store, 'revokeAllForEmail.options.store');
-  _requireEmail(email, 'revokeAllForEmail.email');
+  const normalized = _requireEmail(email, 'revokeAllForEmail.email');
   if (!isFunction(options.store.revokeByEmail)) {
     throw invalidArgument('revokeAllForEmail requires store.revokeByEmail — the memory + Redis stores support it');
   }
-  return options.store.revokeByEmail(email);
+  return options.store.revokeByEmail(normalized);
 }
 
 // ---------------------------------------------------------------------
@@ -365,10 +365,24 @@ function _assertStringOrUndef(v, name) {
 function _requireEmail(v, name) {
   // Reject over-long input before the regex (RFC 5321 caps an address at 254
   // chars) so no pathological string can reach EMAIL_RE at all.
-  if (!isString(v) || v.length > 254 || !EMAIL_RE.test(v)) {
+  if (!isString(v) || v.length > 254 || !EMAIL_RE.test(v.trim())) {
     throw invalidArgument(`${name} must be a well-formed email address`);
   }
-  return v;
+  return normalizeEmail(v);
+}
+
+/**
+ * The canonical form every store key, rate-limit counter and email hash
+ * is computed from. Without it `Victim@x.com` and `victim@x.com` were two
+ * identities: each got its own rate-limit budget, and revokeAllForEmail
+ * on one spelling left links for the other alive. (Mailbox local parts
+ * are case-insensitive in practice everywhere that matters.)
+ *
+ * @param {string} email
+ * @returns {string}
+ */
+function normalizeEmail(email) {
+  return email.trim().toLowerCase();
 }
 
 function _requireDuration(input, name) {

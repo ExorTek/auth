@@ -157,6 +157,24 @@ test('pepper rotation: older-pepper match → needsRehash: true', async () => {
   }
 });
 
+test('rehashApiKey: a wrong secret for a known id cannot replace the hash', async () => {
+  const store = newStore();
+  const pepper = randomBytes(32);
+  const { key, id } = await createApiKey({
+    store,
+    prefix: 'sk_live',
+    userId: 'u',
+    scopes: ['read'],
+    peppers: [pepper],
+  });
+  const preHash = (await store.getById(id)).hash;
+  // Same prefix + id, attacker-chosen secret.
+  const forged = key.slice(0, key.lastIndexOf('_') + 1) + 'A'.repeat(key.length - key.lastIndexOf('_') - 1);
+  assert.equal(await rehashApiKey(forged, { store, peppers: [pepper] }), false);
+  assert.equal((await store.getById(id)).hash, preHash);
+  assert.equal((await verifyApiKey(key, { store, peppers: [pepper] })).valid, true);
+});
+
 test('rehashApiKey: migrates the storage hash to the newest pepper', async () => {
   const store = newStore();
   const oldPepper = randomBytes(32);
@@ -253,4 +271,32 @@ test('store error inside verify → store_unavailable', async () => {
   const res = await verifyApiKey(key, { store: brokenStore });
   assert.equal(res.valid, false);
   assert.equal(res.reason, 'store_unavailable');
+});
+
+test('verifyApiKey: a wrong secret learns nothing about lifecycle state', async () => {
+  const store = newStore();
+  const pepper = randomBytes(32);
+  const { key, id } = await createApiKey({
+    store,
+    prefix: 'sk_live',
+    userId: 'u',
+    scopes: ['read'],
+    peppers: [pepper],
+  });
+  await store.update(id, { revokedAt: Date.now() });
+  const forged = key.slice(0, key.lastIndexOf('_') + 1) + 'A'.repeat(key.length - key.lastIndexOf('_') - 1);
+  assert.equal((await verifyApiKey(forged, { store, peppers: [pepper] })).reason, 'bad_secret');
+  assert.equal((await verifyApiKey(key, { store, peppers: [pepper] })).reason, 'revoked');
+});
+
+test('verifyApiKey: only the canonical spelling of a key verifies', async () => {
+  const store = newStore();
+  const pepper = randomBytes(32);
+  const { key } = await createApiKey({ store, prefix: 'sk_live', userId: 'u', scopes: ['read'], peppers: [pepper] });
+  const cut = key.lastIndexOf('_') + 1;
+  const lower = key.slice(0, cut) + key.slice(cut).toLowerCase();
+  if (lower !== key) {
+    assert.equal((await verifyApiKey(lower, { store, peppers: [pepper] })).valid, false);
+  }
+  assert.equal((await verifyApiKey(key, { store, peppers: [pepper] })).valid, true);
 });

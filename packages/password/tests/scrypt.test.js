@@ -86,3 +86,14 @@ test('scrypt.verify: rejects poisoned r / p beyond sane ceiling (DoS)', async ()
   assert.equal(await scrypt.verify('pw', poisonedR), false);
   assert.equal(await scrypt.verify('pw', poisonedP), false);
 });
+
+test('scrypt.verify: a stored hash with oversized memory / work / length → false, fast', async () => {
+  const good = await scrypt.hash('pw');
+  // ln=24, r=32: within the per-parameter caps but a 64 GiB working set.
+  const huge = good.replace(/ln=\d+,r=\d+,p=\d+/, 'ln=24,r=32,p=1');
+  const started = Date.now();
+  assert.equal(await scrypt.verify('pw', huge), false);
+  assert.ok(Date.now() - started < 1000, 'must refuse before deriving');
+  const longHash = `${good.slice(0, good.lastIndexOf('$') + 1)}${Buffer.alloc(4096).toString('base64').replace(/=+$/, '')}`;
+  assert.equal(await scrypt.verify('pw', longHash), false);
+});

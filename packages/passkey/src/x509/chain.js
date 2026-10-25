@@ -30,6 +30,7 @@
 
 import { X509Certificate } from 'node:crypto';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { findExtension, readChildren, readTlv, TAG } from '../asn1/der.js';
 import { isString, isArray } from '@exortek/shared/predicates';
 
 /**
@@ -87,6 +88,10 @@ function findIssuerAnchor(cert, anchors) {
   return null;
 }
 
+// keyUsage keyCertSign needs no check of its own: X509Certificate#checkIssued
+// (OpenSSL X509_check_issued) already refuses an issuer without it.
+const BASIC_CONSTRAINTS_OID = '2.5.29.19';
+
 /**
  * Look up whether `cert` is in the anchor set. Byte-equal DER
  * (via SHA-256 fingerprint) is the canonical identity check — DN
@@ -121,6 +126,38 @@ function assertIssuerIsCa(signer, position) {
       `x509.verifyChain: issuer of certificate ${position} is not a CA (basicConstraints cA must be TRUE): ${signer.subject.replace(/\n/g, ' ')}`,
     );
   }
+  // RFC 5280 §4.2.1.9: pathLenConstraint caps how many intermediate CA
+  // certificates may follow this one. Below the signer of chain[position]
+  // sit the `position` intermediates chain[1..position] (the leaf,
+  // chain[0], does not count).
+  const pathLen = readPathLen(new Uint8Array(signer.raw));
+  if (pathLen !== null && position > pathLen) {
+    throw new PasskeyError(
+      ErrorCode.ATTESTATION_INVALID,
+      `x509.verifyChain: issuer of certificate ${position} allows ${pathLen} intermediate CA(s) below it; found ${position}`,
+    );
+  }
+}
+
+/**
+ * @param {Uint8Array} der
+ * @returns {number | null}  basicConstraints pathLenConstraint, or null when absent
+ */
+function readPathLen(der) {
+  const ext = findExtension(der, BASIC_CONSTRAINTS_OID);
+  if (ext === null) {
+    return null;
+  }
+  const fields = readChildren(readTlv(ext).contents);
+  const integer = fields.find(f => f.tag === TAG.INTEGER);
+  if (!integer) {
+    return null;
+  }
+  let value = 0;
+  for (const byte of integer.contents) {
+    value = value * 256 + byte;
+  }
+  return value;
 }
 
 /**

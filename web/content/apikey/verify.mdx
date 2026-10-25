@@ -74,7 +74,15 @@ if (res.valid && res.needsRehash) {
 
 `needsRehash: true` means the secret matched an older pepper — call
 [`rehashApiKey`](/apikey/create#pepper-rotation) opportunistically to
-migrate the storage hash to the newest pepper. After every key has
+migrate the storage hash to the newest pepper. `rehashApiKey` re-checks
+the secret against the stored hash first and returns `false` (writing
+nothing) for a wrong one — knowing a key id is not enough to replace its
+hash.
+
+`verifyApiKey` compares the secret before reporting `revoked` / `expired`
+(the id is public, the status is not), and accepts only the canonical
+spelling of a key — lowercase or `I` / `O` look-alike variants do not
+verify. After every key has
 drifted, drop the old pepper.
 
 ## Locking a route to one prefix

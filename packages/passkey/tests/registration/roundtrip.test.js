@@ -424,8 +424,8 @@ describe('registration.finish — response.id / rawId integrity', () => {
   });
 });
 
-describe('registration.finish — requireTrustAnchor exemptions', () => {
-  test('none attestation still passes with requireTrustAnchor: true', async () => {
+describe('registration.finish — requireTrustAnchor admits anchored chains only', () => {
+  test('none attestation is refused with requireTrustAnchor: true', async () => {
     const store = memoryIncrStore();
     const beginRes = await begin({
       rp: { id: RP_ID, name: 'Example' },
@@ -438,19 +438,23 @@ describe('registration.finish — requireTrustAnchor exemptions', () => {
       challengeBase64Url: beginRes.options.challenge,
       origin: ORIGIN,
     });
-    const res = await finish({
-      response: fixture.response,
-      challengeToken: beginRes.challengeToken,
-      expectedRpId: RP_ID,
-      expectedOrigin: ORIGIN,
-      challengeSecret: SECRET,
-      challengeStore: store,
-      requireTrustAnchor: true,
-    });
-    assert.equal(res.attestation.format, 'none');
+    // The client picks the attestation format, so exempting `none` would
+    // let anyone bypass the policy by simply not attesting.
+    await assert.rejects(
+      finish({
+        response: fixture.response,
+        challengeToken: beginRes.challengeToken,
+        expectedRpId: RP_ID,
+        expectedOrigin: ORIGIN,
+        challengeSecret: SECRET,
+        challengeStore: store,
+        requireTrustAnchor: true,
+      }),
+      err => err.code === ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING,
+    );
   });
 
-  test('packed self-attestation (trustPath "self") passes with requireTrustAnchor: true', async () => {
+  test('packed self-attestation (trustPath "self") is refused with requireTrustAnchor: true', async () => {
     const store = memoryIncrStore();
     const beginRes = await begin({
       rp: { id: RP_ID, name: 'Example' },
@@ -463,15 +467,19 @@ describe('registration.finish — requireTrustAnchor exemptions', () => {
       challengeBase64Url: beginRes.options.challenge,
       origin: ORIGIN,
     });
-    const res = await finish({
-      response: fixture.response,
-      challengeToken: beginRes.challengeToken,
-      expectedRpId: RP_ID,
-      expectedOrigin: ORIGIN,
-      challengeSecret: SECRET,
-      challengeStore: store,
-      requireTrustAnchor: true,
-    });
-    assert.equal(res.attestation.trustPath, 'self');
+    // Self attestation is signed by the credential key itself — it says
+    // nothing about the authenticator's make.
+    await assert.rejects(
+      finish({
+        response: fixture.response,
+        challengeToken: beginRes.challengeToken,
+        expectedRpId: RP_ID,
+        expectedOrigin: ORIGIN,
+        challengeSecret: SECRET,
+        challengeStore: store,
+        requireTrustAnchor: true,
+      }),
+      err => err.code === ErrorCode.ATTESTATION_TRUST_ANCHOR_MISSING,
+    );
   });
 });

@@ -199,6 +199,12 @@ export function candidateHashesFor(rawSecret, peppers) {
   } catch {
     return { candidateHashes: [] };
   }
+  // Crockford decoding is forgiving (case, I/L→1, O→0), so one secret has
+  // many accepted spellings. A key must have exactly one: anything keyed on
+  // the wire string (logs, deny lists, dedupe) would otherwise miss variants.
+  if (crockford.encode(secretBytes) !== rawSecret) {
+    return { candidateHashes: [] };
+  }
   if (!peppers || peppers.length === 0) {
     return { candidateHashes: [hashSecret(secretBytes, null)] };
   }

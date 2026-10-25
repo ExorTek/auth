@@ -200,3 +200,11 @@ describe('extensions — readAuthenticatorExtensions', () => {
     assert.equal(out.raw['x-draft'], 'y');
   });
 });
+
+describe('extensions — readAuthenticatorExtensions with hostile keys', () => {
+  test('keeps a __proto__ key as a plain property', () => {
+    const out = readAuthenticatorExtensions(new Map([['__proto__', { polluted: true }]]));
+    assert.equal(out.raw.polluted, undefined);
+    assert.deepEqual(out.raw.__proto__, { polluted: true });
+  });
+});

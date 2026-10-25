@@ -80,13 +80,21 @@ function importCredentialKey(credential) {
  * @param {string | Buffer} params.challengeSecret
  * @param {import('@exortek/challenge').IncrStore} params.challengeStore
  * @param {{
+ *   id: string,
+ *   userId?: string,
+ *   userHandle?: string | Uint8Array,
  *   publicKey?: import('node:crypto').KeyObject,
  *   publicKeyCose?: Map<unknown, unknown>,
  *   algorithm?: number,
  *   counter: number,
  *   transports?: string[],
  * }} params.credential
- * @param {string} [params.expectedUserId]
+ *   The stored credential the assertion claims to be. `id` (base64url, as
+ *   returned by registration) is required and must equal the assertion's
+ *   credential id. `userId` — your user id for the owner — is required
+ *   with `expectedUserId`; `userHandle` (the WebAuthn user.id) is compared
+ *   with the assertion's userHandle when both are present.
+ * @param {string} [params.expectedUserId]  the user this ceremony is for; the credential must belong to them
  * @param {boolean} [params.requireUserVerification=true]
  * @param {boolean} [params.requireBackupEligible=false]
  * @param {boolean} [params.requireBackedUp=false]
@@ -155,6 +163,37 @@ export async function finish(params) {
       'authentication.finish: credential must include the stored counter (number)',
     );
   }
+  if (!isString(credential.id)) {
+    throw new PasskeyError(
+      ErrorCode.INVALID_ARGUMENT,
+      'authentication.finish: credential.id (base64url, as returned by registration) is required',
+    );
+  }
+  // Bind the assertion to the stored credential and that credential to the
+  // user. Without these, an app that resolves "the credential" one way and
+  // "the user" another (challenge user, userHandle) accepts an attacker's
+  // own passkey as the victim's login.
+  const presentedId = isString(response.rawId) ? response.rawId : response.id;
+  if (presentedId !== credential.id) {
+    throw new PasskeyError(
+      ErrorCode.CREDENTIAL_MISMATCH,
+      'authentication.finish: the assertion was made with a different credential than the one supplied',
+    );
+  }
+  if (expectedUserId !== undefined) {
+    if (!isString(credential.userId)) {
+      throw new PasskeyError(
+        ErrorCode.INVALID_ARGUMENT,
+        'authentication.finish: credential.userId (the owner) is required when expectedUserId is set',
+      );
+    }
+    if (credential.userId !== expectedUserId) {
+      throw new PasskeyError(
+        ErrorCode.CREDENTIAL_MISMATCH,
+        'authentication.finish: the credential does not belong to expectedUserId',
+      );
+    }
+  }
 
   const clientDataJSON = decodeB64uField(response.response.clientDataJSON, 'response.clientDataJSON');
   const authDataBytes = decodeB64uField(response.response.authenticatorData, 'response.authenticatorData');
@@ -162,6 +201,17 @@ export async function finish(params) {
   const userHandle = response.response.userHandle
     ? decodeB64uField(response.response.userHandle, 'response.userHandle')
     : null;
+  if (userHandle && credential.userHandle !== undefined) {
+    const stored = isString(credential.userHandle)
+      ? base64url.decode(credential.userHandle)
+      : Buffer.from(credential.userHandle);
+    if (!Buffer.from(userHandle).equals(stored)) {
+      throw new PasskeyError(
+        ErrorCode.CREDENTIAL_MISMATCH,
+        "authentication.finish: response.userHandle does not match the credential's userHandle",
+      );
+    }
+  }
 
   let clientData;
   try {

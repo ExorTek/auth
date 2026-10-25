@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, verify } from 'node:crypto';
 import { base64url } from '@exortek/crypto/encode';
 import { importCoseKey, algorithmForId, ALGORITHMS, DEFAULT_SUPPORTED_ALGORITHMS } from '../../src/cose/key.js';
+import { ErrorCode } from '../../src/errors.js';
 
 /**
  * Build a COSE Key Map (Map<int, ...>) from a JWK. Mirrors what our
@@ -248,5 +249,22 @@ describe('COSE — algorithmForId + default supported set', () => {
     for (const alg of DEFAULT_SUPPORTED_ALGORITHMS) {
       assert.ok(algorithmForId(alg));
     }
+  });
+});
+
+describe('COSE — kty bound to the algorithm', () => {
+  test('rejects an RSA key declared as ES256', () => {
+    const { publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const jwk = publicKey.export({ format: 'jwk' });
+    const cose = new Map([
+      [1, 3], // kty RSA
+      [3, -7], // alg ES256
+      [-1, Buffer.from(jwk.n, 'base64url')],
+      [-2, Buffer.from(jwk.e, 'base64url')],
+    ]);
+    assert.throws(
+      () => importCoseKey(cose),
+      err => err.code === ErrorCode.PUBLIC_KEY_UNSUPPORTED && /does not match/.test(err.message),
+    );
   });
 });

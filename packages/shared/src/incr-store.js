@@ -9,7 +9,7 @@
  * Consumers: `@exortek/challenge`, `@exortek/magic-link` (rate limiter).
  */
 
-import { isFunction, isInteger, isUndefined } from './predicates.js';
+import { isFunction, isInteger } from './predicates.js';
 import { assertRedisClient } from './redis-guard.js';
 import { evalScript } from './redis-helpers.js';
 
@@ -17,7 +17,7 @@ import { evalScript } from './redis-helpers.js';
 
 /**
  * @typedef {object} MemoryIncrStoreOptions
- * @property {number} [maxKeys=10000]  Hard cap; oldest entry dropped when exceeded.
+ * @property {number} [maxKeys=10000]  Hard cap on live keys; incr of a new key throws when every slot is live.
  * @property {number} [sweepMs=60000]  Interval for the background TTL sweep.
  */
 
@@ -77,13 +77,26 @@ export function createMemoryIncrStore(options = {}, wrap) {
     }
   }
 
-  function evictIfFull() {
+  let lastFullSweep = 0;
+
+  // Make room for a new key without ever dropping a live one. A live key
+  // is a rate-limit count or a single-use marker: evicting it would reset
+  // the limit or reopen a replay window — exactly what a flood of fresh
+  // keys would aim for. Expired keys are reclaimed (sweeping at most once
+  // a second); if every slot is still live the store fails closed.
+  function ensureRoom() {
     if (map.size < maxKeys) {
       return;
     }
-    const oldest = map.keys().next().value;
-    if (!isUndefined(oldest)) {
-      map.delete(oldest);
+    const t = Date.now();
+    if (t - lastFullSweep >= 1000) {
+      lastFullSweep = t;
+      sweep();
+    }
+    if (map.size >= maxKeys) {
+      throw new Error(
+        `memoryIncrStore: all ${maxKeys} keys are live — refusing to evict one (raise maxKeys or use a shared store)`,
+      );
     }
   }
 
@@ -93,11 +106,9 @@ export function createMemoryIncrStore(options = {}, wrap) {
       const existing = peekFresh(key);
       if (existing) {
         existing.count += 1;
-        map.delete(key);
-        map.set(key, existing);
         return { count: existing.count, expiresAt: existing.expiresAt };
       }
-      evictIfFull();
+      ensureRoom();
       const expiresAt = Date.now() + ttlMs;
       map.set(key, { count: 1, expiresAt });
       return { count: 1, expiresAt };

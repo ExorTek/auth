@@ -65,7 +65,9 @@ const res = await verifyChallenge(token, {
 ```
 
 The first verify with `consume: true` accepts; every subsequent verify
-fails with `reason: 'replay'`. Enforcement is atomic — the store's
+fails with `reason: 'replay'`. Verifying a single-use token without
+`consume: true` fails with `reason: 'consume_required'` — otherwise it
+would verify any number of times. Enforcement is atomic — the store's
 `incr` call is used as compare-and-set, so two concurrent requests
 with the same token cannot both pass.
 
@@ -86,6 +88,7 @@ Every non-throw failure surfaces one of these `reason` codes:
 | `ip_missing`          | Token was IP-bound but `options.ip` was not supplied.          |
 | `ip_mismatch`         | Token was IP-bound and current IP differs.                     |
 | `replay`              | `consume: true` and store already saw this `jti`.              |
+| `consume_required`    | A single-use token verified without `consume: true`.           |
 | `store_unavailable`   | `consume: true` and the store threw (e.g. Redis down).         |
 
 <Callout type="info">

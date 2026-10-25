@@ -9,7 +9,7 @@ import { hash } from '@exortek/crypto';
 import { parseDuration } from '@exortek/shared/duration';
 import { isNonEmptyString, isFunction } from '@exortek/shared/predicates';
 import { generate } from './token.js';
-import { assertObject, assertNonEmptyString } from './internal/guards.js';
+import { assertObject, assertNonEmptyString, invalidArgument } from './internal/guards.js';
 
 export { generate } from './token.js';
 
@@ -25,7 +25,7 @@ export { generate } from './token.js';
 /**
  * @typedef {import('./token.js').GenerateOptions & {
  *   store: OpaqueStore,
- *   expiresIn?: string | number,
+ *   expiresIn: string | number | null,   // REQUIRED — a duration, or null for a deliberately non-expiring token
  *   metadata?: Record<string, unknown>,
  *   hashAlgo?: import('@exortek/crypto').HashAlgorithm,
  *   now?: number,
@@ -49,12 +49,18 @@ export async function create(options) {
   assertObject(options, 'create.options');
   const { store, expiresIn, metadata, hashAlgo = 'sha256', now = Date.now(), ...tokenOptions } = options;
   assertObject(store, 'create.options.store');
+  // A credential that never expires should be a decision, not an omission.
+  if (expiresIn === undefined) {
+    throw invalidArgument(
+      "create.options.expiresIn is required — pass a duration ('30d', 3600000) or null for a token that never expires",
+    );
+  }
 
   const token = generate(tokenOptions);
   const hashedToken = hashToken(token, hashAlgo);
   // Parse once — stores also accept a number, so a single ms value keeps
   // the returned expiresAt and the store's TTL calculation in lockstep.
-  const expiresMs = expiresIn !== undefined ? parseDuration(expiresIn) : undefined;
+  const expiresMs = expiresIn !== null ? parseDuration(expiresIn) : undefined;
   const expiresAt = expiresMs !== undefined ? new Date(now + expiresMs) : undefined;
 
   await store.set(hashedToken, metadata ?? {}, { expiresIn: expiresMs });
@@ -149,6 +155,8 @@ const JSON_HEADERS = Object.freeze({
  *   throws. The handler still returns the no-oracle default so the endpoint
  *   never leaks store-health signals — this hook exists so the app can still
  *   log the failure.
+ * @property {(req: any) => boolean | Promise<boolean>} [authorize]  Authenticates the CALLER of the
+ *   endpoint (RFC 7662 §2.1). Required by `introspectionHandler`; optional for `revocationHandler`.
  */
 
 /**
@@ -167,10 +175,20 @@ const JSON_HEADERS = Object.freeze({
  */
 export function introspectionHandler(options) {
   assertObject(options, 'introspectionHandler.options');
-  const { store, hashAlgo = 'sha256', tokenField = 'token', onError } = options;
+  const { store, hashAlgo = 'sha256', tokenField = 'token', onError, authorize } = options;
   assertObject(store, 'introspectionHandler.options.store');
+  // RFC 7662 §2.1: the endpoint MUST require caller authorization, or it is
+  // an open oracle — anyone holding a token reads its metadata back.
+  if (!isFunction(authorize)) {
+    throw invalidArgument(
+      'introspectionHandler.options.authorize is required — authenticate the calling resource server',
+    );
+  }
 
   return async function introspection(req) {
+    if ((await authorize(req)) !== true) {
+      return { status: 401, body: { error: 'invalid_client' }, headers: { ...JSON_HEADERS } };
+    }
     const token = req?.body?.[tokenField];
     if (!isNonEmptyString(token)) {
       return { status: 200, body: { active: false }, headers: { ...JSON_HEADERS } };
@@ -204,10 +222,15 @@ export function introspectionHandler(options) {
  */
 export function revocationHandler(options) {
   assertObject(options, 'revocationHandler.options');
-  const { store, hashAlgo = 'sha256', tokenField = 'token', onError } = options;
+  const { store, hashAlgo = 'sha256', tokenField = 'token', onError, authorize } = options;
   assertObject(store, 'revocationHandler.options.store');
 
   return async function revocation(req) {
+    // Optional: revoking a token you hold is harmless self-service, but a
+    // deployment may still restrict the endpoint to authenticated clients.
+    if (isFunction(authorize) && (await authorize(req)) !== true) {
+      return { status: 401, body: { error: 'invalid_client' }, headers: { ...JSON_HEADERS } };
+    }
     const token = req?.body?.[tokenField];
     try {
       if (isNonEmptyString(token)) {

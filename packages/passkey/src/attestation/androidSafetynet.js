@@ -41,6 +41,7 @@ import { base64url } from '@exortek/crypto/encode';
 import { verifyChain, toCertificates } from '../x509/chain.js';
 import { concat } from '../internal/bytes.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { hasSubjectAttribute } from '../x509/subject.js';
 import { isString, isArray } from '@exortek/shared/predicates';
 
 const LEAF_CN = 'attest.android.com';
@@ -182,12 +183,11 @@ export function verifyAndroidSafetynet(params) {
     );
   }
 
-  // Leaf CN check — WebAuthn L3 §8.5 step 3. Anchor the CN to a real
-  // RDN boundary (start/end of the flattened subject or a comma /
-  // newline separator). The previous `(?:$|\D)` terminator matched a
-  // trailing `.`, so `CN=attest.android.com.attacker.example` slipped
-  // through — a subdomain-suffix bypass of the leaf identity gate.
-  if (!/(?:^|[,\n])CN=attest\.android\.com(?:$|[,\n])/i.test(leaf.subject)) {
+  // Leaf CN check — WebAuthn L3 §8.5 step 3. Compare the parsed CN
+  // attribute exactly: a regex over the flattened subject was fooled both
+  // by a suffix (`CN=attest.android.com.attacker.example`) and by an
+  // escaped comma inside another value (`CN=evil\,CN=attest.android.com`).
+  if (!hasSubjectAttribute(leaf.subject, 'CN', LEAF_CN, { ignoreCase: true })) {
     throw new PasskeyError(
       ErrorCode.ATTESTATION_INVALID,
       `android-safetynet: leaf subject CN must be "${LEAF_CN}" (got "${leaf.subject.replace(/\n/g, ' ')}")`,

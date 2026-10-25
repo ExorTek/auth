@@ -5,6 +5,7 @@ import { isArray } from '@exortek/shared/predicates';
 import { array, instanceOf, object, oneOf, optional, string, union } from '@exortek/shared/validate';
 
 import { assertBytesOrString, invalidArgument, parse } from './internal/guards.js';
+import { normalizePassword } from './internal/normalize.js';
 
 const SecretItemSchema = union(string(), instanceOf(Uint8Array));
 
@@ -79,9 +80,15 @@ export function createPepper(config) {
   const hashName = config.hash ?? 'sha256';
   const encoding = config.encoding ?? 'base64';
 
-  const wrapWith = (secretBytes, password) => {
-    return createHmac(hashName, secretBytes).update(toBuffer(password, 'password')).digest(encoding);
-  };
+  // The password is normalized (NFKC, NUL check, length cap) before the
+  // HMAC, exactly as the unpeppered path does — otherwise the same visible
+  // password typed with composed vs decomposed characters peppered to two
+  // different values, and an unbounded input went straight into the HMAC.
+  const wrapWith = (secretBytes, password) =>
+    createHmac(hashName, secretBytes).update(normalizePassword(password)).digest(encoding);
+  // Hashes minted before normalization was applied: the raw bytes.
+  const wrapLegacy = (secretBytes, password) =>
+    createHmac(hashName, secretBytes).update(toBuffer(password, 'password')).digest(encoding);
 
   return {
     /**
@@ -123,7 +130,16 @@ export function createPepper(config) {
      */
     wrapAll(password) {
       assertBytesOrString(password, 'pepper.wrapAll.password');
-      return secrets.map(s => wrapWith(s, password));
+      const out = secrets.map(s => wrapWith(s, password));
+      // Keep hashes peppered from the raw (unnormalized) input verifiable;
+      // when one matches, the caller rehashes under candidates[0] as usual.
+      for (const s of secrets) {
+        const legacy = wrapLegacy(s, password);
+        if (!out.includes(legacy)) {
+          out.push(legacy);
+        }
+      }
+      return out;
     },
 
     /**

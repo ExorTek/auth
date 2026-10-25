@@ -19,35 +19,11 @@
 import { createVerify, verify as verifyRaw, X509Certificate } from 'node:crypto';
 import { importCoseKey, algorithmForId } from '../cose/key.js';
 import { verifyChain, toCertificates } from '../x509/chain.js';
-import { findExtension, readTlv, TAG } from '../asn1/der.js';
 import { bytesEqual, concat } from '../internal/bytes.js';
 import { PasskeyError, ErrorCode } from '../errors.js';
+import { readCertAaguid } from './aaguid.js';
+import { hasSubjectAttribute } from '../x509/subject.js';
 import { isArray } from '@exortek/shared/predicates';
-
-const AAGUID_OID = '1.3.6.1.4.1.45724.1.1.4';
-
-/**
- * Extract the AAGUID from the packed attestation leaf certificate,
- * if present. RFC-shaped: extnValue is OCTET STRING wrapping OCTET
- * STRING wrapping the 16-byte AAGUID.
- *
- * @param {Uint8Array} certDer
- * @returns {Uint8Array | null}
- */
-function readCertAaguid(certDer) {
-  const outer = findExtension(certDer, AAGUID_OID);
-  if (outer === null) {
-    return null;
-  }
-  const inner = readTlv(outer);
-  if (inner.tag !== TAG.OCTET_STRING || inner.contents.byteLength !== 16) {
-    throw new PasskeyError(
-      ErrorCode.ATTESTATION_INVALID,
-      'packed attestation: AAGUID extension is not a 16-byte OCTET STRING',
-    );
-  }
-  return inner.contents;
-}
 
 /**
  * @param {object} params
@@ -137,10 +113,11 @@ export function verifyPacked({ attStmt, authDataBytes, clientDataHash, attestedC
   // Basic packed leaf-cert sanity per WebAuthn L3 §8.2 step 2.3:
   //   version=3, subject-OU="Authenticator Attestation", subject-CN/O
   //   present, basicConstraints CA:FALSE.
-  // Node exposes .subject as multi-line text; parse loosely to avoid
-  // rejecting minor formatting differences.
+  // Compare the parsed OU attribute exactly — a substring match was
+  // satisfied by any value containing the text (`O=Evil OU=Authenticator
+  // Attestation`).
   const subject = leaf.subject.replace(/\r/g, '');
-  if (!/OU=Authenticator Attestation/i.test(subject)) {
+  if (!hasSubjectAttribute(subject, 'OU', 'Authenticator Attestation')) {
     throw new PasskeyError(
       ErrorCode.ATTESTATION_INVALID,
       `packed attestation: leaf subject missing "OU=Authenticator Attestation" per §8.2 step 2.3 (got: ${subject.replace(/\n/g, ' ')})`,

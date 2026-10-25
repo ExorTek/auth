@@ -15,7 +15,7 @@ create({
   prefix?: string, version?: string, type?: string, separator?: string,
 
   store: OpaqueStore,
-  expiresIn?: string | number,       // omit for no expiry
+  expiresIn: string | number | null, // REQUIRED — a duration, or null for a deliberately non-expiring token
   metadata?: Record<string, unknown>,
   hashAlgo?: HashAlgorithm,          // default 'sha256'
   now?: number,                      // override Date.now() for testing

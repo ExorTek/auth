@@ -21,8 +21,10 @@ touching `res` itself.
 ```js
 import { introspectionHandler, revocationHandler } from '@exortek/opaque';
 
-const introspect = introspectionHandler({ store });
-const revokeRoute = revocationHandler({ store });
+// authorize(req) authenticates the calling resource server (RFC 7662 §2.1).
+// Required for introspection — without it the endpoint is an open oracle.
+const introspect = introspectionHandler({ store, authorize: req => isTrustedResourceServer(req) });
+const revokeRoute = revocationHandler({ store }); // authorize is optional here
 
 // RFC 7662 — always 200, active: false for anything invalid so a
 // caller can't distinguish "unknown" from "expired" from "revoked".
@@ -68,7 +70,7 @@ import basicAuth from 'express-basic-auth';
 app.post(
   '/oauth/introspect',
   basicAuth({ users: { 'resource-server': process.env.INTROSPECT_SECRET } }),
-  introspectionHandler({ store }),
+  introspectionHandler({ store, authorize: () => true }), // basicAuth already authenticated the caller
 );
 ```
 

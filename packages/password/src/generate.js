@@ -62,13 +62,14 @@ export function generate(options = {}) {
   return sampleAlphabet(alphabet, length);
 }
 
-// Diceware short word list — 6-word phrases at 12.9 bits of entropy per
-// word give ~77 bits total, which for passphrases beats a 12-char random
-// password on memorability without giving up much strength.
+// Short word list — 256 words, so each word carries exactly 8 bits and the
+// default 6-word phrase ~48 bits. That is fine for something memorable
+// behind a rate-limited login, not for an offline-attackable secret.
 //
-// The list is intentionally hand-curated and short (256 words) so it fits
-// in the bundle without a data file. For higher-entropy passphrases pull
-// a full EFF list into your own consumer code and pass it in.
+// The list is intentionally hand-curated and short so it fits in the
+// bundle without a data file. For higher-entropy passphrases pass more
+// words, or a full EFF list (7776 words ≈ 12.9 bits each) from your own
+// consumer code.
 const DEFAULT_WORDS = [
   'able',
   'acid',

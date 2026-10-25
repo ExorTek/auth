@@ -40,12 +40,12 @@ try {
 | `BACKUP_ELIGIBLE_REQUIRED`          | 400  | `requireBackupEligible: true` but BE bit not set                                  |
 | `BACKED_UP_REQUIRED`                | 400  | `requireBackedUp: true` but BS bit not set                                        |
 | `SIGNATURE_INVALID`                 | 400  | Attestation or assertion signature does not verify                                |
+| `CREDENTIAL_MISMATCH`               | 400  | Assertion made with another credential, credential not owned by `expectedUserId`, or `userHandle` mismatch |
 | `COUNTER_ROLLBACK`                  | 400  | `newCounter <= storedCounter` — possible cloned authenticator                     |
 | `PUBLIC_KEY_UNSUPPORTED`            | 400  | COSE key parses but Node can't import it                                          |
 | `UNSUPPORTED_ALGORITHM`             | 400  | COSE algorithm outside `supportedAlgorithms`                                      |
 | `ATTESTATION_INVALID`               | 400  | Format-specific attestation check failed (nonce, cert extension, etc.)            |
 | `ATTESTATION_TRUST_ANCHOR_MISSING`  | 400  | Cert chain did not terminate at an RP-supplied trust anchor                       |
-| `ATTESTATION_CERT_REVOKED`          | 400  | Optional `checkCertRevocation` hook flagged a cert (not wired at 1.0.0)           |
 | `UNSUPPORTED_ATTESTATION_FORMAT`    | 400  | `fmt` outside the seven WebAuthn L3 formats                                       |
 | `EXTENSION_INVALID`                 | 400  | Extension input/output malformed                                                  |
 | `MDS_BLOB_INVALID`                  | 400  | MDS3 blob malformed / signature bad / header wrong                                |

@@ -52,3 +52,13 @@ test('rejects non-string / non-buffer', () => {
     err => err.code === ErrorCode.INVALID_ARGUMENT,
   );
 });
+
+test('normalizePassword rejects an oversized input before normalizing it', () => {
+  const huge = 'a'.repeat(5_000_000);
+  const started = Date.now();
+  assert.throws(
+    () => normalizePassword(huge),
+    err => err.code === 'PASSWORD_TOO_LONG',
+  );
+  assert.ok(Date.now() - started < 200);
+});

@@ -21,6 +21,9 @@ export const ErrorCode = Object.freeze({
 
   // Signature / crypto
   SIGNATURE_INVALID: 'SIGNATURE_INVALID',
+  // The assertion's credential / user does not match the stored credential
+  // or the user the ceremony was started for.
+  CREDENTIAL_MISMATCH: 'CREDENTIAL_MISMATCH',
   COUNTER_ROLLBACK: 'COUNTER_ROLLBACK',
   PUBLIC_KEY_UNSUPPORTED: 'PUBLIC_KEY_UNSUPPORTED',
   UNSUPPORTED_ALGORITHM: 'UNSUPPORTED_ALGORITHM',
@@ -54,6 +57,7 @@ export class PasskeyError extends BaseError {
     [ErrorCode.BACKUP_ELIGIBLE_REQUIRED]: 400,
     [ErrorCode.BACKED_UP_REQUIRED]: 400,
     [ErrorCode.SIGNATURE_INVALID]: 400,
+    [ErrorCode.CREDENTIAL_MISMATCH]: 400,
     [ErrorCode.COUNTER_ROLLBACK]: 400,
     [ErrorCode.PUBLIC_KEY_UNSUPPORTED]: 400,
     [ErrorCode.UNSUPPORTED_ALGORITHM]: 400,

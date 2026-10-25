@@ -88,3 +88,47 @@ describe(
     });
   },
 );
+
+function mintRoot(name, ext) {
+  sh(`${OPENSSL} ecparam -name prime256v1 -genkey -noout -out ${p(`${name}.key`)}`);
+  sh(
+    `${OPENSSL} req -x509 -new -key ${p(`${name}.key`)} -sha256 -days 3650 -out ${p(`${name}.pem`)} ` +
+      `-subj "/CN=${name}" ${ext.map(e => `-addext "${e}"`).join(' ')}`,
+  );
+}
+
+function mintSigned(name, issuer, extLines) {
+  sh(`${OPENSSL} ecparam -name prime256v1 -genkey -noout -out ${p(`${name}.key`)}`);
+  sh(`${OPENSSL} req -new -key ${p(`${name}.key`)} -out ${p(`${name}.csr`)} -subj "/CN=${name}"`);
+  writeFileSync(p(`${name}.ext`), `${extLines.join('\n')}\n`);
+  sh(
+    `${OPENSSL} x509 -req -in ${p(`${name}.csr`)} -CA ${p(`${issuer}.pem`)} -CAkey ${p(`${issuer}.key`)} ` +
+      `-CAcreateserial -days 3650 -sha256 -extfile ${p(`${name}.ext`)} -out ${p(`${name}.pem`)}`,
+  );
+}
+
+const pem = name => readFileSync(p(`${name}.pem`), 'utf8');
+
+describe(
+  'x509 — issuer keyUsage and pathLenConstraint (RFC 5280 §4.2.1.3, §4.2.1.9)',
+  { skip: !HAS_OPENSSL ? 'openssl not installed' : false },
+  () => {
+    test('rejects a CA whose keyUsage lacks keyCertSign (enforced by checkIssued)', () => {
+      mintRoot('kuRoot', ['basicConstraints=critical,CA:TRUE', 'keyUsage=critical,digitalSignature']);
+      mintSigned('kuLeaf', 'kuRoot', ['basicConstraints=critical,CA:FALSE']);
+      assert.throws(() => verifyChain({ x5c: [pem('kuLeaf')], trustAnchors: [pem('kuRoot')] }));
+    });
+
+    test('rejects an intermediate below a pathlen:0 CA, accepts a direct leaf', () => {
+      mintRoot('plRoot', ['basicConstraints=critical,CA:TRUE,pathlen:0', 'keyUsage=critical,keyCertSign']);
+      mintSigned('plInt', 'plRoot', ['basicConstraints=critical,CA:TRUE', 'keyUsage=critical,keyCertSign']);
+      mintSigned('plLeaf', 'plInt', ['basicConstraints=critical,CA:FALSE']);
+      assert.throws(
+        () => verifyChain({ x5c: [pem('plLeaf'), pem('plInt')], trustAnchors: [pem('plRoot')] }),
+        /allows 0 intermediate/,
+      );
+      mintSigned('plDirect', 'plRoot', ['basicConstraints=critical,CA:FALSE']);
+      verifyChain({ x5c: [pem('plDirect')], trustAnchors: [pem('plRoot')] });
+    });
+  },
+);

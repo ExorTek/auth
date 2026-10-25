@@ -27,12 +27,15 @@ interface MagicLinkStore {
 `createMagicLink`. `listByEmail` / `revokeByEmail` are required
 only for `listPendingForEmail` / `revokeAllForEmail`.
 
-## `memoryStore()`
+## `memoryStore(options?)`
 
 ```js
 import { memoryStore } from '@exortek/magic-link/stores';
-const store = memoryStore();
+const store = memoryStore({ maxRecords: 100_000, sweepMs: 60_000 }); // defaults
 ```
+
+Expired links are swept in the background and at most `maxRecords` are
+kept (oldest dropped first).
 
 In-process Map keyed by `id` with a reverse index by email and a
 small counter map for `incrRate`. Uses `structuredClone` on read /

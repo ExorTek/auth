@@ -426,3 +426,28 @@ test('hashEmailValue: deterministic + secret-namespaced', () => {
   assert.equal(a, b);
   assert.notEqual(a, c);
 });
+
+test('email case and padding do not create a second identity', async () => {
+  const store = memoryStore();
+  try {
+    const base = {
+      secret: SECRET,
+      baseUrl: BASE_URL,
+      expiresIn: '15m',
+      store,
+      maxPerEmail: { count: 2, window: '1h' },
+    };
+    await createMagicLink({ ...base, email: 'victim@x.com' });
+    await createMagicLink({ ...base, email: 'Victim@X.com' });
+    // The rate limit is shared across spellings…
+    await assert.rejects(
+      createMagicLink({ ...base, email: ' VICTIM@x.com ' }),
+      err => err instanceof MagicLinkError && err.code === ErrorCode.RATE_LIMITED,
+    );
+    // …and so is revocation.
+    assert.equal(await revokeAllForEmail('VICTIM@X.COM', { store }), 2);
+    assert.deepEqual(await listPendingForEmail('victim@x.com', { store }), []);
+  } finally {
+    store._stop();
+  }
+});

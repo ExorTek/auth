@@ -15,9 +15,11 @@ stores fit exactly.
 
 ## `memoryStore(options?)`
 
-In-process Map with true LRU eviction (position refreshed on every
-`incr` — the replay-guard tombstone stays warm until its TTL expires)
-and a background TTL sweep.
+In-process Map with a background TTL sweep. It never evicts a live
+key — that would reopen a single-use token's replay window — so when all
+`maxKeys` slots hold unexpired markers, a new `incr` throws (verify then
+reports `store_unavailable`). Size `maxKeys` for your peak, or use the
+Redis store.
 
 ```js
 import { memoryStore } from '@exortek/challenge/stores';

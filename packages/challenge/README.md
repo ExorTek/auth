@@ -133,7 +133,7 @@ verifyChallenge(token, {
       'malformed' | 'bad_signature' | 'expired' | 'not_yet_valid'
       | 'user_mismatch' | 'method_mismatch' | 'step_mismatch'
       | 'next_step_mismatch' | 'ip_mismatch' | 'ip_missing'
-      | 'replay' | 'store_unavailable'
+      | 'replay' | 'consume_required' | 'store_unavailable'
     }
 >
 ```
@@ -165,6 +165,8 @@ const second = await verifyChallenge(token, {
   secret: SECRET, consume: true, store,
 }); // { valid: false, reason: 'replay' }
 ```
+
+A single-use token verified **without** `consume: true` fails with `reason: 'consume_required'` — its single-use guarantee lives in the store, so verifying it any other way would let it replay.
 
 The store is any object exposing `incr(key, ttlMs) → Promise<{ count }>`. `@exortek/security`'s rate-limit stores fit exactly — reuse yours if you already have one.
 

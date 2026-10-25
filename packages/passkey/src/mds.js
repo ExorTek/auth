@@ -134,14 +134,19 @@ export function verifyMdsBlob(jwsCompact, options) {
 /**
  * Build a `{ aaguid: entry }` index from an MDS3 payload.
  *
+ * Each entry keeps the FIDO `statusReports` and the most recent `status`
+ * (MDS3 lists them oldest first): an RP must see a `REVOKED` or
+ * `*_COMPROMISE` authenticator model, not just its metadata statement.
+ *
  * @param {{ entries: Array<Record<string, unknown>> }} mdsPayload
- * @returns {Record<string, { name: string, statement: object }>}
+ * @returns {Record<string, { name: string, statement: object, statusReports: object[], status: string | undefined }>}
  */
 export function buildAaguidIndex(mdsPayload) {
   if (!mdsPayload || !isArray(mdsPayload.entries)) {
     throw new PasskeyError(ErrorCode.MDS_BLOB_INVALID, 'mds: buildAaguidIndex requires a payload with .entries');
   }
-  const out = {};
+  // Keys come from the blob — no prototype for them to collide with.
+  const out = Object.create(null);
   for (const entry of mdsPayload.entries) {
     const statement = entry?.metadataStatement;
     if (!statement) {
@@ -152,7 +157,9 @@ export function buildAaguidIndex(mdsPayload) {
       continue;
     }
     const name = statement.description ?? aaguid;
-    out[aaguid] = { name, statement };
+    const statusReports = isArray(entry.statusReports) ? entry.statusReports : [];
+    const latest = statusReports.at(-1);
+    out[aaguid] = { name, statement, statusReports, status: isString(latest?.status) ? latest.status : undefined };
   }
   return out;
 }

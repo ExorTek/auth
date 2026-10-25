@@ -62,9 +62,10 @@ await revoke(token, { store });
 `generate()` is the entropy layer underneath `create()` — reach for it
 directly when you just need a random string, not a stored/verifiable
 token. Formats: `hex` / `base64url` / `base58` / `crockford` (raw
-entropy), `ulid` / `uuid4` / `uuid7` (standard identifiers),
-`alphanumeric`, plus composite `prefixed` (`usr_3f9a...`) and
-`structured` (`v1.ref.01ARZ...`) shapes.
+entropy, at least 16 bytes), `uuid4`, `alphanumeric` (at least 22
+characters), plus composite `prefixed` (`usr_3f9a...`) and `structured`
+(`v1.ref.5Hue...`) shapes. Every token carries ≥ 128 random bits;
+time-ordered `ulid` / `uuid7` are refused — they are largely predictable.
 
 ## Where to next
 

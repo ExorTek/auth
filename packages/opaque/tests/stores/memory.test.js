@@ -49,3 +49,15 @@ describe('memoryStore', () => {
     store.stop();
   });
 });
+
+describe('memoryStore — bounded', () => {
+  test('evicts the oldest entry beyond maxEntries', async () => {
+    const store = memoryStore({ maxEntries: 2 });
+    await store.set('a', {});
+    await store.set('b', {});
+    await store.set('c', {});
+    assert.equal(await store.get('a'), null);
+    assert.ok(await store.get('c'));
+    store._stop?.();
+  });
+});

@@ -2,6 +2,7 @@ import { PasswordError, ErrorCode } from '../errors.js';
 import { assertPositiveInt } from '../internal/guards.js';
 import { normalizePassword } from '../internal/normalize.js';
 import { parseHash } from '../phc.js';
+import { isSaneHashLength } from '../internal/limits.js';
 import { isString } from '@exortek/shared/predicates';
 
 // OWASP Password Storage Cheat Sheet (2024) Argon2id first-line
@@ -161,6 +162,33 @@ export async function hash(password, options = {}) {
   return impl.hash(pwBytes, argonOptions);
 }
 
+// Verify-side ceilings for parameters read from a stored hash: 1 GiB of
+// memory (m is in KiB), 10 passes, 16 lanes.
+const MAX_VERIFY_MEMORY_KIB = 1024 * 1024;
+const MAX_VERIFY_PASSES = 10;
+const MAX_VERIFY_LANES = 16;
+
+/**
+ * @param {Record<string, string>} params
+ * @returns {boolean}
+ */
+function withinVerifyLimits(params) {
+  const m = Number(params.m);
+  const t = Number(params.t);
+  const p = Number(params.p);
+  return (
+    Number.isInteger(m) &&
+    m >= 1 &&
+    m <= MAX_VERIFY_MEMORY_KIB &&
+    Number.isInteger(t) &&
+    t >= 1 &&
+    t <= MAX_VERIFY_PASSES &&
+    Number.isInteger(p) &&
+    p >= 1 &&
+    p <= MAX_VERIFY_LANES
+  );
+}
+
 /**
  * Verify a candidate password against an Argon2 PHC hash. Returns `false`
  * on any mismatch — including malformed hashes and wrong algorithms —
@@ -172,6 +200,13 @@ export async function hash(password, options = {}) {
  */
 export async function verify(password, phcHash) {
   if (!isString(phcHash) || !phcHash.startsWith('$argon2')) {
+    return false;
+  }
+  // Nothing bounded the cost parameters of a stored hash: m=4194304
+  // (4 GiB) or t=1000 turns one login into a process-wide DoS. Parse and
+  // cap them before handing the hash to the native implementation.
+  const record = parseHash(phcHash);
+  if (!record || !record.hash || !withinVerifyLimits(record.params) || !isSaneHashLength(record.hash)) {
     return false;
   }
   const impl = await loadArgon2();

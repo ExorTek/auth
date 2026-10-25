@@ -102,7 +102,7 @@ function computeTpmName(pubArea) {
 }
 
 /** Mint an AIK RSA-2048 cert with the required TCG profile bits. */
-function mintAikCert() {
+function mintAikCert({ aaguidExt = null } = {}) {
   const keyPath = join(WORK, 'aik.key');
   const csrPath = join(WORK, 'aik.csr');
   const certPath = join(WORK, 'aik.pem');
@@ -124,6 +124,10 @@ function mintAikCert() {
       'basicConstraints = critical,CA:FALSE',
       'extendedKeyUsage = 2.23.133.8.3',
       'subjectAltName = DNS:tpm-test.example.com',
+      // FIDO AAGUID extension: OCTET STRING wrapping the 16-byte AAGUID.
+      ...(aaguidExt
+        ? [`1.3.6.1.4.1.45724.1.1.4 = DER:04:10:${Buffer.from(aaguidExt).toString('hex').match(/../g).join(':')}`]
+        : []),
     ].join('\n'),
   );
   execSync(`${OPENSSL} req -new -key ${keyPath} -out ${csrPath} -config ${cnfPath} -subj "/"`, { stdio: 'ignore' });
@@ -215,7 +219,7 @@ describe('tpm attestation — happy path', { skip: !HAS_OPENSSL ? 'openssl not i
 });
 
 describe('tpm attestation — rejections', { skip: !HAS_OPENSSL ? 'openssl not installed' : false }, () => {
-  function buildFullFixture() {
+  function buildFullFixture({ aaguidExt } = {}) {
     const credKp = generateKeyPairSync('rsa', { modulusLength: 2048 });
     const credJwk = credKp.publicKey.export({ format: 'jwk' });
     const modulus = new Uint8Array(base64url.decode(credJwk.n));
@@ -224,7 +228,7 @@ describe('tpm attestation — rejections', { skip: !HAS_OPENSSL ? 'openssl not i
     for (const b of eBytes) exponent = (exponent << 8) | b;
 
     const pubArea = buildRsaPubArea({ modulus, exponent });
-    const aik = mintAikCert();
+    const aik = mintAikCert({ aaguidExt });
     const aikKey = createPrivateKey(aik.keyPem);
     const inputs = buildInputs({
       rpId: 'example.com',
@@ -239,6 +243,36 @@ describe('tpm attestation — rejections', { skip: !HAS_OPENSSL ? 'openssl not i
     const sig = createSign('RSA-SHA256').update(certInfo).sign(aikKey);
     return { pubArea, certInfo, sig, aik, inputs };
   }
+
+  test('rejects an AIK cert whose AAGUID extension differs from authData', () => {
+    // authData carries the all-zero AAGUID; the cert claims another model.
+    const f = buildFullFixture({ aaguidExt: new Uint8Array(16).fill(0xab) });
+    const attStmt = new Map([
+      ['ver', '2.0'],
+      ['alg', -257],
+      ['sig', new Uint8Array(f.sig)],
+      ['x5c', [f.aik.der]],
+      ['pubArea', new Uint8Array(f.pubArea)],
+      ['certInfo', new Uint8Array(f.certInfo)],
+    ]);
+    assert.throws(
+      () => verifyTpm({ attStmt, ...f.inputs }),
+      err => err instanceof PasskeyError && err.code === ErrorCode.ATTESTATION_INVALID && /AAGUID/.test(err.message),
+    );
+  });
+
+  test('accepts an AIK cert whose AAGUID extension matches authData', () => {
+    const f = buildFullFixture({ aaguidExt: new Uint8Array(16) });
+    const attStmt = new Map([
+      ['ver', '2.0'],
+      ['alg', -257],
+      ['sig', new Uint8Array(f.sig)],
+      ['x5c', [f.aik.der]],
+      ['pubArea', new Uint8Array(f.pubArea)],
+      ['certInfo', new Uint8Array(f.certInfo)],
+    ]);
+    assert.equal(verifyTpm({ attStmt, ...f.inputs }).format, 'tpm');
+  });
 
   test('rejects when ver is not "2.0"', () => {
     const f = buildFullFixture();

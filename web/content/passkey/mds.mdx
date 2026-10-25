@@ -47,7 +47,12 @@ const { payload, certChain } = verifyMdsBlob(jws, {
 const index = buildAaguidIndex(payload);
 index['ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4'].name;
 // → 'Google Password Manager'
+index[aaguid].status; // latest FIDO status, e.g. 'FIDO_CERTIFIED' or 'REVOKED'
+index[aaguid].statusReports; // the full history
 ```
+
+Check `status` at registration — refuse authenticator models reported
+`REVOKED` or with a `*_COMPROMISE` status.
 
 <Callout type="warning">
   We DO NOT bundle the FIDO MDS3 root CA. It rotates on the FIDO
