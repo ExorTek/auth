@@ -7,6 +7,7 @@ import { strength } from './strength.js';
 import { generate, passphrase, alphabets } from './generate.js';
 import { policy, assertPolicy } from './policy.js';
 import { createPepper } from './pepper.js';
+import { createLimiter } from './limiter.js';
 import { createHistory } from './history.js';
 import { presets } from './presets.js';
 import { parseHash, serialiseHash } from './phc.js';
@@ -39,6 +40,7 @@ export const password = Object.freeze({
   policy,
   assertPolicy,
   createPepper,
+  createLimiter,
   createHistory,
   presets,
   parseHash,
@@ -61,6 +63,7 @@ export {
   policy,
   assertPolicy,
   createPepper,
+  createLimiter,
   createHistory,
   presets,
   parseHash,
@@ -89,5 +92,6 @@ export {
  * @typedef {import('./policy.js').PolicyResult} PolicyResult
  * @typedef {import('./policy.js').PolicyViolation} PolicyViolation
  * @typedef {import('./pepper.js').PepperConfig} PepperConfig
+ * @typedef {import('./limiter.js').LimiterConfig} LimiterConfig
  * @typedef {import('./history.js').HistoryConfig} HistoryConfig
  */
