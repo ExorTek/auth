@@ -2,38 +2,81 @@ name: Release
 
 # Manual publish. Versions are bumped beforehand through a normal
 # "chore: version packages" PR (yarn changeset:ver → commit → PR → merge);
-# this workflow only builds, publishes to npm, tags, and cuts GitHub
-# Releases for whatever versions currently sit on master. Trigger it from
-# Actions → Release → "Run workflow", or `gh workflow run release.yml`.
+# this workflow only builds and publishes to npm whatever versions currently
+# sit on master. Trigger it from Actions → Release → "Run workflow", or
+# `gh workflow run release.yml`.
+#
+# Two jobs, so the publish credential never shares a job with untrusted code:
+#   - build   — installs dependencies (their lifecycle scripts run here) and
+#               builds every package. No id-token, read-only contents.
+#   - publish — holds the OIDC token, runs in the protected `npm` environment
+#               (create it under Settings → Environments; add required
+#               reviewers so every publish waits for approval). It installs
+#               with --mode=skip-build, so no dependency script runs next to
+#               the token, and publishes the dist/ built by the build job.
 
 on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Build + pack only, do not publish or tag'
+        description: 'Build + pack only, do not publish'
         type: boolean
         default: false
 
 permissions:
-  contents: write # push tags + create GitHub Releases
-  id-token: write # OIDC — npm Trusted Publishing (no stored token) + provenance
+  contents: read
 
 concurrency: release
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn build
+
+      # Show exactly what each tarball would contain.
+      - name: Pack (dry run)
+        if: ${{ inputs.dry_run }}
+        run: yarn workspaces foreach --all --no-private --verbose pack --dry-run
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: packages/*/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # OIDC — npm Trusted Publishing (no stored token) + provenance
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
       - run: corepack enable
-      - run: yarn install --immutable
-      - run: yarn build
+      - run: yarn install --immutable --mode=skip-build
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: packages
 
       # Auth is OIDC Trusted Publishing — no NPM_TOKEN. Configure a trusted
       # publisher for each @exortek/* package on npmjs.com first (repo
@@ -41,7 +84,6 @@ jobs:
       # environment automatically when id-token:write is granted and no auth
       # token is set. YARN_NPM_PUBLISH_PROVENANCE attaches build provenance.
       - name: Publish to npm (OIDC Trusted Publishing + provenance)
-        if: ${{ !inputs.dry_run }}
         env:
           YARN_NPM_PUBLISH_PROVENANCE: 'true'
         run: |
@@ -52,7 +94,3 @@ jobs:
       # `./scripts/releases.sh --apply` (`gh release create` per package). The
       # in-CI `changeset tag` + `git push --tags` approach silently pushed
       # nothing here ("Everything up-to-date"), so it was moved out.
-
-      - name: Dry-run notice
-        if: ${{ inputs.dry_run }}
-        run: echo "dry_run=true — built only, nothing published or tagged."
