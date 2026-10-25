@@ -43,6 +43,12 @@ await db.users.insert({ email, pw_hash: stored });
 const ok = await password.verify(pepper.wrap(candidate), user.pw_hash);
 ```
 
+`wrap` normalizes the password (NFKC, NUL check, length cap) before the
+HMAC, exactly like the unpeppered path, so the same visible password
+peppers identically on every device. `wrapAll` also yields the digest of
+the raw input, so hashes peppered before that normalization still verify —
+rehash under `candidates[0]` when one of the later candidates matches.
+
 <Callout type="warning">
   **Store the pepper separately from the hashes.** In a KMS, an env var
   read from a secrets manager, or an HSM — **not** in the same database

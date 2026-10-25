@@ -13,7 +13,7 @@ Mint an HMAC-signed short-lived token and the URL to embed in a
 ```ts
 createMagicLink({
   secret:      string | Buffer | Uint8Array,   // ≥ 32 bytes
-  email:       string,
+  email:       string,                          // trimmed + lower-cased before use
   baseUrl:     string,                          // where /auth/verify lives
   expiresIn:   string | number,                 // '15m' | '1h' | ms
 
@@ -69,7 +69,9 @@ await createMagicLink({
 ```
 
 The counter lives on the same store's `incrRate` method (memory +
-Redis both ship it). When the count exceeds `count` inside the
+Redis both ship it), keyed by the normalized address — `Victim@X.com`
+and `victim@x.com` share one budget, and `revokeAllForEmail` /
+`listPendingForEmail` match either spelling. When the count exceeds `count` inside the
 window, `createMagicLink` throws `MagicLinkError` with
 `code: 'RATE_LIMITED'`. Prevents a spammer from burning your mail
 budget without external rate-limit infrastructure.

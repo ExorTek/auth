@@ -76,7 +76,9 @@ const ok = await verifyTotp(receivedCode, sharedSecret, {
 ```
 
 **Use whatever config makes sense** — SHA-512, 10 digits, custom
-period. The Google Key URI Format restrictions don't apply here.
+period. The Google Key URI Format restrictions don't apply here. (HOTP
+truncation yields a 31-bit value, so 10-digit codes carry ~31 bits and
+their first digit is 0–2 — more digits than 9 add little.)
 
 ### 3. Hardware token (RFC 4226 classic)
 
@@ -152,8 +154,10 @@ await verifyTotp(code, secret, {
 ```
 
 **How it works:** on a successful verify, the matched counter is
-written to the store with a TTL that covers the remaining acceptance
-window. Subsequent verifies inside that window with the same code fail
+written to the store with a TTL that lasts until that counter leaves the
+acceptance window — measured from the matched counter, so a code that
+matched ahead of the window centre stays blocked for as long as it could
+still verify. Subsequent verifies inside that window with the same code fail
 silently — `verifyTotp` returns `false` with no separate reason.
 
 Use Redis for cluster deployments so a code accepted on one worker

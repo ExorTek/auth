@@ -25,6 +25,13 @@ wrong password — so login handlers never need a try/catch around it. The
 only exception raised is `MISSING_PEER_DEP`, when the stored hash's
 algorithm needs `argon2` or `bcryptjs` and neither is installed.
 
+The cost parameters come from the stored hash, so a tampered row could
+otherwise demand gigabytes of memory per login. `verify` refuses (returns
+`false` before deriving anything) when they exceed sane ceilings: scrypt
+`128·N·r` > 1 GiB or `128·N·r·p` > 4 GiB, Argon2 `m` > 1 GiB / `t` > 10 /
+`p` > 16, PBKDF2 iterations > 10 million, or a stored digest outside
+16–64 bytes.
+
 ```js
 import { password } from '@exortek/password';
 
