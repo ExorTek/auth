@@ -1,5 +1,13 @@
 # @exortek/jws
 
+## 1.1.0
+
+### Minor Changes
+
+- 3b047e7: - `verifyJson` enforces `maxTokenSize` (default 64 KiB for the serialized JSON) and `maxSignatures` (default 8) before decoding or verifying.
+  - A JWK that declares `alg`, `use` or `key_ops` is only used for that alg / signatures / that operation.
+  - JWK keys are imported once per object; HMAC signs with the KeyObject directly and ECDSA uses IEEE P1363 natively.
+
 ## 1.0.4
 
 ### Patch Changes

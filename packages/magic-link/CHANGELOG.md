@@ -1,5 +1,19 @@
 # @exortek/magic-link
 
+## 3.0.0
+
+### Major Changes
+
+- d370002: - Email addresses are trimmed and lower-cased before indexing, rate limiting, hashing and lookup, so case variants no longer get separate rate-limit budgets or escape `revokeAllForEmail`.
+  - The memory store sweeps expired links and is bounded (`maxRecords`, default 100,000); its rate-limit counters are never evicted while live.
+  
+  **Migration:** links issued to a mixed-case address before upgrading are not found by `listPendingForEmail` / `revokeAllForEmail`.
+
+### Patch Changes
+
+- 9953042: - Duration strings whose unit is the name of an `Object.prototype` member (for example `'1constructor'`) now throw instead of resolving to `NaN`.
+- 9953042: - When a record is stored again under the same id with a different owner (`userId` / `email`), the previous owner no longer lists it, and per-owner bulk revocation (`revokeAllForUser`, `revokeByEmail`) no longer reaches it.
+
 ## 2.1.3
 
 ### Patch Changes

@@ -1,5 +1,23 @@
 # @exortek/jwt
 
+## 2.0.0
+
+### Major Changes
+
+- 3b047e7: - `tokenPair` with `refresh.opaque: false` signs refresh tokens with `typ: refresh+jwt` and refuses a `secret.refresh` equal to `secret.access` (a refresh token under the access key verified as an access token).
+  - HMAC algorithms reject a PEM key or certificate with `INVALID_KEY` instead of an untyped TypeError.
+  - A JWK that declares `alg`, `use` or `key_ops` is only used for that alg / signatures / that operation.
+  - JWK objects and PEM / secret strings are imported once and reused (ES256 verify with a PEM: 48.5 → 34.3 µs); HMAC signs with the KeyObject directly and ECDSA uses IEEE P1363 natively.
+  
+  **Migration:** give `tokenPair` distinct access and refresh keys when `refresh.opaque` is `false`; treat key objects as immutable once used.
+
+### Patch Changes
+
+- 9953042: - Duration strings whose unit is the name of an `Object.prototype` member (for example `'1constructor'`) now throw instead of resolving to `NaN`.
+- 9953042: - Redis refresh-token stores no longer rewrite the stored record when a token is rotated. The atomic `markUsed` script used to decode and re-encode the record with Redis's cjson, which turned empty arrays in the stored claims into `{}` and rounded large numbers. A record created without metadata also crashed the script.
+  - The "used" stamp is now stored as a top-level `usedAt` field in the record. A record stamped by an earlier version is still treated as used. During a rolling upgrade, an instance still on the old version reads a token that a new instance has rotated as unused. Finish the upgrade before relying on reuse detection across instances.
+  - `revokeAll` (`deleteAll`) escapes glob characters in the key prefix and fetches and deletes each SCAN page in one round trip each.
+
 ## 1.3.0
 
 ### Minor Changes

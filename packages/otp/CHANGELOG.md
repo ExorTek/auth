@@ -1,5 +1,11 @@
 # @exortek/otp
 
+## 1.1.5
+
+### Patch Changes
+
+- d370002: The TOTP replay marker now lasts until the matched counter leaves the acceptance window; a code matched ahead of the window centre could previously be replayed after the marker expired.
+
 ## 1.1.4
 
 ### Patch Changes

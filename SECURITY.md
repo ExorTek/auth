@@ -5,28 +5,28 @@
 `@exortek/*` packages follow **semver**. Security fixes land on the current major line of each package; older major
 lines are not patched unless the project has an explicit LTS commitment (none does today).
 
-| Package             | Supported       |
-| ------------------- | --------------- |
-| `@exortek/crypto`   | `1.x` — current |
-| `@exortek/security` | `1.x` — current |
-| `@exortek/otp`      | `1.x` — current |
-| `@exortek/password` | `1.x` — current |
-| `@exortek/session`  | `1.x` — current |
-| `@exortek/jwk`      | `1.x` — current |
-| `@exortek/jws`      | `1.x` — current |
-| `@exortek/jwt`      | `1.x` — current |
-| `@exortek/jwe`      | `1.x` — current |
-| `@exortek/challenge`| `1.x` — current |
-| `@exortek/apikey`   | `1.x` — current |
-| `@exortek/magic-link` | `1.x` — current |
-| `@exortek/jwks`     | `1.x` — current |
-| `@exortek/ua`       | `1.x` — current |
-| `@exortek/opaque`   | `1.x` — current |
-| `@exortek/passkey`  | `1.x` — current |
-| `@exortek/paseto`   | `1.x` — current |
-| `@exortek/oauth2`   | `1.x` — current |
-| `@exortek/oidc`     | `1.x` — current |
-| `@exortek/auth`     | `1.x` — current |
+| Package               | Supported       |
+| --------------------- | --------------- |
+| `@exortek/crypto`     | `2.x` — current |
+| `@exortek/security`   | `2.x` — current |
+| `@exortek/otp`        | `1.x` — current |
+| `@exortek/password`   | `2.x` — current |
+| `@exortek/session`    | `2.x` — current |
+| `@exortek/jwk`        | `1.x` — current |
+| `@exortek/jws`        | `1.x` — current |
+| `@exortek/jwt`        | `2.x` — current |
+| `@exortek/jwe`        | `2.x` — current |
+| `@exortek/challenge`  | `2.x` — current |
+| `@exortek/apikey`     | `1.x` — current |
+| `@exortek/magic-link` | `3.x` — current |
+| `@exortek/jwks`       | `1.x` — current |
+| `@exortek/ua`         | `1.x` — current |
+| `@exortek/opaque`     | `2.x` — current |
+| `@exortek/passkey`    | `2.x` — current |
+| `@exortek/paseto`     | `2.x` — current |
+| `@exortek/oauth2`     | `2.x` — current |
+| `@exortek/oidc`       | `2.x` — current |
+| `@exortek/auth`       | `2.x` — current |
 
 Everything else in the roadmap is **not yet published** — file bug reports through the usual template once a version is
 out.

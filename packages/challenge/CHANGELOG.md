@@ -1,5 +1,18 @@
 # @exortek/challenge
 
+## 2.0.0
+
+### Major Changes
+
+- d370002: - Verifying a `singleUse` challenge without `consume: true` fails with the new reason `consume_required` instead of passing (it used to verify any number of times).
+  - The memory store never evicts a live key when full — a new key throws (verify reports `store_unavailable`) instead of reopening another token's replay window.
+  
+  **Migration:** pass `consume: true` and the store when verifying single-use challenges; size the memory store's `maxKeys` for peak load.
+
+### Patch Changes
+
+- 9953042: - Duration strings whose unit is the name of an `Object.prototype` member (for example `'1constructor'`) now throw instead of resolving to `NaN`.
+
 ## 1.1.3
 
 ### Patch Changes

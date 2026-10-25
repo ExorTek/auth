@@ -1,5 +1,11 @@
 # @exortek/jwk
 
+## 1.0.5
+
+### Patch Changes
+
+- 3b047e7: `toPublic` refuses key types other than RSA / EC / OKP instead of returning an unknown-kty JWK with its private members intact.
+
 ## 1.0.4
 
 ### Patch Changes
