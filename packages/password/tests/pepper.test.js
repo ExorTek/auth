@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { createPepper } from '../src/pepper.js';
 import { PasswordError, ErrorCode } from '../src/errors.js';
 
@@ -99,4 +100,20 @@ test('rejects empty secret array', () => {
 
 test('rejects too-short secret inside array', () => {
   assert.throws(() => createPepper({ secret: [SECRET, 'tiny'] }));
+});
+
+test('pepper.wrap normalizes like the unpeppered path; old raw-input hashes still verify', () => {
+  const pepper = createPepper({ secret: randomBytes(32) });
+  const composed = 'café';
+  const decomposed = 'café';
+  assert.equal(pepper.wrap(composed), pepper.wrap(decomposed));
+  // A hash peppered from the raw decomposed bytes (before this fix) is
+  // still among the candidates.
+  const candidates = pepper.wrapAll(decomposed);
+  assert.equal(candidates[0], pepper.wrap(composed));
+  assert.ok(candidates.length === 2);
+  assert.throws(
+    () => pepper.wrap('x'.repeat(2000)),
+    err => err.code === 'PASSWORD_TOO_LONG',
+  );
 });
