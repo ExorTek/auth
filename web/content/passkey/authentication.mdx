@@ -38,12 +38,15 @@ authentication.finish({
   expectedRpId, expectedOrigin,
   challengeSecret, challengeStore,
   credential: {                // fetched by the app from its store
+    id: string,                // REQUIRED — base64url credential id from registration; must equal response.rawId
+    userId?: string,           // the owner (your user id) — required with expectedUserId
+    userHandle?: string | Uint8Array, // stored WebAuthn user.id — compared with the response's userHandle
     publicKey?: KeyObject,     // one of publicKey OR publicKeyCose
     publicKeyCose?: Map,
     algorithm?: number,        // required when publicKeyCose is used
     counter: number,           // stored signCount
   },
-  expectedUserId?: string,
+  expectedUserId?: string,     // the user this ceremony is for — the credential must belong to them
   requireUserVerification?: boolean,   // default true
   requireBackedUp?: boolean,
 }): Promise<{
@@ -55,6 +58,15 @@ authentication.finish({
   extensionResults, rpId,
 }>
 ```
+
+The assertion is bound to the stored credential and its owner: the
+response's credential id must equal `credential.id`, `credential.userId`
+must equal `expectedUserId` when that is set, and a stored `userHandle`
+must equal the response's. Any mismatch is `CREDENTIAL_MISMATCH` — this
+is what stops an attacker completing the victim's ceremony with their
+own passkey when "the credential" and "the user" are looked up
+separately. The returned `userHandle` is the authenticator's unsigned
+claim; trust the user of the `credential` you passed in.
 
 Counter monotonicity: `newCounter > stored.counter` is required
 UNLESS both are 0 (spec-permitted for authenticators that don't

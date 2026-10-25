@@ -101,6 +101,8 @@ app.post('/passkey/login/begin', async (req, res) => {
 app.post('/passkey/login/finish', async (req, res) => {
   const row = await db.passkeys.findByCredentialId(req.body.id);
   const credential = {
+    id: row.credentialId, // must equal the assertion's credential id
+    userId: row.userId, // the owner — checked when you pass expectedUserId
     publicKeyCose: new Map(row.publicKeyCose),
     algorithm: row.algorithm,
     counter: row.counter,
@@ -165,7 +167,7 @@ Unknown extension keys pass through unchanged.
 import { PasskeyError, ErrorCode } from '@exortek/passkey';
 ```
 
-Every code branches on `err.code` and maps to an HTTP status via `err.status`. Full catalogue: `INVALID_ARGUMENT`, `CHALLENGE_MISMATCH`, `CHALLENGE_EXPIRED`, `CHALLENGE_ALREADY_USED`, `CHALLENGE_INVALID`, `ORIGIN_MISMATCH`, `RP_ID_MISMATCH`, `CLIENT_DATA_INVALID`, `AUTH_DATA_INVALID`, `USER_VERIFICATION_REQUIRED`, `USER_PRESENCE_REQUIRED`, `BACKUP_ELIGIBLE_REQUIRED`, `BACKED_UP_REQUIRED`, `SIGNATURE_INVALID`, `COUNTER_ROLLBACK`, `PUBLIC_KEY_UNSUPPORTED`, `UNSUPPORTED_ALGORITHM`, `ATTESTATION_INVALID`, `ATTESTATION_TRUST_ANCHOR_MISSING`, `ATTESTATION_CERT_REVOKED`, `UNSUPPORTED_ATTESTATION_FORMAT`, `EXTENSION_INVALID`, `MDS_BLOB_INVALID`.
+Every code branches on `err.code` and maps to an HTTP status via `err.status`. Full catalogue: `INVALID_ARGUMENT`, `CHALLENGE_MISMATCH`, `CHALLENGE_EXPIRED`, `CHALLENGE_ALREADY_USED`, `CHALLENGE_INVALID`, `ORIGIN_MISMATCH`, `RP_ID_MISMATCH`, `CLIENT_DATA_INVALID`, `AUTH_DATA_INVALID`, `USER_VERIFICATION_REQUIRED`, `USER_PRESENCE_REQUIRED`, `BACKUP_ELIGIBLE_REQUIRED`, `BACKED_UP_REQUIRED`, `SIGNATURE_INVALID`, `CREDENTIAL_MISMATCH`, `COUNTER_ROLLBACK`, `PUBLIC_KEY_UNSUPPORTED`, `UNSUPPORTED_ALGORITHM`, `ATTESTATION_INVALID`, `ATTESTATION_TRUST_ANCHOR_MISSING`, `UNSUPPORTED_ATTESTATION_FORMAT`, `EXTENSION_INVALID`, `MDS_BLOB_INVALID`.
 
 ## Highlights
 

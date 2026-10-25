@@ -50,11 +50,14 @@ If no anchor is supplied for a format, chain verification is skipped
 (signature still verifies but `attestation.trustPath = 'no-anchor'`).
 This lets you start permissively and tighten later.
 
-To make an unanchored chain-bearing attestation a hard failure instead,
-pass `requireTrustAnchor: true` to `registration.finish`: a format that
-resolves to `'no-anchor'` then throws `ATTESTATION_TRUST_ANCHOR_MISSING`
-(`none` and `packed` self-attestation are exempt — they never had a
-chain to anchor).
+To require attestation from a known authenticator make, pass
+`requireTrustAnchor: true` to `registration.finish`: anything but a chain
+verified to one of your anchors (`trustPath: 'trust-anchor'`) throws
+`ATTESTATION_TRUST_ANCHOR_MISSING` — including `none` and `packed` self
+attestation, since the client picks the format and could otherwise opt
+out of the policy by not attesting. Chains also honour every issuer's
+`pathLenConstraint`, and a TPM AIK certificate's AAGUID extension must
+match authData.
 
 <Callout type="info">
   Bundled default root CAs are deliberately NOT shipped in 1.0.0 —
