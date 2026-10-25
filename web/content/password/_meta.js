@@ -9,6 +9,7 @@ export default {
   policy: 'policy — validation rules',
   pepper: 'pepper — HMAC + rotation',
   history: 'history — reuse prevention',
+  limiter: 'limiter — threadpool budget',
   hibp: 'hibp — breach lookup',
   timing: 'timing — enumeration defence',
   errors: 'errors — PasswordError',

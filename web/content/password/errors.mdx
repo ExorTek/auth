@@ -38,7 +38,7 @@ class PasswordError extends Error {
 
 ## `ErrorCode`
 
-`@exortek/password` throws exactly these 6 codes. Verifying a wrong password is **not** one of them — `verify` /
+`@exortek/password` throws exactly these 7 codes. Verifying a wrong password is **not** one of them — `verify` /
 `constantTimeVerify` return `false` rather than throw (see [When errors are thrown](#when-errors-are-thrown)).
 
 | Code                    | HTTP | Meaning                                                                    |
@@ -49,6 +49,7 @@ class PasswordError extends Error {
 | `PASSWORD_TOO_LONG`     | 400  | Password exceeds `MAX_PASSWORD_BYTES` (1024) or bcrypt strict-mode 72      |
 | `POLICY_VIOLATION`      | 400  | `assertPolicy` rejected the password — `details.violations` lists reasons  |
 | `HIBP_UNAVAILABLE`      | 500  | HIBP network / HTTP failure and `failOpen` wasn't set                      |
+| `QUEUE_FULL`            | 503  | `createLimiter` already has `maxQueue` calls waiting — shed the request    |
 
 ## `status` field
 
