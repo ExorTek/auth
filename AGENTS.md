@@ -105,6 +105,15 @@ than the transitive dep. Each is declared in `package.json` `dependencies`:
 - `@exortek/passkey` → `@exortek/crypto`, `@exortek/challenge` — COSE/encode
   helpers + challenge store.
 - `@exortek/jwks` → `@exortek/jwk` — key import/validate.
+- `@exortek/oauth2` → `@exortek/jwt`, `@exortek/jws`, `@exortek/jwe`,
+  `@exortek/jwk`, `@exortek/jwks`, `@exortek/paseto` — ID token and client
+  assertion verification, DPoP proofs, JAR/JARM, sealed RP state, client and
+  provider key sets, and the JWT / PASETO access-token issuers.
+- `@exortek/oidc` → `@exortek/oauth2`, `@exortek/jwt`, `@exortek/jwks` — OIDC
+  is a layer over the oauth2 client and server: it reuses the RP flow and the
+  authorization server, and verifies ID tokens and logout hints.
+- `@exortek/auth` → every published package — the umbrella is a pure
+  re-export.
 
 These are the *only* sanctioned edges. **Do not add new ones** for new work —
 prefer a plain-object boundary or accept the deliberate utility duplication. Use

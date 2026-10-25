@@ -27,14 +27,16 @@ jobs:
           --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Decide whether this change touches code/config. Docs-only changes
       # (READMEs, AGENTS.md, web/, docs/, .changeset/) don't need the full
       # build + test — but the job must still run and report, because branch
       # protection requires this check. So we always run, and skip the heavy
       # steps below when nothing code-relevant changed.
-      - uses: dorny/paths-filter@v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: changes
         with:
           filters: |
@@ -49,7 +51,7 @@ jobs:
               - '.prettierrc*'
               - 'eslint.config*'
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - run: corepack enable
