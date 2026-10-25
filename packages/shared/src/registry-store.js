@@ -37,7 +37,7 @@
  */
 
 import { isObject, isNonEmptyString, isFiniteNumber } from './predicates.js';
-import { detectDialect, evalScript } from './redis-helpers.js';
+import { createRedisHelpers, detectDialect, evalScript } from './redis-helpers.js';
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
@@ -214,28 +214,75 @@ export function createMemoryRegistryStore({ StoreError, storeErrorCode, parseInt
 
 // REDIS
 
-// Atomically stamp metadata.usedAt if it is currently null/absent.
-// Returns [swapped(0|1), json] or nil when the key doesn't exist.
+// Atomically stamp `usedAt` if the record has not been used yet.
+// Returns [swapped(0|1), raw] or nil when the key doesn't exist.
+//
+// The stamp is spliced onto the front of the stored JSON as a top-level
+// `usedAt` field instead of decoding and re-encoding the record with cjson:
+// cjson turns empty arrays into `{}`, prints numbers with 14 significant
+// digits, and decodes `metadata: null` to a userdata value the script
+// cannot index — every rotation would have silently rewritten the token
+// payload kept in the metadata. `add` always writes `{"expiresAt":…`, so a
+// record that starts with `{"usedAt":` has been stamped. KEEPTTL keeps the
+// record's expiry.
 const MARK_USED_LUA = `
 local raw = redis.call('GET', KEYS[1])
 if not raw then return nil end
-local data = cjson.decode(raw)
-local meta = data['metadata']
-if not meta then meta = {} end
-if meta['usedAt'] ~= nil and meta['usedAt'] ~= cjson.null then
+if string.sub(raw, 1, 10) == '{"usedAt":' then
   return {0, raw}
 end
-meta['usedAt'] = tonumber(ARGV[1])
-data['metadata'] = meta
-local encoded = cjson.encode(data)
-local ttl = redis.call('TTL', KEYS[1])
-if ttl > 0 then
-  redis.call('SET', KEYS[1], encoded, 'EX', ttl)
-else
-  redis.call('SET', KEYS[1], encoded)
-end
-return {1, encoded}
+local stamped = '{"usedAt":' .. ARGV[1] .. ',' .. string.sub(raw, 2)
+redis.call('SET', KEYS[1], stamped, 'KEEPTTL')
+return {1, stamped}
 `;
+
+/**
+ * Decode a stored Redis record. A `usedAt` stamped by {@link MARK_USED_LUA}
+ * sits at the top level and is folded into `metadata`, the shape the memory
+ * store returns. A `metadata.usedAt` written by an earlier version (which
+ * stamped inside the metadata) wins, so a token used before an upgrade stays
+ * used.
+ *
+ * @param {any} parsed  the JSON-parsed stored value
+ * @returns {StoreRecord}
+ */
+function decodeRecord(parsed) {
+  /** @type {Record<string, unknown> | null} */
+  let metadata = isObject(parsed.metadata) ? parsed.metadata : null;
+  if (parsed.usedAt != null && (metadata === null || metadata.usedAt == null)) {
+    metadata = { ...metadata, usedAt: parsed.usedAt };
+  }
+  return { expiresAt: parsed.expiresAt, ...(metadata ? { metadata } : {}) };
+}
+
+/**
+ * Does a raw stored value's metadata match every `filter` entry? Values that
+ * are gone or not records never match.
+ *
+ * @param {string | null} raw
+ * @param {Record<string, unknown>} filter
+ * @returns {boolean}
+ */
+function matchesFilter(raw, filter) {
+  if (raw == null) {
+    return false;
+  }
+  let meta;
+  try {
+    meta = decodeRecord(JSON.parse(raw)).metadata;
+  } catch {
+    return false;
+  }
+  if (!meta) {
+    return false;
+  }
+  for (const [k, v] of Object.entries(filter)) {
+    if (meta[k] !== v) {
+      return false;
+    }
+  }
+  return true;
+}
 
 /**
  * @param {object} binding
@@ -260,6 +307,7 @@ export function createRedisRegistryStore({ StoreError, storeErrorCode, defaultKe
   const dialect = options.dialect ?? detectDialect(client);
 
   const build = key => `${keyPrefix}${key}`;
+  const helpers = createRedisHelpers(client);
 
   return {
     async add(key, expiresAt, metadata) {
@@ -296,8 +344,7 @@ export function createRedisRegistryStore({ StoreError, storeErrorCode, defaultKe
         if (raw == null) {
           return null;
         }
-        const parsed = JSON.parse(raw);
-        return { expiresAt: parsed.expiresAt, ...(parsed.metadata ? { metadata: parsed.metadata } : {}) };
+        return decodeRecord(JSON.parse(raw));
       } catch (err) {
         if (isOwn(err)) {
           throw err;
@@ -316,7 +363,9 @@ export function createRedisRegistryStore({ StoreError, storeErrorCode, defaultKe
       if (!isObject(filter)) {
         throw fail('redis-store.deleteAll: filter must be an object of metadata key/value pairs');
       }
-      const pattern = `${keyPrefix}*`;
+      // Glob-escape the prefix: a `*`, `?` or `[` in it would otherwise
+      // widen the match to keys outside this store.
+      const pattern = `${keyPrefix.replace(/[*?[\]\\]/g, '\\$&')}*`;
       // Redis cursors are protocol strings. node-redis typed them as numbers
       // through v5 but requires a string from v6 on, and the declared peer
       // range admits v6 — so seed a string for both dialects.
@@ -330,32 +379,11 @@ export function createRedisRegistryStore({ StoreError, storeErrorCode, defaultKe
               : await client.scan(cursor, { MATCH: pattern, COUNT: 100 });
           const [nextCursor, keys] = dialect === 'ioredis' ? result : [result.cursor, result.keys];
           cursor = nextCursor;
-          for (const fullKey of keys) {
-            const raw = await client.get(fullKey);
-            if (raw == null) {
-              continue;
-            }
-            let parsed;
-            try {
-              parsed = JSON.parse(raw);
-            } catch {
-              continue;
-            }
-            const meta = parsed && parsed.metadata;
-            if (!meta) {
-              continue;
-            }
-            let ok = true;
-            for (const [k, v] of Object.entries(filter)) {
-              if (meta[k] !== v) {
-                ok = false;
-                break;
-              }
-            }
-            if (ok) {
-              await client.del(fullKey);
-              count++;
-            }
+          // One MGET and one DEL per SCAN page instead of a round trip per key.
+          const values = await helpers.mget(keys);
+          const doomed = keys.filter((_fullKey, i) => matchesFilter(values[i], filter));
+          if (doomed.length > 0) {
+            count += Number(await client.del(doomed));
           }
         } while (String(cursor) !== '0');
       } catch (err) {
@@ -372,12 +400,12 @@ export function createRedisRegistryStore({ StoreError, storeErrorCode, defaultKe
         if (result == null) {
           return null;
         }
-        const [swapped, json] = result;
-        const parsed = JSON.parse(json);
-        return {
-          swapped: Number(swapped) === 1,
-          record: { expiresAt: parsed.expiresAt, ...(parsed.metadata ? { metadata: parsed.metadata } : {}) },
-        };
+        const [swapped, raw] = result;
+        const parsed = JSON.parse(raw);
+        // A record stamped by an earlier version carries its own
+        // `metadata.usedAt` — already used, so this call did not swap.
+        const legacyUsed = isObject(parsed.metadata) && parsed.metadata.usedAt != null;
+        return { swapped: Number(swapped) === 1 && !legacyUsed, record: decodeRecord(parsed) };
       } catch (err) {
         if (isOwn(err)) {
           throw err;
