@@ -62,7 +62,6 @@ generate({ format: 'hex', bytes: 32 });
 // → 64 hex chars
 
 generate({ format: 'uuid4' });
-generate({ format: 'ulid' });
 generate({ format: 'crockford', bytes: 16 }); // no ambiguous glyphs, human-typeable
 generate({ format: 'alphanumeric', length: 24 });
 
@@ -71,19 +70,21 @@ generate({ format: 'prefixed', prefix: 'usr' });
 // → 'usr_3f9a...'  (generator defaults to 'hex')
 
 // Semantic label + entropy, generator and separator configurable
-generate({ format: 'structured', version: 'v1', type: 'ref', generator: 'ulid', separator: '.' });
-// → 'v1.ref.01ARZ3NDEKTSV4RRFFQ69G5FAV'
+generate({ format: 'structured', version: 'v1', type: 'ref', generator: 'base58', separator: '.' });
+// → 'v1.ref.5Hue…'
 ```
 
 | `format`                        | Output                                                     |
 | -------------------------------- | ------------------------------------------------------------ |
-| `hex` / `base64url` / `base58` / `crockford` | Raw entropy, `bytes` long (default 32)         |
-| `ulid` / `uuid4` / `uuid7`        | Standard sortable/random identifiers                       |
-| `alphanumeric`                    | `[A-Za-z0-9]`, `length` characters (default `bytes`)      |
+| `hex` / `base64url` / `base58` / `crockford` | Raw entropy, `bytes` long (default 32, minimum 16) |
+| `uuid4`                           | 122 random bits                                            |
+| `alphanumeric`                    | `[A-Za-z0-9]`, `length` characters (default `bytes`, minimum 22) |
 | `prefixed`                       | `<prefix><separator><generator output>`                    |
 | `structured`                     | `<version><separator><type><separator><generator output>` |
 
 `generator` (default `'hex'`) selects which of the bare formats above produces the entropy segment for `prefixed` / `structured`.
+
+Every token carries at least 128 random bits. `ulid` and `uuid7` are refused: they are mostly timestamp, and a monotonic ULID makes consecutive tokens differ only in their last character — guessable, which a bearer secret must never be.
 
 ## API
 
@@ -97,7 +98,7 @@ create({
   prefix?: string, version?: string, type?: string, separator?: string,
 
   store: OpaqueStore,
-  expiresIn?: string | number,       // omit for no expiry
+  expiresIn: string | number | null, // REQUIRED — a duration, or null for a deliberately non-expiring token
   metadata?: Record<string, unknown>,
   hashAlgo?: HashAlgorithm,          // default 'sha256'
   now?: number,                      // override Date.now() for testing
@@ -146,7 +147,9 @@ Handlers are framework-neutral. They return `{ status, body, headers }` — you 
 ```js
 import { introspectionHandler, revocationHandler } from '@exortek/opaque';
 
-const introspect = introspectionHandler({ store });
+// authorize(req) authenticates the CALLER (the resource server) — required
+// for introspection (RFC 7662 §2.1), optional for revocation.
+const introspect = introspectionHandler({ store, authorize: req => isTrustedResourceServer(req) });
 const revokeRoute = revocationHandler({ store });
 
 // RFC 7662 — always 200, `active: false` for anything invalid.
@@ -166,7 +169,7 @@ app.post('/oauth/revoke', async (req, res) => {
 
 Every returned `headers` includes the RFC-recommended defaults (`Content-Type: application/json` on introspection, `Cache-Control: no-store`, `Pragma: no-cache`) — merge and add anything else you want.
 
-> **Security — both endpoints MUST be authenticated.** RFC 7662 §2.1 and RFC 7009 §2.1 require the caller to authenticate (resource-server credential, mTLS, HMAC, basic auth, …). An anonymous `/oauth/introspect` lets a probe scan for valid tokens; an anonymous `/oauth/revoke` lets any observer of a leaked token burn it. Gate the route before mounting the handler — nothing in this package will do it for you.
+> **Security — both endpoints MUST be authenticated.** RFC 7662 §2.1 and RFC 7009 §2.1 require the caller to authenticate (resource-server credential, mTLS, HMAC, basic auth, …). `introspectionHandler` therefore requires an `authorize(req)` hook and answers `401 invalid_client` unless it returns `true`; `revocationHandler` accepts the same hook optionally.
 >
 > Whatever you pass to `create({ metadata })` is what introspection echoes back — do **not** stash PII, secrets, or internal identifiers there. Prefer the RFC 7662 §2.2 claim names (`sub`, `scope`, `client_id`, `exp`, `token_type`, `iss`, …).
 
@@ -176,7 +179,7 @@ import basicAuth from 'express-basic-auth';
 app.post(
   '/oauth/introspect',
   basicAuth({ users: { 'resource-server': process.env.INTROSPECT_SECRET } }),
-  introspectionHandler({ store }),
+  introspectionHandler({ store, authorize: () => true }), // basicAuth already authenticated the caller
 );
 ```
 
@@ -186,6 +189,7 @@ app.post(
 | `hashAlgo`   | `'sha256'` |                                           |
 | `tokenField` | `'token'`  | Field read off the parsed request body.  |
 | `onError`    | —          | `(err) => void` called if `store.get`/`store.delete` throws. The handler still replies with the no-oracle default. |
+| `authorize`  | —          | `(req) => boolean \| Promise<boolean>` — authenticates the caller. **Required** for `introspectionHandler`; optional for `revocationHandler`. |
 
 Metadata is echoed verbatim by introspection, and the response's `active` field is always ours — a `metadata.active` you stored gets shadowed.
 

@@ -13,7 +13,7 @@ matching the `OpaqueStore` interface works.
 ```js
 import { memoryStore } from '@exortek/opaque/stores';
 
-const store = memoryStore({ sweepMs: 60_000 }); // default shown
+const store = memoryStore({ sweepMs: 60_000, maxEntries: 100_000 }); // defaults shown — oldest evicted beyond maxEntries
 ```
 
 In-process `Map`, lazy expiry check on `get` plus a background sweep.
