@@ -158,6 +158,7 @@ describe('resolver — error handling', () => {
       ok: false,
       status: 500,
       headers: new Map(),
+      text: async () => 'Internal Server Error',
     }));
     const resolver = createRemoteJWKS('https://example.com/jwks');
     const err = await resolver({ kid: 'k1' }).catch(e => e);
@@ -227,6 +228,32 @@ describe('resolver — error handling', () => {
     // 64 KiB cap over 32 KiB chunks: two fit, the third crosses it and stops.
     assert.equal(chunksDelivered, 3, 'must stop at the first chunk past the cap');
     assert.ok(cancelled, 'the remainder of the stream must be cancelled');
+  });
+
+  test('the timeout also covers a body that arrives too slowly', async () => {
+    // Headers come back at once, then the body never finishes. Clearing the
+    // timer at the headers would leave this read hanging forever.
+    mockFetch(async (_url, init) => ({
+      ok: true,
+      status: 200,
+      headers: new Map(),
+      body: {
+        getReader: () => ({
+          read: () =>
+            new Promise((_resolve, reject) => {
+              init.signal.addEventListener('abort', () => reject(init.signal.reason));
+            }),
+          cancel: async () => {},
+        }),
+      },
+    }));
+
+    const resolver = createRemoteJWKS('https://example.com/jwks', { timeout: 50 });
+    const err = await resolver({ kid: 'k1' }).catch(e => e);
+
+    assert.ok(err instanceof JwksError);
+    assert.equal(err.code, ErrorCode.FETCH_FAILED);
+    assert.match(err.message, /timed out/);
   });
 
   test('throws FETCH_FAILED on invalid response body', async () => {
