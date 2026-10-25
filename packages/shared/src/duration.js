@@ -103,9 +103,11 @@ export function parseDuration(input) {
   }
   const value = Number(match[1]);
   const unit = (match[2] || 'ms').toLowerCase();
-  const multiplier = UNIT_MS[/** @type {keyof typeof UNIT_MS} */ (unit)];
-  if (multiplier === undefined) {
+  // Own keys only: a plain lookup would resolve `constructor` (and every
+  // other Object.prototype member) to a function, turning '1constructor'
+  // into NaN instead of an error.
+  if (!Object.hasOwn(UNIT_MS, unit)) {
     throw new Error(`parseDuration: unknown time unit ${JSON.stringify(unit)}. Supported: ${SUPPORTED_UNITS}.`);
   }
-  return Math.round(value * multiplier);
+  return Math.round(value * UNIT_MS[/** @type {keyof typeof UNIT_MS} */ (unit)]);
 }
