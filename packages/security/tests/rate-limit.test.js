@@ -711,3 +711,7 @@ test('token / leaky bucket: polling every millisecond does not speed up the refi
     }
   }
 });
+
+test('parseDuration rejects a prototype member as a unit instead of returning NaN', () => {
+  assert.throws(() => parseDuration('1constructor'), SecurityError);
+});

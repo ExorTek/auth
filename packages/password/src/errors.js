@@ -12,6 +12,7 @@ export const ErrorCode = Object.freeze({
   PASSWORD_TOO_LONG: 'PASSWORD_TOO_LONG',
   POLICY_VIOLATION: 'POLICY_VIOLATION',
   HIBP_UNAVAILABLE: 'HIBP_UNAVAILABLE',
+  QUEUE_FULL: 'QUEUE_FULL',
 });
 
 /**
@@ -39,6 +40,7 @@ export class PasswordError extends BaseError {
     [ErrorCode.POLICY_VIOLATION]: 400,
     [ErrorCode.MISSING_PEER_DEP]: 500,
     [ErrorCode.HIBP_UNAVAILABLE]: 500,
+    [ErrorCode.QUEUE_FULL]: 503,
   };
   static defaultStatus = 500;
 }

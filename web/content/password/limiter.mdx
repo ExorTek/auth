@@ -1,0 +1,74 @@
+---
+title: 'password/limiter — threadpool budget'
+sidebarTitle: limiter
+---
+
+import { Callout } from 'nextra/components';
+
+# `limiter`
+
+scrypt, pbkdf2 and argon2 are slow on purpose, and Node runs them on the
+**libuv threadpool** — 4 threads by default, the same pool that serves
+`fs`, `dns.lookup` and `zlib`. Under a login burst, unbounded `verify`
+calls occupy every thread and everything else that needs one waits
+behind them: file reads, DNS resolution for outbound requests,
+compression.
+
+`createLimiter` keeps the excess in a JS queue instead, and sheds load
+once that queue is full.
+
+```ts
+createLimiter({
+  concurrency?: number,  // hashes running at once — default 2
+  maxQueue?:    number,  // calls allowed to wait — default 1000
+}): ((task: () => Promise<T>) => Promise<T>) & {
+  active:  number,       // getter, tasks running now
+  pending: number,       // getter, tasks waiting for a slot
+}
+```
+
+## Basic use
+
+```js
+import { createLimiter, password, PasswordError, ErrorCode } from '@exortek/password';
+
+// One limiter per process, shared by every route that hashes.
+const limit = createLimiter({ concurrency: 2 });
+
+app.post('/login', async (req, res) => {
+  const user = await db.users.findByEmail(req.body.email);
+  try {
+    const ok = await limit(() => password.constantTimeVerify(req.body.password, user?.pw_hash));
+    if (!ok) return res.status(401).end();
+  } catch (err) {
+    if (err instanceof PasswordError && err.code === ErrorCode.QUEUE_FULL) {
+      return res.status(503).set('Retry-After', '1').end();
+    }
+    throw err;
+  }
+  // …
+});
+```
+
+## Sizing
+
+- Keep `concurrency` **below** `UV_THREADPOOL_SIZE` so at least one
+  thread is always free for I/O.
+- To give hashing more room, raise the pool size when the process starts
+  — it is read once, before the first threadpool task:
+
+  ```bash
+  UV_THREADPOOL_SIZE=8 node server.js
+  ```
+
+  More threads than CPU cores does not make KDFs faster; it only lets
+  more of them wait on the CPU at once.
+- `maxQueue × (time per hash ÷ concurrency)` is the worst-case wait. At
+  ~100 ms per verify and `concurrency: 2`, a queue of 1000 is ~50 s —
+  lower it if your clients time out sooner.
+
+<Callout type="info">
+  `bcrypt` (via `bcryptjs`) runs on the main thread, not the threadpool.
+  A limiter still bounds how many run concurrently, which bounds the
+  event-loop time they take.
+</Callout>

@@ -76,3 +76,9 @@ test('rejects a whitespace-flooded string without ReDoS (linear)', () => {
   // "1" + spaces + junk. Must throw quickly now, not hang.
   assert.throws(() => parseDuration('1' + ' '.repeat(500000) + '!'), /could not parse/);
 });
+
+test('rejects Object.prototype member names as units', () => {
+  for (const unit of ['constructor', 'hasOwnProperty', 'toString', 'valueOf']) {
+    assert.throws(() => parseDuration(`1${unit}`), /unknown time unit/, unit);
+  }
+});

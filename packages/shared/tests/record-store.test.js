@@ -17,6 +17,14 @@ describe('createMemoryRecordStore', () => {
     assert.equal((await store.getById('k1')).name, 'Test');
   });
 
+  test('put under a new owner drops the old index entry', async () => {
+    const store = createMemoryRecordStore({ idField: 'id', indexField: 'userId' });
+    await store.put({ id: 'k1', userId: 'u1' });
+    await store.put({ id: 'k1', userId: 'u2' });
+    assert.deepEqual(await store.listByIndex('u1'), []);
+    assert.equal((await store.listByIndex('u2')).length, 1);
+  });
+
   test('put + getById with deep copy', async () => {
     const store = createMemoryRecordStore({ idField: 'id', indexField: 'email', copyStrategy: 'deep' });
     const rec = { id: 'k1', email: 'a@b.com', meta: { x: 1 } };
@@ -184,6 +192,17 @@ describe('createRedisRecordStore', () => {
     await store.put({ id: 'k1', userId: 'u1', name: 'Old' });
     const updated = await store.update('k1', { name: 'New' });
     assert.equal(updated.name, 'New');
+  });
+
+  test('put under a new owner hides the record from the old owner', async () => {
+    const client = createFakeRedisClient();
+    const store = createRedisRecordStore(client, { idField: 'id', indexField: 'userId', keyPrefix: 'p:' });
+    await store.put({ id: 'k1', userId: 'u1' });
+    await store.put({ id: 'k1', userId: 'u2' });
+    assert.deepEqual(await store.fetchIndexRecords('u1'), [['k1', null]]);
+    assert.deepEqual(await client.smembers('p:u:u1'), [], 'stale entry pruned');
+    assert.deepEqual(await store.listByIndex('u1'), []);
+    assert.equal((await store.listByIndex('u2')).length, 1);
   });
 
   test('update: re-indexes when indexField changes', async () => {

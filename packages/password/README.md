@@ -206,6 +206,18 @@ await db.users.update(user.id, {
 Stateless "don't reuse the last N passwords" helper. Walks the caller-supplied list via the umbrella `verify` router —
 the history array can be mixed-algorithm during migration.
 
+### `password.createLimiter({ concurrency?, maxQueue? })`
+
+```ts
+const limit = createLimiter({ concurrency: 2, maxQueue: 1000 });
+const ok = await limit(() => password.verify(candidate, user.pw_hash));
+```
+
+Caps concurrent hashes. scrypt / pbkdf2 / argon2 run on the libuv threadpool (`UV_THREADPOOL_SIZE`, default 4), shared
+with `fs`, `dns.lookup` and `zlib` — a login burst can otherwise take every thread. Excess calls wait in a JS queue;
+past `maxQueue` they reject with `QUEUE_FULL` (503). Keep `concurrency` below the pool size, or raise the pool with
+`UV_THREADPOOL_SIZE` before the process starts.
+
 ### `createHibpClient(options?)` (subpath `@exortek/password/hibp`)
 
 ```ts
@@ -250,7 +262,7 @@ try {
 ```
 
 Codes: `INVALID_ARGUMENT`, `UNSUPPORTED_ALGORITHM`, `MISSING_PEER_DEP`, `PASSWORD_TOO_LONG`,
-`POLICY_VIOLATION`, `HIBP_UNAVAILABLE`.
+`POLICY_VIOLATION`, `HIBP_UNAVAILABLE`, `QUEUE_FULL`.
 
 ## Algorithm choice
 

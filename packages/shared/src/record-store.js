@@ -83,8 +83,15 @@ export function createMemoryRecordStore(config) {
     byIndex,
 
     async put(record) {
-      byId.set(record[idField], copy(record));
-      addIndex(record[indexField], record[idField]);
+      const id = record[idField];
+      const previous = byId.get(id);
+      // Overwriting a record under a different owner must drop the old
+      // owner's index entry, or the old owner keeps listing it.
+      if (previous && previous[indexField] !== record[indexField]) {
+        removeIndex(previous[indexField], id);
+      }
+      byId.set(id, copy(record));
+      addIndex(record[indexField], id);
     },
 
     async getById(id) {
@@ -260,7 +267,10 @@ export function createRedisRecordStore(client, config) {
       const raw = rows[i * stride];
       const rawTomb = tombstones ? rows[i * stride + 1] : null;
       const record = helpers.parseRecord(raw);
-      if (!record) {
+      // Gone, or re-put under another owner (`put` does not read the old
+      // record, so it cannot unlink the old index entry itself) — prune the
+      // stale entry and never hand the record to this owner.
+      if (!record || record[indexField] !== indexValue) {
         await indexRemove(indexValue, ids[i]);
         pairs.push([ids[i], null]);
         continue;

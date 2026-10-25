@@ -171,25 +171,32 @@ export function parse(ua, options) {
   }
 
   const lower = safe.toLowerCase();
+  // The hint headers are read up front (cheap, and the cached result must
+  // not keep a reference to the request's headers); each section is still
+  // parsed — and hints applied — only when first read.
+  const ch = hasHints ? parseClientHints(options.headers) : null;
   let _browser, _os, _device, _engine, _cpu;
 
   const result = {
     ua: safe,
     get browser() {
       if (!_browser) {
-        _browser = runBrowser(safe, lower);
+        const browser = runBrowser(safe, lower);
+        _browser = ch ? applyBrowserHints(ch, browser) : browser;
       }
       return _browser;
     },
     get os() {
       if (!_os) {
-        _os = runOS(safe, lower);
+        const os = runOS(safe, lower);
+        _os = ch ? applyOsHints(ch, os) : os;
       }
       return _os;
     },
     get device() {
       if (!_device) {
-        _device = runDevice(safe, lower);
+        const device = runDevice(safe, lower);
+        _device = ch ? applyDeviceHints(ch, device) : device;
       }
       return _device;
     },
@@ -201,19 +208,12 @@ export function parse(ua, options) {
     },
     get cpu() {
       if (!_cpu) {
-        _cpu = runCPU(safe, lower);
+        const cpu = runCPU(safe, lower);
+        _cpu = ch ? applyCpuHints(ch, cpu) : cpu;
       }
       return _cpu;
     },
   };
-
-  if (hasHints) {
-    const ch = parseClientHints(options.headers);
-    _browser = applyBrowserHints(ch, runBrowser(safe, lower));
-    _device = applyDeviceHints(ch, runDevice(safe, lower));
-    _os = applyOsHints(ch, runOS(safe, lower));
-    _cpu = applyCpuHints(ch, runCPU(safe, lower));
-  }
 
   parseCache.set(cacheKey, result);
   return result;

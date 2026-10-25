@@ -102,7 +102,7 @@ test('redis: markUsed dispatches the right EVAL form per dialect', async () => {
   const io = {
     async eval(script, numkeys, key, arg) {
       this.call = { numkeys, key, arg };
-      return [1, JSON.stringify({ expiresAt: 1, metadata: { usedAt: Number(arg) } })];
+      return [1, JSON.stringify({ usedAt: Number(arg), expiresAt: 1 })];
     },
   };
   Object.defineProperty(io.constructor, 'name', { value: 'Redis' });
@@ -115,7 +115,7 @@ test('redis: markUsed dispatches the right EVAL form per dialect', async () => {
   class NodeRedisClient {
     async eval(script, opts) {
       this.call = opts;
-      return [0, JSON.stringify({ expiresAt: 1, metadata: { usedAt: 7 } })];
+      return [0, JSON.stringify({ usedAt: 7, expiresAt: 1 })];
     }
   }
   const nr = new NodeRedisClient();
@@ -123,6 +123,7 @@ test('redis: markUsed dispatches the right EVAL form per dialect', async () => {
   const nrRes = await nrStore.markUsed('k', 42);
   assert.deepEqual(nr.call, { keys: ['t:k'], arguments: ['42'] });
   assert.equal(nrRes.swapped, false);
+  assert.equal(nrRes.record.metadata.usedAt, 7);
 });
 
 test('redis: missing client raises STORE_ERROR', () => {

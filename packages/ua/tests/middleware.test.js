@@ -49,6 +49,20 @@ describe('Express UA middleware', () => {
     assert.equal(req.ua.os.name, 'Windows');
   });
 
+  it('keeps req.ua lazy — sections stay getters, JSON still carries them', () => {
+    const mw = uaMiddleware();
+    const req = mockReq(chromeUA, { 'sec-ch-ua-platform': '"macOS"' });
+    mw(req, mockRes(), () => {});
+    for (const section of ['browser', 'os', 'device', 'engine', 'cpu']) {
+      assert.equal(typeof Object.getOwnPropertyDescriptor(req.ua, section).get, 'function', section);
+    }
+    // Hints still apply when a section is read.
+    assert.equal(req.ua.os.name, 'macOS');
+    const json = JSON.parse(JSON.stringify(req.ua));
+    assert.equal(json.browser.name, 'Chrome');
+    assert.equal(json.bot, null);
+  });
+
   it('sets Accept-CH and Vary response headers', () => {
     const mw = uaMiddleware();
     const req = mockReq(chromeUA);

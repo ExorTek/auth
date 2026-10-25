@@ -8,6 +8,7 @@
 import { importJWK } from '@exortek/jwk/import';
 import { validate } from '@exortek/jwk/validate';
 import { parseDuration } from '@exortek/shared/duration';
+import { fetchCapped } from '@exortek/shared/fetch-capped';
 import { isString, isFunction, isObject } from '@exortek/shared/predicates';
 import { JwksError, ErrorCode } from './errors.js';
 import { assertNonEmptyString, invalidArgument } from './internal/guards.js';
@@ -106,48 +107,16 @@ export function createRemoteJWKS(uri, options = {}) {
       return;
     }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout);
-    const fetchSignal = externalSignal ? AbortSignal.any([controller.signal, externalSignal]) : controller.signal;
-
     async function doFetch() {
-      /** @type {Response} */
-      let res;
-      try {
-        res = await fetch(uri, {
-          signal: fetchSignal,
-          redirect: 'manual',
-          headers: { accept: 'application/json', ...extraHeaders },
-        });
-      } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
-          throw new JwksError(ErrorCode.FETCH_FAILED, `JWKS fetch timed out after ${timeout}ms: ${uri}`);
-        }
-        throw err;
-      } finally {
-        clearTimeout(timer);
-      }
-
-      if (res.status >= 300 && res.status < 400) {
-        throw new JwksError(
-          ErrorCode.FETCH_FAILED,
-          `JWKS fetch refused redirect (${res.status}) from ${uri} — redirects are disabled for SSRF safety`,
-        );
-      }
+      const { response: res, text } = await fetchCapped(
+        uri,
+        { headers: { accept: 'application/json', ...extraHeaders } },
+        { timeoutMs: timeout, maxBytes: maxResponseSize, signal: externalSignal, fail: fetchFailure },
+      );
 
       if (!res.ok) {
         throw new JwksError(ErrorCode.FETCH_FAILED, `JWKS fetch failed: ${uri} responded with ${res.status}`);
       }
-
-      const contentLength = Number(res.headers.get('content-length'));
-      if (contentLength > maxResponseSize) {
-        throw new JwksError(
-          ErrorCode.FETCH_FAILED,
-          `JWKS response from ${uri} exceeds maxResponseSize (${contentLength} > ${maxResponseSize})`,
-        );
-      }
-
-      const text = await readCapped(res, maxResponseSize, uri);
 
       /** @type {unknown} */
       let body;
@@ -337,50 +306,13 @@ export function createRemoteJWKS(uri, options = {}) {
 }
 
 /**
- * Read a response body as text, refusing to buffer more than `limit`
- * bytes.
+ * Map a transport failure from `fetchCapped` to the package error.
  *
- * `Content-Length` is only a hint — it is absent on a chunked response,
- * and a server chooses whether to send it. Checking it and then calling
- * `res.text()` therefore enforces nothing: the whole body is already in
- * memory by the time the size is known. Read the stream instead and stop
- * at the first chunk that crosses the limit, cancelling the rest so the
- * connection is not left draining.
- *
- * @param {Response} res
- * @param {number} limit  maximum bytes to buffer
- * @param {string} uri    for the error message
- * @returns {Promise<string>}
+ * @param {import('@exortek/shared/fetch-capped').FetchFailure} reason
+ * @param {string} message
+ * @returns {JwksError}
  */
-async function readCapped(res, limit, uri) {
-  if (!res.body) {
-    // No stream (an empty body, or a fetch implementation without one) —
-    // `text()` is bounded by whatever is already buffered.
-    return res.text();
-  }
-
-  const reader = res.body.getReader();
-  const chunks = [];
-  let total = 0;
-
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-      total += value.byteLength;
-      if (total > limit) {
-        throw new JwksError(
-          ErrorCode.FETCH_FAILED,
-          `JWKS response from ${uri} exceeds maxResponseSize (> ${limit} bytes)`,
-        );
-      }
-      chunks.push(value);
-    }
-  } finally {
-    await reader.cancel().catch(() => {});
-  }
-
-  return Buffer.concat(chunks).toString('utf8');
+function fetchFailure(reason, message) {
+  const hint = reason === 'too_large' ? ' (maxResponseSize)' : '';
+  return new JwksError(ErrorCode.FETCH_FAILED, `JWKS ${message}${hint}`);
 }

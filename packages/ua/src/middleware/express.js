@@ -56,7 +56,10 @@ export function uaMiddleware(options) {
     });
 
     const bot = opts.detectBots ? detectBot(ua) : null;
-    const result = { ...parsed, bot };
+    // Copy the lazy getters rather than spreading them — a spread reads every
+    // getter and runs every parser, though most handlers read one field.
+    const result = Object.defineProperties({}, Object.getOwnPropertyDescriptors(parsed));
+    result.bot = bot;
 
     if (bot && opts.onBot) {
       if (opts.onBot(bot, req) === true) {
