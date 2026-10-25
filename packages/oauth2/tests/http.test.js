@@ -98,6 +98,35 @@ test('a timeout surfaces as NETWORK_ERROR', async () => {
   });
 });
 
+test('the timeout also covers a body that is still arriving', async () => {
+  // Headers at once, then one byte every 20 ms forever — the deadline must
+  // not stop at the headers.
+  handler = (_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    const drip = setInterval(() => res.write(' '), 20);
+    res.on('close', () => clearInterval(drip));
+  };
+  await assert.rejects(getJson(`${base}/userinfo`, {}, { timeout: 100 }), err => {
+    assert.equal(err.code, ErrorCode.NETWORK_ERROR);
+    assert.match(err.message, /timed out/);
+    return true;
+  });
+});
+
+test('a chunked response with no content-length is capped while streaming', async () => {
+  handler = (_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.write('{"blob":"');
+    res.write('x'.repeat(2000));
+    res.end('"}');
+  };
+  await assert.rejects(getJson(`${base}/userinfo`, {}, { maxResponseSize: 100 }), err => {
+    assert.equal(err.code, ErrorCode.USERINFO_FAILED);
+    assert.match(err.message, /maxResponseSize/);
+    return true;
+  });
+});
+
 test('a malformed JSON body throws the typed error', async () => {
   handler = (_req, res) => {
     res.writeHead(200, { 'content-type': 'application/json' });

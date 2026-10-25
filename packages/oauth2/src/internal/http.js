@@ -3,17 +3,18 @@
  * discovery, revocation. Node 22's global `fetch` (undici) only; no
  * third-party HTTP dependency.
  *
- * Mirrors the safety patterns of `@exortek/jwks` `remote.js`:
- *   - `AbortController` + `setTimeout` request timeout,
+ * Transport guards come from the shared `fetchCapped` (also used by
+ * `@exortek/jwks`):
+ *   - one timeout over the request AND the body read,
  *   - `redirect: 'manual'` — a redirect from a token/userinfo endpoint is
  *     never legitimate and is an SSRF lever, so we refuse it,
- *   - `content-length` + decoded-body length guarded against
- *     `maxResponseSize`,
+ *   - `content-length` pre-check + a streaming cap at `maxResponseSize`,
  *   - non-2xx → a typed {@link OAuth2Error} with a caller-chosen code,
  *   - `JSON.parse` guarded so a malformed body is a typed error, not a
  *     raw `SyntaxError`.
  */
-import { isArray, isFiniteNumber, isObject, isString } from '@exortek/shared/predicates';
+import { fetchCapped } from '@exortek/shared/fetch-capped';
+import { isArray, isObject, isString } from '@exortek/shared/predicates';
 import { ErrorCode, OAuth2Error } from './errors.js';
 
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -46,44 +47,15 @@ async function requestJson(url, init, options = {}) {
     errorCode = ErrorCode.NETWORK_ERROR,
   } = options;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  const signal = externalSignal ? AbortSignal.any([controller.signal, externalSignal]) : controller.signal;
-
-  /** @type {Response} */
-  let res;
-  try {
-    res = await fetch(url, { ...init, signal, redirect: 'manual' });
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new OAuth2Error(ErrorCode.NETWORK_ERROR, `request to ${url} timed out after ${timeout}ms`, { cause: err });
-    }
-    throw new OAuth2Error(ErrorCode.NETWORK_ERROR, `request to ${url} failed: ${describe(err)}`, { cause: err });
-  } finally {
-    clearTimeout(timer);
-  }
-
-  // A 3xx from a token/userinfo endpoint is never legitimate — refuse it
-  // rather than follow an attacker-controlled Location (SSRF).
-  if (res.status >= 300 && res.status < 400) {
-    throw new OAuth2Error(errorCode, `${url} returned a redirect (${res.status}) — refused for SSRF safety`);
-  }
-
-  const contentLength = Number(res.headers.get('content-length'));
-  if (isFiniteNumber(contentLength) && contentLength > maxResponseSize) {
-    throw new OAuth2Error(errorCode, `${url} response exceeds maxResponseSize (${contentLength} > ${maxResponseSize})`);
-  }
-
-  // The whole body is buffered into memory before parsing; `maxResponseSize`
-  // is the cap. Measure BYTES, not UTF-16 code units — `String.length`
-  // undercounts multi-byte characters, so a non-ASCII body could slip past
-  // a byte budget. (The Content-Length pre-check above is the first gate;
-  // this catches a chunked response with no declared length.)
-  const text = await res.text();
-  const byteSize = Buffer.byteLength(text, 'utf8');
-  if (byteSize > maxResponseSize) {
-    throw new OAuth2Error(errorCode, `${url} response exceeds maxResponseSize (${byteSize} > ${maxResponseSize})`);
-  }
+  const { response: res, text } = await fetchCapped(url, init, {
+    timeoutMs: timeout,
+    maxBytes: maxResponseSize,
+    signal: externalSignal,
+    fail: (reason, message, cause) =>
+      reason === 'timeout' || reason === 'network'
+        ? new OAuth2Error(ErrorCode.NETWORK_ERROR, message, { cause })
+        : new OAuth2Error(errorCode, reason === 'too_large' ? `${message} (maxResponseSize)` : message),
+  });
 
   /** @type {unknown} */
   let body;
@@ -152,9 +124,4 @@ export function getJson(url, auth = {}, options = {}) {
     { method: 'GET', headers },
     { ...options, errorCode: options.errorCode ?? ErrorCode.USERINFO_FAILED },
   );
-}
-
-/** @param {unknown} err @returns {string} */
-function describe(err) {
-  return err instanceof Error ? err.message : String(err);
 }
